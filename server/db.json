@@ -1,0 +1,49 @@
+{
+  "records": [
+    {
+      "id": "1",
+      "code": "HS-2024-001",
+      "customerName": "Công ty TNHH ABC",
+      "phoneNumber": "0909123456",
+      "recordType": "Cấp GCN lần đầu",
+      "content": "Xin cấp phép xây dựng nhà xưởng",
+      "receivedDate": "2023-10-20",
+      "deadline": "2023-10-30",
+      "status": "HANDOVER",
+      "assignedTo": "emp1",
+      "assignedDate": "2023-10-21",
+      "completedDate": "2023-10-29",
+      "group": "Minh Hưng",
+      "ward": "P. Minh Hưng",
+      "landPlot": "15",
+      "mapSheet": "20",
+      "measurementNumber": "TĐ-001",
+      "exportBatch": 1,
+      "exportDate": "2023-10-29T10:00:00.000Z",
+      "privateNotes": "Khách hàng VIP"
+    },
+    {
+      "id": "2",
+      "code": "HS-2024-002",
+      "customerName": "Nguyễn Văn Nam",
+      "phoneNumber": "0918777888",
+      "recordType": "Chuyển nhượng QSDĐ",
+      "content": "Thủ tục chuyển nhượng đất đai",
+      "receivedDate": "2023-10-25",
+      "deadline": "2023-11-05",
+      "status": "IN_PROGRESS",
+      "assignedTo": "emp2",
+      "assignedDate": "2023-10-25",
+      "group": "Chơn Thành",
+      "ward": "P. Hưng Long",
+      "landPlot": "102",
+      "mapSheet": "5",
+      "excerptNumber": "TL-999"
+    }
+  ],
+  "excerpt_counters": {
+    "X. Nha Bích": 100,
+    "P. Minh Hưng": 205
+  },
+  "excerpt_history": []
+}

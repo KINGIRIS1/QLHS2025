@@ -1,0 +1,91 @@
+
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
+const { fork } = require('child_process');
+const fs = require('fs');
+
+// Biến lưu trữ process của Server
+let serverProcess;
+
+function startServer() {
+  // Xác định đường dẫn tới file server/index.js
+  // Khi đóng gói (isPackaged), server sẽ nằm trong resources/server
+  const serverPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'server', 'index.js')
+    : path.join(__dirname, '../server/index.js');
+
+  // Xác định nơi lưu file db.json (AppData/Roaming/TenApp) để có quyền GHI
+  const userDataPath = app.getPath('userData');
+  const dbPath = path.join(userDataPath, 'db.json');
+
+  console.log('Starting server at:', serverPath);
+  console.log('Database location:', dbPath);
+
+  // Khởi chạy Server dưới dạng tiến trình con (Child Process)
+  // Truyền biến môi trường DB_PATH để Server biết nơi lưu dữ liệu
+  serverProcess = fork(serverPath, [], {
+    env: { ...process.env, DB_PATH: dbPath },
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+  });
+
+  serverProcess.on('message', (msg) => {
+    if (msg === 'ready') {
+      console.log('Internal Server is ready!');
+    }
+  });
+
+  serverProcess.stderr.on('data', (data) => {
+    console.error(`Server Error: ${data}`);
+  });
+}
+
+function createWindow() {
+  // Tạo cửa sổ trình duyệt chính
+  const mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    icon: path.join(__dirname, '../public/vite.svg'), 
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      webSecurity: false 
+    },
+    autoHideMenuBar: true,
+  });
+
+  const isDev = !app.isPackaged;
+
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
+}
+
+app.whenReady().then(() => {
+  // 1. Khởi động Server nội bộ trước
+  startServer();
+  // 2. Sau đó mở giao diện
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+// Khi tắt ứng dụng -> Diệt luôn Server con
+app.on('before-quit', () => {
+  if (serverProcess) {
+    console.log('Killing internal server...');
+    serverProcess.kill();
+  }
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});

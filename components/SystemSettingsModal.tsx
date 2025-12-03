@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Database, AlertTriangle, ShieldAlert, Server, Sparkles, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { testApiConnection } from '../services/geminiService';
 
 interface SystemSettingsModalProps {
@@ -20,7 +20,7 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
   if (!isOpen) return null;
 
   const handleConfirmDeleteData = async () => {
-      if (confirm("CẢNH BÁO: Bạn đang thực hiện hành động xóa TOÀN BỘ dữ liệu hồ sơ và lịch sử trích lục trên hệ thống.\n\nHành động này KHÔNG THỂ khôi phục.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
+      if (confirm("CẢNH BÁO: Bạn đang thực hiện hành động xóa TOÀN BỘ dữ liệu hồ sơ và lịch sử trích lục trên Cloud.\n\nHành động này KHÔNG THỂ khôi phục.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
           if (confirm("XÁC NHẬN LẦN CUỐI: Dữ liệu sẽ bị mất vĩnh viễn. Nhấn OK để Xóa ngay.")) {
               setIsDeletingData(true);
               await onDeleteAllData();
@@ -52,12 +52,13 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
             {/* Server Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-bold text-blue-800 flex items-center gap-2 mb-2">
-                    <Server size={18} />
-                    Trạng thái Kết nối
+                    <Cloud size={18} />
+                    Trạng thái Database
                 </h3>
                 <p className="text-sm text-blue-700">
-                    Hệ thống đang kết nối tới máy chủ: <span className="font-mono bg-blue-100 px-2 py-0.5 rounded">{localStorage.getItem('SERVER_URL') || 'http://localhost:3000'}</span>
+                    Hệ thống đang chạy trên nền tảng: <span className="font-bold">Supabase Cloud (PostgreSQL)</span>
                 </p>
+                <p className="text-xs text-blue-600 mt-1">Dữ liệu được đồng bộ hóa thời gian thực và an toàn trên đám mây.</p>
             </div>
 
             {/* AI Settings */}
@@ -107,12 +108,10 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
                 <div className="bg-red-50 border border-red-200 rounded-lg p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                            <Database size={16} /> Reset toàn bộ dữ liệu (Factory Reset)
+                            <Database size={16} /> Reset dữ liệu Cloud
                         </h4>
                         <p className="text-sm text-gray-600 mt-2 max-w-md">
-                            Hành động này sẽ xóa vĩnh viễn tất cả <b>Hồ sơ</b> và <b>Lịch sử cấp trích lục</b> hiện có trong cơ sở dữ liệu. 
-                            <br/>
-                            <span className="text-red-600 italic font-medium">Lưu ý: Dữ liệu nhân viên và tài khoản đăng nhập sẽ KHÔNG bị xóa.</span>
+                            Hành động này sẽ xóa vĩnh viễn tất cả <b>Hồ sơ</b> và <b>Lịch sử cấp trích lục</b> trên Database Supabase. 
                         </p>
                     </div>
                     <button 

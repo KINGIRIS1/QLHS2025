@@ -1,203 +1,273 @@
 
-import { RecordFile, RecordStatus, Employee, User } from '../types';
+import { supabase, isConfigured } from './supabaseClient';
+import { RecordFile, Employee, User } from '../types';
+import { MOCK_RECORDS, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
 
-// Hàm lấy URL gốc từ cài đặt hoặc mặc định là localhost
-export const getBaseUrl = () => {
-  return localStorage.getItem('SERVER_URL') || 'http://localhost:3000';
+// Hàm helper để log lỗi rõ ràng hơn
+const logError = (context: string, error: any) => {
+    console.error(`Lỗi tại ${context}:`, error?.message || JSON.stringify(error, null, 2));
 };
 
 // --- API RECORDS ---
 export const fetchRecords = async (): Promise<RecordFile[]> => {
+  // Chế độ Demo hoặc chưa cấu hình
+  if (!isConfigured) return MOCK_RECORDS;
+
   try {
-    const API_BASE_URL = getBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/records`);
-    if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.json();
-    return data;
+    const { data, error } = await supabase
+      .from('records')
+      .select('*')
+      .order('receivedDate', { ascending: false });
+
+    if (error) throw error;
+    return data as RecordFile[];
   } catch (error) {
-    console.warn("Không kết nối được Server (Offline mode):", error);
-    return []; // Trả về rỗng để App chuyển sang chế độ Offline
+    logError("fetchRecords - Chuyển sang dữ liệu mẫu", error);
+    return MOCK_RECORDS;
   }
 };
 
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
+  if (!isConfigured) {
+      console.log("Demo Mode: Giả lập tạo hồ sơ mới");
+      return { ...record, id: Math.random().toString(36).substr(2, 9) };
+  }
+
   try {
-    const API_BASE_URL = getBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/records`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    return await response.json();
+    const cleanRecord = JSON.parse(JSON.stringify(record));
+    const { data, error } = await supabase
+      .from('records')
+      .insert(cleanRecord)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("Lỗi tạo hồ sơ:", error);
+    logError("createRecordApi", error);
     return null;
   }
 };
 
 export const createRecordsBatchApi = async (records: RecordFile[]): Promise<boolean> => {
+    if (!isConfigured) return true; // Giả lập thành công
+
     try {
-      const API_BASE_URL = getBaseUrl();
-      const response = await fetch(`${API_BASE_URL}/records/bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(records)
-      });
-      return response.ok;
+      const cleanRecords = JSON.parse(JSON.stringify(records));
+      const { error } = await supabase
+        .from('records')
+        .insert(cleanRecords);
+
+      if (error) throw error;
+      return true;
     } catch (error) {
-      console.error("Lỗi import lô hồ sơ:", error);
+      logError("createRecordsBatchApi", error);
       return false;
     }
   };
 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
+  if (!isConfigured) return record; // Giả lập thành công
+
   try {
-    const API_BASE_URL = getBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/records/${record.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    return await response.json();
+    const cleanRecord = JSON.parse(JSON.stringify(record));
+    const { data, error } = await supabase
+      .from('records')
+      .update(cleanRecord)
+      .eq('id', record.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("Lỗi cập nhật hồ sơ:", error);
+    logError("updateRecordApi", error);
     return null;
   }
 };
 
 export const deleteRecordApi = async (id: string): Promise<boolean> => {
+  if (!isConfigured) return true; // Giả lập thành công
+
   try {
-    const API_BASE_URL = getBaseUrl();
-    await fetch(`${API_BASE_URL}/records/${id}`, { method: 'DELETE' });
+    const { error } = await supabase
+      .from('records')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
     return true;
   } catch (error) {
-    console.error("Lỗi xóa hồ sơ:", error);
+    logError("deleteRecordApi", error);
     return false;
   }
 };
 
 // --- API EMPLOYEES (NHÂN VIÊN) ---
 export const fetchEmployees = async (): Promise<Employee[]> => {
+    if (!isConfigured) return MOCK_EMPLOYEES;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        const res = await fetch(`${API_BASE_URL}/employees`);
-        if (!res.ok) return [];
-        return await res.json();
-    } catch (e) { return []; }
+        const { data, error } = await supabase.from('employees').select('*');
+        if (error) throw error;
+        return data as Employee[];
+    } catch (e) { 
+        logError("fetchEmployees - Chuyển sang dữ liệu mẫu", e);
+        return MOCK_EMPLOYEES; 
+    }
 };
 
 export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Promise<Employee | null> => {
+    if (!isConfigured) return employee;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        const url = isUpdate ? `${API_BASE_URL}/employees/${employee.id}` : `${API_BASE_URL}/employees`;
-        const method = isUpdate ? 'PUT' : 'POST';
-        
-        const res = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(employee)
-        });
-        return await res.json();
-    } catch (e) { console.error(e); return null; }
+        const { data, error } = await supabase
+            .from('employees')
+            .upsert(employee)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    } catch (e) { 
+        logError("saveEmployeeApi", e); 
+        return null; 
+    }
 };
 
 export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
+    if (!isConfigured) return true;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        await fetch(`${API_BASE_URL}/employees/${id}`, { method: 'DELETE' });
+        const { error } = await supabase.from('employees').delete().eq('id', id);
+        if (error) throw error;
         return true;
-    } catch (e) { console.error(e); return false; }
+    } catch (e) { 
+        logError("deleteEmployeeApi", e);
+        return false; 
+    }
 };
 
 // --- API USERS (TÀI KHOẢN) ---
 export const fetchUsers = async (): Promise<User[]> => {
+    if (!isConfigured) return MOCK_USERS;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        const res = await fetch(`${API_BASE_URL}/users`);
-        if (!res.ok) return [];
-        // json-server cần id, nhưng user dùng username làm khóa chính trong logic App
-        // Cần đảm bảo khi lưu user có trường id (có thể là username)
-        return await res.json();
-    } catch (e) { return []; }
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) throw error;
+        return data as User[];
+    } catch (e) { 
+        logError("fetchUsers - Chuyển sang dữ liệu mẫu", e);
+        return MOCK_USERS; 
+    }
 };
 
 export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User | null> => {
+    if (!isConfigured) return user;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        // Json-server yêu cầu ID. Sử dụng username làm ID
-        const userWithId = { ...user, id: user.username };
-        
-        const url = isUpdate ? `${API_BASE_URL}/users/${user.username}` : `${API_BASE_URL}/users`;
-        const method = isUpdate ? 'PUT' : 'POST';
-        
-        const res = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userWithId)
-        });
-        return await res.json();
-    } catch (e) { console.error(e); return null; }
+        const { data, error } = await supabase
+            .from('users')
+            .upsert(user)
+            .select()
+            .single();
+            
+        if (error) throw error;
+        return data;
+    } catch (e) { 
+        logError("saveUserApi", e); 
+        return null; 
+    }
 };
 
 export const deleteUserApi = async (username: string): Promise<boolean> => {
+    if (!isConfigured) return true;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        await fetch(`${API_BASE_URL}/users/${username}`, { method: 'DELETE' });
+        const { error } = await supabase.from('users').delete().eq('username', username);
+        if (error) throw error;
         return true;
-    } catch (e) { console.error(e); return false; }
+    } catch (e) { 
+        logError("deleteUserApi", e); 
+        return false; 
+    }
 };
 
 
 // --- API EXCERPTS (TRÍCH LỤC) ---
 export const fetchExcerptHistory = async () => {
+  if (!isConfigured) return []; // Không có mock history trong constants
+
   try {
-    const API_BASE_URL = getBaseUrl();
-    const res = await fetch(`${API_BASE_URL}/excerpt_history`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } catch (e) { return []; }
+    const { data, error } = await supabase
+        .from('excerpt_history')
+        .select('*')
+        .order('createdAt', { ascending: false });
+    if (error) throw error;
+    return data;
+  } catch (e) { 
+      logError("fetchExcerptHistory", e);
+      return []; 
+  }
 };
 
 export const saveExcerptRecord = async (data: any) => {
+  if (!isConfigured) return;
+
   try {
-    const API_BASE_URL = getBaseUrl();
-    await fetch(`${API_BASE_URL}/excerpt_history`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (e) { console.error(e); }
+    const { error } = await supabase.from('excerpt_history').insert(data);
+    if (error) throw error;
+  } catch (e) { logError("saveExcerptRecord", e); }
 };
 
-export const fetchExcerptCounters = async () => {
+export const fetchExcerptCounters = async (): Promise<Record<string, number>> => {
+    if (!isConfigured) return { 'Minh Hưng': 100, 'Nha Bích': 50, 'Chơn Thành': 20 }; // Mock counters
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        const res = await fetch(`${API_BASE_URL}/excerpt_counters`);
-        if (!res.ok) return {};
-        return await res.json();
-    } catch (e) { return {}; }
+        const { data, error } = await supabase.from('excerpt_counters').select('*');
+        if (error) throw error;
+
+        const countersObj: Record<string, number> = {};
+        data.forEach((row: any) => {
+            countersObj[row.ward] = Number(row.count);
+        });
+        return countersObj;
+    } catch (e) { 
+        logError("fetchExcerptCounters", e);
+        return {}; 
+    }
 };
 
 export const saveExcerptCounters = async (counters: Record<string, number>) => {
+    if (!isConfigured) return;
+
     try {
-        const API_BASE_URL = getBaseUrl();
-        // Sử dụng Route Custom để đảm bảo object được ghi đè đúng cách
-        await fetch(`${API_BASE_URL}/custom/counters`, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(counters)
-        });
-    } catch (e) { console.error(e); }
+        const upsertData = Object.entries(counters).map(([ward, count]) => ({
+            ward,
+            count
+        }));
+
+        const { error } = await supabase
+            .from('excerpt_counters')
+            .upsert(upsertData);
+            
+        if (error) throw error;
+    } catch (e) { logError("saveExcerptCounters", e); }
 };
 
 export const deleteAllDataApi = async (): Promise<boolean> => {
+  if (!isConfigured) {
+      alert("Đang ở chế độ Demo, không thể xóa dữ liệu Cloud.");
+      return false;
+  }
   try {
-    const API_BASE_URL = getBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/system/reset`, { method: 'POST' });
-    return response.ok;
+    const { error: err1 } = await supabase.from('records').delete().neq('id', '0');
+    const { error: err2 } = await supabase.from('excerpt_history').delete().neq('id', '0');
+    
+    if (err1 || err2) throw new Error("Lỗi xóa dữ liệu");
+    return true;
   } catch (error) {
-    console.error("Lỗi xóa dữ liệu:", error);
+    logError("deleteAllDataApi", error);
     return false;
   }
 };

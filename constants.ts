@@ -1,3 +1,4 @@
+
 import { RecordStatus, Employee, RecordFile, User, UserRole } from './types';
 
 // CẤU HÌNH KẾT NỐI MẠNG LAN
@@ -41,6 +42,28 @@ export const RECORD_TYPES = [
   'Đo đạc',     
   'Cắm mốc'
 ];
+
+// Hàm rút gọn tên loại hồ sơ để hiển thị trong Danh sách (Table)
+export const getShortRecordType = (type: string | undefined): string => {
+  if (!type) return '---';
+  const t = type.toLowerCase();
+  
+  // Ưu tiên kiểm tra các từ khóa dài trước
+  if (t.includes('chỉnh lý') || t.includes('hiến đường') || t.includes('thay đổi hlbv')) return 'Chỉnh lý';
+  if (t.includes('trích lục')) return 'Trích lục';
+  // Kiểm tra "trích đo" sau "chỉnh lý" vì "trích đo chỉnh lý" chứa "trích đo"
+  if (t.includes('trích đo')) return 'Trích đo';
+  
+  if (t.includes('cắm mốc')) return 'Cắm mốc';
+  if (t.includes('đo đạc')) return 'Đo đạc';
+  if (t.includes('tách thửa')) return 'Tách thửa';
+  if (t.includes('hợp thửa')) return 'Hợp thửa';
+  if (t.includes('chuyển mục đích')) return 'Chuyển MĐ';
+  if (t.includes('cấp đổi')) return 'Cấp đổi';
+  if (t.includes('cấp mới')) return 'Cấp mới';
+  
+  return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
+};
 
 export const MOCK_EMPLOYEES: Employee[] = [
   { 

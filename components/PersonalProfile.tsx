@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
 import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { getShortRecordType } from '../constants';
 
 interface PersonalProfileProps {
   user: User;
@@ -27,23 +29,6 @@ function removeVietnameseTones(str: string): string {
     str = str.trim();
     return str;
 }
-
-// --- HÀM HIỂN THỊ TÊN NGẮN GỌN (Giống App.tsx) ---
-const getDisplayRecordType = (type: string | undefined): string => {
-    if (!type) return 'Chưa phân loại';
-    const t = type.toLowerCase();
-    
-    // Ưu tiên kiểm tra các từ khóa dài trước
-    if (t.includes('chỉnh lý') || t.includes('hiến đường') || t.includes('thay đổi hlbv')) return 'Chỉnh lý';
-    if (t.includes('trích lục')) return 'Trích lục';
-    // Kiểm tra "trích đo" sau "chỉnh lý" vì "trích đo chỉnh lý" chứa "trích đo"
-    if (t.includes('trích đo')) return 'Trích đo';
-    
-    if (t.includes('cắm mốc')) return 'Cắm mốc';
-    if (t.includes('đo đạc')) return 'Đo đạc';
-    
-    return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
-};
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -250,7 +235,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                     <td className="p-3 text-center text-gray-400 text-xs align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                                     <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code}>{r.code}</div></td>
                                     <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName}>{r.customerName}</div></td>
-                                    <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType}>{getDisplayRecordType(r.recordType)}</div></td>
+                                    <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType}>{getShortRecordType(r.recordType)}</div></td>
                                     <td className="p-3 align-middle">
                                         <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
                                             {deadlineStatus.icon}

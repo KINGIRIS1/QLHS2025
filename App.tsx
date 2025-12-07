@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from './types';
-import { STATUS_LABELS, WARDS as DEFAULT_WARDS } from './constants';
+import { STATUS_LABELS, WARDS as DEFAULT_WARDS, getShortRecordType } from './constants';
 import Sidebar from './components/Sidebar';
 import RecordModal from './components/RecordModal';
 import ImportModal from './components/ImportModal';
@@ -602,7 +602,7 @@ function App() {
           r.code,
           r.customerName,
           r.address || r.ward,
-          r.recordType,
+          getShortRecordType(r.recordType), // Sửa đổi: Sử dụng tên ngắn gọn
           r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
           r.content
       ]);
@@ -1446,7 +1446,7 @@ function App() {
                                     </td>
                                 )}
                                 {visibleColumns.completed && <td className="p-3 text-center text-gray-600 align-middle">{formatDate(record.completedDate) || '--'}</td>}
-                                {visibleColumns.type && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.recordType}>{record.recordType || 'Chưa phân loại'}</div></td>}
+                                {visibleColumns.type && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.recordType}>{getShortRecordType(record.recordType)}</div></td>}
                                 {visibleColumns.tech && (
                                     <td className="p-3 align-middle">
                                     <div className="flex flex-col gap-2">

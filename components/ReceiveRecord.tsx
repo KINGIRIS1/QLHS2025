@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, Holiday } from '../types';
-import { RECORD_TYPES } from '../constants';
+import { RECORD_TYPES, getShortRecordType } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { Save, User as UserIcon, MapPin, FileText, Calendar, RotateCcw, Settings, Eye, LayoutList, PlusCircle, FileSpreadsheet, Search, FileCheck } from 'lucide-react';
 import { generateDocxBlob, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -257,7 +258,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
           r.code,
           r.customerName,
           r.address || r.ward,
-          r.recordType,
+          getShortRecordType(r.recordType), // Áp dụng rút gọn tên
           r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
           r.content
       ]);
@@ -522,7 +523,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
                                             <td className="p-4 font-medium text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
                                             <td className="p-4 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
                                             <td className="p-4 text-gray-600 truncate align-middle" title={r.address ? `${r.address}, ${r.ward}` : r.ward}> {r.address ? `${r.address}, ${r.ward}` : r.ward} </td> 
-                                            <td className="p-4 text-gray-600 truncate align-middle" title={r.recordType}>{r.recordType}</td> 
+                                            <td className="p-4 text-gray-600 truncate align-middle" title={r.recordType}>{getShortRecordType(r.recordType)}</td> 
                                             <td className="p-4 text-center text-blue-700 font-medium align-middle"> {r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'} </td> 
                                             <td className="p-4 text-gray-500 italic truncate align-middle" title={r.content}>{r.content}</td>
                                         </tr>

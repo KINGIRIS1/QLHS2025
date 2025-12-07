@@ -536,7 +536,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     <Paperclip size={20} />
                 </button>
                 
-                {/* SCREENSHOT BUTTONS (CLICK TO OPEN) */}
+                {/* SCREENSHOT BUTTONS (CLICK TO OPEN - FIXED) */}
                 <div className="relative hidden sm:block" ref={screenshotMenuRef}>
                     <button 
                         type="button" 

@@ -117,12 +117,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white min-h-screen flex flex-col shadow-xl transition-transform duration-300 ease-in-out
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="p-6 border-b border-slate-700 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <span className="text-blue-400">QL</span> Hồ Sơ
+        <div className="p-5 border-b border-slate-700 flex justify-between items-start">
+          <div className="flex flex-col">
+            <h1 className="text-sm font-bold leading-tight">
+              <span className="text-blue-400 block mb-1">HỆ THỐNG TIẾP NHẬN</span>
+              VÀ QUẢN LÝ HỒ SƠ ĐO ĐẠC
             </h1>
-            <p className="text-xs text-slate-400 mt-1">Hệ thống hành chính công</p>
+            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Chi nhánh Chơn Thành</p>
           </div>
           <button 
             onClick={() => setMobileOpen(false)}
@@ -217,7 +218,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               Đăng xuất
           </button>
           <div className="mt-2 text-[10px] text-slate-500 text-center">
-              Phiên bản 1.6.1
+              Phiên bản 1.6.2
           </div>
         </div>
       </div>

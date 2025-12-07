@@ -108,35 +108,41 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
           const nav = navigator as any;
 
           // 1. Kiểm tra môi trường Electron (Sử dụng window.require)
+          // FIX: Thêm try-catch và kiểm tra kỹ properties để tránh lỗi undefined
           if ((window as any).require) {
              try {
-                 const { desktopCapturer } = (window as any).require('electron');
-                 // Lấy nguồn màn hình
-                 const sources = await desktopCapturer.getSources({ types: ['screen'] });
-                 
-                 if (sources && sources.length > 0) {
-                     const source = sources[0]; // Màn hình chính
+                 const electron = (window as any).require('electron');
+                 // Chỉ tiếp tục nếu module electron và desktopCapturer tồn tại
+                 if (electron && electron.desktopCapturer) {
+                     const { desktopCapturer } = electron;
+                     // Lấy nguồn màn hình
+                     const sources = await desktopCapturer.getSources({ types: ['screen'] });
                      
-                     // Cấu hình constraints CHUẨN cho Electron
-                     // LƯU Ý: Không set minWidth/minHeight để tránh lỗi NotSupported nếu màn hình nhỏ
-                     const constraints = {
-                         audio: false,
-                         video: {
-                             mandatory: {
-                                 chromeMediaSource: 'desktop',
-                                 chromeMediaSourceId: source.id
+                     if (sources && sources.length > 0) {
+                         const source = sources[0]; // Màn hình chính
+                         
+                         // Cấu hình constraints CHUẨN cho Electron
+                         // LƯU Ý: Không set minWidth/minHeight để tránh lỗi NotSupported nếu màn hình nhỏ
+                         const constraints = {
+                             audio: false,
+                             video: {
+                                 mandatory: {
+                                     chromeMediaSource: 'desktop',
+                                     chromeMediaSourceId: source.id
+                                 }
                              }
-                         }
-                     } as any;
-                     
-                     stream = await nav.mediaDevices.getUserMedia(constraints);
+                         } as any;
+                         
+                         stream = await nav.mediaDevices.getUserMedia(constraints);
+                     }
                  }
              } catch (e) {
-                 console.warn("Electron native capture failed:", e);
+                 console.warn("Electron native capture failed (Will use fallback):", e);
              }
           }
 
           // 2. Fallback Web API (Cho trình duyệt thường hoặc nếu Electron fail)
+          // Phương pháp này cũng hoạt động tốt trên Electron nếu cách trên thất bại
           if (!stream) {
                if (nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
                    try {
@@ -201,7 +207,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
       } catch (err: any) {
           console.error("Lỗi chụp màn hình:", err);
           if (err.name !== 'NotAllowedError' && !err.message.includes('Permission denied')) {
-              alert(`Lỗi chụp màn hình: ${err.message || 'Không xác định'}\n(Nếu dùng Web, hãy đảm bảo dùng HTTPS hoặc Localhost)`);
+              alert(`Lỗi chụp màn hình: ${err.message || 'Không xác định'}`);
           }
       }
   };

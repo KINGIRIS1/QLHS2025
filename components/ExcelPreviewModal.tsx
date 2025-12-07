@@ -35,14 +35,14 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
             const table = containerRef.current.querySelector('table');
             
             if (table) {
-                // Xử lý độ rộng cột
+                // Xử lý độ rộng cột (Scale hiển thị)
                 if (ws['!cols']) {
                     const colGroup = document.createElement('colgroup');
                     ws['!cols'].forEach((col: any) => {
                         const colElem = document.createElement('col');
                         let widthPx = 64; 
                         if (col.wpx) widthPx = col.wpx;
-                        else if (col.wch) widthPx = col.wch * 7.5; 
+                        else if (col.wch) widthPx = col.wch * 8; 
                         colElem.style.width = `${widthPx}px`;
                         colGroup.appendChild(colElem);
                     });
@@ -53,12 +53,11 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                 table.style.width = '100%'; 
                 table.style.borderCollapse = 'collapse';
                 table.style.fontFamily = "'Times New Roman', serif";
-                table.style.fontSize = "12pt";
+                table.style.fontSize = "11pt"; // Font nhỏ hơn chút cho vừa nhiều cột
                 table.style.backgroundColor = "#ffffff";
                 table.style.tableLayout = "fixed"; 
                 table.style.margin = "0 auto"; 
                 
-                // Format rows (như cũ)
                 const rows = table.querySelectorAll('tr');
                 let tableHeaderIndex = -1;
 
@@ -67,7 +66,10 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                 });
 
                 rows.forEach((row, rowIndex) => {
+                    const rowText = row.innerText.toLowerCase();
                     const cells = row.querySelectorAll('td, th');
+
+                    // 1. Phần Header (Trước dòng STT)
                     if (tableHeaderIndex !== -1 && rowIndex < tableHeaderIndex) {
                         cells.forEach((cell: any) => {
                             cell.style.border = 'none';
@@ -75,7 +77,9 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                             if (rowIndex === 0 || rowIndex === 1 || rowIndex === 3) cell.style.fontWeight = 'bold';
                             if (rowIndex === 1) cell.style.textDecoration = 'underline';
                         });
-                    } else if (rowIndex === tableHeaderIndex) {
+                    } 
+                    // 2. Dòng Tiêu đề cột (STT)
+                    else if (rowIndex === tableHeaderIndex) {
                         cells.forEach((cell: any) => {
                             cell.style.border = '1px solid black';
                             cell.style.fontWeight = 'bold';
@@ -83,23 +87,29 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                             cell.style.backgroundColor = '#f0f0f0';
                             cell.style.verticalAlign = 'middle';
                         });
-                    } else {
-                        const rowText = row.innerText.toLowerCase();
-                        if (rowText.includes('bên giao') || rowText.includes('bên nhận') || rowText.includes('ký ghi rõ')) {
+                    } 
+                    // 3. Phần Dữ liệu và Footer
+                    else {
+                        // Nhận diện Footer: Có chữ "Bên giao" hoặc "Ký ghi rõ"
+                        if (rowText.includes('bên giao') || rowText.includes('ký ghi rõ') || rowText.includes('bên nhận')) {
                              cells.forEach((cell: any) => {
-                                 cell.style.border = 'none';
+                                 cell.style.border = 'none'; // QUAN TRỌNG: Bỏ kẻ bảng footer
                                  cell.style.textAlign = 'center';
+                                 cell.style.paddingTop = '10px';
                                  if (rowText.includes('bên giao')) cell.style.fontWeight = 'bold';
                                  else cell.style.fontStyle = 'italic';
                              });
                         } else {
+                             // Dữ liệu bảng chính
                              cells.forEach((cell: any) => {
+                                 // Chỉ kẻ bảng nếu chưa có border (tránh override style từ Excel)
                                  if (!cell.style.border || cell.style.border === 'none') {
                                      cell.style.border = '1px solid black';
                                  }
                                  cell.style.verticalAlign = 'middle';
                                  cell.style.padding = '4px';
-                                 if (cell.cellIndex === 0 || cell.cellIndex === 5) cell.style.textAlign = 'center';
+                                 // Căn giữa STT (cột 0) và Hẹn trả (cột 9)
+                                 if (cell.cellIndex === 0 || cell.cellIndex === 9) cell.style.textAlign = 'center';
                              });
                         }
                     }
@@ -120,7 +130,7 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
 
   if (!isOpen) return null;
 
-  // --- CƠ CHẾ IN MỚI: IFRAME ISOLATION ---
+  // --- CƠ CHẾ IN: IFRAME ISOLATION ---
   const handlePrint = () => {
     if (!containerRef.current) return;
 
@@ -133,7 +143,6 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
     iframe.style.border = '0';
     document.body.appendChild(iframe);
 
-    // Lấy nội dung bảng
     const content = containerRef.current.innerHTML;
 
     const doc = iframe.contentWindow?.document;
@@ -144,11 +153,24 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                 <head>
                     <title>${fileName}</title>
                     <style>
-                        @page { margin: 15mm; size: auto; }
-                        body { font-family: "Times New Roman", serif; padding: 20px; }
-                        table { width: 100%; border-collapse: collapse; font-size: 11pt; }
-                        td, th { padding: 4px; }
-                        /* Sao chép một số style inline quan trọng nếu cần */
+                        /* CẤU HÌNH IN A4 LANDSCAPE (NGANG) */
+                        @page { 
+                            size: A4 landscape; 
+                            margin: 10mm; 
+                        }
+                        body { 
+                            font-family: "Times New Roman", serif; 
+                            margin: 0; 
+                            padding: 0;
+                        }
+                        table { 
+                            width: 100%; 
+                            border-collapse: collapse; 
+                            font-size: 11pt; 
+                        }
+                        td, th { 
+                            padding: 4px; 
+                        }
                     </style>
                 </head>
                 <body>
@@ -185,7 +207,7 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                     Xem trước Excel: <span className="text-green-700">{fileName}</span>
                 </h2>
                 <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                    <AlertTriangle size={12} /> Chế độ xem mô phỏng in ấn.
+                    <AlertTriangle size={12} /> Đã tối ưu cho khổ A4 Ngang (Landscape).
                 </p>
             </div>
             <div className="flex items-center gap-2">
@@ -226,8 +248,8 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                 className="bg-white shadow-lg p-10 transition-transform origin-top"
                 style={{ 
                     transform: `scale(${zoomLevel / 100})`,
-                    minWidth: '210mm', 
-                    minHeight: '297mm',
+                    minWidth: '297mm', // A4 Ngang
+                    minHeight: '210mm',
                     width: 'fit-content',
                     boxSizing: 'border-box'
                 }}

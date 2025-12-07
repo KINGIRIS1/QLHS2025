@@ -90,6 +90,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     let subTitle = "";
     let fileName = "";
 
+    // Xử lý tên xã phường để hiển thị
+    const wardTitle = selectedWard === 'all' ? "TOÀN BỘ" : selectedWard.toUpperCase();
+
     if (type === 'handover') {
         const [dateStr, batchStr] = selectedBatchKey.split('_');
         const batchNum = parseInt(batchStr);
@@ -100,7 +103,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             return matchBatch && matchWard;
         });
 
-        title = "DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA";
+        title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA - ${wardTitle}`;
         subTitle = `ĐỢT: ${batchNum}  -  TỔNG SỐ HỒ SƠ: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         fileName = `Giao_1_Cua_Dot_${batchNum}_${safeDate}`;
@@ -116,7 +119,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             return matchDate && matchStatus && matchWard;
         });
 
-        title = "DANH SÁCH HỒ SƠ TRÌNH KÝ";
+        title = `DANH SÁCH HỒ SƠ TRÌNH KÝ - ${wardTitle}`;
         subTitle = `NGÀY TIẾP NHẬN: ${formatDate(dateStr)}  -  SỐ LƯỢNG: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         fileName = `Trinh_Ky_Ngay_${safeDate}`;
@@ -176,14 +179,28 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A9" });
 
     const lastDataRow = 8 + dataRows.length;
-    const footerStartRow = lastDataRow + 3;
+    const footerStartRow = lastDataRow + 2;
 
+    // Thêm Footer (Canh đều 2 bên)
     XLSX.utils.sheet_add_aoa(ws, [
-        ["BÊN GIAO HỒ SƠ", "", "", "", "", "", "", "BÊN NHẬN HỒ SƠ"],
-        ["(Ký và ghi rõ họ tên)", "", "", "", "", "", "", "(Ký và ghi rõ họ tên)"]
+        ["BÊN GIAO HỒ SƠ", "", "", "", "", "BÊN NHẬN HỒ SƠ"],
+        ["(Ký và ghi rõ họ tên)", "", "", "", "", "(Ký và ghi rõ họ tên)"]
     ], { origin: `A${footerStartRow + 1}` });
 
-    const wscols = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 8 }, { wch: 8 }, { wch: 25 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 20 }];
+    // Độ rộng cột tinh chỉnh cho vừa A4 Landscape
+    const wscols = [
+        { wch: 5 },  // STT
+        { wch: 14 }, // Mã HS
+        { wch: 22 }, // Chủ SD
+        { wch: 15 }, // Xã
+        { wch: 7 },  // Thửa
+        { wch: 7 },  // Tờ
+        { wch: 20 }, // Loại
+        { wch: 8 },  // TĐ
+        { wch: 8 },  // TL
+        { wch: 11 }, // Hẹn
+        { wch: 15 }  // Ghi chú
+    ];
     ws['!cols'] = wscols;
 
     ws['!merges'] = [
@@ -192,10 +209,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         { s: { r: 3, c: 0 }, e: { r: 3, c: 10 } },
         { s: { r: 4, c: 0 }, e: { r: 4, c: 10 } },
         { s: { r: 5, c: 0 }, e: { r: 5, c: 10 } },
-        { s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 3 } },     
-        { s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 3 } }, 
-        { s: { r: footerStartRow, c: 7 }, e: { r: footerStartRow, c: 10 } },    
-        { s: { r: footerStartRow + 1, c: 7 }, e: { r: footerStartRow + 1, c: 10 } },
+        // Footer Merges (Canh rộng ra)
+        { s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 4 } },     // Bên trái (5 cột)
+        { s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 4 } }, 
+        { s: { r: footerStartRow, c: 6 }, e: { r: footerStartRow, c: 10 } },    // Bên phải (5 cột)
+        { s: { r: footerStartRow + 1, c: 6 }, e: { r: footerStartRow + 1, c: 10 } },
     ];
 
     // Styles
@@ -203,11 +221,12 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     const styles = {
         nationalTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         nationalSlogan: { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } },
-        reportTitle: { font: { name: "Times New Roman", sz: 16, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+        reportTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         reportSubTitle: { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } },
         tableHeader: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: borderStyle, fill: { fgColor: { rgb: "E0E0E0" } } },
         tableData: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center", wrapText: true } },
         tableDataCenter: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { horizontal: "center", vertical: "center", wrapText: true } },
+        // Footer: KHÔNG VIỀN (border: undefined)
         sigTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         sigNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } }
     };
@@ -231,10 +250,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         }
     }
 
+    // Apply Footer Styles (NO BORDER)
     const giaoRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 0 });
     const giaoNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 0 });
-    const nhanRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 7 });
-    const nhanNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 7 });
+    const nhanRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 6 });
+    const nhanNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 6 });
 
     if(ws[giaoRef]) ws[giaoRef].s = styles.sigTitle;
     if(ws[giaoNoteRef]) ws[giaoNoteRef].s = styles.sigNote;
@@ -327,7 +347,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
             <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border border-blue-100 flex gap-2 items-start">
                 <Calendar size={14} className="mt-0.5 text-blue-500 shrink-0" />
-                <p>Hệ thống sẽ tạo file Excel định dạng chuẩn để in ấn hoặc lưu trữ.</p>
+                <p>Hệ thống sẽ tạo file Excel chuẩn A4 Ngang để in ấn.</p>
             </div>
 
             <div className="pt-4 flex justify-between gap-3 border-t">

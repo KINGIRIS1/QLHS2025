@@ -18,6 +18,7 @@ import ExcerptManagement from './components/ExcerptManagement';
 import ReceiveRecord from './components/ReceiveRecord'; 
 import ReceiveContract from './components/ReceiveContract'; 
 import InternalChat from './components/InternalChat';
+import ExcelPreviewModal from './components/ExcelPreviewModal'; // Import Modal Preview Excel
 import { generateReport } from './services/geminiService';
 import { 
     fetchRecords, createRecordApi, updateRecordApi, deleteRecordApi, deleteAllDataApi, createRecordsBatchApi,
@@ -30,7 +31,7 @@ import {
   RefreshCw, Calendar, FileOutput, Loader2,
   BarChart3, FileText, CheckSquare, Square, Users, FileSpreadsheet,
   SlidersHorizontal, AlertTriangle, AlertCircle, Filter, Pencil, RotateCcw, Eye, Trash2, CalendarRange, Clock, FileDown, Lock, Download, WifiOff, Wifi,
-  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, BellRing, MapPin, PenTool, Sparkles, X, FileSignature, Menu, FolderInput
+  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, BellRing, MapPin, PenTool, Sparkles, X, FileSignature, Menu, FolderInput, Printer
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -118,10 +119,6 @@ const isRecordApproaching = (record: RecordFile): boolean => {
   return diffDays >= 0 && diffDays <= 3;
 };
 
-// ... (Phần còn lại của App.tsx giữ nguyên, chỉ thay đổi hàm getDisplayRecordType ở trên)
-// Để tiết kiệm không gian, tôi chỉ hiển thị phần đầu file chứa hàm getDisplayRecordType đã sửa đổi.
-// Phần logic render bên dưới sẽ tự động gọi hàm này.
-
 // --- COMPONENT BIỂU ĐỒ ---
 const DashboardChart = ({ data }: { data: RecordFile[] }) => {
   const statusData = useMemo(() => {
@@ -183,55 +180,16 @@ const DashboardChart = ({ data }: { data: RecordFile[] }) => {
   );
 };
 
-// ... (Phần code ReportSection và Main App giữ nguyên)
-// ...
+// --- COMPONENT BÁO CÁO (Đã được điều chỉnh để nhận State từ App) ---
+interface ReportSectionProps {
+    reportContent: string;
+    loading: boolean;
+    range: 'week' | 'month' | 'last_month';
+    setRange: (range: 'week' | 'month' | 'last_month') => void;
+    onGenerate: () => void;
+}
 
-const ReportSection = ({ records, currentUser }: { records: RecordFile[], currentUser: User }) => {
-    const [reportContent, setReportContent] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [range, setRange] = useState<'week' | 'month' | 'last_month'>('week');
-
-    const handleGenerate = async () => {
-        setLoading(true);
-        setReportContent(''); // Reset
-
-        // 1. Lọc dữ liệu theo thời gian
-        const now = new Date();
-        const filtered = records.filter(r => {
-            if(!r.receivedDate) return false;
-            const rDate = new Date(r.receivedDate);
-            
-            if (range === 'week') {
-                const sevenDaysAgo = new Date(now);
-                sevenDaysAgo.setDate(now.getDate() - 7);
-                return rDate >= sevenDaysAgo && rDate <= now;
-            } else if (range === 'month') {
-                return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
-            } else if (range === 'last_month') {
-                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
-            }
-            return false;
-        });
-
-        // 2. Tạo nhãn thời gian
-        let timeLabel = '';
-        if (range === 'week') timeLabel = '7 ngày qua';
-        else if (range === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-        else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
-
-        // 3. Gọi API
-        try {
-            const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
-            const result = await generateReport(filtered, timeLabel, scope, currentUser.name);
-            setReportContent(result);
-        } catch (error) {
-            setReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, loading, range, setRange, onGenerate }) => {
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] gap-4">
             {/* Toolbar */}
@@ -253,7 +211,7 @@ const ReportSection = ({ records, currentUser }: { records: RecordFile[], curren
                     </select>
 
                     <button 
-                        onClick={handleGenerate}
+                        onClick={onGenerate}
                         disabled={loading}
                         className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm font-medium text-sm"
                     >
@@ -274,6 +232,7 @@ const ReportSection = ({ records, currentUser }: { records: RecordFile[], curren
                         <FileText size={64} className="mb-4 text-gray-300" />
                         <p className="text-lg">Chọn thời gian và nhấn "Tạo báo cáo ngay"</p>
                         <p className="text-sm">AI sẽ phân tích dữ liệu hồ sơ và viết báo cáo cho bạn.</p>
+                        <p className="text-xs italic mt-2 text-blue-500">Mẹo: Bạn có thể chuyển tab làm việc khác trong khi AI đang viết.</p>
                     </div>
                 )}
             </div>
@@ -298,6 +257,12 @@ function App() {
     return saved ? JSON.parse(saved) : DEFAULT_WARDS;
   });
 
+  // --- STATE CHO BÁO CÁO (LIFTED STATE UP) ---
+  // Đưa state này ra App để giữ dữ liệu khi chuyển tab
+  const [reportContent, setReportContent] = useState('');
+  const [isReportLoading, setIsReportLoading] = useState(false);
+  const [reportRange, setReportRange] = useState<'week' | 'month' | 'last_month'>('week');
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
@@ -307,6 +272,11 @@ function App() {
   });
 
   const [showApproachingOnly, setShowApproachingOnly] = useState(false);
+
+  // --- STATE CHO PREVIEW EXCEL (MỚI) ---
+  const [isExcelPreviewOpen, setIsExcelPreviewOpen] = useState(false);
+  const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [previewExcelName, setPreviewExcelName] = useState('');
 
   // LOAD DATA
   useEffect(() => {
@@ -375,6 +345,49 @@ function App() {
   const handleDeleteUser = async (username: string) => {
       const success = await deleteUserApi(username);
       if(success) setUsers(prev => prev.filter(u => u.username !== username));
+  };
+
+  // --- HÀM TẠO BÁO CÁO (LIFTED UP) ---
+  const handleGenerateReport = async () => {
+      if (!currentUser) return;
+      setIsReportLoading(true);
+      setReportContent(''); // Reset nội dung tạm thời, nhưng state loading vẫn giữ UI
+
+      // 1. Lọc dữ liệu theo thời gian
+      const now = new Date();
+      const filtered = records.filter(r => {
+          if(!r.receivedDate) return false;
+          const rDate = new Date(r.receivedDate);
+          
+          if (reportRange === 'week') {
+              const sevenDaysAgo = new Date(now);
+              sevenDaysAgo.setDate(now.getDate() - 7);
+              return rDate >= sevenDaysAgo && rDate <= now;
+          } else if (reportRange === 'month') {
+              return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
+          } else if (reportRange === 'last_month') {
+              const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
+          }
+          return false;
+      });
+
+      // 2. Tạo nhãn thời gian
+      let timeLabel = '';
+      if (reportRange === 'week') timeLabel = '7 ngày qua';
+      else if (reportRange === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
+      else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
+
+      // 3. Gọi API
+      try {
+          const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
+          const result = await generateReport(filtered, timeLabel, scope, currentUser.name);
+          setReportContent(result);
+      } catch (error) {
+          setReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key.");
+      } finally {
+          setIsReportLoading(false);
+      }
   };
 
   // ... (Các logic phân trang, sort, filter giữ nguyên)
@@ -846,7 +859,15 @@ function App() {
 
   // --- LOGIC RENDER MAIN VIEW (CẬP NHẬT 2 COMPONENT MỚI) ---
   const renderMainContent = (): React.ReactNode => {
-    if (currentView === 'reports' && currentUser) return <ReportSection records={records} currentUser={currentUser} />;
+    if (currentView === 'reports' && currentUser) return (
+        <ReportSection 
+            reportContent={reportContent} 
+            loading={isReportLoading} 
+            range={reportRange} 
+            setRange={setReportRange} 
+            onGenerate={handleGenerateReport} 
+        />
+    );
     
     // === CHAT NỘI BỘ ===
     if (currentView === 'internal_chat' && currentUser) {
@@ -1292,7 +1313,7 @@ function App() {
                                     </td>
                                 )}
                                 {visibleColumns.completed && <td className="p-3 text-center text-gray-600 align-middle">{formatDate(record.completedDate) || '--'}</td>}
-                                {visibleColumns.type && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.recordType}>{getDisplayRecordType(record.recordType)}</div></td>}
+                                {visibleColumns.type && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.recordType}>{record.recordType || 'Chưa phân loại'}</div></td>}
                                 {visibleColumns.tech && (
                                     <td className="p-3 align-middle">
                                     <div className="flex flex-col gap-2">
@@ -1526,6 +1547,14 @@ function App() {
       
       <DeleteConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteRecord} message={`Bạn có chắc chắn muốn xóa hồ sơ ${deletingRecord?.code}?`} />
       <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} records={records} wards={wards} />
+      
+      {/* Modal Preview Excel */}
+      <ExcelPreviewModal 
+        isOpen={isExcelPreviewOpen} 
+        onClose={() => setIsExcelPreviewOpen(false)} 
+        workbook={previewWorkbook} 
+        fileName={previewExcelName} 
+      />
     </div>
   );
 }

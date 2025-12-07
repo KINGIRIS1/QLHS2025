@@ -889,7 +889,17 @@ function App() {
       ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 }];
       
       XLSX.utils.book_append_sheet(wb, ws, "Danh Sach");
-      XLSX.writeFile(wb, "Danh_Sach_Trinh_Ky.xlsx");
+      
+      // Xử lý tên file kèm Xã/Phường
+      let fileName = "Danh_Sach_Trinh_Ky";
+      if (filterWard !== 'all') {
+          const cleanWard = removeVietnameseTones(filterWard).replace(/\s+/g, '_').toUpperCase();
+          fileName += `_${cleanWard}`;
+      }
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      fileName += `_${dateStr}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
   };
 
   const handleConfirmSignBatch = async () => {
@@ -1312,9 +1322,12 @@ function App() {
                         <Eye size={16} /> Xem & In DS
                     </button>
 
-                    <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm ml-2" onClick={() => setIsExportModalOpen(true)}>
-                        <FileDown size={16} className="text-green-600" /> Xuất Excel
-                    </button>
+                    {/* Chỉ hiển thị nút xuất Excel (Generic) ở danh sách Handover */}
+                    {currentView === 'handover_list' && (
+                        <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm ml-2" onClick={() => setIsExportModalOpen(true)}>
+                            <FileDown size={16} className="text-green-600" /> Xuất Excel
+                        </button>
+                    )}
                     
                     {currentView === 'handover_list' && (
                         <button className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors text-sm font-medium shadow-sm ml-2" onClick={handleExportBatch}>

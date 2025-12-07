@@ -61,6 +61,16 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       return `${day}/${month}/${year}`;
   };
 
+  // Helper loại bỏ dấu tiếng Việt để tạo tên file an toàn
+  const removeVietnameseTones = (str: string): string => {
+    if (!str) return '';
+    str = str.toLowerCase();
+    str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    str = str.replace(/đ/g, "d");
+    str = str.replace(/\s+/g, "_"); // Thay khoảng trắng bằng _
+    return str.toUpperCase();
+  };
+
   const handleExport = () => {
     if (!selectedBatchKey) return;
 
@@ -281,7 +291,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     // Tạo tên sheet và xuất file
     const safeDate = dateStr.replace(/-/g, '');
-    const fileName = `Danh_Sach_Giao_1_Cua_Dot_${batchNum}_${safeDate}.xlsx`;
+    let fileName = `Danh_Sach_Giao_1_Cua_Dot_${batchNum}_${safeDate}`;
+    
+    // Thêm tên Xã/Phường vào tên file nếu có chọn
+    if (selectedWard !== 'all') {
+        fileName += `_${removeVietnameseTones(selectedWard)}`;
+    }
+    fileName += '.xlsx';
     
     XLSX.utils.book_append_sheet(wb, ws, "Danh Sách");
     XLSX.writeFile(wb, fileName);

@@ -105,36 +105,52 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
       try {
           let stream: MediaStream | null = null;
           const nav = navigator as any;
-          // Kiểm tra môi trường Electron thông qua window.require
-          const isElectron = !!(window as any).require;
+          
+          // Kiểm tra môi trường Electron chính xác hơn
+          const isElectron = typeof window !== 'undefined' && 
+                             (window as any).process && 
+                             (window as any).process.type === 'renderer';
 
           // 1. Xử lý cho môi trường Electron (App cài đặt)
           if (isElectron) {
              try {
                  const electron = (window as any).require('electron');
                  if (electron && electron.desktopCapturer) {
-                     const sources = await electron.desktopCapturer.getSources({ types: ['screen'] });
+                     // Lấy danh sách nguồn màn hình
+                     const sources = await electron.desktopCapturer.getSources({ 
+                         types: ['screen'],
+                         thumbnailSize: { width: 0, height: 0 } // Tối ưu hiệu năng
+                     });
                      
                      if (sources && sources.length > 0) {
-                         const source = sources[0];
-                         // QUAN TRỌNG: Không đặt minWidth/minHeight để tránh lỗi "ConstraintNotSatisfied"
+                         const source = sources[0]; // Mặc định lấy màn hình chính
                          const constraints = {
                              audio: false,
                              video: {
                                  mandatory: {
                                      chromeMediaSource: 'desktop',
-                                     chromeMediaSourceId: source.id
+                                     chromeMediaSourceId: source.id,
+                                     minWidth: 1280,
+                                     maxWidth: 4000, // Hỗ trợ màn hình độ phân giải cao
+                                     minHeight: 720,
+                                     maxHeight: 4000
                                  }
                              }
                          } as any;
                          
                          stream = await nav.mediaDevices.getUserMedia(constraints);
+                     } else {
+                         alert("Lỗi Electron: Không tìm thấy nguồn màn hình nào.");
+                         return;
                      }
+                 } else {
+                     alert("Lỗi: Không thể truy cập module desktopCapturer của Electron.");
+                     return;
                  }
              } catch (e: any) {
                  console.error("Electron capture failed:", e);
                  alert(`Lỗi chụp màn hình App: ${e.message}`);
-                 return; // Dừng lại, không fallback sang Web API (vì Web API thường fail trên file://)
+                 return; 
              }
           } 
           // 2. Xử lý cho môi trường Web (Trình duyệt)
@@ -147,7 +163,8 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                       });
                    } catch (err: any) {
                        if (err.name === 'NotAllowedError') return; // Người dùng bấm Hủy
-                       throw err;
+                       alert("Bạn đã từ chối quyền chia sẻ màn hình.");
+                       return;
                    }
                } else {
                    alert("Trình duyệt của bạn không hỗ trợ chụp màn hình trực tiếp.");
@@ -155,25 +172,30 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                }
           }
 
-          if (!stream) return;
+          if (!stream) {
+              alert("Không thể khởi tạo luồng video màn hình.");
+              return;
+          }
 
           // 3. Xử lý Stream -> Ảnh (Canvas)
           const video = document.createElement('video');
-          video.style.position = 'fixed';
-          video.style.opacity = '0';
-          video.style.pointerEvents = 'none';
+          video.style.display = 'none'; // Ẩn video element
           document.body.appendChild(video);
 
           video.srcObject = stream;
           
-          await new Promise((resolve) => {
+          // Đợi video load metadata và play thành công
+          await new Promise<void>((resolve, reject) => {
               video.onloadedmetadata = () => {
-                  video.play().then(resolve);
+                  video.play()
+                    .then(() => resolve())
+                    .catch((e) => reject(e));
               };
+              video.onerror = (e) => reject(e);
           });
 
-          // Đợi một chút để render frame đầu tiên
-          await new Promise(r => setTimeout(r, 500)); 
+          // Đợi thêm một chút để chắc chắn frame đầu tiên đã render (tránh ảnh đen)
+          await new Promise(r => setTimeout(r, 300)); 
 
           const canvas = document.createElement('canvas');
           canvas.width = video.videoWidth;
@@ -187,6 +209,8 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                       const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
                       const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
                       setFile(screenshotFile);
+                  } else {
+                      alert("Lỗi: Không thể tạo file ảnh từ màn hình.");
                   }
                   
                   // Dọn dẹp
@@ -195,16 +219,17 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                   canvas.remove();
               }, 'image/png');
           } else {
+              alert("Lỗi: Không thể khởi tạo Canvas 2D.");
               stream?.getTracks().forEach(t => t.stop());
               video.remove();
           }
 
       } catch (err: any) {
-          console.error("Lỗi chung:", err);
+          console.error("Lỗi chụp màn hình:", err);
           if (err.message && (err.message.includes('Not supported') || err.message.includes('Permission denied'))) {
               alert("Không thể chụp màn hình. Hãy dùng phím Print Screen và dán (Ctrl+V) vào đây.");
           } else {
-              alert(`Lỗi: ${err.message || 'Không xác định'}`);
+              alert(`Lỗi không xác định khi chụp: ${err.message}`);
           }
       }
   };
@@ -572,7 +597,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     type="button" 
                     onClick={handleScreenshot}
                     className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
-                    title="Chụp màn hình (Hoặc nhấn PrintScreen rồi Ctrl+V)"
+                    title="Chụp màn hình"
                 >
                     <Monitor size={20} />
                 </button>

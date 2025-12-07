@@ -71,19 +71,20 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
                           /* CSS Reset CHUẨN A4 cho in ấn */
                           @page { 
                               size: A4 portrait; /* Bắt buộc khổ A4 dọc */
-                              margin: 0; /* Xóa lề mặc định của trình duyệt để tránh bị thu nhỏ */
+                              margin: 10mm 15mm 10mm 20mm; /* Lề in: Trên - Phải - Dưới - Trái (Đã nới rộng để vừa nội dung) */
                           }
                           
                           html, body { 
-                              width: 210mm; /* Chiều rộng chuẩn A4 */
-                              height: 297mm; /* Chiều cao chuẩn A4 */
+                              width: 100%;
+                              height: 100%;
                               margin: 0; 
                               padding: 0;
                               background: white;
                               font-family: "Times New Roman", serif; 
-                              font-size: 12pt; 
+                              font-size: 13pt; 
                               color: #000;
                               -webkit-print-color-adjust: exact;
+                              line-height: 1.3;
                           }
 
                           /* Cấu hình hiển thị nội dung từ docx-preview */
@@ -95,20 +96,39 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
                           
                           /* Thẻ section đại diện cho 1 trang giấy trong thư viện */
                           section { 
-                              width: 210mm !important;
-                              min-height: 296mm !important; /* Gần bằng A4 để tránh nhảy trang thừa */
+                              width: 100% !important; /* Tự động co giãn theo khổ giấy */
                               margin: 0 auto !important; 
-                              padding: 15mm 15mm 15mm 20mm !important; /* Lề văn bản: Trên-Phải-Dưới-Trái */
+                              padding: 0 !important; /* Padding đã được xử lý bởi @page */
                               box-shadow: none !important; 
                               box-sizing: border-box;
-                              overflow: hidden;
+                              overflow: visible;
                               page-break-after: always;
                           }
                           
                           /* Đảm bảo ảnh và bảng hiển thị đúng */
                           img { max-width: 100%; height: auto; }
-                          table { width: 100%; border-collapse: collapse; }
+                          table { width: 100% !important; border-collapse: collapse; }
                           
+                          /* --- XỬ LÝ PHẦN GIAO NHẬN (BẢNG KÝ TÊN) --- */
+                          /* Giả định bảng ký tên là bảng cuối cùng trong văn bản */
+                          table:last-of-type {
+                              margin-top: 20px;
+                              width: 100% !important;
+                          }
+                          
+                          /* Ẩn đường viền cho bảng cuối cùng (Giao nhận) */
+                          table:last-of-type td, table:last-of-type th {
+                              border: none !important;
+                              padding: 5px;
+                              vertical-align: top;
+                          }
+
+                          /* Căn đều 2 bên cho bảng ký tên */
+                          table:last-of-type td {
+                              width: 50% !important; /* Chia đôi cột */
+                              text-align: center !important; /* Căn giữa nội dung trong cột */
+                          }
+
                           /* Ẩn phần tử thừa */
                           section:last-child { page-break-after: auto; }
                       </style>
@@ -180,14 +200,14 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
             {/* Container hiển thị trên UI */}
             <div 
                 ref={containerRef} 
-                className="bg-white shadow-lg mx-auto min-h-[1000px] p-8 text-left transition-opacity duration-300 docx-viewer-container"
+                className="bg-white shadow-lg mx-auto min-h-[1000px] p-12 text-left transition-opacity duration-300 docx-viewer-container"
                 style={{ width: '210mm', opacity: loading ? 0 : 1 }} 
             />
         </div>
         
         {/* Footer Hint */}
         <div className="p-2 text-center text-xs text-gray-500 bg-gray-100 border-t shrink-0">
-            Lưu ý: Nếu in bị lỗi font hoặc lệch dòng, vui lòng nhấn nút "Tải về" và in bằng Microsoft Word.
+            Lưu ý: Chế độ "In ngay" đã được tối ưu hóa khổ giấy A4 và tự động ẩn khung bảng chữ ký.
         </div>
       </div>
     </div>

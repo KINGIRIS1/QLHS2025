@@ -196,16 +196,19 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
     else if (rType.includes('trích đo chỉnh lý')) standardDays = "15";
     else if (rType.includes('trích đo') || rType.includes('đo đạc') || rType.includes('cắm mốc')) standardDays = "30";
 
-    // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) ---
+    // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) VỚI ĐỊA ĐIỂM ---
     let tp1Value = 'Phiếu yêu cầu';
     // Logic gộp nhóm theo yêu cầu:
-    // Trích đo chỉnh lý, Trích đo bản đồ, Trích lục bản đồ -> 'Phiếu yêu cầu trích lục, trích đo'
     if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     } 
-    // Đo đạc, Cắm mốc -> 'Phiếu yêu cầu Đo đạc, cắm mốc'
     else if (rType.includes('đo đạc') || rType.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
+    }
+
+    // Thêm tên Xã/Phường vào tiêu đề
+    if (formData.ward) {
+        tp1Value += ` tại ${formData.ward}`;
     }
 
     const day = rDate.getDate().toString().padStart(2, '0');
@@ -219,7 +222,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
         MA: val(formData.code), SO_HS: val(formData.code), TEN: val(formData.customerName), HO_TEN: val(formData.customerName), KHACH_HANG: val(formData.customerName), NGAY_NHAN: rDate.toLocaleDateString('vi-VN'), HEN_TRA: dDate.toLocaleDateString('vi-VN'), NGAY_HEN: dDate.toLocaleDateString('vi-VN'), NGUOI_NHAN: val(currentUser.name), CAN_BO: val(currentUser.name), SDT: val(formData.phoneNumber), DIEN_THOAI: val(formData.phoneNumber), CCCD: val(formData.cccd), CMND: val(formData.cccd), NOI_DUNG: val(formData.content), DIA_CHI: val(formData.address || formData.ward), DC: val(formData.address || formData.ward), DIA_CHI_CHI_TIET: val(formData.address), DC_CT: val(formData.address), XA: val(formData.ward), PHUONG: val(formData.ward), XAPHUONG: val(formData.ward), TO: val(formData.mapSheet), THUA: val(formData.landPlot), DT: val(formData.area), DIEN_TICH: val(formData.area), LOAI_HS: val(formData.recordType), GIAY_TO_KHAC: val(formData.otherDocs), NGUOI_UY_QUYEN: val(formData.authorizedBy), UY_QUYEN: val(formData.authorizedBy), NGUOI_DUOC_UY_QUYEN: val(formData.authorizedBy), LOAI_UY_QUYEN: val(formData.authDocType), LOAI_GIAY_TO_UY_QUYEN: val(formData.authDocType), GIAY_UY_QUYEN: val(formData.authDocType), NGAYNHAN: dateFullString, NGAY_THANG_NAM: dateFullString, 
         TGTRA: standardDays, // Dùng số chuẩn
         SO_NGAY: standardDays, // Dùng số chuẩn
-        TP1: tp1Value // Tiêu đề phiếu
+        TP1: tp1Value // Tiêu đề phiếu có kèm Xã
     };
     const blob = generateDocxBlob(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
     if (blob) { setPreviewBlob(blob); setPreviewFileName(`BienNhan_${formData.code}`); setIsPreviewOpen(true); }

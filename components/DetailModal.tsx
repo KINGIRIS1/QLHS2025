@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { RecordFile, Employee, User, UserRole } from '../types';
 import { STATUS_LABELS } from '../constants';
@@ -67,16 +68,19 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         standardDays = "30";
     }
 
-    // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) ---
+    // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) VỚI ĐỊA ĐIỂM ---
     let tp1Value = 'Phiếu yêu cầu';
     // Logic gộp nhóm theo yêu cầu:
-    // Trích đo chỉnh lý, Trích đo bản đồ, Trích lục bản đồ -> 'Phiếu yêu cầu trích lục, trích đo'
     if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     } 
-    // Đo đạc, Cắm mốc -> 'Phiếu yêu cầu Đo đạc, cắm mốc'
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
+    }
+
+    // Thêm tên Xã/Phường vào tiêu đề
+    if (record.ward) {
+        tp1Value += ` tại ${record.ward}`;
     }
     
     const day = rDate.getDate().toString().padStart(2, '0');

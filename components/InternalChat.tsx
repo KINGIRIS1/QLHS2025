@@ -100,35 +100,32 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
 
   // --- LOGIC CHỤP MÀN HÌNH (CẬP NHẬT FIX LỖI NOT SUPPORTED) ---
   const handleScreenshot = async () => {
-      // Chỉ cho phép chụp khi không đang gửi tin
       if (sending) return;
       
       try {
           let stream: MediaStream | null = null;
           const nav = navigator as any;
+          const isElectron = !!(window as any).require;
 
-          // 1. Kiểm tra môi trường Electron (Sử dụng window.require)
-          // FIX: Thêm try-catch và kiểm tra kỹ properties để tránh lỗi undefined
-          if ((window as any).require) {
+          // 1. Ưu tiên: Môi trường Electron
+          if (isElectron) {
              try {
                  const electron = (window as any).require('electron');
-                 // Chỉ tiếp tục nếu module electron và desktopCapturer tồn tại
                  if (electron && electron.desktopCapturer) {
-                     const { desktopCapturer } = electron;
-                     // Lấy nguồn màn hình
-                     const sources = await desktopCapturer.getSources({ types: ['screen'] });
+                     const sources = await electron.desktopCapturer.getSources({ types: ['screen'] });
                      
                      if (sources && sources.length > 0) {
-                         const source = sources[0]; // Màn hình chính
-                         
-                         // Cấu hình constraints CHUẨN cho Electron
-                         // LƯU Ý: Không set minWidth/minHeight để tránh lỗi NotSupported nếu màn hình nhỏ
+                         const source = sources[0];
                          const constraints = {
                              audio: false,
                              video: {
                                  mandatory: {
                                      chromeMediaSource: 'desktop',
-                                     chromeMediaSourceId: source.id
+                                     chromeMediaSourceId: source.id,
+                                     minWidth: 1280, // Thêm constraints để tránh lỗi NotSupported
+                                     maxWidth: 4000,
+                                     minHeight: 720,
+                                     maxHeight: 4000
                                  }
                              }
                          } as any;
@@ -137,29 +134,24 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                      }
                  }
              } catch (e) {
-                 console.warn("Electron native capture failed (Will use fallback):", e);
+                 console.warn("Electron capture failed, trying fallback...", e);
              }
           }
 
-          // 2. Fallback Web API (Cho trình duyệt thường hoặc nếu Electron fail)
-          // Phương pháp này cũng hoạt động tốt trên Electron nếu cách trên thất bại
+          // 2. Fallback: Web API chuẩn (getDisplayMedia)
+          // Chỉ chạy nếu Electron thất bại hoặc không phải Electron
           if (!stream) {
                if (nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
-                   try {
-                       stream = await nav.mediaDevices.getDisplayMedia({ 
-                          video: true, 
-                          audio: false 
-                      });
-                   } catch (webErr) {
-                       console.warn("Web capture failed:", webErr);
-                   }
+                   stream = await nav.mediaDevices.getDisplayMedia({ 
+                      video: true, 
+                      audio: false 
+                  });
+               } else {
+                   throw new Error("Trình duyệt không hỗ trợ API chụp màn hình.");
                }
           }
 
-          if (!stream) {
-              // Nếu cả 2 cách đều thất bại (hoặc user bấm Cancel)
-              return;
-          }
+          if (!stream) return;
 
           // 3. Xử lý Stream -> Ảnh (Canvas)
           const video = document.createElement('video');
@@ -170,15 +162,13 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
 
           video.srcObject = stream;
           
-          // Đợi video load metadata xong mới play
           await new Promise((resolve) => {
               video.onloadedmetadata = () => {
                   video.play().then(resolve);
               };
           });
 
-          // Chờ thêm 300ms để đảm bảo frame hình ảnh đã render đầy đủ (tránh ảnh đen)
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 300)); // Đợi render frame
 
           const canvas = document.createElement('canvas');
           canvas.width = video.videoWidth;
@@ -194,7 +184,6 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                       setFile(screenshotFile);
                   }
                   
-                  // Dọn dẹp tài nguyên
                   stream?.getTracks().forEach(t => t.stop());
                   video.remove();
                   canvas.remove();
@@ -206,7 +195,12 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
 
       } catch (err: any) {
           console.error("Lỗi chụp màn hình:", err);
-          if (err.name !== 'NotAllowedError' && !err.message.includes('Permission denied')) {
+          // Xử lý thông báo lỗi thân thiện hơn
+          if (err.name === 'NotAllowedError') {
+              // Người dùng hủy, không cần báo lỗi
+          } else if (err.message && (err.message.includes('Not supported') || err.message.includes('Permission denied'))) {
+              alert("Chức năng chụp màn hình tự động bị hạn chế trên thiết bị này.\n\nGIẢI PHÁP: Hãy dùng phím 'Print Screen' hoặc 'Snipping Tool' để chụp, sau đó nhấn Ctrl+V để dán ảnh vào khung chat.");
+          } else {
               alert(`Lỗi chụp màn hình: ${err.message || 'Không xác định'}`);
           }
       }
@@ -575,7 +569,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     type="button" 
                     onClick={handleScreenshot}
                     className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
-                    title="Chụp màn hình (Ctrl+V để dán ảnh)"
+                    title="Chụp màn hình (Hoặc nhấn PrintScreen rồi Ctrl+V)"
                 >
                     <Monitor size={20} />
                 </button>

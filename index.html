@@ -22,19 +22,23 @@
       }
     </style>
     <script>
-      // Polyfill cho process.env để tránh lỗi crash khi thư viện truy cập biến môi trường
-      // Thêm listenerCount để fix lỗi thư viện jszip/docxtemplater trên browser
-      window.process = {
-        env: {
-          NODE_ENV: 'development',
-          API_KEY: '' 
-        },
-        version: '',
-        nextTick: function(fn) { setTimeout(fn, 0); },
-        listenerCount: function() { return 0; },
-        on: function() {},
-        browser: true
-      };
+      // Polyfill thông minh cho process.env
+      // QUAN TRỌNG: Kiểm tra nếu process đã tồn tại (Môi trường Electron) thì KHÔNG ghi đè
+      if (typeof window.process === 'undefined') {
+        window.process = { env: {} };
+      }
+      
+      if (!window.process.env) window.process.env = {};
+      
+      // Thiết lập biến môi trường mặc định nếu chưa có
+      if (!window.process.env.NODE_ENV) window.process.env.NODE_ENV = 'development';
+      if (!window.process.env.API_KEY) window.process.env.API_KEY = '';
+
+      // Polyfill các hàm NodeJS mà thư viện bên thứ 3 (jszip, docxtemplater) cần
+      if (!window.process.nextTick) window.process.nextTick = function(fn) { setTimeout(fn, 0); };
+      if (!window.process.listenerCount) window.process.listenerCount = function() { return 0; };
+      if (!window.process.on) window.process.on = function() {};
+      if (typeof window.process.browser === 'undefined') window.process.browser = true;
     </script>
   <script type="importmap">
 {

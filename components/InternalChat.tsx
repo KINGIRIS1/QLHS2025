@@ -98,110 +98,110 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
     };
   }, [currentGroupId]);
 
-  // --- LOGIC CHỤP MÀN HÌNH (CẬP NHẬT) ---
+  // --- LOGIC CHỤP MÀN HÌNH (CẬP NHẬT FIX LỖI NOT SUPPORTED) ---
   const handleScreenshot = async () => {
+      // Chỉ cho phép chụp khi không đang gửi tin
+      if (sending) return;
+      
       try {
           let stream: MediaStream | null = null;
-          
-          // 1. Kiểm tra môi trường Electron
-          // Sử dụng userAgent hoặc check window.require
-          const isElectron = /electron/i.test(navigator.userAgent) || !!(window as any).require;
+          const nav = navigator as any;
 
-          if (isElectron && (window as any).require) {
+          // 1. Kiểm tra môi trường Electron (Sử dụng window.require)
+          if ((window as any).require) {
              try {
                  const { desktopCapturer } = (window as any).require('electron');
-                 // Lấy nguồn màn hình (Screen 1, Screen 2...)
+                 // Lấy nguồn màn hình
                  const sources = await desktopCapturer.getSources({ types: ['screen'] });
                  
                  if (sources && sources.length > 0) {
-                     const source = sources[0]; // Mặc định lấy màn hình chính
+                     const source = sources[0]; // Màn hình chính
                      
-                     // Cấu hình constraints riêng cho Electron
+                     // Cấu hình constraints CHUẨN cho Electron
+                     // LƯU Ý: Không set minWidth/minHeight để tránh lỗi NotSupported nếu màn hình nhỏ
                      const constraints = {
                          audio: false,
                          video: {
                              mandatory: {
                                  chromeMediaSource: 'desktop',
-                                 chromeMediaSourceId: source.id,
-                                 maxWidth: 1920,
-                                 maxHeight: 1080,
-                                 minWidth: 1280,
-                                 minHeight: 720
+                                 chromeMediaSourceId: source.id
                              }
                          }
-                     };
+                     } as any;
                      
-                     // Gọi getUserMedia thay vì getDisplayMedia trong Electron
-                     // @ts-ignore
-                     stream = await navigator.mediaDevices.getUserMedia(constraints);
+                     stream = await nav.mediaDevices.getUserMedia(constraints);
                  }
              } catch (e) {
-                 console.warn("Electron native capture failed, trying fallback...", e);
+                 console.warn("Electron native capture failed:", e);
              }
           }
 
-          // 2. Fallback Web API (Cho trình duyệt thường)
+          // 2. Fallback Web API (Cho trình duyệt thường hoặc nếu Electron fail)
           if (!stream) {
-               // Check HTTPS hoặc Localhost
-               if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                  alert("LỖI: Trình duyệt chặn tính năng này trên giao thức HTTP (Mạng LAN).\nVui lòng sử dụng HTTPS hoặc Localhost, hoặc dùng App Electron.");
-                  return;
+               if (nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
+                   try {
+                       stream = await nav.mediaDevices.getDisplayMedia({ 
+                          video: true, 
+                          audio: false 
+                      });
+                   } catch (webErr) {
+                       console.warn("Web capture failed:", webErr);
+                   }
                }
-
-               if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                   alert("Trình duyệt không hỗ trợ chụp màn hình.");
-                   return;
-               }
-
-               stream = await navigator.mediaDevices.getDisplayMedia({ 
-                  video: true, 
-                  audio: false 
-              });
           }
 
-          // 3. Xử lý Stream -> Ảnh
-          if (stream) {
-              const video = document.createElement('video');
-              // Quan trọng: Phải gắn vào DOM (dù ẩn) để một số browser render được frame
-              video.style.position = 'fixed';
-              video.style.top = '-10000px';
-              video.style.left = '-10000px';
-              document.body.appendChild(video);
-
-              video.srcObject = stream;
-              await video.play();
-
-              // Chờ 500ms để video stream ổn định và render frame đầu tiên
-              await new Promise(r => setTimeout(r, 500));
-
-              const canvas = document.createElement('canvas');
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              const ctx = canvas.getContext('2d');
-              
-              if (ctx) {
-                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                  canvas.toBlob((blob) => {
-                      if (blob) {
-                          const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
-                          const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
-                          setFile(screenshotFile);
-                      }
-                      
-                      // Dọn dẹp tài nguyên
-                      const tracks = stream?.getTracks();
-                      tracks?.forEach(t => t.stop());
-                      video.remove();
-                      canvas.remove();
-                  }, 'image/png');
-              }
+          if (!stream) {
+              // Nếu cả 2 cách đều thất bại (hoặc user bấm Cancel)
+              return;
           }
+
+          // 3. Xử lý Stream -> Ảnh (Canvas)
+          const video = document.createElement('video');
+          video.style.position = 'fixed';
+          video.style.opacity = '0';
+          video.style.pointerEvents = 'none';
+          document.body.appendChild(video);
+
+          video.srcObject = stream;
+          
+          // Đợi video load metadata xong mới play
+          await new Promise((resolve) => {
+              video.onloadedmetadata = () => {
+                  video.play().then(resolve);
+              };
+          });
+
+          // Chờ thêm 300ms để đảm bảo frame hình ảnh đã render đầy đủ (tránh ảnh đen)
+          await new Promise(r => setTimeout(r, 300));
+
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              canvas.toBlob((blob) => {
+                  if (blob) {
+                      const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+                      const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
+                      setFile(screenshotFile);
+                  }
+                  
+                  // Dọn dẹp tài nguyên
+                  stream?.getTracks().forEach(t => t.stop());
+                  video.remove();
+                  canvas.remove();
+              }, 'image/png');
+          } else {
+              stream?.getTracks().forEach(t => t.stop());
+              video.remove();
+          }
+
       } catch (err: any) {
           console.error("Lỗi chụp màn hình:", err);
-          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
-              // Người dùng hủy, không làm gì cả
-          } else {
-              alert(`Lỗi chụp màn hình: ${err.message || 'Không xác định'}\n(Thử lại bằng ứng dụng Electron nếu đang dùng Web)`);
+          if (err.name !== 'NotAllowedError' && !err.message.includes('Permission denied')) {
+              alert(`Lỗi chụp màn hình: ${err.message || 'Không xác định'}\n(Nếu dùng Web, hãy đảm bảo dùng HTTPS hoặc Localhost)`);
           }
       }
   };
@@ -333,7 +333,6 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   };
 
   // --- LOGIC LỌC NHÓM HIỂN THỊ ---
-  // Hiển thị nếu: (Là Admin) HOẶC (Là chủ nhóm) HOẶC (Có tên trong members) HOẶC (Nhóm Public - members null)
   const myCustomGroups = useMemo(() => {
       if (isAdmin) return customGroups;
       return customGroups.filter(g => {
@@ -570,7 +569,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     type="button" 
                     onClick={handleScreenshot}
                     className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
-                    title="Chụp màn hình"
+                    title="Chụp màn hình (Ctrl+V để dán ảnh)"
                 >
                     <Monitor size={20} />
                 </button>

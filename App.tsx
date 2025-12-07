@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from './types';
 import { STATUS_LABELS, WARDS as DEFAULT_WARDS } from './constants';
@@ -120,6 +118,10 @@ const isRecordApproaching = (record: RecordFile): boolean => {
   return diffDays >= 0 && diffDays <= 3;
 };
 
+// ... (Phần còn lại của App.tsx giữ nguyên, chỉ thay đổi hàm getDisplayRecordType ở trên)
+// Để tiết kiệm không gian, tôi chỉ hiển thị phần đầu file chứa hàm getDisplayRecordType đã sửa đổi.
+// Phần logic render bên dưới sẽ tự động gọi hàm này.
+
 // --- COMPONENT BIỂU ĐỒ ---
 const DashboardChart = ({ data }: { data: RecordFile[] }) => {
   const statusData = useMemo(() => {
@@ -181,7 +183,9 @@ const DashboardChart = ({ data }: { data: RecordFile[] }) => {
   );
 };
 
-// --- COMPONENT BÁO CÁO (ReportSection) ---
+// ... (Phần code ReportSection và Main App giữ nguyên)
+// ...
+
 const ReportSection = ({ records, currentUser }: { records: RecordFile[], currentUser: User }) => {
     const [reportContent, setReportContent] = useState('');
     const [loading, setLoading] = useState(false);

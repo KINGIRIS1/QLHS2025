@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, Holiday } from '../types';
 import { RECORD_TYPES } from '../constants';
@@ -198,9 +197,13 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
 
     // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) ---
     let tp1Value = 'Phiếu yêu cầu';
-    if (rType.includes('trích') || rType.includes('chỉnh lý')) {
+    // Logic gộp nhóm theo yêu cầu:
+    // Trích đo chỉnh lý, Trích đo bản đồ, Trích lục bản đồ -> 'Phiếu yêu cầu trích lục, trích đo'
+    if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
-    } else if (rType.includes('đo đạc') || rType.includes('cắm mốc')) {
+    } 
+    // Đo đạc, Cắm mốc -> 'Phiếu yêu cầu Đo đạc, cắm mốc'
+    else if (rType.includes('đo đạc') || rType.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
 

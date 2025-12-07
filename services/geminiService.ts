@@ -3,13 +3,40 @@ import { GoogleGenAI } from "@google/genai";
 import { RecordFile, RecordStatus } from "../types";
 import { STATUS_LABELS } from "../constants";
 
-// Khởi tạo client Gemini
-// Sử dụng kiểm tra an toàn để tránh lỗi ReferenceError: process is not defined
-const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
-const ai = new GoogleGenAI({ apiKey: apiKey });
+// Key lưu trong LocalStorage
+export const LS_API_KEY = 'GEMINI_API_KEY_CUSTOM';
+
+// Helper function để lấy client AI khi cần
+// Ưu tiên lấy từ LocalStorage (người dùng cài đặt), sau đó mới đến biến môi trường
+const getAiClient = (): GoogleGenAI | null => {
+  let apiKey = '';
+  
+  // 1. Thử lấy từ cài đặt người dùng
+  try {
+    const customKey = localStorage.getItem(LS_API_KEY);
+    if (customKey) apiKey = customKey;
+  } catch (e) {
+    console.warn("Không thể đọc LocalStorage");
+  }
+
+  // 2. Nếu không có, lấy từ biến môi trường (Mặc định)
+  if (!apiKey && typeof process !== 'undefined' && process.env.API_KEY) {
+    apiKey = process.env.API_KEY;
+  }
+  
+  if (!apiKey) {
+    console.warn("Gemini API Key is missing.");
+    return null;
+  }
+  
+  return new GoogleGenAI({ apiKey: apiKey });
+};
 
 export const testApiConnection = async (): Promise<boolean> => {
   try {
+    const ai = getAiClient();
+    if (!ai) return false;
+
     // Sử dụng model nhẹ để test kết nối nhanh
     const model = 'gemini-2.5-flash';
     await ai.models.generateContent({
@@ -30,6 +57,9 @@ export const generateReport = async (
   userName?: string
 ): Promise<string> => {
   try {
+    const ai = getAiClient();
+    if (!ai) return "Chưa cấu hình API Key. Vui lòng vào Cấu hình hệ thống -> Gemini AI để nhập Key.";
+
     const model = 'gemini-2.5-flash';
     
     // Chuẩn bị dữ liệu tóm tắt để gửi cho AI

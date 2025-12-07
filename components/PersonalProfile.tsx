@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';

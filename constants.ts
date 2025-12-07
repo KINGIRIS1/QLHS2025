@@ -33,6 +33,7 @@ export const WARDS = [
 ];
 
 // Danh sách loại hồ sơ đầy đủ (Hiển thị trong Form Thêm/Sửa)
+// Đã xóa 'Chỉnh lại' và giữ nguyên tên đầy đủ
 export const RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
   'Trích đo bản đồ địa chính',

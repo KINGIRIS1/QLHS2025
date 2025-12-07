@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { RecordFile, Employee, User, UserRole } from '../types';
 import { STATUS_LABELS } from '../constants';
@@ -70,9 +69,13 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
 
     // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) ---
     let tp1Value = 'Phiếu yêu cầu';
-    if (type.includes('trích') || type.includes('chỉnh lý')) {
+    // Logic gộp nhóm theo yêu cầu:
+    // Trích đo chỉnh lý, Trích đo bản đồ, Trích lục bản đồ -> 'Phiếu yêu cầu trích lục, trích đo'
+    if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
-    } else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
+    } 
+    // Đo đạc, Cắm mốc -> 'Phiếu yêu cầu Đo đạc, cắm mốc'
+    else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
     

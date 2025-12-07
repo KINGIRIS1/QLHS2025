@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect } from 'react';
-import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, AlertCircle, Terminal, Copy, Calendar, Plus, Trash2, Save } from 'lucide-react';
-import { testApiConnection } from '../services/geminiService';
+import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, AlertCircle, Terminal, Copy, Calendar, Plus, Trash2, Save, Key, Eye, EyeOff } from 'lucide-react';
+import { testApiConnection, LS_API_KEY } from '../services/geminiService';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays } from '../services/api';
 
@@ -21,16 +20,26 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showSql, setShowSql] = useState(false);
   
+  // Gemini Key State
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  
   // Holiday States
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [newHoliday, setNewHoliday] = useState<Partial<Holiday>>({ name: '', day: 1, month: 1, isLunar: false });
   const [savingHolidays, setSavingHolidays] = useState(false);
 
-  // Helper an toàn để lấy API Key mà không crash app
-  const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
+  // Helper an toàn để lấy API Key mặc định (env)
+  const envApiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
 
   useEffect(() => {
-      if(isOpen) loadHolidays();
+      if(isOpen) {
+          loadHolidays();
+          // Load API Key từ LocalStorage
+          const storedKey = localStorage.getItem(LS_API_KEY);
+          if (storedKey) setCustomApiKey(storedKey);
+          else setCustomApiKey('');
+      }
   }, [isOpen]);
 
   const loadHolidays = async () => {
@@ -62,6 +71,17 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
               setIsDeletingData(false);
           }
       }
+  };
+
+  const handleSaveApiKey = () => {
+      if (customApiKey.trim()) {
+          localStorage.setItem(LS_API_KEY, customApiKey.trim());
+          alert('Đã lưu API Key thành công!');
+      } else {
+          localStorage.removeItem(LS_API_KEY);
+          alert('Đã xóa API Key tùy chỉnh. Hệ thống sẽ dùng Key mặc định (nếu có).');
+      }
+      setTestStatus('idle'); // Reset trạng thái test
   };
 
   const handleTestAi = async () => {
@@ -445,11 +465,40 @@ ALTER PUBLICATION supabase_realtime ADD TABLE records, employees, users, contrac
                         Gemini AI
                     </h3>
                     <div className="space-y-3">
-                        <div className="text-sm text-purple-700">
-                            Trạng thái Key: <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${apiKey ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
-                                {apiKey ? 'Đã cấu hình' : 'Trống'}
-                            </span>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs font-bold text-purple-700">API Key (Google Gemini)</label>
+                            <div className="relative">
+                                <Key size={14} className="absolute left-2.5 top-2.5 text-purple-400" />
+                                <input 
+                                    type={showKey ? "text" : "password"}
+                                    placeholder="Nhập API Key của bạn..."
+                                    className="w-full border border-purple-300 rounded-md py-2 pl-8 pr-8 text-sm outline-none focus:ring-1 focus:ring-purple-500"
+                                    value={customApiKey}
+                                    onChange={(e) => setCustomApiKey(e.target.value)}
+                                />
+                                <button 
+                                    onClick={() => setShowKey(!showKey)}
+                                    className="absolute right-2 top-2 text-gray-400 hover:text-purple-600"
+                                >
+                                    {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                </button>
+                            </div>
+                            <button 
+                                onClick={handleSaveApiKey}
+                                className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-700 w-fit ml-auto"
+                            >
+                                Lưu Key
+                            </button>
                         </div>
+
+                        <div className="text-xs text-purple-600 italic border-t border-purple-200 pt-2">
+                            {customApiKey ? (
+                                <span className="flex items-center gap-1 text-green-700 font-bold"><CheckCircle size={12}/> Đang sử dụng Key tùy chỉnh.</span>
+                            ) : (
+                                <span>{envApiKey ? "Đang sử dụng Key mặc định của hệ thống." : "Chưa có Key nào được cấu hình."}</span>
+                            )}
+                        </div>
+
                         <button 
                             onClick={handleTestAi}
                             disabled={testStatus === 'testing'}
@@ -466,7 +515,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE records, employees, users, contrac
                     )}
                     {testStatus === 'error' && (
                         <div className="mt-2 text-xs font-bold text-red-700 flex items-center gap-1 animate-fade-in">
-                            <AlertCircle size={14} /> Lỗi kết nối AI.
+                            <AlertCircle size={14} /> Lỗi kết nối AI. Vui lòng kiểm tra Key.
                         </div>
                     )}
                 </div>

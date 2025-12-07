@@ -5,6 +5,15 @@ import { fetchMessages, sendMessageApi, uploadChatFile, fetchChatGroups, createC
 import { supabase } from '../services/supabaseClient';
 import { Send, Paperclip, File as FileIcon, X, Loader2, Image as ImageIcon, Download, Hash, MapPin, Plus, Trash2, Users, Monitor, Camera, UserPlus, Shield } from 'lucide-react';
 
+// Định nghĩa kiểu cho window.electronAPI
+declare global {
+  interface Window {
+    electronAPI?: {
+      captureScreenshot: () => Promise<string>;
+    };
+  }
+}
+
 interface InternalChatProps {
   currentUser: User;
   wards?: string[]; 
@@ -13,6 +22,21 @@ interface InternalChatProps {
 }
 
 const normalizeStr = (str: string) => str ? str.toLowerCase().trim() : '';
+
+// Hàm helper chuyển DataURL sang File
+const dataURLtoFile = (dataurl: string, filename: string) => {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) return null;
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type:mime});
+};
 
 const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], employees, users }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -98,139 +122,83 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
     };
   }, [currentGroupId]);
 
-  // --- LOGIC CHỤP MÀN HÌNH (ĐÃ CẬP NHẬT FIX LỖI) ---
+  // --- LOGIC CHỤP MÀN HÌNH (REFACTORED) ---
   const handleScreenshot = async () => {
       if (sending) return;
       
       try {
-          let stream: MediaStream | null = null;
-          const nav = navigator as any;
-          
-          // Kiểm tra môi trường Electron chính xác hơn
-          const isElectron = typeof window !== 'undefined' && 
-                             (window as any).process && 
-                             (window as any).process.type === 'renderer';
-
-          // 1. Xử lý cho môi trường Electron (App cài đặt)
-          if (isElectron) {
-             try {
-                 const electron = (window as any).require('electron');
-                 if (electron && electron.desktopCapturer) {
-                     // Lấy danh sách nguồn màn hình
-                     const sources = await electron.desktopCapturer.getSources({ 
-                         types: ['screen'],
-                         thumbnailSize: { width: 0, height: 0 } // Tối ưu hiệu năng
-                     });
-                     
-                     if (sources && sources.length > 0) {
-                         const source = sources[0]; // Mặc định lấy màn hình chính
-                         const constraints = {
-                             audio: false,
-                             video: {
-                                 mandatory: {
-                                     chromeMediaSource: 'desktop',
-                                     chromeMediaSourceId: source.id,
-                                     minWidth: 1280,
-                                     maxWidth: 4000, // Hỗ trợ màn hình độ phân giải cao
-                                     minHeight: 720,
-                                     maxHeight: 4000
-                                 }
-                             }
-                         } as any;
-                         
-                         stream = await nav.mediaDevices.getUserMedia(constraints);
-                     } else {
-                         alert("Lỗi Electron: Không tìm thấy nguồn màn hình nào.");
-                         return;
-                     }
-                 } else {
-                     alert("Lỗi: Không thể truy cập module desktopCapturer của Electron.");
-                     return;
-                 }
-             } catch (e: any) {
-                 console.error("Electron capture failed:", e);
-                 alert(`Lỗi chụp màn hình App: ${e.message}`);
-                 return; 
-             }
-          } 
-          // 2. Xử lý cho môi trường Web (Trình duyệt)
-          else {
-               if (nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
-                   try {
-                       stream = await nav.mediaDevices.getDisplayMedia({ 
-                          video: true, 
-                          audio: false 
-                      });
-                   } catch (err: any) {
-                       if (err.name === 'NotAllowedError') return; // Người dùng bấm Hủy
-                       alert("Bạn đã từ chối quyền chia sẻ màn hình.");
-                       return;
-                   }
-               } else {
-                   alert("Trình duyệt của bạn không hỗ trợ chụp màn hình trực tiếp.");
-                   return;
-               }
-          }
-
-          if (!stream) {
-              alert("Không thể khởi tạo luồng video màn hình.");
+          // 1. ƯU TIÊN SỬ DỤNG ELECTRON API (QUA IPC)
+          if (window.electronAPI && window.electronAPI.captureScreenshot) {
+              const dataUrl = await window.electronAPI.captureScreenshot();
+              if (dataUrl) {
+                  const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+                  const screenshotFile = dataURLtoFile(dataUrl, `Screenshot_${timestamp}.png`);
+                  if (screenshotFile) {
+                      setFile(screenshotFile);
+                  } else {
+                      alert("Lỗi chuyển đổi dữ liệu ảnh.");
+                  }
+              } else {
+                  alert("Không chụp được màn hình.");
+              }
               return;
           }
 
-          // 3. Xử lý Stream -> Ảnh (Canvas)
-          const video = document.createElement('video');
-          video.style.display = 'none'; // Ẩn video element
-          document.body.appendChild(video);
-
-          video.srcObject = stream;
-          
-          // Đợi video load metadata và play thành công
-          await new Promise<void>((resolve, reject) => {
-              video.onloadedmetadata = () => {
-                  video.play()
-                    .then(() => resolve())
-                    .catch((e) => reject(e));
-              };
-              video.onerror = (e) => reject(e);
-          });
-
-          // Đợi thêm một chút để chắc chắn frame đầu tiên đã render (tránh ảnh đen)
-          await new Promise(r => setTimeout(r, 300)); 
-
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          
-          if (ctx) {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              canvas.toBlob((blob) => {
-                  if (blob) {
-                      const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
-                      const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
-                      setFile(screenshotFile);
-                  } else {
-                      alert("Lỗi: Không thể tạo file ảnh từ màn hình.");
-                  }
+          // 2. FALLBACK: SỬ DỤNG WEB API (CHO TRÌNH DUYỆT / LOCALHOST)
+          const nav = navigator as any;
+          if (nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
+               try {
+                   const stream = await nav.mediaDevices.getDisplayMedia({ 
+                      video: true, 
+                      audio: false 
+                  });
                   
-                  // Dọn dẹp
-                  stream?.getTracks().forEach(t => t.stop());
-                  video.remove();
-                  canvas.remove();
-              }, 'image/png');
+                  // Xử lý Stream -> Ảnh (Canvas)
+                  const video = document.createElement('video');
+                  video.style.display = 'none';
+                  document.body.appendChild(video);
+                  video.srcObject = stream;
+                  
+                  await new Promise<void>((resolve, reject) => {
+                      video.onloadedmetadata = () => {
+                          video.play().then(() => resolve()).catch((e) => reject(e));
+                      };
+                      video.onerror = (e) => reject(e);
+                  });
+
+                  await new Promise(r => setTimeout(r, 300)); // Đợi frame render
+
+                  const canvas = document.createElement('canvas');
+                  canvas.width = video.videoWidth;
+                  canvas.height = video.videoHeight;
+                  const ctx = canvas.getContext('2d');
+                  
+                  if (ctx) {
+                      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                      canvas.toBlob((blob) => {
+                          if (blob) {
+                              const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+                              const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
+                              setFile(screenshotFile);
+                          }
+                          // Dọn dẹp
+                          stream.getTracks().forEach((t: any) => t.stop());
+                          video.remove();
+                          canvas.remove();
+                      }, 'image/png');
+                  }
+               } catch (err: any) {
+                   if (err.name !== 'NotAllowedError') {
+                       alert("Trình duyệt không hỗ trợ chụp màn hình hoặc quyền bị từ chối.");
+                   }
+               }
           } else {
-              alert("Lỗi: Không thể khởi tạo Canvas 2D.");
-              stream?.getTracks().forEach(t => t.stop());
-              video.remove();
+               alert("Chức năng này yêu cầu App Desktop hoặc trình duyệt hỗ trợ chia sẻ màn hình.");
           }
 
       } catch (err: any) {
           console.error("Lỗi chụp màn hình:", err);
-          if (err.message && (err.message.includes('Not supported') || err.message.includes('Permission denied'))) {
-              alert("Không thể chụp màn hình. Hãy dùng phím Print Screen và dán (Ctrl+V) vào đây.");
-          } else {
-              alert(`Lỗi không xác định khi chụp: ${err.message}`);
-          }
+          alert(`Lỗi: ${err.message}`);
       }
   };
 

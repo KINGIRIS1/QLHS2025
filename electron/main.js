@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -47,8 +47,9 @@ function createWindow() {
     icon: path.join(__dirname, '../public/vite.svg'), 
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false 
+      contextIsolation: false, // Lưu ý: Giữ false để tương thích code cũ, nhưng khuyến khích true trong tương lai
+      webSecurity: false,
+      preload: path.join(__dirname, 'preload.js') // Đăng ký Preload Script
     },
     autoHideMenuBar: true,
   });
@@ -62,6 +63,29 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 }
+
+// --- IPC HANDLERS (Xử lý sự kiện từ React) ---
+
+// Handler chụp màn hình
+ipcMain.handle('capture-screenshot', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({ 
+      types: ['screen'], 
+      thumbnailSize: { width: 1920, height: 1080 } // Chất lượng Full HD
+    });
+    
+    if (sources.length > 0) {
+      // Lấy màn hình chính (đầu tiên) và trả về DataURL (Base64)
+      return sources[0].thumbnail.toDataURL();
+    }
+    return null;
+  } catch (error) {
+    console.error('Lỗi chụp màn hình tại Main Process:', error);
+    throw error;
+  }
+});
+
+// ---------------------------------------------
 
 app.whenReady().then(() => {
   // 1. Khởi động Server nội bộ trước

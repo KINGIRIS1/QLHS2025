@@ -394,6 +394,7 @@ function App() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportModalType, setExportModalType] = useState<'handover' | 'check_list'>('handover');
   
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
   const [viewingRecord, setViewingRecord] = useState<RecordFile | null>(null);
@@ -575,157 +576,16 @@ function App() {
 
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
 
-  // --- HÀM TẠO EXCEL PREVIEW CHO DANH SÁCH ---
-  const handlePreviewList = () => {
-      if (filteredRecords.length === 0) {
-          alert("Danh sách trống, không có dữ liệu để xem.");
-          return;
-      }
-
-      // 1. Chuẩn bị tiêu đề & dữ liệu
-      let title = "DANH SÁCH HỒ SƠ";
-      if (currentView === 'check_list') title = "DANH SÁCH HỒ SƠ TRÌNH KÝ";
-      else if (currentView === 'handover_list') title = "DANH SÁCH TRẢ KẾT QUẢ";
-
-      // CẬP NHẬT: Thêm thông tin Xã/Phường vào tiêu đề
-      const wardTitle = filterWard !== 'all' ? `KHU VỰC: ${filterWard.toUpperCase()}` : "TOÀN BỘ ĐỊA BÀN";
-
-      const dateParts = new Date().toLocaleDateString('vi-VN').split('/');
-      const dateStr = `Ngày ${dateParts[0]} tháng ${dateParts[1]} năm ${dateParts[2]}`;
-
-      // Header bảng
-      const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"];
-      
-      // Dữ liệu dòng
-      const dataRows = filteredRecords.map((r, i) => [
-          i + 1,
-          r.code,
-          r.customerName,
-          r.address || r.ward,
-          getShortRecordType(r.recordType), // Sửa đổi: Sử dụng tên ngắn gọn
-          r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
-          r.content
-      ]);
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([]);
-
-      // 2. Định nghĩa Style (Chuẩn văn bản)
-      const styles = {
-          // Quốc hiệu
-          nationalTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } },
-          nationalSlogan: { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } },
-          // Tiêu đề báo cáo
-          reportTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } },
-          reportSubTitle: { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } },
-          // Header bảng
-          header: { 
-              font: { name: "Times New Roman", sz: 11, bold: true }, 
-              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, 
-              fill: { fgColor: { rgb: "E0E0E0" } }, 
-              alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-          },
-          // Cell dữ liệu bình thường
-          cell: { 
-              font: { name: "Times New Roman", sz: 11 }, 
-              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
-              alignment: { vertical: "center", wrapText: true }
-          },
-          // Cell căn giữa (STT, Hẹn trả)
-          cellCenter: {
-              font: { name: "Times New Roman", sz: 11 }, 
-              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
-              alignment: { horizontal: "center", vertical: "center", wrapText: true }
-          },
-          // Footer
-          footerTitle: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center" } },
-          footerNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center" } }
-      };
-
-      // 3. Xây dựng nội dung
-      XLSX.utils.sheet_add_aoa(ws, [
-          ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"], // A1
-          ["Độc lập - Tự do - Hạnh phúc"],         // A2
-          [""],                                    // A3
-          [title],                                 // A4
-          [wardTitle],                             // A5 (Thêm dòng Xã/Phường)
-          [dateStr],                               // A6
-          [""],                                    // A7
-          tableHeader                              // A8 (Header)
-      ], { origin: "A1" });
-
-      // Thêm dữ liệu từ A9 (Thay vì A8 như trước)
-      XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A9" });
-
-      const lastRow = 8 + dataRows.length; // Index dòng cuối dữ liệu (0-based)
-      const footerStart = lastRow + 2;
-
-      // Thêm Footer (Chữ ký)
-      XLSX.utils.sheet_add_aoa(ws, [
-          ["BÊN GIAO", "", "", "", "BÊN NHẬN"],
-          ["(Ký ghi rõ họ tên)", "", "", "", "(Ký ghi rõ họ tên)"]
-      ], { origin: `A${footerStart + 1}` });
-
-      // 4. Áp dụng Style & Merge
-      // Merge tiêu đề
-      ws['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // Quốc hiệu
-          { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }, // Tiêu ngữ
-          { s: { r: 3, c: 0 }, e: { r: 3, c: 6 } }, // Tên DS
-          { s: { r: 4, c: 0 }, e: { r: 4, c: 6 } }, // Tên Xã (A5)
-          { s: { r: 5, c: 0 }, e: { r: 5, c: 6 } }, // Ngày (A6)
-          // Footer Merge
-          { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 2 } },     // Bên trái
-          { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 2 } },
-          { s: { r: footerStart, c: 4 }, e: { r: footerStart, c: 6 } },     // Bên phải
-          { s: { r: footerStart + 1, c: 4 }, e: { r: footerStart + 1, c: 6 } },
-      ];
-
-      // Độ rộng cột
-      ws['!cols'] = [
-          { wch: 5 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 15 }
-      ];
-
-      // Gán Style Header
-      if(ws['A1']) ws['A1'].s = styles.nationalTitle;
-      if(ws['A2']) ws['A2'].s = styles.nationalSlogan;
-      if(ws['A4']) ws['A4'].s = styles.reportTitle;
-      if(ws['A5']) ws['A5'].s = styles.reportSubTitle;
-      if(ws['A6']) ws['A6'].s = styles.reportSubTitle;
-
-      // Gán Style Bảng
-      for(let c=0; c<=6; c++) { 
-          // Header Row (A8 - Index 7)
-          const ref = XLSX.utils.encode_cell({r: 7, c: c}); 
-          if(!ws[ref]) ws[ref] = { v: "", t: "s"}; 
-          ws[ref].s = styles.header; 
-      }
-      for(let r=8; r < 8 + dataRows.length; r++) { 
-          for(let c=0; c<=6; c++) { 
-              const ref = XLSX.utils.encode_cell({r: r, c: c}); 
-              if(!ws[ref]) ws[ref] = { v: "", t: "s"}; 
-              
-              if(c === 0 || c === 5) ws[ref].s = styles.cellCenter; // Căn giữa STT, Hẹn trả
-              else ws[ref].s = styles.cell; 
-          } 
-      }
-
-      // Gán Style Footer
-      const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
-      const leftNote = XLSX.utils.encode_cell({r: footerStart + 1, c: 0});
-      const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 4});
-      const rightNote = XLSX.utils.encode_cell({r: footerStart + 1, c: 4});
-
-      if(ws[leftTitle]) ws[leftTitle].s = styles.footerTitle;
-      if(ws[leftNote]) ws[leftNote].s = styles.footerNote;
-      if(ws[rightTitle]) ws[rightTitle].s = styles.footerTitle;
-      if(ws[rightNote]) ws[rightNote].s = styles.footerNote;
-
-      XLSX.utils.book_append_sheet(wb, ws, "Danh Sach");
-      
-      setPreviewWorkbook(wb);
-      setPreviewExcelName(`${title.replace(/\s/g, '_')}_${new Date().getTime()}`);
+  // --- HÀM XỬ LÝ PREVIEW TỪ EXPORT MODAL ---
+  const handleExcelPreview = (workbook: XLSX.WorkBook, fileName: string) => {
+      setPreviewWorkbook(workbook);
+      setPreviewExcelName(fileName);
       setIsExcelPreviewOpen(true);
+  };
+
+  const handleOpenExportModal = (type: 'handover' | 'check_list') => {
+      setExportModalType(type);
+      setIsExportModalOpen(true);
   };
 
   const advanceStatus = async (record: RecordFile, targetStatus?: RecordStatus) => {
@@ -864,44 +724,6 @@ function App() {
       alert('Đã giao hồ sơ thành công!');
   };
 
-  const handleExportSimple = () => {
-      const header = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã Phường", "Nội Dung", "Loại Hồ Sơ", "Số Tờ", "Số Thửa"];
-      const data = filteredRecords.map((r, index) => [
-          index + 1,
-          r.code || '',
-          r.customerName || '',
-          r.ward || '',
-          r.content || '',
-          r.recordType || '',
-          r.mapSheet || '',
-          r.landPlot || ''
-      ]);
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([
-          ["DANH SÁCH HỒ SƠ TRÌNH KÝ"],
-          [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}`],
-          [],
-          header,
-          ...data
-      ]);
-
-      ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 }];
-      
-      XLSX.utils.book_append_sheet(wb, ws, "Danh Sach");
-      
-      // Xử lý tên file kèm Xã/Phường
-      let fileName = "Danh_Sach_Trinh_Ky";
-      if (filterWard !== 'all') {
-          const cleanWard = removeVietnameseTones(filterWard).replace(/\s+/g, '_').toUpperCase();
-          fileName += `_${cleanWard}`;
-      }
-      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-      fileName += `_${dateStr}.xlsx`;
-
-      XLSX.writeFile(wb, fileName);
-  };
-
   const handleConfirmSignBatch = async () => {
     if (!canPerformAction) return;
 
@@ -991,13 +813,11 @@ function App() {
     );
   };
 
-  // --- LOGIC RENDER MAIN VIEW (CẬP NHẬT 2 COMPONENT MỚI) ---
+  // --- LOGIC RENDER MAIN VIEW ---
   const renderMainContent = (): React.ReactNode => {
     if (currentView === 'reports' && currentUser) return <ReportSection records={records} currentUser={currentUser} />;
     
-    // === CHAT NỘI BỘ ===
     if (currentView === 'internal_chat' && currentUser) {
-        // CẬP NHẬT: Truyền thêm users để thêm thành viên
         return <InternalChat currentUser={currentUser} wards={wards} employees={employees} users={users} />;
     }
 
@@ -1024,7 +844,6 @@ function App() {
         );
     }
 
-    // === HIỂN THỊ MÀN HÌNH TIẾP NHẬN HỒ SƠ ===
     if (currentView === 'receive_record' && currentUser) {
         return (
             <ReceiveRecord 
@@ -1032,12 +851,11 @@ function App() {
                 wards={wards}
                 employees={employees}
                 currentUser={currentUser}
-                records={records} // Truyền records để tính mã tự động
+                records={records}
             />
         );
     }
 
-    // === HIỂN THỊ MÀN HÌNH TIẾP NHẬN HỢP ĐỒNG ===
     if (currentView === 'receive_contract' && currentUser) {
         return (
             <ReceiveContract 
@@ -1112,10 +930,9 @@ function App() {
 
     const isListView = currentView === 'check_list' || currentView === 'handover_list';
 
-    // RENDER DANH SÁCH (Mặc định cho các view còn lại)
+    // RENDER DANH SÁCH
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full">
-        {/* ĐÃ GỠ BỎ: Banner cảnh báo quá hạn tại đây theo yêu cầu */}
         
         <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -1141,7 +958,7 @@ function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
-                 {/* BỘ LỌC NGÀY (Ẩn đi khi ở các tab nhập liệu mới) */}
+                 {/* BỘ LỌC NGÀY */}
                  {currentView !== 'handover_list' && (
                      <>
                         {!showAdvancedDateFilter && (
@@ -1316,19 +1133,14 @@ function App() {
                     </button>
                 )}
 
+                {/* --- CẬP NHẬT CÁC NÚT THAO TÁC CHO LIST VIEW --- */}
                 {canPerformAction && isListView && (
                    <>
-                    <button className="flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-3 py-1.5 rounded-md hover:bg-blue-50 transition-colors text-sm font-medium shadow-sm ml-auto" onClick={handlePreviewList}>
+                    {/* Nút Xem & In & Xuất (Gộp chung) */}
+                    <button className="flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-3 py-1.5 rounded-md hover:bg-blue-50 transition-colors text-sm font-medium shadow-sm ml-auto" onClick={() => handleOpenExportModal(currentView === 'handover_list' ? 'handover' : 'check_list')}>
                         <Eye size={16} /> Xem & In DS
                     </button>
 
-                    {/* Chỉ hiển thị nút xuất Excel (Generic) ở danh sách Handover */}
-                    {currentView === 'handover_list' && (
-                        <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm ml-2" onClick={() => setIsExportModalOpen(true)}>
-                            <FileDown size={16} className="text-green-600" /> Xuất Excel
-                        </button>
-                    )}
-                    
                     {currentView === 'handover_list' && (
                         <button className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors text-sm font-medium shadow-sm ml-2" onClick={handleExportBatch}>
                             <FileOutput size={16} /> Chốt danh sách
@@ -1337,9 +1149,6 @@ function App() {
 
                     {currentView === 'check_list' && (
                         <>
-                            <button className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm ml-2" onClick={handleExportSimple}>
-                                <FileSpreadsheet size={16} /> Xuất danh sách
-                            </button>
                             <button className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm ml-2" onClick={handleConfirmSignBatch}>
                                 <FileSignature size={16} /> Chốt danh sách trình ký
                             </button>
@@ -1350,7 +1159,7 @@ function App() {
             </div>
         </div>
         
-        {/* Table Content - FIXED WIDTHS AND TRUNCATE */}
+        {/* Table Content */}
         <div className="flex-1 overflow-auto">
           <table className="w-full text-left border-collapse min-w-[1400px] table-fixed">
              <thead className="sticky top-0 bg-gray-100 z-10 text-xs font-semibold text-gray-600 uppercase tracking-wider shadow-sm">
@@ -1679,7 +1488,15 @@ function App() {
       />
       
       <DeleteConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteRecord} message={`Bạn có chắc chắn muốn xóa hồ sơ ${deletingRecord?.code}?`} />
-      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} records={records} wards={wards} />
+      
+      <ExportModal 
+        isOpen={isExportModalOpen} 
+        onClose={() => setIsExportModalOpen(false)} 
+        records={records} 
+        wards={wards} 
+        type={exportModalType}
+        onPreview={handleExcelPreview}
+      />
       
       <ExcelPreviewModal 
         isOpen={isExcelPreviewOpen} 

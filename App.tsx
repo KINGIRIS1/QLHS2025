@@ -18,7 +18,8 @@ import ExcerptManagement from './components/ExcerptManagement';
 import ReceiveRecord from './components/ReceiveRecord'; 
 import ReceiveContract from './components/ReceiveContract'; 
 import InternalChat from './components/InternalChat';
-import ExcelPreviewModal from './components/ExcelPreviewModal'; // Import Modal Preview Excel
+import ExcelPreviewModal from './components/ExcelPreviewModal';
+import TemplateConfigModal from './components/TemplateConfigModal'; // Import Template Config
 import { generateReport } from './services/geminiService';
 import { 
     fetchRecords, createRecordApi, updateRecordApi, deleteRecordApi, deleteAllDataApi, createRecordsBatchApi,
@@ -31,7 +32,7 @@ import {
   RefreshCw, Calendar, FileOutput, Loader2,
   BarChart3, FileText, CheckSquare, Square, Users, FileSpreadsheet,
   SlidersHorizontal, AlertTriangle, AlertCircle, Filter, Pencil, RotateCcw, Eye, Trash2, CalendarRange, Clock, FileDown, Lock, Download, WifiOff, Wifi,
-  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, BellRing, MapPin, PenTool, Sparkles, X, FileSignature, Menu, FolderInput, Printer
+  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, BellRing, MapPin, PenTool, Sparkles, X, FileSignature, Menu, FolderInput, Printer, Settings
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -180,16 +181,53 @@ const DashboardChart = ({ data }: { data: RecordFile[] }) => {
   );
 };
 
-// --- COMPONENT BÁO CÁO (Đã được điều chỉnh để nhận State từ App) ---
-interface ReportSectionProps {
-    reportContent: string;
-    loading: boolean;
-    range: 'week' | 'month' | 'last_month';
-    setRange: (range: 'week' | 'month' | 'last_month') => void;
-    onGenerate: () => void;
-}
+// --- COMPONENT BÁO CÁO (ReportSection) ---
+const ReportSection = ({ records, currentUser }: { records: RecordFile[], currentUser: User }) => {
+    const [reportContent, setReportContent] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [range, setRange] = useState<'week' | 'month' | 'last_month'>('week');
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, loading, range, setRange, onGenerate }) => {
+    const handleGenerate = async () => {
+        setLoading(true);
+        setReportContent(''); // Reset
+
+        // 1. Lọc dữ liệu theo thời gian
+        const now = new Date();
+        const filtered = records.filter(r => {
+            if(!r.receivedDate) return false;
+            const rDate = new Date(r.receivedDate);
+            
+            if (range === 'week') {
+                const sevenDaysAgo = new Date(now);
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                return rDate >= sevenDaysAgo && rDate <= now;
+            } else if (range === 'month') {
+                return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
+            } else if (range === 'last_month') {
+                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
+            }
+            return false;
+        });
+
+        // 2. Tạo nhãn thời gian
+        let timeLabel = '';
+        if (range === 'week') timeLabel = '7 ngày qua';
+        else if (range === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
+        else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
+
+        // 3. Gọi API
+        try {
+            const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
+            const result = await generateReport(filtered, timeLabel, scope, currentUser.name);
+            setReportContent(result);
+        } catch (error) {
+            setReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] gap-4">
             {/* Toolbar */}
@@ -211,7 +249,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, loading, r
                     </select>
 
                     <button 
-                        onClick={onGenerate}
+                        onClick={handleGenerate}
                         disabled={loading}
                         className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm font-medium text-sm"
                     >
@@ -232,7 +270,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, loading, r
                         <FileText size={64} className="mb-4 text-gray-300" />
                         <p className="text-lg">Chọn thời gian và nhấn "Tạo báo cáo ngay"</p>
                         <p className="text-sm">AI sẽ phân tích dữ liệu hồ sơ và viết báo cáo cho bạn.</p>
-                        <p className="text-xs italic mt-2 text-blue-500">Mẹo: Bạn có thể chuyển tab làm việc khác trong khi AI đang viết.</p>
                     </div>
                 )}
             </div>
@@ -257,12 +294,6 @@ function App() {
     return saved ? JSON.parse(saved) : DEFAULT_WARDS;
   });
 
-  // --- STATE CHO BÁO CÁO (LIFTED STATE UP) ---
-  // Đưa state này ra App để giữ dữ liệu khi chuyển tab
-  const [reportContent, setReportContent] = useState('');
-  const [isReportLoading, setIsReportLoading] = useState(false);
-  const [reportRange, setReportRange] = useState<'week' | 'month' | 'last_month'>('week');
-
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
@@ -277,6 +308,9 @@ function App() {
   const [isExcelPreviewOpen, setIsExcelPreviewOpen] = useState(false);
   const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [previewExcelName, setPreviewExcelName] = useState('');
+  
+  // --- STATE CHO TEMPLATE CONFIG (MỚI) ---
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   // LOAD DATA
   useEffect(() => {
@@ -345,49 +379,6 @@ function App() {
   const handleDeleteUser = async (username: string) => {
       const success = await deleteUserApi(username);
       if(success) setUsers(prev => prev.filter(u => u.username !== username));
-  };
-
-  // --- HÀM TẠO BÁO CÁO (LIFTED UP) ---
-  const handleGenerateReport = async () => {
-      if (!currentUser) return;
-      setIsReportLoading(true);
-      setReportContent(''); // Reset nội dung tạm thời, nhưng state loading vẫn giữ UI
-
-      // 1. Lọc dữ liệu theo thời gian
-      const now = new Date();
-      const filtered = records.filter(r => {
-          if(!r.receivedDate) return false;
-          const rDate = new Date(r.receivedDate);
-          
-          if (reportRange === 'week') {
-              const sevenDaysAgo = new Date(now);
-              sevenDaysAgo.setDate(now.getDate() - 7);
-              return rDate >= sevenDaysAgo && rDate <= now;
-          } else if (reportRange === 'month') {
-              return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
-          } else if (reportRange === 'last_month') {
-              const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-              return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
-          }
-          return false;
-      });
-
-      // 2. Tạo nhãn thời gian
-      let timeLabel = '';
-      if (reportRange === 'week') timeLabel = '7 ngày qua';
-      else if (reportRange === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-      else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
-
-      // 3. Gọi API
-      try {
-          const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
-          const result = await generateReport(filtered, timeLabel, scope, currentUser.name);
-          setReportContent(result);
-      } catch (error) {
-          setReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key.");
-      } finally {
-          setIsReportLoading(false);
-      }
   };
 
   // ... (Các logic phân trang, sort, filter giữ nguyên)
@@ -603,6 +594,153 @@ function App() {
   }, [filteredRecords, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+
+  // --- HÀM TẠO EXCEL PREVIEW CHO DANH SÁCH ---
+  const handlePreviewList = () => {
+      if (filteredRecords.length === 0) {
+          alert("Danh sách trống, không có dữ liệu để xem.");
+          return;
+      }
+
+      // 1. Chuẩn bị tiêu đề & dữ liệu
+      let title = "DANH SÁCH HỒ SƠ";
+      if (currentView === 'check_list') title = "DANH SÁCH HỒ SƠ TRÌNH KÝ";
+      else if (currentView === 'handover_list') title = "DANH SÁCH TRẢ KẾT QUẢ";
+
+      const dateParts = new Date().toLocaleDateString('vi-VN').split('/');
+      const dateStr = `Ngày ${dateParts[0]} tháng ${dateParts[1]} năm ${dateParts[2]}`;
+
+      // Header bảng
+      const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"];
+      
+      // Dữ liệu dòng
+      const dataRows = filteredRecords.map((r, i) => [
+          i + 1,
+          r.code,
+          r.customerName,
+          r.address || r.ward,
+          r.recordType,
+          r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
+          r.content
+      ]);
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([]);
+
+      // 2. Định nghĩa Style (Chuẩn văn bản)
+      const styles = {
+          // Quốc hiệu
+          nationalTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } },
+          nationalSlogan: { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } },
+          // Tiêu đề báo cáo
+          reportTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } },
+          reportSubTitle: { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } },
+          // Header bảng
+          header: { 
+              font: { name: "Times New Roman", sz: 11, bold: true }, 
+              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, 
+              fill: { fgColor: { rgb: "E0E0E0" } }, 
+              alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+          },
+          // Cell dữ liệu bình thường
+          cell: { 
+              font: { name: "Times New Roman", sz: 11 }, 
+              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
+              alignment: { vertical: "center", wrapText: true }
+          },
+          // Cell căn giữa (STT, Hẹn trả)
+          cellCenter: {
+              font: { name: "Times New Roman", sz: 11 }, 
+              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
+              alignment: { horizontal: "center", vertical: "center", wrapText: true }
+          },
+          // Footer
+          footerTitle: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center" } },
+          footerNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center" } }
+      };
+
+      // 3. Xây dựng nội dung
+      XLSX.utils.sheet_add_aoa(ws, [
+          ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"], // A1
+          ["Độc lập - Tự do - Hạnh phúc"],         // A2
+          [""],                                    // A3
+          [title],                                 // A4
+          [dateStr],                               // A5
+          [""],                                    // A6
+          tableHeader                              // A7 (Header)
+      ], { origin: "A1" });
+
+      // Thêm dữ liệu từ A8
+      XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A8" });
+
+      const lastRow = 7 + dataRows.length; // Index dòng cuối dữ liệu (0-based)
+      const footerStart = lastRow + 2;
+
+      // Thêm Footer (Chữ ký)
+      XLSX.utils.sheet_add_aoa(ws, [
+          ["BÊN GIAO", "", "", "", "BÊN NHẬN"],
+          ["(Ký ghi rõ họ tên)", "", "", "", "(Ký ghi rõ họ tên)"]
+      ], { origin: `A${footerStart + 1}` });
+
+      // 4. Áp dụng Style & Merge
+      // Merge tiêu đề
+      ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // Quốc hiệu
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }, // Tiêu ngữ
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 6 } }, // Tên DS
+          { s: { r: 4, c: 0 }, e: { r: 4, c: 6 } }, // Ngày
+          // Footer Merge
+          { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 2 } },     // Bên trái
+          { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 2 } },
+          { s: { r: footerStart, c: 4 }, e: { r: footerStart, c: 6 } },     // Bên phải
+          { s: { r: footerStart + 1, c: 4 }, e: { r: footerStart + 1, c: 6 } },
+      ];
+
+      // Độ rộng cột
+      ws['!cols'] = [
+          { wch: 5 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 15 }
+      ];
+
+      // Gán Style Header
+      if(ws['A1']) ws['A1'].s = styles.nationalTitle;
+      if(ws['A2']) ws['A2'].s = styles.nationalSlogan;
+      if(ws['A4']) ws['A4'].s = styles.reportTitle;
+      if(ws['A5']) ws['A5'].s = styles.reportSubTitle;
+
+      // Gán Style Bảng
+      for(let c=0; c<=6; c++) { 
+          // Header Row (A7)
+          const ref = XLSX.utils.encode_cell({r: 6, c: c}); 
+          if(!ws[ref]) ws[ref] = { v: "", t: "s"}; 
+          ws[ref].s = styles.header; 
+      }
+      for(let r=7; r < 7 + dataRows.length; r++) { 
+          for(let c=0; c<=6; c++) { 
+              const ref = XLSX.utils.encode_cell({r: r, c: c}); 
+              if(!ws[ref]) ws[ref] = { v: "", t: "s"}; 
+              
+              if(c === 0 || c === 5) ws[ref].s = styles.cellCenter; // Căn giữa STT, Hẹn trả
+              else ws[ref].s = styles.cell; 
+          } 
+      }
+
+      // Gán Style Footer
+      const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
+      const leftNote = XLSX.utils.encode_cell({r: footerStart + 1, c: 0});
+      const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 4});
+      const rightNote = XLSX.utils.encode_cell({r: footerStart + 1, c: 4});
+
+      if(ws[leftTitle]) ws[leftTitle].s = styles.footerTitle;
+      if(ws[leftNote]) ws[leftNote].s = styles.footerNote;
+      if(ws[rightTitle]) ws[rightTitle].s = styles.footerTitle;
+      if(ws[rightNote]) ws[rightNote].s = styles.footerNote;
+
+      XLSX.utils.book_append_sheet(wb, ws, "Danh Sach");
+      
+      setPreviewWorkbook(wb);
+      setPreviewExcelName(`${title.replace(/\s/g, '_')}_${new Date().getTime()}`);
+      setIsExcelPreviewOpen(true);
+  };
 
   const advanceStatus = async (record: RecordFile, targetStatus?: RecordStatus) => {
     let nextStatus = targetStatus;
@@ -859,15 +997,7 @@ function App() {
 
   // --- LOGIC RENDER MAIN VIEW (CẬP NHẬT 2 COMPONENT MỚI) ---
   const renderMainContent = (): React.ReactNode => {
-    if (currentView === 'reports' && currentUser) return (
-        <ReportSection 
-            reportContent={reportContent} 
-            loading={isReportLoading} 
-            range={reportRange} 
-            setRange={setReportRange} 
-            onGenerate={handleGenerateReport} 
-        />
-    );
+    if (currentView === 'reports' && currentUser) return <ReportSection records={records} currentUser={currentUser} />;
     
     // === CHAT NỘI BỘ ===
     if (currentView === 'internal_chat' && currentUser) {
@@ -1192,6 +1322,14 @@ function App() {
 
                 {canPerformAction && isListView && (
                    <>
+                    {/* NÚT XEM & IN MỚI */}
+                    <button onClick={() => setIsTemplateModalOpen(true)} className="text-sm text-gray-600 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm hover:bg-gray-50 flex items-center gap-1 transition-colors">
+                        <Settings size={14} /> Cấu hình Mẫu
+                    </button>
+                    <button onClick={handlePreviewList} className="flex items-center gap-2 bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-md hover:bg-blue-200 transition-colors text-sm font-bold shadow-sm">
+                        <Eye size={16} /> Xem & In
+                    </button>
+
                     <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm ml-auto" onClick={() => setIsExportModalOpen(true)}>
                         <FileDown size={16} className="text-green-600" /> Xuất Excel
                     </button>
@@ -1548,7 +1686,12 @@ function App() {
       <DeleteConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteRecord} message={`Bạn có chắc chắn muốn xóa hồ sơ ${deletingRecord?.code}?`} />
       <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} records={records} wards={wards} />
       
-      {/* Modal Preview Excel */}
+      {/* MODAL MỚI CHO VIEW & PRINT */}
+      <TemplateConfigModal 
+        isOpen={isTemplateModalOpen} 
+        onClose={() => setIsTemplateModalOpen(false)} 
+        type="excel_list"
+      />
       <ExcelPreviewModal 
         isOpen={isExcelPreviewOpen} 
         onClose={() => setIsExcelPreviewOpen(false)} 

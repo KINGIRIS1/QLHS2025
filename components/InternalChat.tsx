@@ -44,9 +44,11 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   // Screenshot & Cropping State
   const [screenshotImg, setScreenshotImg] = useState<string | null>(null);
   const [isCropping, setIsCropping] = useState(false);
+  const [isScreenshotMenuOpen, setIsScreenshotMenuOpen] = useState(false); // State quản lý menu chụp ảnh
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const screenshotMenuRef = useRef<HTMLDivElement>(null); // Ref để bắt sự kiện click ra ngoài
 
   const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
 
@@ -58,6 +60,17 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Xử lý đóng menu chụp ảnh khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (screenshotMenuRef.current && !screenshotMenuRef.current.contains(event.target as Node)) {
+        setIsScreenshotMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Load Groups
   useEffect(() => {
@@ -523,31 +536,34 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     <Paperclip size={20} />
                 </button>
                 
-                {/* SCREENSHOT BUTTONS (ZALO STYLE) */}
-                <div className="relative group/shot hidden sm:block">
+                {/* SCREENSHOT BUTTONS (CLICK TO OPEN) */}
+                <div className="relative hidden sm:block" ref={screenshotMenuRef}>
                     <button 
                         type="button" 
-                        className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors peer"
+                        onClick={() => setIsScreenshotMenuOpen(!isScreenshotMenuOpen)}
+                        className={`p-3 rounded-full transition-colors ${isScreenshotMenuOpen ? 'text-blue-600 bg-blue-100' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100'}`}
+                        title="Chụp màn hình"
                     >
                         <Camera size={20} />
                     </button>
-                    {/* Hover Dropdown Menu */}
-                    <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 p-1 w-48 hidden group-hover/shot:block hover:block z-50 animate-fade-in-up">
-                        <button 
-                            type="button"
-                            onClick={() => handleScreenshot(true)} 
-                            className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm text-gray-700 flex items-center gap-2"
-                        >
-                            <Monitor size={16} /> Chụp màn hình khác
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => handleScreenshot(false)} 
-                            className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm text-gray-700 flex items-center gap-2"
-                        >
-                            <Crop size={16} /> Chụp cửa sổ chat
-                        </button>
-                    </div>
+                    {isScreenshotMenuOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 p-1 w-48 z-50 animate-fade-in-up">
+                            <button 
+                                type="button"
+                                onClick={() => { handleScreenshot(true); setIsScreenshotMenuOpen(false); }} 
+                                className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm text-gray-700 flex items-center gap-2"
+                            >
+                                <Monitor size={16} /> Chụp màn hình khác
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => { handleScreenshot(false); setIsScreenshotMenuOpen(false); }} 
+                                className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm text-gray-700 flex items-center gap-2"
+                            >
+                                <Crop size={16} /> Chụp cửa sổ chat
+                            </button>
+                        </div>
+                    )}
                 </div>
                 
                 <div className="flex-1 relative">

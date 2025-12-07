@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2 } from 'lucide-react';
 import { User, UserRole } from '../types';
 
 interface SidebarProps {
@@ -12,6 +12,7 @@ interface SidebarProps {
   onLogout: () => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
+  isGeneratingReport?: boolean; // Prop mới: Trạng thái đang tạo báo cáo
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -22,7 +23,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentUser, 
   onLogout,
   mobileOpen,
-  setMobileOpen
+  setMobileOpen,
+  isGeneratingReport = false
 }) => {
   const isAdmin = currentUser.role === UserRole.ADMIN;
   const isSubadmin = currentUser.role === UserRole.SUBADMIN;
@@ -39,7 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       id: 'internal_chat', 
       label: 'Chat nội bộ', 
       icon: MessageSquare, 
-      visible: true // Hiển thị cho mọi người
+      visible: true 
     },
     { 
       id: 'personal_profile', 
@@ -51,13 +53,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       id: 'receive_record', 
       label: 'Tiếp nhận hồ sơ', 
       icon: FolderInput, 
-      visible: true // Hiển thị cho mọi người
+      visible: true 
     },
     { 
       id: 'receive_contract', 
       label: 'Tiếp nhận hợp đồng', 
       icon: FileSignature, 
-      visible: true // Hiển thị cho mọi người
+      visible: true 
     },
     { 
       id: 'all_records', 
@@ -150,14 +152,20 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleMenuClick(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${
                 currentView === item.id
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              <item.icon size={20} />
-              <span className="font-medium text-sm">{item.label}</span>
+              <div className="flex items-center gap-3">
+                <item.icon size={20} />
+                <span className="font-medium text-sm">{item.label}</span>
+              </div>
+              {/* Hiển thị icon Loading nếu đang tạo báo cáo và mục menu là Reports */}
+              {item.id === 'reports' && isGeneratingReport && (
+                <Loader2 size={16} className="animate-spin text-yellow-400" />
+              )}
             </button>
           ))}
           
@@ -209,7 +217,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               Đăng xuất
           </button>
           <div className="mt-2 text-[10px] text-slate-500 text-center">
-              Phiên bản 1.6.0
+              Phiên bản 1.6.1
           </div>
         </div>
       </div>

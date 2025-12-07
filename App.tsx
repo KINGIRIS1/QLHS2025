@@ -165,50 +165,18 @@ const DashboardChart = ({ data }: { data: RecordFile[] }) => {
 };
 
 // --- COMPONENT BÁO CÁO (ReportSection) ---
-const ReportSection = ({ records, currentUser }: { records: RecordFile[], currentUser: User }) => {
-    const [reportContent, setReportContent] = useState('');
-    const [loading, setLoading] = useState(false);
+// Đã được cập nhật để nhận Props từ App thay vì xử lý local state
+interface ReportSectionProps {
+    reportContent: string;
+    isGenerating: boolean;
+    onGenerate: (range: 'week' | 'month' | 'last_month') => void;
+}
+
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate }) => {
     const [range, setRange] = useState<'week' | 'month' | 'last_month'>('week');
 
-    const handleGenerate = async () => {
-        setLoading(true);
-        setReportContent(''); // Reset
-
-        // 1. Lọc dữ liệu theo thời gian
-        const now = new Date();
-        const filtered = records.filter(r => {
-            if(!r.receivedDate) return false;
-            const rDate = new Date(r.receivedDate);
-            
-            if (range === 'week') {
-                const sevenDaysAgo = new Date(now);
-                sevenDaysAgo.setDate(now.getDate() - 7);
-                return rDate >= sevenDaysAgo && rDate <= now;
-            } else if (range === 'month') {
-                return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
-            } else if (range === 'last_month') {
-                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
-            }
-            return false;
-        });
-
-        // 2. Tạo nhãn thời gian
-        let timeLabel = '';
-        if (range === 'week') timeLabel = '7 ngày qua';
-        else if (range === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-        else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
-
-        // 3. Gọi API
-        try {
-            const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
-            const result = await generateReport(filtered, timeLabel, scope, currentUser.name);
-            setReportContent(result);
-        } catch (error) {
-            setReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key.");
-        } finally {
-            setLoading(false);
-        }
+    const handleGenerateClick = () => {
+        onGenerate(range);
     };
 
     return (
@@ -232,12 +200,12 @@ const ReportSection = ({ records, currentUser }: { records: RecordFile[], curren
                     </select>
 
                     <button 
-                        onClick={handleGenerate}
-                        disabled={loading}
+                        onClick={handleGenerateClick}
+                        disabled={isGenerating}
                         className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm font-medium text-sm"
                     >
-                        {loading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                        {loading ? 'Đang viết báo cáo...' : 'Tạo báo cáo ngay'}
+                        {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                        {isGenerating ? 'Đang viết báo cáo...' : 'Tạo báo cáo ngay'}
                     </button>
                 </div>
             </div>
@@ -252,7 +220,9 @@ const ReportSection = ({ records, currentUser }: { records: RecordFile[], curren
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60">
                         <FileText size={64} className="mb-4 text-gray-300" />
                         <p className="text-lg">Chọn thời gian và nhấn "Tạo báo cáo ngay"</p>
-                        <p className="text-sm">AI sẽ phân tích dữ liệu hồ sơ và viết báo cáo cho bạn.</p>
+                        <p className="text-sm">
+                            {isGenerating ? 'AI đang phân tích dữ liệu... Bạn có thể chuyển tab khác, quá trình này sẽ chạy ngầm.' : 'AI sẽ phân tích dữ liệu hồ sơ và viết báo cáo cho bạn.'}
+                        </p>
                     </div>
                 )}
             </div>
@@ -291,6 +261,10 @@ function App() {
   const [isExcelPreviewOpen, setIsExcelPreviewOpen] = useState(false);
   const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [previewExcelName, setPreviewExcelName] = useState('');
+
+  // --- STATE BÁO CÁO TOÀN CỤC ---
+  const [globalReportContent, setGlobalReportContent] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   // LOAD DATA
   useEffect(() => {
@@ -359,6 +333,49 @@ function App() {
   const handleDeleteUser = async (username: string) => {
       const success = await deleteUserApi(username);
       if(success) setUsers(prev => prev.filter(u => u.username !== username));
+  };
+
+  // --- HÀM TẠO BÁO CÁO TOÀN CỤC ---
+  const handleGlobalGenerateReport = async (range: 'week' | 'month' | 'last_month') => {
+      if (!currentUser) return;
+      setIsGeneratingReport(true);
+      setGlobalReportContent(''); // Reset tạm thời (hoặc giữ nguyên nếu muốn)
+
+      // 1. Lọc dữ liệu theo thời gian
+      const now = new Date();
+      const filtered = records.filter(r => {
+          if(!r.receivedDate) return false;
+          const rDate = new Date(r.receivedDate);
+          
+          if (range === 'week') {
+              const sevenDaysAgo = new Date(now);
+              sevenDaysAgo.setDate(now.getDate() - 7);
+              return rDate >= sevenDaysAgo && rDate <= now;
+          } else if (range === 'month') {
+              return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
+          } else if (range === 'last_month') {
+              const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
+          }
+          return false;
+      });
+
+      // 2. Tạo nhãn thời gian
+      let timeLabel = '';
+      if (range === 'week') timeLabel = '7 ngày qua';
+      else if (range === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
+      else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
+
+      // 3. Gọi API
+      try {
+          const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
+          const result = await generateReport(filtered, timeLabel, scope, currentUser.name);
+          setGlobalReportContent(result);
+      } catch (error) {
+          setGlobalReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key.");
+      } finally {
+          setIsGeneratingReport(false);
+      }
   };
 
   // ... (Các logic phân trang, sort, filter giữ nguyên)
@@ -815,7 +832,16 @@ function App() {
 
   // --- LOGIC RENDER MAIN VIEW ---
   const renderMainContent = (): React.ReactNode => {
-    if (currentView === 'reports' && currentUser) return <ReportSection records={records} currentUser={currentUser} />;
+    // --- SỬ DỤNG ReportSection ĐÃ ĐƯỢC TÁCH ---
+    if (currentView === 'reports' && currentUser) {
+        return (
+            <ReportSection 
+                reportContent={globalReportContent} 
+                isGenerating={isGeneratingReport}
+                onGenerate={handleGlobalGenerateReport}
+            />
+        );
+    }
     
     if (currentView === 'internal_chat' && currentUser) {
         return <InternalChat currentUser={currentUser} wards={wards} employees={employees} users={users} />;
@@ -1400,7 +1426,8 @@ function App() {
         currentUser={currentUser}
         onLogout={() => setCurrentUser(null)}
         mobileOpen={isMobileMenuOpen} 
-        setMobileOpen={setIsMobileMenuOpen} 
+        setMobileOpen={setIsMobileMenuOpen}
+        isGeneratingReport={isGeneratingReport} // Truyền prop này vào Sidebar
       />
       
       <main className="flex-1 p-4 h-screen overflow-hidden flex flex-col">

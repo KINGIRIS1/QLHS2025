@@ -91,7 +91,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     let fileName = "";
 
     // Xử lý tên xã phường để hiển thị
-    const wardTitle = selectedWard === 'all' ? "TOÀN BỘ" : selectedWard.toUpperCase();
+    // NẾU selectedWard là 'all' thì hiển thị "TOÀN BỘ", ngược lại hiển thị tên xã
+    const wardTitle = selectedWard === 'all' ? "" : ` - ${selectedWard.toUpperCase()}`;
 
     if (type === 'handover') {
         const [dateStr, batchStr] = selectedBatchKey.split('_');
@@ -103,7 +104,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             return matchBatch && matchWard;
         });
 
-        title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA - ${wardTitle}`;
+        title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA${wardTitle}`;
         subTitle = `ĐỢT: ${batchNum}  -  TỔNG SỐ HỒ SƠ: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         fileName = `Giao_1_Cua_Dot_${batchNum}_${safeDate}`;
@@ -119,7 +120,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             return matchDate && matchStatus && matchWard;
         });
 
-        title = `DANH SÁCH HỒ SƠ TRÌNH KÝ - ${wardTitle}`;
+        title = `DANH SÁCH HỒ SƠ TRÌNH KÝ${wardTitle}`;
         subTitle = `NGÀY TIẾP NHẬN: ${formatDate(dateStr)}  -  SỐ LƯỢNG: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         fileName = `Trinh_Ky_Ngay_${safeDate}`;
@@ -165,6 +166,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]); 
 
+    // Header Quốc Hiệu
     XLSX.utils.sheet_add_aoa(ws, [
         ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
         ["Độc lập - Tự do - Hạnh phúc"],
@@ -176,18 +178,23 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         tableHeader
     ], { origin: "A1" });
 
+    // Data
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A9" });
 
     const lastDataRow = 8 + dataRows.length;
     const footerStartRow = lastDataRow + 2;
 
-    // Thêm Footer (Canh đều 2 bên)
+    // Thêm Footer (Canh đều 2 bên - Justify)
+    // Để canh đều 2 bên cho khổ A4 Landscape, ta đặt:
+    // Bên giao: Cột A -> E (Merge)
+    // Bên nhận: Cột G -> K (Merge)
+    // Cột F ở giữa làm khoảng trắng
     XLSX.utils.sheet_add_aoa(ws, [
-        ["BÊN GIAO HỒ SƠ", "", "", "", "", "BÊN NHẬN HỒ SƠ"],
-        ["(Ký và ghi rõ họ tên)", "", "", "", "", "(Ký và ghi rõ họ tên)"]
+        ["BÊN GIAO HỒ SƠ", "", "", "", "", "", "BÊN NHẬN HỒ SƠ"],
+        ["(Ký và ghi rõ họ tên)", "", "", "", "", "", "(Ký và ghi rõ họ tên)"]
     ], { origin: `A${footerStartRow + 1}` });
 
-    // Độ rộng cột tinh chỉnh cho vừa A4 Landscape
+    // Độ rộng cột tinh chỉnh cho vừa A4 Landscape (Tổng width ~ 140-150)
     const wscols = [
         { wch: 5 },  // STT
         { wch: 14 }, // Mã HS
@@ -210,9 +217,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         { s: { r: 4, c: 0 }, e: { r: 4, c: 10 } },
         { s: { r: 5, c: 0 }, e: { r: 5, c: 10 } },
         // Footer Merges (Canh rộng ra)
-        { s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 4 } },     // Bên trái (5 cột)
+        // Bên trái (5 cột: 0,1,2,3,4)
+        { s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 4 } },     
         { s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 4 } }, 
-        { s: { r: footerStartRow, c: 6 }, e: { r: footerStartRow, c: 10 } },    // Bên phải (5 cột)
+        // Bên phải (5 cột: 6,7,8,9,10)
+        { s: { r: footerStartRow, c: 6 }, e: { r: footerStartRow, c: 10 } },    
         { s: { r: footerStartRow + 1, c: 6 }, e: { r: footerStartRow + 1, c: 10 } },
     ];
 
@@ -347,7 +356,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
             <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border border-blue-100 flex gap-2 items-start">
                 <Calendar size={14} className="mt-0.5 text-blue-500 shrink-0" />
-                <p>Hệ thống sẽ tạo file Excel chuẩn A4 Ngang để in ấn.</p>
+                <p>Hệ thống sẽ tạo file Excel chuẩn A4 Ngang (Landscape) để in ấn.</p>
             </div>
 
             <div className="pt-4 flex justify-between gap-3 border-t">

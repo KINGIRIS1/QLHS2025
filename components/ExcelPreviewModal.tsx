@@ -90,12 +90,14 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                     } 
                     // 3. Phần Dữ liệu và Footer
                     else {
-                        // Nhận diện Footer: Có chữ "Bên giao" hoặc "Ký ghi rõ"
-                        if (rowText.includes('bên giao') || rowText.includes('ký ghi rõ') || rowText.includes('bên nhận')) {
+                        // Nhận diện Footer: Có chữ "Bên giao" hoặc "Ký ghi rõ" hoặc "Bên nhận"
+                        // Hoặc các dòng ngay sau dữ liệu chính
+                        if (rowText.includes('bên giao') || rowText.includes('ký') && rowText.includes('họ tên') || rowText.includes('bên nhận')) {
                              cells.forEach((cell: any) => {
                                  cell.style.border = 'none'; // QUAN TRỌNG: Bỏ kẻ bảng footer
                                  cell.style.textAlign = 'center';
                                  cell.style.paddingTop = '10px';
+                                 cell.style.verticalAlign = 'top';
                                  if (rowText.includes('bên giao')) cell.style.fontWeight = 'bold';
                                  else cell.style.fontStyle = 'italic';
                              });
@@ -103,6 +105,9 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                              // Dữ liệu bảng chính
                              cells.forEach((cell: any) => {
                                  // Chỉ kẻ bảng nếu chưa có border (tránh override style từ Excel)
+                                 // Nếu cell rỗng và ở cuối, có thể là footer ẩn, cần check kỹ
+                                 const cellText = cell.innerText.trim();
+                                 // Logic đơn giản: Nếu dòng này không phải footer text thì kẻ bảng
                                  if (!cell.style.border || cell.style.border === 'none') {
                                      cell.style.border = '1px solid black';
                                  }

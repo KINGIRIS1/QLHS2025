@@ -1,9 +1,10 @@
 
+
 import React, { useState, useRef } from 'react';
-import XLSX from 'xlsx-js-style';
+import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { STATUS_LABELS } from '../constants';
-import { X, Upload, FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download } from 'lucide-react';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -19,30 +20,78 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   const [successMsg, setSuccessMsg] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // QUAN TRỌNG: Nếu modal không mở, không hiển thị gì cả
   if (!isOpen) return null;
 
-  // Hàm chuyển đổi ngày từ Excel (dd/mm/yyyy hoặc serial number) sang ISO (yyyy-mm-dd)
-  const parseDate = (dateVal: any): string => {
-    if (!dateVal) return '';
+  // Hàm chuyển đổi ngày từ Excel an toàn hơn
+  // Khắc phục lỗi: 22007 (invalid syntax), 22008 (out of range)
+  const parseDate = (dateVal: any): string | undefined => {
+    if (!dateVal) return undefined;
+
     try {
-        // Trường hợp là số (Excel serial date)
+        let date: Date | null = null;
+
+        // Trường hợp 1: Excel Serial Number (VD: 45321)
         if (typeof dateVal === 'number') {
-            const date = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
-            return date.toISOString().split('T')[0];
+            // Excel tính từ 30/12/1899, cần trừ đi sai số múi giờ nếu cần
+            date = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
         }
-        // Trường hợp là chuỗi "dd/mm/yyyy"
-        if (typeof dateVal === 'string') {
-            const parts = dateVal.split('/');
-            if (parts.length === 3) {
-                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        // Trường hợp 2: Chuỗi ký tự
+        else if (typeof dateVal === 'string') {
+            const cleanStr = dateVal.trim();
+            // Nếu chuỗi chứa ký tự lạ không phải số hoặc dấu phân cách ngày -> Bỏ qua
+            // VD: "619-0032", "CSD RÚT HS" -> Regex check
+            if (!/^[\d\-\/\.]+$/.test(cleanStr)) return undefined;
+
+            // Xử lý dd/mm/yyyy
+            if (cleanStr.includes('/')) {
+                const parts = cleanStr.split('/');
+                if (parts.length === 3) {
+                    const d = parseInt(parts[0], 10);
+                    const m = parseInt(parts[1], 10);
+                    const y = parseInt(parts[2], 10);
+                    // Kiểm tra ngày tháng hợp lệ (VD: Tháng 6 không có ngày 60)
+                    if (m > 12 || d > 31) return undefined;
+                    date = new Date(y, m - 1, d);
+                }
+            } 
+            // Xử lý yyyy-mm-dd
+            else if (cleanStr.includes('-')) {
+                const parts = cleanStr.split('-');
+                if (parts.length === 3) {
+                     // Nếu format ngược dd-mm-yyyy hoặc yyyy-mm-dd
+                     // Kiểm tra phần tử đầu tiên có phải năm không (> 1900)
+                     const p1 = parseInt(parts[0], 10);
+                     if (p1 > 1900) {
+                         date = new Date(cleanStr); // Chuẩn ISO
+                     } else {
+                         // Giả sử dd-mm-yyyy
+                         const d = parseInt(parts[0], 10);
+                         const m = parseInt(parts[1], 10);
+                         const y = parseInt(parts[2], 10);
+                         if (m > 12 || d > 31) return undefined;
+                         date = new Date(y, m - 1, d);
+                     }
+                }
             }
-            // Trường hợp yyyy-mm-dd sẵn
-            if (dateVal.includes('-')) return dateVal;
         }
-        return '';
+
+        // Kiểm tra cuối cùng: Date object có hợp lệ không
+        if (date && !isNaN(date.getTime())) {
+             // Định dạng lại thành YYYY-MM-DD để gửi API
+             const y = date.getFullYear();
+             const m = String(date.getMonth() + 1).padStart(2, '0');
+             const d = String(date.getDate()).padStart(2, '0');
+             
+             // Chặn năm quá xa hoặc quá khứ (lỗi data rác)
+             if (y < 1990 || y > 2100) return undefined;
+
+             return `${y}-${m}-${d}`;
+        }
     } catch (e) {
-        return '';
+        return undefined;
     }
+    return undefined;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +116,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        // FIX: Đổi từ 'binary' sang 'array' để đọc ArrayBuffer -> Ổn định hơn cho file .xlsx
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0]; // Lấy sheet đầu tiên
         const sheet = workbook.Sheets[sheetName];
         // defval: '' để đảm bảo các ô trống không bị undefined
@@ -78,7 +128,33 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         console.error(err);
       }
     };
-    reader.readAsBinaryString(file);
+    // FIX: Sử dụng readAsArrayBuffer thay vì readAsBinaryString
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleDownloadSample = () => {
+      const headers = [
+          "MÃ HỒ SƠ", "CHỦ SỬ DỤNG", "SỐ ĐIỆN THOẠI", "CCCD", 
+          "ĐỊA CHỈ", "XÃ PHƯỜNG", "NHÓM", "TỜ", "THỬA", "DIỆN TÍCH",
+          "LOẠI HỒ SƠ", "NỘI DUNG", "NGÀY TIẾP NHẬN", "NGÀY HẸN TRẢ", 
+          "NGƯỜI XỬ LÝ", "TRẠNG THÁI"
+      ];
+      const sampleData = [
+          "HS-2024-001", "Nguyễn Văn A", "0909123456", "070090001234",
+          "Ấp 1", "Minh Hưng", "Minh Hưng", "10", "123", 150.5,
+          "Trích lục", "Xin trích lục", "2024-01-01", "2024-01-15",
+          "Nguyễn Văn B", "Tiếp nhận mới"
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, sampleData]);
+      
+      // Auto width
+      const wscols = headers.map(h => ({ wch: h.length + 5 }));
+      ws['!cols'] = wscols;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Mau_Nhap_Ho_So");
+      XLSX.writeFile(wb, "Mau_Nhap_Ho_So.xlsx");
   };
 
   const handleImport = () => {
@@ -117,13 +193,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             const customerName = getVal(['CHỦ SỬ DỤNG', 'TÊN', 'HỌ TÊN', 'KHÁCH HÀNG', 'CHỦ HỘ', 'TEN', 'CHU SU DUNG']);
             
             // Xử lý cột ngày tháng
-            const deadline = getVal(['NGÀY HẸN TRẢ', 'HẸN TRẢ', 'DEADLINE', 'NGAY HEN TRA']);
-            const receivedDate = getVal(['NGÀY TIẾP NHẬN', 'NGÀY NHẬN', 'NGÀY NỘP', 'NGAY TIEP NHAN']) || new Date().toISOString().split('T')[0];
+            const deadline = parseDate(getVal(['NGÀY HẸN TRẢ', 'HẸN TRẢ', 'DEADLINE', 'NGAY HEN TRA']));
+            // Nếu không có ngày nhận -> lấy ngày hôm nay
+            const receivedDate = parseDate(getVal(['NGÀY TIẾP NHẬN', 'NGÀY NHẬN', 'NGÀY NỘP', 'NGAY TIEP NHAN'])) || new Date().toISOString().split('T')[0];
             const assignedDate = parseDate(getVal(['NGÀY GIAO NHÂN VIÊN', 'NGÀY GIAO NV', 'NGAY GIAO']));
             const completedDateRaw = getVal(['NGÀY GIAO MỘT CỬA', 'NGÀY TRẢ', 'NGÀY HOÀN THÀNH', 'NGAY TRA KQ']);
             const completedDate = parseDate(completedDateRaw);
 
-            // --- XỬ LÝ SỐ ĐIỆN THOẠI ---
+            // --- XỬ lý SỐ ĐIỆN THOẠI ---
             const rawPhone = getVal(['SỐ ĐIỆN THOẠI', 'SĐT', 'ĐIỆN THOẠI', 'PHONE', 'SDT', 'DIEN THOAI']);
             let phoneNumber = '';
             if (rawPhone) {
@@ -133,6 +210,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     phoneNumber = String(rawPhone);
                 }
             }
+            
+            // --- XỬ LÝ CCCD ---
+            const cccd = String(getVal(['CCCD', 'CMND', 'CĂN CƯỚC', 'CHỨNG MINH']));
+
+            // --- XỬ LÝ ĐỊA CHỈ & DIỆN TÍCH ---
+            const address = String(getVal(['ĐỊA CHỈ', 'DIA CHI', 'ADDRESS']));
+            const areaRaw = getVal(['DIỆN TÍCH', 'DT', 'AREA', 'S']);
+            // Chuyển diện tích sang số
+            const area = parseFloat(String(areaRaw).replace(',', '.')); 
 
             // --- XỬ LÝ NHÂN VIÊN ĐƯỢC GIAO ---
             // Tìm kiếm cột tên nhân viên hoặc người xử lý
@@ -198,12 +284,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             // --- XỬ LÝ LOẠI HỒ SƠ (MAPPING VIẾT TẮT) ---
             let recordTypeRaw = String(getVal(['LOẠI HỒ SƠ', 'LOẠI', 'NOI DUNG', 'LOAI HO SO']) || '').trim();
             
-            // Bảng mã hóa viết tắt -> Tên đầy đủ
+            // Bảng mã hóa viết tắt -> Tên ĐẦY ĐỦ (để lưu vào DB)
             const recordTypeMapping: Record<string, string> = {
-                'TL': 'Trích lục',
-                'TĐ': 'Trích đo', 'TD': 'Trích đo', // Hỗ trợ cả không dấu
-                'ĐĐ': 'Đo đạc',   'DD': 'Đo đạc',   // Hỗ trợ cả không dấu
+                'TL': 'Trích lục bản đồ địa chính',
+                'TĐ': 'Trích đo bản đồ địa chính', 
+                'TD': 'Trích đo bản đồ địa chính',
+                'ĐĐ': 'Đo đạc',   
+                'DD': 'Đo đạc',
                 'CM': 'Cắm mốc',
+                'CL': 'Trích đo chỉnh lý bản đồ địa chính', 
+                'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính', 
+                'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
                 'CCTT': 'Cung cấp thông tin',
                 'TA': 'Tòa án',
                 'THA': 'Thi hành án'
@@ -211,8 +302,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
             // Chuẩn hóa input về dạng chữ hoa để so sánh
             const typeKey = recordTypeRaw.toUpperCase();
-            // Nếu tìm thấy trong bảng map thì lấy giá trị, không thì giữ nguyên
-            const finalRecordType = recordTypeMapping[typeKey] || recordTypeRaw;
+            // Nếu tìm thấy trong bảng map thì lấy giá trị
+            let finalRecordType = recordTypeMapping[typeKey] || recordTypeRaw;
+            
+            // Mapping thêm một số trường hợp tên dài chưa chuẩn
+            const typeLower = finalRecordType.toLowerCase();
+            if (typeLower.includes('trích lục') && !typeLower.includes('bản đồ')) finalRecordType = 'Trích lục bản đồ địa chính';
+            else if ((typeLower.includes('chỉnh lý') || typeLower.includes('hiến đường')) && !typeLower.includes('bản đồ')) finalRecordType = 'Trích đo chỉnh lý bản đồ địa chính';
+            else if (typeLower.includes('trích đo') && !typeLower.includes('chỉnh lý') && !typeLower.includes('bản đồ')) finalRecordType = 'Trích đo bản đồ địa chính';
 
 
             // --- XỬ LÝ XÃ PHƯỜNG & ĐỊA CHÍNH ---
@@ -227,8 +324,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 code: String(code || `AUTO-${Math.floor(Math.random()*10000)}`), 
                 customerName: String(customerName || 'Chưa cập nhật'), 
                 phoneNumber: phoneNumber, 
-                receivedDate: parseDate(receivedDate),
-                deadline: parseDate(deadline) || '',
+                cccd: cccd,
+                address: address,
+                area: isNaN(area) ? 0 : area,
+                receivedDate: receivedDate || new Date().toISOString().split('T')[0], // Fallback nếu parse fail
+                deadline: deadline || '',
                 ward: ward,
                 group: group,
                 landPlot: landPlot,
@@ -282,6 +382,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         <div className="p-6 space-y-4">
             {!successMsg ? (
                 <>
+                    <div className="flex justify-end">
+                        <button 
+                            onClick={handleDownloadSample}
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mb-2"
+                        >
+                            <Download size={14} /> Tải file mẫu chuẩn (.xlsx)
+                        </button>
+                    </div>
+
                     <div 
                         className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => fileInputRef.current?.click()}
@@ -312,11 +421,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                             Tìm thấy <span className="font-bold">{previewData.length}</span> dòng dữ liệu.
                             <br/>
                             <span className="text-xs text-gray-500 italic block mt-1">
-                                * Hệ thống tự động nhận diện các cột: <br/>
-                                - <b>Danh sách xuất</b> (VD: "DS1", "Đợt 5" &rarr; Lấy số đợt và ngày hoàn thành) <br/>
-                                - <b>Người xử lý / Nhân viên</b> (Tự map tên trong Excel với tên nhân viên trong hệ thống) <br/>
-                                - <b>Loại hồ sơ</b> (Tự map TL-Trích lục, TĐ-Trích đo...) <br/>
-                                - Xã/Phường, SĐT, Ngày tháng...
+                                * Hệ thống sẽ <strong>tự động bỏ qua</strong> các cột thừa.<br/>
+                                * Tự động lấy các cột quan trọng: Mã HS, Tên, SĐT, Diện tích, Địa chỉ, Loại HS, Ngày tháng...
                             </span>
                         </div>
                     )}

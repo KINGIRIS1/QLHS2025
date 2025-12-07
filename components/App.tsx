@@ -1,38 +1,41 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { STATUS_LABELS, GROUPS, WARDS as DEFAULT_WARDS } from '../constants';
-import Sidebar from './Sidebar';
-import RecordModal from './RecordModal';
-import ImportModal from './ImportModal';
-import AssignModal from './AssignModal';
-import SettingsModal from './SettingsModal';
-import SystemSettingsModal from './SystemSettingsModal';
-import DetailModal from './DetailModal';
-import DeleteConfirmModal from './DeleteConfirmModal';
-import StatusBadge from './StatusBadge';
-import Login from './Login'; 
-import UserManagement from './UserManagement'; 
-import ExportModal from './ExportModal'; 
-import PersonalProfile from './PersonalProfile'; 
-import ExcerptManagement from './ExcerptManagement';
-import { generateReport } from '../services/geminiService';
+import { STATUS_LABELS, WARDS as DEFAULT_WARDS } from '../constants';
+import Sidebar from './components/Sidebar';
+import RecordModal from './components/RecordModal';
+import ImportModal from './components/ImportModal';
+import AssignModal from './components/AssignModal';
+import SettingsModal from './components/SettingsModal';
+import SystemSettingsModal from './components/SystemSettingsModal';
+import DetailModal from './components/DetailModal';
+import DeleteConfirmModal from './components/DeleteConfirmModal';
+import StatusBadge from './components/StatusBadge';
+import Login from './components/Login'; 
+import UserManagement from './components/UserManagement'; 
+import ExportModal from './components/ExportModal'; 
+import PersonalProfile from './components/PersonalProfile'; 
+import ExcerptManagement from './components/ExcerptManagement';
+import ReceiveRecord from './components/ReceiveRecord'; 
+import ReceiveContract from './components/ReceiveContract'; 
+import InternalChat from './components/InternalChat'; // IMPORT MỚI
+import { generateReport } from './services/geminiService';
 import { 
     fetchRecords, createRecordApi, updateRecordApi, deleteRecordApi, deleteAllDataApi, createRecordsBatchApi,
     fetchEmployees, saveEmployeeApi, deleteEmployeeApi,
     fetchUsers, saveUserApi, deleteUserApi
-} from '../services/api';
-import * as XLSX from 'xlsx';
+} from './services/api';
+import * as XLSX from 'xlsx-js-style';
 import { 
   Plus, Search, ArrowRight, FileCheck, CheckCircle, 
   RefreshCw, Calendar, FileOutput, Loader2,
   BarChart3, FileText, CheckSquare, Square, Users, FileSpreadsheet,
   SlidersHorizontal, AlertTriangle, AlertCircle, Filter, Pencil, RotateCcw, Eye, Trash2, CalendarRange, Clock, FileDown, Lock, Download, WifiOff, Wifi,
-  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, BellRing, MapPin, PenTool, Sparkles, X, FileSignature
+  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, BellRing, MapPin, PenTool, Sparkles, X, FileSignature, Menu, FolderInput
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-// --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
+// --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIT ---
 function removeVietnameseTones(str: string): string {
     if (!str) return '';
     str = str.toLowerCase();
@@ -97,50 +100,6 @@ const isRecordApproaching = (record: RecordFile): boolean => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   return diffDays >= 0 && diffDays <= 3;
-};
-
-// --- HÀM GỬI THÔNG BÁO HỆ THỐNG ---
-const sendDeadlineNotification = (records: RecordFile[], user: User, onClickCallback: () => void) => {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "default") Notification.requestPermission();
-  if (Notification.permission !== "granted") return;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const urgentRecords = records.filter(r => {
-    if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED) return false;
-    if (user.role === UserRole.EMPLOYEE && r.assignedTo !== user.employeeId) return false;
-    if (!r.deadline) return false;
-    const deadline = new Date(r.deadline);
-    deadline.setHours(0, 0, 0, 0);
-    const diffTime = deadline.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 2;
-  });
-
-  if (urgentRecords.length > 0) {
-    const overdueCount = urgentRecords.filter(r => isRecordOverdue(r)).length;
-    const approachingCount = urgentRecords.length - overdueCount;
-
-    let bodyMsg = "";
-    if (overdueCount > 0) bodyMsg += `🔴 ${overdueCount} hồ sơ ĐÃ QUÁ HẠN.\n`;
-    if (approachingCount > 0) bodyMsg += `⚠️ ${approachingCount} hồ sơ đến hạn trong 2 ngày tới.`;
-    bodyMsg += "\n[Nhấn để xem chi tiết]";
-
-    const notification = new Notification("Nhắc nhở hạn trả hồ sơ", {
-      body: bodyMsg || "Bạn có hồ sơ cần xử lý gấp!",
-      icon: '/vite.svg', 
-      tag: 'deadline-notification', 
-      requireInteraction: true 
-    });
-
-    notification.onclick = () => {
-        window.focus();
-        onClickCallback();
-        notification.close();
-    };
-  }
 };
 
 // --- COMPONENT BIỂU ĐỒ ---
@@ -304,11 +263,11 @@ const ReportSection = ({ records, currentUser }: { records: RecordFile[], curren
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [records, setRecords] = useState<RecordFile[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline'>('connected');
   
-  // Dữ liệu Nhân viên và Users tải từ API, không dùng Mock nữa
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   
@@ -325,7 +284,6 @@ function App() {
     direction: 'desc'
   });
 
-  const hasNotifiedRef = useRef(false);
   const [showApproachingOnly, setShowApproachingOnly] = useState(false);
 
   // LOAD DATA
@@ -399,17 +357,6 @@ function App() {
 
   // ... (Các logic phân trang, sort, filter giữ nguyên)
   useEffect(() => { setCurrentPage(1); }, [currentView, sortConfig, showApproachingOnly]);
-
-  const handleNotificationClick = () => { setCurrentView('all_records'); setShowApproachingOnly(true); };
-
-  useEffect(() => {
-    if (currentUser && records.length > 0 && !hasNotifiedRef.current) {
-        sendDeadlineNotification(records, currentUser, handleNotificationClick);
-        hasNotifiedRef.current = true;
-    }
-  }, [records, currentUser]);
-
-  useEffect(() => { hasNotifiedRef.current = false; }, [currentUser]);
 
   const handleAddWard = (newWard: string) => {
     if (!wards.includes(newWard)) setWards(prev => [newWard, ...prev]);
@@ -533,7 +480,8 @@ function App() {
     }
 
     // --- LOGIC LỌC NGÀY (THAY THẾ FILTER TIMERANGE CŨ) ---
-    if (currentView !== 'handover_list') {
+    // Loại trừ các tab mới ra khỏi logic lọc ngày của danh sách chính
+    if (currentView !== 'handover_list' && currentView !== 'receive_record' && currentView !== 'receive_contract') {
          // Nếu là handover_list thì dùng logic riêng ở trên (filterDate cho exportBatch)
          // Còn lại dùng bộ lọc ngày chung cho receivedDate
         if (showAdvancedDateFilter) {
@@ -554,8 +502,6 @@ function App() {
             }
         }
     }
-
-    // Đã bỏ lọc khu vực (Group)
 
     if (filterWard !== 'all') {
          // Áp dụng normalize cho bộ lọc ward luôn
@@ -579,18 +525,15 @@ function App() {
       const rawSearch = searchTerm.toLowerCase().trim();
 
       result = result.filter(r => {
-        // 1. Tìm chính xác (tương đối) với các trường không dấu (Mã, SĐT, Tờ, Thửa)
         if ((r.code || '').toLowerCase().includes(rawSearch)) return true;
         if ((r.phoneNumber || '').includes(rawSearch)) return true;
         if ((r.landPlot || '').toLowerCase().includes(rawSearch)) return true;
         if ((r.mapSheet || '').toLowerCase().includes(rawSearch)) return true;
 
-        // 2. Tìm tương đối với các trường có dấu (Tên, Xã, Khu vực, Nội dung) -> Cần bỏ dấu
         const nameNorm = removeVietnameseTones(r.customerName || '');
         const wardNorm = removeVietnameseTones(r.ward || '');
         const groupNorm = removeVietnameseTones(r.group || '');
         const contentNorm = removeVietnameseTones(r.content || '');
-        // Gộp chung trích đo/lục để tìm kiếm
         const techNorm = removeVietnameseTones((r.measurementNumber || '') + ' ' + (r.excerptNumber || ''));
 
         if (nameNorm.includes(normalizedSearch)) return true;
@@ -684,6 +627,16 @@ function App() {
     setEditingRecord(null);
   };
 
+  // --- HÀM TẠO HỒ SƠ CHO COMPONENT MỚI ---
+  const handleCreateRecord = async (newRecord: RecordFile) => {
+      const savedRecord = await createRecordApi(newRecord);
+      if(savedRecord) {
+          setRecords(prev => [savedRecord, ...prev]);
+          return true;
+      }
+      return false;
+  };
+
   const handleDeleteRecord = async () => {
     if (deletingRecord) {
         await deleteRecordApi(deletingRecord.id);
@@ -752,7 +705,6 @@ function App() {
       alert('Đã giao hồ sơ thành công!');
   };
 
-  // Hàm xuất danh sách đơn giản (cho Danh sách trình ký)
   const handleExportSimple = () => {
       const header = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã Phường", "Nội Dung", "Loại Hồ Sơ", "Số Tờ", "Số Thửa"];
       const data = filteredRecords.map((r, index) => [
@@ -775,18 +727,15 @@ function App() {
           ...data
       ]);
 
-      // Định dạng đơn giản
       ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 }];
       
       XLSX.utils.book_append_sheet(wb, ws, "Danh Sach");
       XLSX.writeFile(wb, "Danh_Sach_Trinh_Ky.xlsx");
   };
 
-  // Chốt danh sách trình ký (Chuyển tất cả PENDING_SIGN -> SIGNED)
   const handleConfirmSignBatch = async () => {
     if (!canPerformAction) return;
 
-    // Lọc ra các hồ sơ đang chờ ký trong danh sách hiển thị
     const recordsToUpdate = filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
 
     if (recordsToUpdate.length === 0) {
@@ -811,8 +760,6 @@ function App() {
   const handleExportBatch = async () => {
     if (!canPerformAction) return;
     const todayStr = filterDate;
-    // Lọc những hồ sơ cần xuất: Status SIGNED hoặc HANDOVER nhưng chưa có batch
-    // Sửa logic: Chốt danh sách ở giao 1 cửa -> Đánh dấu hồ sơ thành HANDOVER luôn
     const recordsToExport = filteredRecords.filter(r => {
         const isExportedToday = r.exportDate?.split('T')[0] === todayStr && r.exportBatch;
         return !isExportedToday;
@@ -835,8 +782,8 @@ function App() {
             ...r, 
             exportBatch: nextBatch, 
             exportDate: timestamp,
-            status: RecordStatus.HANDOVER, // Tự động chuyển về trạng thái Đã giao 1 cửa (Hoàn thành)
-            completedDate: r.completedDate || todayStr // Ghi nhận ngày hoàn thành nếu chưa có
+            status: RecordStatus.HANDOVER,
+            completedDate: r.completedDate || todayStr
         };
         await updateRecordApi(updated);
         return updated;
@@ -851,7 +798,11 @@ function App() {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN');
+    if (isNaN(date.getTime())) return '';
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
   };
 
   const renderSortableHeader = (label: string, sortKey: string) => {
@@ -871,10 +822,16 @@ function App() {
     );
   };
 
-  // --- LOGIC RENDER MAIN VIEW ---
-  const renderMainContent = () => {
+  // --- LOGIC RENDER MAIN VIEW (CẬP NHẬT 2 COMPONENT MỚI) ---
+  const renderMainContent = (): React.ReactNode => {
     if (currentView === 'reports' && currentUser) return <ReportSection records={records} currentUser={currentUser} />;
     
+    // === CHAT NỘI BỘ ===
+    if (currentView === 'internal_chat' && currentUser) {
+        // CẬP NHẬT: Truyền thêm users để thêm thành viên
+        return <InternalChat currentUser={currentUser} wards={wards} employees={employees} users={users} />;
+    }
+
     if (currentView === 'user_management' && isAdmin) {
       return (
         <UserManagement 
@@ -894,6 +851,31 @@ function App() {
                 records={records}
                 onUpdateStatus={(r, status) => advanceStatus(r, status)}
                 onViewRecord={(r) => setViewingRecord(r)}
+            />
+        );
+    }
+
+    // === HIỂN THỊ MÀN HÌNH TIẾP NHẬN HỒ SƠ ===
+    if (currentView === 'receive_record' && currentUser) {
+        return (
+            <ReceiveRecord 
+                onSave={handleCreateRecord}
+                wards={wards}
+                employees={employees}
+                currentUser={currentUser}
+                records={records} // Truyền records để tính mã tự động
+            />
+        );
+    }
+
+    // === HIỂN THỊ MÀN HÌNH TIẾP NHẬN HỢP ĐỒNG ===
+    if (currentView === 'receive_contract' && currentUser) {
+        return (
+            <ReceiveContract 
+                onSave={handleCreateRecord}
+                wards={wards}
+                currentUser={currentUser}
+                records={records}
             />
         );
     }
@@ -923,7 +905,7 @@ function App() {
                         </div>
                         <div className="p-3 bg-blue-50 rounded-lg text-blue-600"><FileText size={24} /></div>
                     </div>
-                    {/* ... (Các thẻ khác giữ nguyên) */}
+                    {/* ... (Các thẻ Dashboard khác giữ nguyên) */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500 mb-1">Đang xử lý</p>
@@ -961,39 +943,11 @@ function App() {
 
     const isListView = currentView === 'check_list' || currentView === 'handover_list';
 
+    // RENDER DANH SÁCH (Mặc định cho các view còn lại)
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full">
-         {/* ... (Phần render List view giữ nguyên) */}
-         {/* Banner quá hạn / sắp tới hạn */}
-         {overdueCount > 0 && !showOverdueOnly && !showApproachingOnly && (
-            <div className="bg-red-50 px-4 py-2 border-b border-red-100 flex items-center justify-between animate-fade-in">
-                <div className="flex items-center gap-2 text-red-700 text-sm font-medium">
-                    <AlertTriangle size={16} />
-                    <span>Cảnh báo: Có {overdueCount} hồ sơ đã quá hạn trả kết quả!</span>
-                </div>
-                <button 
-                    onClick={() => { setShowOverdueOnly(true); setShowApproachingOnly(false); }}
-                    className="text-xs bg-white border border-red-200 text-red-600 px-3 py-1 rounded-full hover:bg-red-100 transition-colors font-semibold"
-                >
-                    Xem danh sách quá hạn
-                </button>
-            </div>
-        )}
-        {approachingCount > 0 && !showApproachingOnly && !showOverdueOnly && (
-             <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-100 flex items-center justify-between animate-fade-in">
-                <div className="flex items-center gap-2 text-yellow-800 text-sm font-medium">
-                    <Clock size={16} />
-                    <span>Chú ý: Có {approachingCount} hồ sơ sắp tới hạn trong 2 ngày tới.</span>
-                </div>
-                <button 
-                    onClick={() => { setShowApproachingOnly(true); setShowOverdueOnly(false); }}
-                    className="text-xs bg-white border border-yellow-200 text-yellow-700 px-3 py-1 rounded-full hover:bg-yellow-100 transition-colors font-semibold"
-                >
-                    Xem hồ sơ sắp tới hạn
-                </button>
-            </div>
-        )}
-
+        {/* ĐÃ GỠ BỎ: Banner cảnh báo quá hạn tại đây theo yêu cầu */}
+        
         <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -1018,10 +972,9 @@ function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
-                 {/* ---------------- BỘ LỌC NGÀY MỚI (CHỈ HIỂN THỊ NẾU KHÔNG PHẢI LIST GIAO 1 CỬA) ---------------- */}
+                 {/* BỘ LỌC NGÀY (Ẩn đi khi ở các tab nhập liệu mới) */}
                  {currentView !== 'handover_list' && (
                      <>
-                        {/* Lọc 1 ngày cơ bản */}
                         {!showAdvancedDateFilter && (
                              <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                                 <Calendar size={16} className="text-gray-500" />
@@ -1040,7 +993,6 @@ function App() {
                             </div>
                         )}
 
-                        {/* Lọc nâng cao: Khoảng thời gian */}
                         {showAdvancedDateFilter && (
                             <div className="flex items-center gap-2 bg-blue-50 px-2 py-1.5 border border-blue-200 rounded-md shadow-sm animate-fade-in">
                                 <span className="text-xs font-semibold text-blue-700">Từ:</span>
@@ -1063,7 +1015,6 @@ function App() {
                             </div>
                         )}
 
-                        {/* Nút Toggle Lọc nâng cao */}
                         <button
                             onClick={() => setShowAdvancedDateFilter(!showAdvancedDateFilter)}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${
@@ -1077,8 +1028,6 @@ function App() {
                         </button>
                      </>
                  )}
-
-                {/* Đã bỏ lọc khu vực */}
 
                 <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                     <MapPin size={16} className="text-gray-500" />
@@ -1130,7 +1079,6 @@ function App() {
                     </div>
                 )}
 
-                {/* Nút lọc Quá hạn/Sắp tới hạn ... */}
                 <button
                     onClick={() => { setShowOverdueOnly(!showOverdueOnly); if(!showOverdueOnly) setShowApproachingOnly(false); }}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${
@@ -1153,7 +1101,6 @@ function App() {
                     <Clock size={16} /> {showApproachingOnly ? 'Đang lọc sắp đến hạn' : 'Lọc sắp đến hạn'}
                 </button>
 
-                {/* Column Selector ... */}
                  <div className="relative" ref={columnSelectorRef}>
                     <button
                         onClick={() => setShowColumnSelector(!showColumnSelector)}
@@ -1202,19 +1149,16 @@ function App() {
 
                 {canPerformAction && isListView && (
                    <>
-                    {/* Nút Xuất Excel (Danh sách đã chốt) */}
                     <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm ml-auto" onClick={() => setIsExportModalOpen(true)}>
                         <FileDown size={16} className="text-green-600" /> Xuất Excel
                     </button>
                     
-                    {/* Nút Chốt danh sách (Chỉ hiện ở tab Giao 1 cửa) */}
                     {currentView === 'handover_list' && (
                         <button className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors text-sm font-medium shadow-sm" onClick={handleExportBatch}>
                             <FileOutput size={16} /> Chốt danh sách
                         </button>
                     )}
 
-                    {/* Nút Xuất danh sách trình ký (Chỉ hiện ở tab Ký kiểm tra) */}
                     {currentView === 'check_list' && (
                         <>
                             <button className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm" onClick={handleExportSimple}>
@@ -1230,9 +1174,9 @@ function App() {
             </div>
         </div>
         
-        {/* Table Content */}
+        {/* Table Content - FIXED WIDTHS AND TRUNCATE */}
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse min-w-[1200px]">
+          <table className="w-full text-left border-collapse min-w-[1400px] table-fixed">
              <thead className="sticky top-0 bg-gray-100 z-10 text-xs font-semibold text-gray-600 uppercase tracking-wider shadow-sm">
               <tr>
                 <th className="p-3 border-b w-10 text-center">
@@ -1242,21 +1186,21 @@ function App() {
                         </button>
                     ) : <Lock size={14} className="text-gray-400 mx-auto" />}
                 </th>
-                {visibleColumns.code && <th className="p-3 border-b">{renderSortableHeader('Mã Hồ Sơ', 'code')}</th>}
-                {visibleColumns.customer && <th className="p-3 border-b">{renderSortableHeader('Chủ Sử Dụng', 'customerName')}</th>}
-                {visibleColumns.phone && <th className="p-3 border-b">{renderSortableHeader('Số Điện Thoại', 'phoneNumber')}</th>}
-                {visibleColumns.received && <th className="p-3 border-b">{renderSortableHeader('Ngày TN', 'receivedDate')}</th>}
-                {visibleColumns.deadline && <th className="p-3 border-b">{renderSortableHeader('Hẹn Trả', 'deadline')}</th>}
-                {visibleColumns.ward && <th className="p-3 border-b">{renderSortableHeader('Xã Phường', 'ward')}</th>}
-                {visibleColumns.group && <th className="p-3 border-b">{renderSortableHeader('Nhóm', 'group')}</th>}
-                {visibleColumns.landInfo && <th className="p-3 border-b text-center">{renderSortableHeader('Thửa / Tờ', 'landPlot')}</th>}
-                {visibleColumns.assigned && <th className="p-3 border-b text-center">{renderSortableHeader('Ngày Giao NV', 'assignedDate')}</th>}
-                {visibleColumns.completed && <th className="p-3 border-b text-center">{renderSortableHeader('Ngày Giao 1 Cửa', 'completedDate')}</th>}
-                {visibleColumns.type && <th className="p-3 border-b">{renderSortableHeader('Loại Hồ Sơ', 'recordType')}</th>}
-                {visibleColumns.tech && <th className="p-3 border-b min-w-[120px]">{renderSortableHeader('Trích Đo/Lục', 'measurementNumber')}</th>}
-                {visibleColumns.batch && <th className="p-3 border-b text-center">{renderSortableHeader('Danh Sách Xuất', 'exportBatch')}</th>}
-                {visibleColumns.status && <th className="p-3 border-b text-center">{renderSortableHeader('Trạng Thái', 'status')}</th>}
-                {canPerformAction && <th className="p-3 border-b sticky right-0 bg-gray-100 shadow-l">Thao Tác</th>}
+                {visibleColumns.code && <th className="p-3 border-b w-[140px]">{renderSortableHeader('Mã Hồ Sơ', 'code')}</th>}
+                {visibleColumns.customer && <th className="p-3 border-b w-[200px]">{renderSortableHeader('Chủ Sử Dụng', 'customerName')}</th>}
+                {visibleColumns.phone && <th className="p-3 border-b w-[120px]">{renderSortableHeader('Số Điện Thoại', 'phoneNumber')}</th>}
+                {visibleColumns.received && <th className="p-3 border-b w-[120px]">{renderSortableHeader('Ngày TN', 'receivedDate')}</th>}
+                {visibleColumns.deadline && <th className="p-3 border-b w-[130px]">{renderSortableHeader('Hẹn Trả', 'deadline')}</th>}
+                {visibleColumns.ward && <th className="p-3 border-b w-[150px]">{renderSortableHeader('Xã Phường', 'ward')}</th>}
+                {visibleColumns.group && <th className="p-3 border-b w-[120px]">{renderSortableHeader('Nhóm', 'group')}</th>}
+                {visibleColumns.landInfo && <th className="p-3 border-b text-center w-[100px]">{renderSortableHeader('Thửa / Tờ', 'landPlot')}</th>}
+                {visibleColumns.assigned && <th className="p-3 border-b text-center w-[120px]">{renderSortableHeader('Ngày Giao', 'assignedDate')}</th>}
+                {visibleColumns.completed && <th className="p-3 border-b text-center w-[120px]">{renderSortableHeader('Ngày Xong', 'completedDate')}</th>}
+                {visibleColumns.type && <th className="p-3 border-b w-[200px]">{renderSortableHeader('Loại Hồ Sơ', 'recordType')}</th>}
+                {visibleColumns.tech && <th className="p-3 border-b w-[120px]">{renderSortableHeader('Trích Đo/Lục', 'measurementNumber')}</th>}
+                {visibleColumns.batch && <th className="p-3 border-b text-center w-[120px]">{renderSortableHeader('DS Xuất', 'exportBatch')}</th>}
+                {visibleColumns.status && <th className="p-3 border-b text-center w-[140px]">{renderSortableHeader('Trạng Thái', 'status')}</th>}
+                {canPerformAction && <th className="p-3 border-b sticky right-0 bg-gray-100 shadow-l w-[120px] text-center">Thao Tác</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
@@ -1273,8 +1217,7 @@ function App() {
                                 ${isOverdue ? 'bg-red-50 border-l-red-500 hover:bg-red-100' : isApproaching ? 'bg-orange-50 border-l-orange-500 hover:bg-orange-100' : isSelected ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100' : 'border-l-transparent hover:bg-blue-50/60 hover:shadow-sm'}`}
                                 onDoubleClick={() => setViewingRecord(record)}
                             >
-                                {/* ... (Nội dung từng dòng giữ nguyên như cũ, chỉ thay đổi logic lấy employee ở trên) */}
-                                <td className="p-3 text-center">
+                                <td className="p-3 text-center align-middle">
                                   {canPerformAction ? (
                                      <button onClick={() => toggleSelectRecord(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
                                         {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
@@ -1283,20 +1226,20 @@ function App() {
                                 </td>
                                 
                                 {visibleColumns.code && (
-                                    <td className="p-3 font-medium text-blue-600 cursor-pointer" onClick={() => { 
+                                    <td className="p-3 font-medium text-blue-600 cursor-pointer align-middle" onClick={() => { 
                                         if(canPerformAction) { setEditingRecord(record); setIsModalOpen(true); } 
                                         else { setViewingRecord(record); }
                                     }}>
-                                        {record.code}
-                                        {isOverdue && <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold">Quá hạn</span>}
+                                        <div className="truncate" title={record.code}>{record.code}</div>
+                                        {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold mt-1">Quá hạn</span>}
                                     </td>
                                 )}
                                 
-                                {visibleColumns.customer && <td className="p-3 font-medium text-gray-900">{record.customerName}</td>}
-                                {visibleColumns.phone && <td className="p-3 text-gray-500">{record.phoneNumber || '--'}</td>}
-                                {visibleColumns.received && <td className="p-3 text-gray-600">{formatDate(record.receivedDate)}</td>}
+                                {visibleColumns.customer && <td className="p-3 font-medium text-gray-900 align-middle"><div className="truncate" title={record.customerName}>{record.customerName}</div></td>}
+                                {visibleColumns.phone && <td className="p-3 text-gray-500 align-middle">{record.phoneNumber || '--'}</td>}
+                                {visibleColumns.received && <td className="p-3 text-gray-600 align-middle">{formatDate(record.receivedDate)}</td>}
                                 {visibleColumns.deadline && (
-                                    <td className="p-3">
+                                    <td className="p-3 align-middle">
                                         <div className="flex items-center gap-1">
                                             <span className={`font-medium ${isOverdue ? 'text-red-700' : isApproaching ? 'text-orange-700' : 'text-gray-600'}`}>
                                                 {formatDate(record.deadline)}
@@ -1306,10 +1249,10 @@ function App() {
                                         </div>
                                     </td>
                                 )}
-                                {visibleColumns.ward && <td className="p-3 text-gray-600">{record.ward || '--'}</td>}
-                                {visibleColumns.group && <td className="p-3"><span className="inline-block px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">{record.group}</span></td>}
+                                {visibleColumns.ward && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.ward}>{record.ward || '--'}</div></td>}
+                                {visibleColumns.group && <td className="p-3 align-middle"><div className="truncate" title={record.group}><span className="inline-block px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">{record.group}</span></div></td>}
                                 {visibleColumns.landInfo && (
-                                    <td className="p-3 text-center">
+                                    <td className="p-3 text-center align-middle">
                                         <div className="flex flex-col items-center">
                                             <span className="text-xs font-semibold">T: {record.landPlot || '-'}</span>
                                             <span className="text-xs text-gray-500">TB: {record.mapSheet || '-'}</span>
@@ -1317,68 +1260,66 @@ function App() {
                                     </td>
                                 )}
                                 {visibleColumns.assigned && (
-                                    <td className="p-3 text-center">
+                                    <td className="p-3 text-center align-middle">
                                         {record.assignedDate ? (
                                             <div className="flex flex-col items-center">
                                                 <span className="text-xs">{formatDate(record.assignedDate)}</span>
-                                                {employee && <span className="text-[10px] text-indigo-600 font-medium">({employee.name})</span>}
+                                                {employee && <span className="text-[10px] text-indigo-600 font-medium truncate max-w-full" title={employee.name}>({employee.name})</span>}
                                             </div>
                                         ) : '--'}
                                     </td>
                                 )}
-                                {visibleColumns.completed && <td className="p-3 text-center text-gray-600">{formatDate(record.completedDate) || '--'}</td>}
-                                {visibleColumns.type && <td className="p-3 text-gray-600 truncate max-w-[150px]" title={record.recordType}>{record.recordType || 'Chưa phân loại'}</td>}
+                                {visibleColumns.completed && <td className="p-3 text-center text-gray-600 align-middle">{formatDate(record.completedDate) || '--'}</td>}
+                                {visibleColumns.type && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.recordType}>{record.recordType || 'Chưa phân loại'}</div></td>}
                                 {visibleColumns.tech && (
-                                    <td className="p-3">
+                                    <td className="p-3 align-middle">
                                     <div className="flex flex-col gap-2">
                                         <div className="flex items-center gap-1">
-                                            <span className="text-[10px] font-bold text-gray-500 w-6">TĐ:</span>
+                                            <span className="text-[10px] font-bold text-gray-500 w-6 shrink-0">TĐ:</span>
                                             {canPerformAction ? (
                                                 <input
                                                     type="text"
-                                                    className="w-24 text-xs border border-gray-200 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-all bg-white/50"
+                                                    className="w-full text-xs border border-gray-200 rounded px-1 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-all bg-white/50"
                                                     value={record.measurementNumber || ''}
                                                     onChange={(e) => handleQuickUpdate(record.id, 'measurementNumber', e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     placeholder="Số TĐ"
                                                 />
-                                            ) : <span className="text-xs text-gray-800 font-mono">{record.measurementNumber || '---'}</span>}
+                                            ) : <span className="text-xs text-gray-800 font-mono truncate">{record.measurementNumber || '---'}</span>}
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <span className="text-[10px] font-bold text-gray-500 w-6">TL:</span>
+                                            <span className="text-[10px] font-bold text-gray-500 w-6 shrink-0">TL:</span>
                                             {canPerformAction ? (
                                                 <input
                                                     type="text"
-                                                    className="w-24 text-xs border border-gray-200 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-all bg-white/50"
+                                                    className="w-full text-xs border border-gray-200 rounded px-1 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-all bg-white/50"
                                                     value={record.excerptNumber || ''}
                                                     onChange={(e) => handleQuickUpdate(record.id, 'excerptNumber', e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     placeholder="Số TL"
                                                 />
-                                            ) : <span className="text-xs text-gray-800 font-mono">{record.excerptNumber || '---'}</span>}
+                                            ) : <span className="text-xs text-gray-800 font-mono truncate">{record.excerptNumber || '---'}</span>}
                                         </div>
                                     </div>
                                     </td>
                                 )}
                                 {visibleColumns.batch && (
-                                    <td className="p-3 text-center">
+                                    <td className="p-3 text-center align-middle">
                                         {record.exportBatch ? (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200 whitespace-nowrap">
-                                                Đợt {record.exportBatch}
-                                                <span className="ml-1 text-[10px] text-green-700">({formatDate(record.exportDate)})</span>
+                                            <span className="inline-flex flex-col items-center px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-800 border border-green-200">
+                                                <span className="font-bold">Đợt {record.exportBatch}</span>
+                                                <span className="text-[10px] text-green-600 whitespace-nowrap">({formatDate(record.exportDate)})</span>
                                             </span>
                                         ) : '-'}
                                     </td>
                                 )}
-                                {visibleColumns.status && <td className="p-3 text-center"><StatusBadge status={record.status} /></td>}
+                                {visibleColumns.status && <td className="p-3 text-center align-middle"><StatusBadge status={record.status} /></td>}
                                 
                                 {canPerformAction && (
-                                    <td className={`p-3 sticky right-0 shadow-l text-center ${isOverdue ? 'bg-red-50 group-hover:bg-red-100' : isApproaching ? 'bg-orange-50 group-hover:bg-orange-100' : 'bg-white group-hover:bg-blue-50/60'}`}>
-                                        <div className="flex items-center justify-center gap-2">
+                                    <td className={`p-3 sticky right-0 shadow-l text-center align-middle ${isOverdue ? 'bg-red-50 group-hover:bg-red-100' : isApproaching ? 'bg-orange-50 group-hover:bg-orange-100' : 'bg-white group-hover:bg-blue-50/60'}`}>
+                                        <div className="flex items-center justify-center gap-1">
                                             <button onClick={(e) => { e.stopPropagation(); setViewingRecord(record); }} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Xem chi tiết"><Eye size={16} /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); setEditingRecord(record); setIsModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Chỉnh sửa"><Pencil size={16} /></button>
                                             
-                                            {/* LOGIC NÚT ĐIỀU HƯỚNG */}
                                             {record.status === RecordStatus.PENDING_SIGN ? (
                                                 <button onClick={(e) => { e.stopPropagation(); advanceStatus(record, RecordStatus.SIGNED); }} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded-full transition-colors flex items-center gap-1 font-bold" title="Đã ký duyệt (Chuyển sang Giao 1 cửa)">
                                                     <PenTool size={16} /> 
@@ -1387,10 +1328,6 @@ function App() {
                                                 <button onClick={(e) => { e.stopPropagation(); advanceStatus(record); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition-colors" title={record.status === RecordStatus.RECEIVED ? "Giao việc" : "Chuyển bước tiếp theo"}><ArrowRight size={16} /></button>
                                             )}
                                             {record.status === RecordStatus.HANDOVER && <CheckCircle size={16} className="text-green-500" />}
-                                            
-                                            {hasAdminRights && (
-                                                <button onClick={(e) => { e.stopPropagation(); confirmDelete(record); }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Xóa hồ sơ"><Trash2 size={16} /></button>
-                                            )}
                                         </div>
                                     </td>
                                 )}
@@ -1409,20 +1346,20 @@ function App() {
         </div>
         
         {/* Pagination Footer */}
-        <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between bg-white">
+        <div className="border-t border-gray-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between bg-white gap-4">
              <div className="flex items-center gap-2">
                  <span className="text-sm text-gray-600">
-                     Hiển thị {paginatedRecords.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} đến {Math.min(currentPage * itemsPerPage, filteredRecords.length)} trong tổng số <strong>{filteredRecords.length}</strong> hồ sơ
+                     Hiển thị {paginatedRecords.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} / <strong>{filteredRecords.length}</strong>
                  </span>
                  <select 
                     value={itemsPerPage} 
                     onChange={(e) => setItemsPerPage(Number(e.target.value))}
                     className="ml-2 border border-gray-300 rounded text-sm px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500"
                  >
-                     <option value={10}>10 dòng</option>
-                     <option value={20}>20 dòng</option>
-                     <option value={50}>50 dòng</option>
-                     <option value={100}>100 dòng</option>
+                     <option value={10}>10</option>
+                     <option value={20}>20</option>
+                     <option value={50}>50</option>
+                     <option value={100}>100</option>
                  </select>
              </div>
              
@@ -1434,7 +1371,6 @@ function App() {
                  >
                      <ChevronLeft size={20} />
                  </button>
-                 {/* ... (Phân trang logic giữ nguyên) */}
                   {Array.from({ length: Math.min(5, totalPages) }).map((_, idx) => {
                      let pageNum = idx + 1;
                      if (totalPages > 5) {
@@ -1478,29 +1414,40 @@ function App() {
         onOpenSystemSettings={() => setIsSystemSettingsOpen(true)}
         currentUser={currentUser}
         onLogout={() => setCurrentUser(null)}
+        mobileOpen={isMobileMenuOpen} 
+        setMobileOpen={setIsMobileMenuOpen} 
       />
       
       <main className="flex-1 p-4 h-screen overflow-hidden flex flex-col">
         <header className="flex justify-between items-center mb-6 shrink-0">
-          {/* Header Title giữ nguyên */}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {currentView === 'dashboard' ? 'Tổng quan hệ thống' : 
+          <div className="flex items-center">
+            <button 
+                className="mr-3 p-2 rounded-md bg-white border border-gray-200 text-gray-600 md:hidden shadow-sm active:bg-gray-100"
+                onClick={() => setIsMobileMenuOpen(true)}
+            >
+                <Menu size={20} />
+            </button>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800 truncate max-w-[200px] md:max-w-none">
+              {currentView === 'dashboard' ? 'Tổng quan' : 
                currentView === 'reports' ? 'Báo cáo & Thống kê' : 
                currentView === 'personal_profile' ? 'Hồ sơ cá nhân' :
+               currentView === 'internal_chat' ? 'Kênh Chat Nội Bộ' :
                currentView === 'user_management' ? 'Quản trị hệ thống' : 
                currentView === 'excerpt_management' ? 'Cấp Số Trích Lục' : 
-               currentView === 'assign_tasks' ? 'Giao Hồ Sơ (Chưa phân công)' : 'Quản lý hồ sơ địa chính'}
+               currentView === 'assign_tasks' ? 'Giao Hồ Sơ' : 
+               currentView === 'receive_record' ? 'Tiếp Nhận Hồ Sơ' :
+               currentView === 'receive_contract' ? 'Tiếp Nhận Hợp Đồng' :
+               'Quản lý hồ sơ'}
             </h1>
           </div>
           <div className="flex items-center gap-4">
              {connectionStatus === 'connected' ? (
                 <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-green-200 shadow-sm text-green-700">
-                    <Wifi size={14} /> <span className="text-xs font-bold">Online (Server)</span>
+                    <Wifi size={14} /> <span className="text-xs font-bold hidden sm:inline">Online</span>
                 </div>
              ) : (
                 <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-full border border-red-200 shadow-sm text-red-700">
-                    <WifiOff size={14} /> <span className="text-xs font-bold">Offline (Dữ liệu mẫu)</span>
+                    <WifiOff size={14} /> <span className="text-xs font-bold hidden sm:inline">Offline</span>
                 </div>
              )}
           </div>
@@ -1508,6 +1455,7 @@ function App() {
         <div className="flex-1 overflow-hidden flex flex-col">{renderMainContent()}</div>
       </main>
 
+      {/* Các Modal giữ nguyên */}
       <RecordModal 
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingRecord(null); }}
@@ -1543,7 +1491,17 @@ function App() {
       />
 
       <AssignModal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} onConfirm={confirmAssign} employees={employees} selectedRecords={assignTargetRecords} />
-      <DetailModal isOpen={!!viewingRecord} onClose={() => setViewingRecord(null)} record={viewingRecord} employees={employees} />
+      
+      <DetailModal 
+        isOpen={!!viewingRecord} 
+        onClose={() => setViewingRecord(null)} 
+        record={viewingRecord} 
+        employees={employees} 
+        currentUser={currentUser} 
+        onEdit={(record) => { setEditingRecord(record); setIsModalOpen(true); }}
+        onDelete={confirmDelete}
+      />
+      
       <DeleteConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteRecord} message={`Bạn có chắc chắn muốn xóa hồ sơ ${deletingRecord?.code}?`} />
       <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} records={records} wards={wards} />
     </div>

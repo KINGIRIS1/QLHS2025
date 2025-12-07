@@ -190,10 +190,13 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
     : history;
 
   const formatDate = (isoString: string) => {
-    return new Date(isoString).toLocaleString('vi-VN', { 
-        day: '2-digit', month: '2-digit', year: 'numeric', 
-        hour: '2-digit', minute: '2-digit' 
-    });
+    const date = new Date(isoString);
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm} - ${d}/${m}/${y}`;
   };
 
   return (
@@ -393,38 +396,38 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                 </div>
 
                 <div className="overflow-auto flex-1">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse table-fixed">
                         <thead className="bg-white sticky top-0 shadow-sm z-10 text-xs font-semibold text-gray-500 uppercase">
                             <tr>
                                 <th className="p-3 border-b text-center w-20">STL</th>
-                                <th className="p-3 border-b">Xã / Phường</th>
-                                <th className="p-3 border-b text-center">Tờ</th>
-                                <th className="p-3 border-b text-center">Thửa</th>
-                                <th className="p-3 border-b">Hồ sơ liên kết</th>
-                                <th className="p-3 border-b">Thời gian</th>
-                                <th className="p-3 border-b">Người cấp</th>
+                                <th className="p-3 border-b w-[200px]">Xã / Phường</th>
+                                <th className="p-3 border-b text-center w-16">Tờ</th>
+                                <th className="p-3 border-b text-center w-16">Thửa</th>
+                                <th className="p-3 border-b w-[150px]">Hồ sơ liên kết</th>
+                                <th className="p-3 border-b w-[150px]">Thời gian</th>
+                                <th className="p-3 border-b w-[150px]">Người cấp</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
                             {filteredHistory.length > 0 ? (
                                 filteredHistory.map((item) => (
                                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="p-3 text-center font-bold text-orange-600 bg-orange-50/50">
+                                        <td className="p-3 text-center font-bold text-orange-600 bg-orange-50/50 align-middle">
                                             {item.excerptNumber}
                                         </td>
-                                        <td className="p-3 font-medium">{item.ward}</td>
-                                        <td className="p-3 text-center font-mono">{item.mapSheet}</td>
-                                        <td className="p-3 text-center font-mono">{item.landPlot}</td>
-                                        <td className="p-3">
+                                        <td className="p-3 font-medium truncate align-middle" title={item.ward}>{item.ward}</td>
+                                        <td className="p-3 text-center font-mono align-middle">{item.mapSheet}</td>
+                                        <td className="p-3 text-center font-mono align-middle">{item.landPlot}</td>
+                                        <td className="p-3 truncate align-middle" title={item.linkedRecordCode}>
                                             {item.linkedRecordCode ? (
                                                 <span className="text-blue-600 font-medium text-xs bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                                                     {item.linkedRecordCode}
                                                 </span>
                                             ) : <span className="text-gray-400 text-xs italic">--</span>}
                                         </td>
-                                        <td className="p-3 text-gray-500 text-xs">{formatDate(item.createdAt)}</td>
-                                        <td className="p-3 text-xs text-blue-600 font-medium bg-blue-50 rounded px-2 w-fit">
-                                            {item.createdBy}
+                                        <td className="p-3 text-gray-500 text-xs align-middle">{formatDate(item.createdAt)}</td>
+                                        <td className="p-3 text-xs text-blue-600 font-medium align-middle">
+                                            <div className="truncate w-full" title={item.createdBy}>{item.createdBy}</div>
                                         </td>
                                     </tr>
                                 ))

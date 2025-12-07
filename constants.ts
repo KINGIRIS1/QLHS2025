@@ -1,4 +1,3 @@
-
 import { RecordStatus, Employee, RecordFile, User, UserRole } from './types';
 
 // CẤU HÌNH KẾT NỐI MẠNG LAN
@@ -33,23 +32,13 @@ export const WARDS = [
   'Nha Bích'
 ];
 
+// Danh sách loại hồ sơ đầy đủ (Hiển thị trong Form Thêm/Sửa)
 export const RECORD_TYPES = [
-  'Cấp GCN lần đầu',
-  'Chuyển nhượng QSDĐ',
-  'Tặng cho QSDĐ',
-  'Thừa kế QSDĐ',
-  'Tách thửa',
-  'Hợp thửa',
-  'Đăng ký biến động',
-  'Cấp đổi GCN',
-  'Trích lục',
-  'Trích đo',
-  'Đo đạc',
-  'Cắm mốc',
-  'Cung cấp thông tin',
-  'Tòa án',
-  'Thi hành án',
-  'Khác'
+  'Trích đo chỉnh lý bản đồ địa chính',
+  'Trích đo bản đồ địa chính',
+  'Trích lục bản đồ địa chính',
+  'Đo đạc',     
+  'Cắm mốc'
 ];
 
 export const MOCK_EMPLOYEES: Employee[] = [
@@ -115,7 +104,7 @@ export const MOCK_RECORDS: RecordFile[] = [
     code: 'HS-2024-001',
     customerName: 'DỮ LIỆU MẪU (OFFLINE)',
     phoneNumber: '0909123456',
-    recordType: 'Cấp GCN lần đầu',
+    recordType: 'Trích lục bản đồ địa chính',
     content: 'Vui lòng kết nối Server để xem dữ liệu thực',
     receivedDate: getRelativeDate(0), 
     deadline: getRelativeDate(5),      

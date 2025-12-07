@@ -1,5 +1,5 @@
 {
-  "name": "Hệ Thống Quản Lý Hồ Sơ Thông Minh",
+  "name": "QLHSCT",
   "description": "Ứng dụng theo dõi quy trình hồ sơ hành chính, lập danh sách kiểm tra và tự động tạo báo cáo tuần/tháng bằng AI.",
   "requestFramePermissions": []
 }

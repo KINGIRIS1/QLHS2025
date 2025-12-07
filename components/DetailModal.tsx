@@ -1,29 +1,159 @@
 
-import React from 'react';
-import { RecordFile, Employee } from '../types';
+import React, { useState, useRef } from 'react';
+import { RecordFile, Employee, User, UserRole } from '../types';
 import { STATUS_LABELS } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, Calendar, FileText, User, Info, Phone, Lock, ShieldAlert } from 'lucide-react';
+import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil } from 'lucide-react';
+import { generateDocxBlob, hasTemplate, STORAGE_KEYS } from '../services/docxService';
+import DocxPreviewModal from './DocxPreviewModal';
 
 interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   record: RecordFile | null;
   employees: Employee[];
+  currentUser: User | null;
+  onEdit?: (record: RecordFile) => void;
+  onDelete?: (record: RecordFile) => void;
 }
 
-const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees }) => {
+const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, currentUser, onEdit, onDelete }) => {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileName, setPreviewFileName] = useState('');
+
   if (!isOpen || !record) return null;
+
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
+  const canPerformAction = isAdmin || isSubadmin; // Điều kiện để Sửa/Xóa
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '---';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
+    const date = new Date(dateStr);
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
   };
 
   const getEmployeeName = (id?: string) => {
     if (!id) return 'Chưa giao';
     const emp = employees.find(e => e.id === id);
     return emp ? `${emp.name} (${emp.department})` : 'Không xác định';
+  };
+
+  const handlePrintReceipt = () => {
+    if (!currentUser) return;
+    
+    if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
+        alert('Chưa có mẫu biên nhận. Vui lòng vào mục "Tiếp nhận hồ sơ" để cấu hình mẫu in trước.');
+        return;
+    }
+
+    const rDate = record.receivedDate ? new Date(record.receivedDate) : new Date();
+    const dDate = record.deadline ? new Date(record.deadline) : new Date();
+    
+    // --- CẬP NHẬT LOGIC IN BIÊN NHẬN (SỬ DỤNG SỐ NGÀY CỐ ĐỊNH) ---
+    // Để tránh lỗi sai lệch khi in lại hồ sơ cũ, ta gán cứng số ngày theo loại hồ sơ
+    let standardDays = "30"; // Mặc định
+    const type = (record.recordType || '').toLowerCase();
+
+    // Logic tính số ngày
+    if (type.includes('trích lục')) {
+        standardDays = "10";
+    } else if (type.includes('trích đo chỉnh lý')) {
+        standardDays = "15"; 
+    } else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) {
+        standardDays = "30";
+    }
+
+    // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) ---
+    let tp1Value = 'Phiếu yêu cầu';
+    if (type.includes('trích') || type.includes('chỉnh lý')) {
+        tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
+    } else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
+        tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
+    }
+    
+    const day = rDate.getDate().toString().padStart(2, '0');
+    const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
+    const year = rDate.getFullYear();
+    const dateFullString = `ngày ${day} tháng ${month} năm ${year}`;
+
+    const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
+
+    const printData = {
+        code: val(record.code),
+        customerName: val(record.customerName),
+        receivedDate: rDate.toLocaleDateString('vi-VN'),
+        deadline: dDate.toLocaleDateString('vi-VN'),
+        currentUser: val(currentUser.name),
+        phoneNumber: val(record.phoneNumber),
+        cccd: val(record.cccd),
+        content: val(record.content),
+        address: val(record.address || record.ward),
+        ward: val(record.ward),
+        landPlot: val(record.landPlot),
+        mapSheet: val(record.mapSheet),
+        area: val(record.area),
+        recordType: val(record.recordType),
+        otherDocs: val(record.otherDocs),
+        authorizedBy: val(record.authorizedBy),
+        authDocType: val(record.authDocType),
+        
+        // Aliases cho template
+        MA: val(record.code),
+        SO_HS: val(record.code),
+        TEN: val(record.customerName),
+        HO_TEN: val(record.customerName),
+        KHACH_HANG: val(record.customerName),
+        NGAY_NHAN: rDate.toLocaleDateString('vi-VN'),
+        HEN_TRA: dDate.toLocaleDateString('vi-VN'),
+        NGAY_HEN: dDate.toLocaleDateString('vi-VN'),
+        NGUOI_NHAN: val(currentUser.name),
+        CAN_BO: val(currentUser.name),
+        SDT: val(record.phoneNumber),
+        DIEN_THOAI: val(record.phoneNumber),
+        CCCD: val(record.cccd),
+        CMND: val(record.cccd),
+        NOI_DUNG: val(record.content),
+        DIA_CHI: val(record.address || record.ward),
+        DC: val(record.address || record.ward),
+        DIA_CHI_CHI_TIET: val(record.address),
+        DC_CT: val(record.address),
+        XA: val(record.ward),
+        PHUONG: val(record.ward),
+        XAPHUONG: val(record.ward),
+        TO: val(record.mapSheet),
+        THUA: val(record.landPlot),
+        DT: val(record.area),
+        DIEN_TICH: val(record.area),
+        LOAI_HS: val(record.recordType),
+        GIAY_TO_KHAC: val(record.otherDocs),
+        NGUOI_UY_QUYEN: val(record.authorizedBy),
+        UY_QUYEN: val(record.authorizedBy),
+        NGUOI_DUOC_UY_QUYEN: val(record.authorizedBy),
+        LOAI_UY_QUYEN: val(record.authDocType),
+        LOAI_GIAY_TO_UY_QUYEN: val(record.authDocType),
+        GIAY_UY_QUYEN: val(record.authDocType),
+        NGAYNHAN: dateFullString,
+        NGAY_THANG_NAM: dateFullString,
+        
+        // SỐ NGÀY TRẢ KẾT QUẢ
+        TGTRA: standardDays, 
+        SO_NGAY: standardDays, 
+
+        // TIÊU ĐỀ PHIẾU (MỚI)
+        TP1: tp1Value
+    };
+
+    const blob = generateDocxBlob(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+    if (blob) {
+        setPreviewBlob(blob);
+        setPreviewFileName(`BienNhan_${record.code}`);
+        setIsPreviewOpen(true);
+    }
   };
 
   return (
@@ -41,19 +171,51 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
             </div>
             <h2 className="text-xl font-bold text-gray-800">{record.recordType}</h2>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+              <button 
+                onClick={handlePrintReceipt}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors shadow-sm text-sm font-medium"
+                title="In biên nhận cho hồ sơ này"
+              >
+                  <Printer size={16} /> In biên nhận
+              </button>
+              
+              {canPerformAction && onEdit && (
+                  <button 
+                    onClick={() => { onClose(); onEdit(record); }}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                    title="Chỉnh sửa hồ sơ"
+                  >
+                    <Pencil size={20} />
+                  </button>
+              )}
+              
+              {canPerformAction && onDelete && (
+                  <button 
+                    onClick={() => { onClose(); onDelete(record); }}
+                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                    title="Xóa hồ sơ"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+              )}
+
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+              <button 
+                onClick={onClose} 
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-8">
           {/* 1. Thông tin khách hàng */}
           <section>
             <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-wide mb-4 border-l-4 border-blue-500 pl-2">
-              <User size={18} className="text-blue-500" />
+              <UserIcon size={18} className="text-blue-500" />
               Thông tin chủ hồ sơ
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
@@ -164,7 +326,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                     <div className="mt-4">
                         <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Người xử lý</h4>
                         <div className="flex items-center gap-2 p-2 bg-gray-100 rounded text-sm font-medium text-gray-700">
-                            <User size={14} />
+                            <UserIcon size={14} />
                             {getEmployeeName(record.assignedTo)}
                         </div>
                     </div>
@@ -181,6 +343,13 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
            )}
         </div>
       </div>
+
+      <DocxPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        docxBlob={previewBlob}
+        fileName={previewFileName}
+      />
     </div>
   );
 };

@@ -4,8 +4,9 @@ import { RecordFile, RecordStatus } from "../types";
 import { STATUS_LABELS } from "../constants";
 
 // Khởi tạo client Gemini
-// Lưu ý: process.env.API_KEY được inject tự động, không cần khai báo
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Sử dụng kiểm tra an toàn để tránh lỗi ReferenceError: process is not defined
+const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 export const testApiConnection = async (): Promise<boolean> => {
   try {

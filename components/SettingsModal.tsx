@@ -1,7 +1,8 @@
+
 import React, { useState, useRef } from 'react';
 import { Employee, User, UserRole } from '../types';
-import { X, Plus, Trash2, Save, User as UserIcon, FileSpreadsheet, Upload } from 'lucide-react';
-import XLSX from 'xlsx-js-style';
+import { X, Plus, Trash2, Save, User as UserIcon, FileSpreadsheet, Upload, Download } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -61,7 +62,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setEditingEmployee(prev => (prev ? { ...prev, [field]: value } : null));
   };
 
-  // --- LOGIC NHẬP EXCEL ---
+  const handleDownloadSample = () => {
+      const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "PHỤ TRÁCH"];
+      const data = [
+          ["NV001", "Trần Văn B", "Kỹ thuật", "Minh Hưng, Nha Bích"],
+          ["NV002", "Lê Thị C", "Văn phòng", ""],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Nhan_Su_Mau");
+      XLSX.writeFile(wb, "Nhan_Su_Mau.xlsx");
+  };
+
+  // --- LOGIC NHẬP EXCEL (FIXED) ---
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -69,14 +82,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const data = evt.target?.result;
+        // FIX: Đổi 'binary' -> 'array'
+        const wb = XLSX.read(data, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
         let count = 0;
-        data.forEach((row: any) => {
+        rows.forEach((row: any) => {
            // Chuẩn hóa tên cột
            const normalizedRow: Record<string, any> = {};
            Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
@@ -108,7 +122,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
          if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
-    reader.readAsBinaryString(file);
+    // FIX: Sử dụng readAsArrayBuffer thay vì readAsBinaryString
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -146,12 +161,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             accept=".xlsx, .xls"
                             className="hidden"
                         />
-                        <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 font-medium text-sm"
-                        >
-                            <FileSpreadsheet size={16} /> Nhập từ Excel
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={handleDownloadSample}
+                                className="flex-1 flex items-center justify-center gap-2 bg-white text-blue-600 border border-blue-200 px-2 py-2 rounded-md hover:bg-blue-50 font-medium text-xs"
+                                title="Tải file mẫu"
+                            >
+                                <Download size={14} /> Mẫu
+                            </button>
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex-[2] flex items-center justify-center gap-2 bg-green-600 text-white px-2 py-2 rounded-md hover:bg-green-700 font-medium text-sm"
+                            >
+                                <FileSpreadsheet size={16} /> Nhập Excel
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="overflow-y-auto flex-1 p-2 space-y-2">

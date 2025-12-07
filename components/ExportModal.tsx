@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import XLSX from 'xlsx-js-style'; // Sử dụng thư viện hỗ trợ Style
+import * as XLSX from 'xlsx-js-style'; // Sử dụng thư viện hỗ trợ Style
 import { RecordFile } from '../types';
 import { X, FileDown, Calendar, Layers, MapPin } from 'lucide-react';
 
@@ -53,6 +53,14 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     if (isOpen) setSelectedWard('all');
   }, [isOpen, batchOptions]);
 
+  const formatDate = (d: string) => {
+      const date = new Date(d);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+  };
+
   const handleExport = () => {
     if (!selectedBatchKey) return;
 
@@ -93,7 +101,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         r.recordType || '',
         r.measurementNumber || '',
         r.excerptNumber || '',
-        r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
+        r.deadline ? formatDate(r.deadline) : '',
         r.notes || ''
     ]);
 
@@ -279,11 +287,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     XLSX.writeFile(wb, fileName);
     
     onClose();
-  };
-
-  const formatDate = (d: string) => {
-      const [y, m, dstr] = d.split('-');
-      return `${dstr}/${m}/${y}`;
   };
 
   if (!isOpen) return null;

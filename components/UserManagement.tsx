@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Employee } from '../types';
-import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, FileSpreadsheet } from 'lucide-react';
-import XLSX from 'xlsx-js-style';
+import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, FileSpreadsheet, Download } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
 
 interface UserManagementProps {
   users: User[];
@@ -92,7 +93,19 @@ const UserManagement: React.FC<UserManagementProps> = ({
       setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // --- LOGIC NHẬP EXCEL ---
+  const handleDownloadSample = () => {
+      const headers = ["USERNAME", "PASSWORD", "HỌ TÊN", "VAI TRÒ", "MÃ NV"];
+      const data = [
+          ["nguyenvana", "123456", "Nguyễn Văn A", "EMPLOYEE", "NV001"],
+          ["admin_test", "password", "Quản trị viên", "ADMIN", ""],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Tai_Khoan_Mau");
+      XLSX.writeFile(wb, "Tai_Khoan_Mau.xlsx");
+  };
+
+  // --- LOGIC NHẬP EXCEL (FIXED) ---
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -100,16 +113,17 @@ const UserManagement: React.FC<UserManagementProps> = ({
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const data = evt.target?.result;
+        // FIX: Đổi 'binary' -> 'array'
+        const wb = XLSX.read(data, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
         let count = 0;
         let skipCount = 0;
 
-        data.forEach((row: any) => {
+        rows.forEach((row: any) => {
            // Chuẩn hóa tên cột
            const normalizedRow: Record<string, any> = {};
            Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
@@ -153,7 +167,8 @@ const UserManagement: React.FC<UserManagementProps> = ({
          if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
-    reader.readAsBinaryString(file);
+    // FIX: Sử dụng readAsArrayBuffer
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -170,6 +185,13 @@ const UserManagement: React.FC<UserManagementProps> = ({
           </p>
         </div>
         <div className="flex gap-2">
+            <button 
+                onClick={handleDownloadSample}
+                className="flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors shadow-sm font-medium text-sm"
+                title="Tải file Excel mẫu để nhập liệu"
+            >
+                <Download size={18} /> File mẫu
+            </button>
             <div className="relative">
                 <input 
                     type="file" 

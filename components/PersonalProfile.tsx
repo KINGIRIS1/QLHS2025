@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
@@ -28,6 +29,23 @@ function removeVietnameseTones(str: string): string {
     str = str.trim();
     return str;
 }
+
+// --- HÀM HIỂN THỊ TÊN NGẮN GỌN (Giống App.tsx) ---
+const getDisplayRecordType = (type: string | undefined): string => {
+    if (!type) return 'Chưa phân loại';
+    const t = type.toLowerCase();
+    
+    // Ưu tiên kiểm tra các từ khóa dài trước
+    if (t.includes('chỉnh lý') || t.includes('hiến đường') || t.includes('thay đổi hlbv')) return 'Chỉnh lý';
+    if (t.includes('trích lục')) return 'Trích lục';
+    // Kiểm tra "trích đo" sau "chỉnh lý" vì "trích đo chỉnh lý" chứa "trích đo"
+    if (t.includes('trích đo')) return 'Trích đo';
+    
+    if (t.includes('cắm mốc')) return 'Cắm mốc';
+    if (t.includes('đo đạc')) return 'Đo đạc';
+    
+    return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
+};
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -106,7 +124,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '---';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
+    const date = new Date(dateStr);
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
   };
 
   const getDeadlineStatus = (deadlineStr?: string) => {
@@ -128,19 +150,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   const renderSortHeader = (label: string, key: keyof RecordFile) => {
       const isSorted = sortConfig.key === key;
       return (
-          <th 
-            className="p-3 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-            onClick={() => handleSort(key)}
-          >
-              <div className="flex items-center gap-1">
-                  {label}
-                  <span className="text-gray-400">
-                    {isSorted ? (
-                        sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-blue-600"/> : <ArrowDown size={12} className="text-blue-600"/>
-                    ) : <ArrowUpDown size={12} />}
-                  </span>
-              </div>
-          </th>
+          <div className="flex items-center gap-1 cursor-pointer select-none" onClick={() => handleSort(key)}>
+              {label}
+              <span className="text-gray-400">
+                {isSorted ? (
+                    sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-blue-600"/> : <ArrowDown size={12} className="text-blue-600"/>
+                ) : <ArrowUpDown size={12} />}
+              </span>
+          </div>
       );
   };
 
@@ -215,16 +232,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         
         <div className="flex-1 overflow-x-auto">
             {pendingRecords.length > 0 ? (
-                <table className="w-full text-left">
+                <table className="w-full text-left table-fixed min-w-[900px]">
                     <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase">
                         <tr>
                             <th className="p-3 w-10 text-center">#</th>
-                            {renderSortHeader('Mã HS', 'code')}
-                            {renderSortHeader('Chủ sử dụng', 'customerName')}
-                            {renderSortHeader('Địa chỉ', 'ward')}
-                            {renderSortHeader('Hẹn trả (Deadline)', 'deadline')}
-                            <th className="p-3 text-center">Trạng thái</th>
-                            <th className="p-3 text-center">Thao tác chính</th>
+                            <th className="p-3 w-[120px]">{renderSortHeader('Mã HS', 'code')}</th>
+                            <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
+                            <th className="p-3 w-[150px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
+                            <th className="p-3 w-[150px]">{renderSortHeader('Hẹn trả', 'deadline')}</th>
+                            <th className="p-3 text-center w-[120px]">Trạng thái</th>
+                            <th className="p-3 text-center w-[120px]">Thao tác chính</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
@@ -232,19 +249,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                             const deadlineStatus = getDeadlineStatus(r.deadline);
                             return (
                                 <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
-                                    <td className="p-3 text-center text-gray-400 text-xs">{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                                    <td className="p-3 font-medium text-blue-600">{r.code}</td>
-                                    <td className="p-3 font-medium text-gray-800">{r.customerName}</td>
-                                    <td className="p-3 text-gray-500 max-w-[150px] truncate" title={r.ward}>{r.ward}</td>
-                                    <td className="p-3">
+                                    <td className="p-3 text-center text-gray-400 text-xs align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                                    <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code}>{r.code}</div></td>
+                                    <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName}>{r.customerName}</div></td>
+                                    <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType}>{getDisplayRecordType(r.recordType)}</div></td>
+                                    <td className="p-3 align-middle">
                                         <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
                                             {deadlineStatus.icon}
                                             <span>{formatDate(r.deadline)}</span>
                                             <span className="text-[10px] uppercase ml-1">{deadlineStatus.text}</span>
                                         </div>
                                     </td>
-                                    <td className="p-3 text-center"><StatusBadge status={r.status} /></td>
-                                    <td className="p-3">
+                                    <td className="p-3 text-center align-middle"><StatusBadge status={r.status} /></td>
+                                    <td className="p-3 align-middle">
                                         <div className="flex justify-center gap-2">
                                             <button 
                                                 onClick={() => onViewRecord(r)}
@@ -321,21 +338,21 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         </div>
         {reviewRecords.length > 0 ? (
             <div className="max-h-60 overflow-y-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left table-fixed">
                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0">
                         <tr>
-                            <th className="p-3">Mã HS</th>
-                            <th className="p-3">Chủ sử dụng</th>
-                            <th className="p-3">Ngày nộp</th>
-                            <th className="p-3 text-center">Trạng thái</th>
-                            <th className="p-3 text-right">Chi tiết</th>
+                            <th className="p-3 w-[120px]">Mã HS</th>
+                            <th className="p-3 w-[200px]">Chủ sử dụng</th>
+                            <th className="p-3 w-[120px]">Ngày nộp</th>
+                            <th className="p-3 text-center w-[120px]">Trạng thái</th>
+                            <th className="p-3 text-right w-[80px]">Chi tiết</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {reviewRecords.map(r => (
                             <tr key={r.id} className="hover:bg-gray-50">
-                                <td className="p-3 font-medium text-gray-700">{r.code}</td>
-                                <td className="p-3">{r.customerName}</td>
+                                <td className="p-3 font-medium text-gray-700 truncate" title={r.code}>{r.code}</td>
+                                <td className="p-3 truncate" title={r.customerName}>{r.customerName}</td>
                                 <td className="p-3 text-gray-500">{formatDate(r.receivedDate)}</td>
                                 <td className="p-3 text-center"><StatusBadge status={r.status} /></td>
                                 <td className="p-3 text-right">

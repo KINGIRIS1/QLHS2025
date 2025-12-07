@@ -98,45 +98,61 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
     };
   }, [currentGroupId]);
 
-  // --- LOGIC CHỤP MÀN HÌNH ---
+  // --- LOGIC CHỤP MÀN HÌNH (CẬP NHẬT) ---
   const handleScreenshot = async () => {
       try {
-          // Check: Browser chỉ cho phép getDisplayMedia trên HTTPS hoặc Localhost
-          if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-              alert("LỖI: Tính năng chụp màn hình bị trình duyệt chặn trên giao thức HTTP (Mạng LAN).\nVui lòng sử dụng HTTPS hoặc Localhost.");
-              return;
-          }
-
           let stream: MediaStream | null = null;
           
-          // 1. Thử dùng Electron DesktopCapturer
-          // @ts-ignore
-          if (window.require) {
+          // 1. Kiểm tra môi trường Electron
+          // Sử dụng userAgent hoặc check window.require
+          const isElectron = /electron/i.test(navigator.userAgent) || !!(window as any).require;
+
+          if (isElectron && (window as any).require) {
              try {
-                 // @ts-ignore
-                 const { desktopCapturer } = window.require('electron');
+                 const { desktopCapturer } = (window as any).require('electron');
+                 // Lấy nguồn màn hình (Screen 1, Screen 2...)
                  const sources = await desktopCapturer.getSources({ types: ['screen'] });
+                 
                  if (sources && sources.length > 0) {
-                     const source = sources[0];
-                     stream = await navigator.mediaDevices.getUserMedia({
+                     const source = sources[0]; // Mặc định lấy màn hình chính
+                     
+                     // Cấu hình constraints riêng cho Electron
+                     const constraints = {
                          audio: false,
                          video: {
                              mandatory: {
                                  chromeMediaSource: 'desktop',
                                  chromeMediaSourceId: source.id,
                                  maxWidth: 1920,
-                                 maxHeight: 1080
+                                 maxHeight: 1080,
+                                 minWidth: 1280,
+                                 minHeight: 720
                              }
-                         } as any
-                     });
+                         }
+                     };
+                     
+                     // Gọi getUserMedia thay vì getDisplayMedia trong Electron
+                     // @ts-ignore
+                     stream = await navigator.mediaDevices.getUserMedia(constraints);
                  }
              } catch (e) {
-                 console.warn("Electron screen capture failed:", e);
+                 console.warn("Electron native capture failed, trying fallback...", e);
              }
           }
 
-          // 2. Fallback Web API
+          // 2. Fallback Web API (Cho trình duyệt thường)
           if (!stream) {
+               // Check HTTPS hoặc Localhost
+               if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                  alert("LỖI: Trình duyệt chặn tính năng này trên giao thức HTTP (Mạng LAN).\nVui lòng sử dụng HTTPS hoặc Localhost, hoặc dùng App Electron.");
+                  return;
+               }
+
+               if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                   alert("Trình duyệt không hỗ trợ chụp màn hình.");
+                   return;
+               }
+
                stream = await navigator.mediaDevices.getDisplayMedia({ 
                   video: true, 
                   audio: false 
@@ -146,11 +162,17 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
           // 3. Xử lý Stream -> Ảnh
           if (stream) {
               const video = document.createElement('video');
+              // Quan trọng: Phải gắn vào DOM (dù ẩn) để một số browser render được frame
+              video.style.position = 'fixed';
+              video.style.top = '-10000px';
+              video.style.left = '-10000px';
+              document.body.appendChild(video);
+
               video.srcObject = stream;
               await video.play();
 
-              // Chờ 1 chút để video render frame
-              await new Promise(r => setTimeout(r, 300));
+              // Chờ 500ms để video stream ổn định và render frame đầu tiên
+              await new Promise(r => setTimeout(r, 500));
 
               const canvas = document.createElement('canvas');
               canvas.width = video.videoWidth;
@@ -166,6 +188,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                           setFile(screenshotFile);
                       }
                       
+                      // Dọn dẹp tài nguyên
                       const tracks = stream?.getTracks();
                       tracks?.forEach(t => t.stop());
                       video.remove();
@@ -173,12 +196,12 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                   }, 'image/png');
               }
           }
-      } catch (err) {
+      } catch (err: any) {
           console.error("Lỗi chụp màn hình:", err);
-          if (err instanceof DOMException && err.name === 'NotAllowedError') {
-              // User cancelled
+          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+              // Người dùng hủy, không làm gì cả
           } else {
-              alert("Không thể chụp màn hình. Vui lòng kiểm tra quyền truy cập.");
+              alert(`Lỗi chụp màn hình: ${err.message || 'Không xác định'}\n(Thử lại bằng ứng dụng Electron nếu đang dùng Web)`);
           }
       }
   };
@@ -547,6 +570,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     type="button" 
                     onClick={handleScreenshot}
                     className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
+                    title="Chụp màn hình"
                 >
                     <Monitor size={20} />
                 </button>

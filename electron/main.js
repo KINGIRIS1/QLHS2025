@@ -67,12 +67,27 @@ function createWindow() {
 // --- IPC HANDLERS (Xử lý sự kiện từ React) ---
 
 // Handler chụp màn hình
-ipcMain.handle('capture-screenshot', async () => {
+ipcMain.handle('capture-screenshot', async (event, { hideWindow = true } = {}) => {
   try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    
+    // Nếu yêu cầu ẩn cửa sổ (để chụp màn hình khác/desktop)
+    if (hideWindow && win) {
+      win.minimize(); 
+      // Đợi animation minimize xong (khoảng 300-500ms)
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     const sources = await desktopCapturer.getSources({ 
       types: ['screen'], 
       thumbnailSize: { width: 1920, height: 1080 } // Chất lượng Full HD
     });
+    
+    // Sau khi chụp xong, hiện lại cửa sổ ngay lập tức
+    if (hideWindow && win) {
+      win.restore();
+      win.focus();
+    }
     
     if (sources.length > 0) {
       // Lấy màn hình chính (đầu tiên) và trả về DataURL (Base64)
@@ -81,6 +96,12 @@ ipcMain.handle('capture-screenshot', async () => {
     return null;
   } catch (error) {
     console.error('Lỗi chụp màn hình tại Main Process:', error);
+    // Đảm bảo hiện lại cửa sổ nếu có lỗi
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      win.restore();
+      win.focus();
+    }
     throw error;
   }
 });

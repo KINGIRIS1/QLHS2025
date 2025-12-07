@@ -3,13 +3,14 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { User, Message, ChatGroup, UserRole, Employee } from '../types';
 import { fetchMessages, sendMessageApi, uploadChatFile, fetchChatGroups, createChatGroup, deleteChatGroup, deleteMessageApi, addMemberToGroupApi } from '../services/api';
 import { supabase } from '../services/supabaseClient';
-import { Send, Paperclip, File as FileIcon, X, Loader2, Image as ImageIcon, Download, Hash, MapPin, Plus, Trash2, Users, Monitor, Camera, UserPlus, Shield } from 'lucide-react';
+import { Send, Paperclip, File as FileIcon, X, Loader2, Image as ImageIcon, Download, Hash, MapPin, Plus, Trash2, Users, Monitor, Camera, UserPlus, Shield, Crop } from 'lucide-react';
+import ScreenshotCropper from './ScreenshotCropper';
 
 // Định nghĩa kiểu cho window.electronAPI
 declare global {
   interface Window {
     electronAPI?: {
-      captureScreenshot: () => Promise<string>;
+      captureScreenshot: (options?: { hideWindow: boolean }) => Promise<string>;
     };
   }
 }
@@ -22,21 +23,6 @@ interface InternalChatProps {
 }
 
 const normalizeStr = (str: string) => str ? str.toLowerCase().trim() : '';
-
-// Hàm helper chuyển DataURL sang File
-const dataURLtoFile = (dataurl: string, filename: string) => {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) return null;
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, {type:mime});
-};
 
 const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], employees, users }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,6 +40,10 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   // Add Member State
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [targetGroupForAdd, setTargetGroupForAdd] = useState<ChatGroup | null>(null);
+
+  // Screenshot & Cropping State
+  const [screenshotImg, setScreenshotImg] = useState<string | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,84 +112,45 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
     };
   }, [currentGroupId]);
 
-  // --- LOGIC CHỤP MÀN HÌNH (REFACTORED) ---
-  const handleScreenshot = async () => {
+  // --- LOGIC CHỤP MÀN HÌNH (ZALO STYLE) ---
+  const handleScreenshot = async (hideWindow: boolean) => {
       if (sending) return;
       
       try {
-          // 1. ƯU TIÊN SỬ DỤNG ELECTRON API (QUA IPC)
           if (window.electronAPI && window.electronAPI.captureScreenshot) {
-              const dataUrl = await window.electronAPI.captureScreenshot();
+              // Gọi IPC để chụp, truyền tham số ẩn cửa sổ hay không
+              const dataUrl = await window.electronAPI.captureScreenshot({ hideWindow });
               if (dataUrl) {
-                  const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
-                  const screenshotFile = dataURLtoFile(dataUrl, `Screenshot_${timestamp}.png`);
-                  if (screenshotFile) {
-                      setFile(screenshotFile);
-                  } else {
-                      alert("Lỗi chuyển đổi dữ liệu ảnh.");
-                  }
+                  setScreenshotImg(dataUrl);
+                  setIsCropping(true);
               } else {
                   alert("Không chụp được màn hình.");
               }
-              return;
-          }
-
-          // 2. FALLBACK: SỬ DỤNG WEB API (CHO TRÌNH DUYỆT / LOCALHOST)
-          const nav = navigator as any;
-          if (nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
-               try {
-                   const stream = await nav.mediaDevices.getDisplayMedia({ 
-                      video: true, 
-                      audio: false 
-                  });
-                  
-                  // Xử lý Stream -> Ảnh (Canvas)
-                  const video = document.createElement('video');
-                  video.style.display = 'none';
-                  document.body.appendChild(video);
-                  video.srcObject = stream;
-                  
-                  await new Promise<void>((resolve, reject) => {
-                      video.onloadedmetadata = () => {
-                          video.play().then(() => resolve()).catch((e) => reject(e));
-                      };
-                      video.onerror = (e) => reject(e);
-                  });
-
-                  await new Promise(r => setTimeout(r, 300)); // Đợi frame render
-
-                  const canvas = document.createElement('canvas');
-                  canvas.width = video.videoWidth;
-                  canvas.height = video.videoHeight;
-                  const ctx = canvas.getContext('2d');
-                  
-                  if (ctx) {
-                      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                      canvas.toBlob((blob) => {
-                          if (blob) {
-                              const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
-                              const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
-                              setFile(screenshotFile);
-                          }
-                          // Dọn dẹp
-                          stream.getTracks().forEach((t: any) => t.stop());
-                          video.remove();
-                          canvas.remove();
-                      }, 'image/png');
-                  }
-               } catch (err: any) {
-                   if (err.name !== 'NotAllowedError') {
-                       alert("Trình duyệt không hỗ trợ chụp màn hình hoặc quyền bị từ chối.");
-                   }
-               }
           } else {
-               alert("Chức năng này yêu cầu App Desktop hoặc trình duyệt hỗ trợ chia sẻ màn hình.");
+               alert("Chức năng này yêu cầu App Desktop (Electron).");
           }
-
       } catch (err: any) {
           console.error("Lỗi chụp màn hình:", err);
           alert(`Lỗi: ${err.message}`);
       }
+  };
+
+  const handleCropConfirm = (blob: Blob) => {
+      // Chuyển Blob thành File
+      const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+      const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
+      
+      // Đặt vào state file để chuẩn bị gửi
+      setFile(screenshotFile);
+      
+      // Reset cropping UI
+      setScreenshotImg(null);
+      setIsCropping(false);
+  };
+
+  const handleCropCancel = () => {
+      setScreenshotImg(null);
+      setIsCropping(false);
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -354,8 +305,17 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   };
 
   return (
-    <div className="flex h-full bg-gray-50 rounded-xl overflow-hidden shadow-sm border border-gray-200">
+    <div className="flex h-full bg-gray-50 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative">
       
+      {/* CROPPER OVERLAY */}
+      {isCropping && screenshotImg && (
+          <ScreenshotCropper 
+              imageSrc={screenshotImg}
+              onConfirm={handleCropConfirm}
+              onCancel={handleCropCancel}
+          />
+      )}
+
       {/* SIDEBAR */}
       <div className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
           <div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -558,17 +518,37 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                     type="button" 
                     onClick={() => fileInputRef.current?.click()}
                     className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors"
+                    title="Đính kèm file"
                 >
                     <Paperclip size={20} />
                 </button>
-                <button 
-                    type="button" 
-                    onClick={handleScreenshot}
-                    className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
-                    title="Chụp màn hình"
-                >
-                    <Monitor size={20} />
-                </button>
+                
+                {/* SCREENSHOT BUTTONS (ZALO STYLE) */}
+                <div className="relative group/shot hidden sm:block">
+                    <button 
+                        type="button" 
+                        className="p-3 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors peer"
+                    >
+                        <Camera size={20} />
+                    </button>
+                    {/* Hover Dropdown Menu */}
+                    <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 p-1 w-48 hidden group-hover/shot:block hover:block z-50 animate-fade-in-up">
+                        <button 
+                            type="button"
+                            onClick={() => handleScreenshot(true)} 
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm text-gray-700 flex items-center gap-2"
+                        >
+                            <Monitor size={16} /> Chụp màn hình khác
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => handleScreenshot(false)} 
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm text-gray-700 flex items-center gap-2"
+                        >
+                            <Crop size={16} /> Chụp cửa sổ chat
+                        </button>
+                    </div>
+                </div>
                 
                 <div className="flex-1 relative">
                     <textarea

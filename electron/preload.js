@@ -5,5 +5,5 @@ const { ipcRenderer } = require('electron');
 // Do main.js đang để contextIsolation: false, ta gán trực tiếp vào window.
 // Nếu contextIsolation: true, phải dùng contextBridge.exposeInMainWorld
 window.electronAPI = {
-  captureScreenshot: () => ipcRenderer.invoke('capture-screenshot'),
+  captureScreenshot: (options) => ipcRenderer.invoke('capture-screenshot', options),
 };

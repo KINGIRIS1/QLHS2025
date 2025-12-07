@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-// --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
+// --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIT ---
 function removeVietnameseTones(str: string): string {
     if (!str) return '';
     str = str.toLowerCase();
@@ -165,18 +165,32 @@ const DashboardChart = ({ data }: { data: RecordFile[] }) => {
 };
 
 // --- COMPONENT BÁO CÁO (ReportSection) ---
-// Đã được cập nhật để nhận Props từ App thay vì xử lý local state
 interface ReportSectionProps {
     reportContent: string;
     isGenerating: boolean;
-    onGenerate: (range: 'week' | 'month' | 'last_month') => void;
+    onGenerate: (fromDate: string, toDate: string) => void;
 }
 
 const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate }) => {
-    const [range, setRange] = useState<'week' | 'month' | 'last_month'>('week');
+    // Mặc định: Từ ngày đầu tháng đến hiện tại
+    const [fromDate, setFromDate] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    });
+    const [toDate, setToDate] = useState(() => {
+        return new Date().toISOString().split('T')[0];
+    });
 
     const handleGenerateClick = () => {
-        onGenerate(range);
+        if (!fromDate || !toDate) {
+            alert("Vui lòng chọn đầy đủ Từ ngày và Đến ngày.");
+            return;
+        }
+        if (new Date(fromDate) > new Date(toDate)) {
+            alert("Ngày bắt đầu không được lớn hơn ngày kết thúc.");
+            return;
+        }
+        onGenerate(fromDate, toDate);
     };
 
     return (
@@ -188,24 +202,33 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <h2 className="font-bold text-gray-800">Trợ lý AI Báo cáo</h2>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                    <select 
-                        value={range}
-                        onChange={(e) => setRange(e.target.value as any)}
-                        className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500 outline-none"
-                    >
-                        <option value="week">7 ngày qua</option>
-                        <option value="month">Tháng này</option>
-                        <option value="last_month">Tháng trước</option>
-                    </select>
+                <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Từ ngày:</span>
+                        <input 
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Đến ngày:</span>
+                        <input 
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
+                        />
+                    </div>
 
                     <button 
                         onClick={handleGenerateClick}
                         disabled={isGenerating}
-                        className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm font-medium text-sm"
+                        className="flex items-center gap-2 bg-purple-600 text-white px-4 py-1.5 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm font-medium text-sm ml-2"
                     >
                         {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                        {isGenerating ? 'Đang viết báo cáo...' : 'Tạo báo cáo ngay'}
+                        {isGenerating ? 'Đang viết...' : 'Tạo báo cáo'}
                     </button>
                 </div>
             </div>
@@ -219,9 +242,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60">
                         <FileText size={64} className="mb-4 text-gray-300" />
-                        <p className="text-lg">Chọn thời gian và nhấn "Tạo báo cáo ngay"</p>
-                        <p className="text-sm">
-                            {isGenerating ? 'AI đang phân tích dữ liệu... Bạn có thể chuyển tab khác, quá trình này sẽ chạy ngầm.' : 'AI sẽ phân tích dữ liệu hồ sơ và viết báo cáo cho bạn.'}
+                        <p className="text-lg">Chọn khoảng thời gian và nhấn "Tạo báo cáo"</p>
+                        <p className="text-sm text-center max-w-md mt-2">
+                            {isGenerating ? 'AI đang phân tích dữ liệu... Bạn có thể chuyển tab khác, quá trình này sẽ chạy ngầm.' : 'Hệ thống sẽ tổng hợp số liệu, phân tích tiến độ và danh sách trễ hạn trong khoảng thời gian bạn chọn.'}
                         </p>
                     </div>
                 )}
@@ -335,36 +358,30 @@ function App() {
       if(success) setUsers(prev => prev.filter(u => u.username !== username));
   };
 
-  // --- HÀM TẠO BÁO CÁO TOÀN CỤC ---
-  const handleGlobalGenerateReport = async (range: 'week' | 'month' | 'last_month') => {
+  // --- HÀM TẠO BÁO CÁO TOÀN CỤC (Đã cập nhật logic Từ ngày - Đến ngày) ---
+  const handleGlobalGenerateReport = async (fromDateStr: string, toDateStr: string) => {
       if (!currentUser) return;
       setIsGeneratingReport(true);
-      setGlobalReportContent(''); // Reset tạm thời (hoặc giữ nguyên nếu muốn)
+      setGlobalReportContent(''); // Reset tạm thời
 
       // 1. Lọc dữ liệu theo thời gian
-      const now = new Date();
+      const from = new Date(fromDateStr);
+      from.setHours(0, 0, 0, 0); // Đầu ngày
+
+      const to = new Date(toDateStr);
+      to.setHours(23, 59, 59, 999); // Cuối ngày
+
       const filtered = records.filter(r => {
           if(!r.receivedDate) return false;
           const rDate = new Date(r.receivedDate);
-          
-          if (range === 'week') {
-              const sevenDaysAgo = new Date(now);
-              sevenDaysAgo.setDate(now.getDate() - 7);
-              return rDate >= sevenDaysAgo && rDate <= now;
-          } else if (range === 'month') {
-              return rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear();
-          } else if (range === 'last_month') {
-              const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-              return rDate.getMonth() === prevMonth.getMonth() && rDate.getFullYear() === prevMonth.getFullYear();
-          }
-          return false;
+          // So sánh ngày tiếp nhận nằm trong khoảng
+          return rDate >= from && rDate <= to;
       });
 
-      // 2. Tạo nhãn thời gian
-      let timeLabel = '';
-      if (range === 'week') timeLabel = '7 ngày qua';
-      else if (range === 'month') timeLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-      else timeLabel = `Tháng ${now.getMonth() === 0 ? 12 : now.getMonth()}/${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}`;
+      // 2. Tạo nhãn thời gian hiển thị
+      // Format lại ngày tháng năm để hiển thị đẹp hơn
+      const formatDateVN = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+      const timeLabel = `Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}`;
 
       // 3. Gọi API
       try {

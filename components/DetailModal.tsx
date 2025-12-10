@@ -91,6 +91,17 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         tp1Value += ` tại ${getNormalizedWard(record.ward)}`;
     }
     
+    // --- LOGIC TỰ ĐỘNG SDTLH (SỐ ĐIỆN THOẠI LIÊN HỆ) ---
+    let sdtLienHe = "";
+    const wRaw = (record.ward || "").toLowerCase();
+    if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
+        sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
+    } else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) {
+        sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
+    } else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) {
+        sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
+    }
+
     const day = rDate.getDate().toString().padStart(2, '0');
     const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
     const year = rDate.getFullYear();
@@ -166,6 +177,9 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
 
         // TIÊU ĐỀ PHIẾU (MỚI)
         TP1: tp1Value,
+
+        // SỐ ĐIỆN THOẠI LIÊN HỆ THEO XÃ (MỚI)
+        SDTLH: sdtLienHe,
 
         // ĐỊA DANH HÀNH CHÍNH
         TINH: "Bình Phước",

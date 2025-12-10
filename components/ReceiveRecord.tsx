@@ -212,6 +212,17 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
         tp1Value += ` tại ${getNormalizedWard(formData.ward || '')}`;
     }
 
+    // --- LOGIC TỰ ĐỘNG SDTLH (SỐ ĐIỆN THOẠI LIÊN HỆ) ---
+    let sdtLienHe = "";
+    const wRaw = (formData.ward || "").toLowerCase();
+    if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
+        sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
+    } else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) {
+        sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
+    } else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) {
+        sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
+    }
+
     const dayRec = rDate.getDate().toString().padStart(2, '0');
     const monthRec = (rDate.getMonth() + 1).toString().padStart(2, '0');
     const yearRec = rDate.getFullYear();
@@ -311,6 +322,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, wards, employees,
         THOI_GIAN_GIAI_QUYET: standardDays,
         TP1: tp1Value,
         TIEU_DE: tp1Value,
+
+        // SỐ ĐIỆN THOẠI LIÊN HỆ THEO XÃ (MỚI)
+        SDTLH: sdtLienHe,
 
         // ĐỊA DANH HÀNH CHÍNH
         TINH: "Bình Phước",

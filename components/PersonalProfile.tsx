@@ -12,7 +12,6 @@ interface PersonalProfileProps {
   onViewRecord: (record: RecordFile) => void;
 }
 
-// Hàm hỗ trợ bỏ dấu tiếng Việt để tìm kiếm
 function removeVietnameseTones(str: string): string {
     if (!str) return '';
     str = str.toLowerCase();
@@ -34,23 +33,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
-  // State cho tìm kiếm và sắp xếp
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof RecordFile; direction: 'asc' | 'desc' }>({
     key: 'deadline',
-    direction: 'desc' // Mặc định: Ngày hẹn trả mới nhất lên đầu (Giảm dần)
+    direction: 'desc' 
   });
 
-  // 1. Lọc hồ sơ được giao cho user này
   const myRecords = useMemo(() => {
     return records.filter(r => user.employeeId && r.assignedTo === user.employeeId);
   }, [records, user.employeeId]);
   
-  // 2. Phân loại và Xử lý Tìm kiếm/Sắp xếp cho danh sách "Đang xử lý"
   const pendingRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
 
-      // --- LOGIC TÌM KIẾM ---
       if (searchTerm) {
           const lowerSearch = removeVietnameseTones(searchTerm);
           const rawSearch = searchTerm.toLowerCase();
@@ -63,16 +58,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
           });
       }
 
-      // --- LOGIC SẮP XẾP ---
       return list.sort((a, b) => {
           const aValue = a[sortConfig.key];
           const bValue = b[sortConfig.key];
 
-          // Xử lý giá trị null/undefined
           if (!aValue) return 1;
           if (!bValue) return -1;
 
-          // So sánh
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
           return 0;
@@ -82,17 +74,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   const reviewRecords = myRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
   const completedRecords = myRecords.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER);
 
-  // LOGIC PHÂN TRANG
   const totalPages = Math.ceil(pendingRecords.length / itemsPerPage);
   const paginatedPendingRecords = useMemo(() => {
       const startIndex = (currentPage - 1) * itemsPerPage;
       return pendingRecords.slice(startIndex, startIndex + itemsPerPage);
   }, [pendingRecords, currentPage, itemsPerPage]);
 
-  // Xử lý sự kiện click tiêu đề cột để sắp xếp
   const handleSort = (key: keyof RecordFile) => {
       let direction: 'asc' | 'desc' = 'asc';
-      // Nếu đang sort cột này rồi thì đảo chiều
       if (sortConfig.key === key && sortConfig.direction === 'asc') {
           direction = 'desc';
       }
@@ -144,7 +133,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       );
   };
 
-  // Nếu user chưa liên kết với nhân viên
   if (!user.employeeId) {
     return (
         <div className="flex flex-col items-center justify-center h-96 bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -166,9 +154,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Header thống kê */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div className="flex flex-col h-full space-y-4 animate-fade-in-up overflow-hidden">
+      {/* Header thống kê - FIXED (SHRINK-0) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
              <Briefcase className="text-blue-600" />
@@ -192,15 +180,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         </div>
       </div>
 
-      {/* DANH SÁCH ĐANG XỬ LÝ (Có Phân trang & Sắp xếp) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-[400px]">
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+      {/* DANH SÁCH ĐANG XỬ LÝ (SCROLLABLE CONTENT) */}
+      <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
             <div className="flex items-center gap-2">
                 <Clock size={18} className="text-orange-500" />
                 <h3 className="font-bold text-gray-700">Hồ sơ đang thực hiện ({pendingRecords.length})</h3>
             </div>
             
-            {/* Thanh tìm kiếm */}
             <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
@@ -213,15 +200,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             </div>
         </div>
         
-        <div className="flex-1 overflow-x-auto">
+        <div className="flex-1 overflow-y-auto">
             {pendingRecords.length > 0 ? (
                 <table className="w-full text-left table-fixed min-w-[900px]">
-                    <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase">
+                    <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                         <tr>
                             <th className="p-3 w-10 text-center">#</th>
                             <th className="p-3 w-[120px]">{renderSortHeader('Mã HS', 'code')}</th>
                             <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
-                            <th className="p-3 w-[150px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
+                            {/* THU HẸP CỘT LOẠI HỒ SƠ */}
+                            <th className="p-3 w-[130px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
                             <th className="p-3 w-[150px]">{renderSortHeader('Hẹn trả', 'deadline')}</th>
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
                             <th className="p-3 text-center w-[120px]">Thao tác chính</th>
@@ -276,7 +264,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
 
         {/* PAGINATION FOOTER */}
         {pendingRecords.length > 0 && (
-            <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-between items-center">
+            <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-between items-center shrink-0">
                 <span className="text-xs text-gray-500">
                     Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, pendingRecords.length)}</strong> trên tổng <strong>{pendingRecords.length}</strong>
                 </span>
@@ -313,16 +301,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         )}
       </div>
 
-       {/* DANH SÁCH CHỜ KÝ (Giữ nguyên dạng cuộn ngắn gọn) */}
-       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-90">
-        <div className="p-4 border-b border-gray-100 bg-purple-50 flex items-center gap-2">
+       {/* DANH SÁCH CHỜ KÝ (Scrollable within limits) */}
+       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-90 shrink-0 max-h-64 flex flex-col">
+        <div className="p-4 border-b border-gray-100 bg-purple-50 flex items-center gap-2 shrink-0">
             <CheckCircle size={18} className="text-purple-600" />
             <h3 className="font-bold text-gray-800">Đã trình ký / Chờ kết quả ({reviewRecords.length})</h3>
         </div>
         {reviewRecords.length > 0 ? (
-            <div className="max-h-60 overflow-y-auto">
+            <div className="overflow-y-auto">
                 <table className="w-full text-left table-fixed">
-                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0">
+                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0 shadow-sm">
                         <tr>
                             <th className="p-3 w-[120px]">Mã HS</th>
                             <th className="p-3 w-[200px]">Chủ sử dụng</th>

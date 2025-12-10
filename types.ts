@@ -13,7 +13,9 @@ export enum RecordStatus {
 export enum UserRole {
   ADMIN = 'ADMIN',
   SUBADMIN = 'SUBADMIN', // Phó quản trị (Quyền như Admin trừ quản lý User)
-  EMPLOYEE = 'EMPLOYEE'
+  TEAM_LEADER = 'TEAM_LEADER', // Nhóm trưởng (Quyền quản lý tác vụ, xem báo cáo, trích lục)
+  EMPLOYEE = 'EMPLOYEE',
+  ONEDOOR = 'ONEDOOR'    // Bộ phận một cửa (Chỉ tiếp nhận và xem)
 }
 
 export interface User {
@@ -51,6 +53,9 @@ export interface RecordFile {
   receivedDate: string;   
   deadline: string;       
   assignedDate?: string;  
+  
+  submissionDate?: string; // Ngày trình ký
+  approvalDate?: string;   // Ngày ký duyệt
   completedDate?: string; 
   
   status: RecordStatus;   
@@ -154,6 +159,12 @@ export interface Message {
   file_name?: string;
   file_type?: string; // 'image' | 'document' | 'other'
   created_at: string;
+  
+  // Tính năng mới
+  reply_to_id?: string | null;       // ID tin nhắn gốc
+  reply_to_content?: string | null; // Nội dung tin nhắn gốc (snapshot)
+  reply_to_sender?: string | null;  // Người gửi tin nhắn gốc
+  reactions?: Record<string, string>; // { "username": "❤️", "username2": "👍" }
 }
 
 // Interface cho Ngày nghỉ lễ

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, FileSpreadsheet } from 'lucide-react';
-import { saveTemplate, hasTemplate, removeTemplate, STORAGE_KEYS } from '../services/docxService';
+import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, FileSpreadsheet, MapPin, Ruler, Link as LinkIcon, Cloud, Loader2, FileCheck } from 'lucide-react';
+import { saveTemplate, hasTemplate, removeTemplate, saveTemplateUrl, getTemplateSourceType, STORAGE_KEYS } from '../services/docxService';
 import { saveExcelTemplate, hasExcelTemplate, removeExcelTemplate, EXCEL_STORAGE_KEYS } from '../services/excelTemplateService';
 import * as XLSX from 'xlsx-js-style';
 
@@ -12,9 +12,16 @@ interface TemplateConfigModalProps {
 }
 
 const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClose, type }) => {
+  const [mode, setMode] = useState<'upload' | 'url'>('upload'); // Chế độ: Upload file hoặc Link
   const [file, setFile] = useState<File | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [startRow, setStartRow] = useState<number>(8); // Mặc định dòng 8
+  const [url, setUrl] = useState('');
+  
+  const [savedType, setSavedType] = useState<'FILE' | 'URL' | 'NONE'>('NONE');
+  const [startRow, setStartRow] = useState<number>(8);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // State mới để chọn loại hợp đồng con (4 loại)
+  const [contractSubType, setContractSubType] = useState<'dodac' | 'cammoc' | 'liq_dodac' | 'liq_cammoc'>('dodac');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -29,8 +36,19 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
           title = 'Cấu hình Mẫu Biên Nhận (.docx)';
           break;
       case 'contract':
-          storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE;
-          title = 'Cấu hình Mẫu Hợp Đồng (.docx)';
+          if (contractSubType === 'dodac') {
+              storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_DODAC;
+              title = 'Mẫu Hợp đồng Đo đạc / Tách thửa';
+          } else if (contractSubType === 'cammoc') {
+              storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC;
+              title = 'Mẫu Hợp đồng Cắm mốc';
+          } else if (contractSubType === 'liq_dodac') {
+              storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC;
+              title = 'Mẫu Thanh Lý HĐ Đo Đạc';
+          } else {
+              storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC;
+              title = 'Mẫu Thanh Lý HĐ Cắm Mốc';
+          }
           break;
       case 'excel_list':
           storageKey = EXCEL_STORAGE_KEYS.DAILY_LIST_TEMPLATE;
@@ -43,13 +61,14 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
   useEffect(() => {
     if (isOpen) {
         if (isExcel) {
-            setSaved(hasExcelTemplate(storageKey));
+            setSavedType(hasExcelTemplate(storageKey) ? 'FILE' : 'NONE');
             const savedRow = localStorage.getItem(storageKey + '_start_row');
             if (savedRow) setStartRow(parseInt(savedRow));
         } else {
-            setSaved(hasTemplate(storageKey));
+            setSavedType(getTemplateSourceType(storageKey));
         }
         setFile(null);
+        setUrl('');
     }
   }, [isOpen, storageKey, isExcel]);
 
@@ -67,40 +86,50 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
   };
 
   const handleSave = async () => {
-    if (!file && !saved) return;
-    
-    let success = false;
+    setIsSaving(true);
     if (isExcel) {
+        // Excel chỉ hỗ trợ Upload file (chưa hỗ trợ link do thư viện xlsx phức tạp hơn)
         if (file) {
-            success = await saveExcelTemplate(storageKey, file, startRow);
-        } else if (saved) {
+            const success = await saveExcelTemplate(storageKey, file, startRow);
+            if (success) { setSavedType('FILE'); alert('Đã lưu mẫu Excel!'); setFile(null); }
+        } else if (savedType !== 'NONE') {
             localStorage.setItem(storageKey + '_start_row', startRow.toString());
-            success = true;
+            alert('Đã cập nhật cấu hình!');
         }
-    } else {
-        if (file) success = await saveTemplate(storageKey, file);
+        setIsSaving(false);
+        return;
+    }
+
+    // Word logic
+    let success = false;
+    if (mode === 'upload' && file) {
+        success = await saveTemplate(storageKey, file);
+    } else if (mode === 'url' && url.trim()) {
+        success = await saveTemplateUrl(storageKey, url);
     }
 
     if (success) {
-        setSaved(true);
+        setSavedType(mode === 'upload' ? 'FILE' : 'URL');
         alert('Đã lưu cấu hình mẫu thành công!');
-        onClose();
+        setFile(null);
+        setUrl('');
     } else {
-        alert('Lỗi khi lưu mẫu.');
+        alert('Lỗi khi lưu mẫu. Vui lòng kiểm tra lại.');
     }
+    setIsSaving(false);
   };
 
   const handleDelete = () => {
-      if(confirm('Bạn có chắc muốn xóa mẫu hiện tại?')) {
+      if(confirm(`Bạn có chắc muốn xóa mẫu "${title}" hiện tại?`)) {
           if (isExcel) removeExcelTemplate(storageKey);
           else removeTemplate(storageKey);
-          setSaved(false);
+          setSavedType('NONE');
           setFile(null);
+          setUrl('');
       }
   };
 
   const handleDownloadExcelSample = () => {
-      // Tạo file mẫu Excel chuẩn để người dùng tải về
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet([
           ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
@@ -109,36 +138,13 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
           ["DANH SÁCH HỒ SƠ TRÍCH LỤC TRÍCH ĐO"],
           ["NGÀY ... THÁNG ... NĂM ..."],
           [],
-          ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"], // Dòng 7
+          ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"],
       ]);
-
-      // Định dạng độ rộng cột
-      ws['!cols'] = [
-          { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 20 }
-      ];
-
-      // Định dạng merge tiêu đề
+      ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 20 }];
       ws['!merges'] = [
-          { s: {r:0, c:0}, e: {r:0, c:6} }, // Quốc hiệu
-          { s: {r:1, c:0}, e: {r:1, c:6} },
-          { s: {r:3, c:0}, e: {r:3, c:6} }, // Tên danh sách
-          { s: {r:4, c:0}, e: {r:4, c:6} }, // Ngày
+          { s: {r:0, c:0}, e: {r:0, c:6} }, { s: {r:1, c:0}, e: {r:1, c:6} },
+          { s: {r:3, c:0}, e: {r:3, c:6} }, { s: {r:4, c:0}, e: {r:4, c:6} },
       ];
-
-      // Định dạng Style (Cơ bản)
-      const centerStyle = { alignment: { horizontal: "center" }, font: { name: "Times New Roman", bold: true } };
-      const headerStyle = { ...centerStyle, border: { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"} }, fill: { fgColor: { rgb: "E0E0E0" } } };
-
-      if(ws['A1']) ws['A1'].s = { ...centerStyle, font: { ...centerStyle.font, sz: 12 } };
-      if(ws['A2']) ws['A2'].s = { ...centerStyle, font: { ...centerStyle.font, sz: 12, underline: true } };
-      if(ws['A4']) ws['A4'].s = { ...centerStyle, font: { ...centerStyle.font, sz: 14 } };
-      if(ws['A5']) ws['A5'].s = { ...centerStyle, font: { ...centerStyle.font, sz: 12, italic: true } };
-
-      // Style Header cột
-      ['A7', 'B7', 'C7', 'D7', 'E7', 'F7', 'G7'].forEach(cell => {
-          if(ws[cell]) ws[cell].s = headerStyle;
-      });
-
       XLSX.utils.book_append_sheet(wb, ws, "Mau_DS");
       XLSX.writeFile(wb, "Mau_Danh_Sach_Ho_So.xlsx");
   };
@@ -149,7 +155,7 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
         <div className="flex justify-between items-center p-5 border-b shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             {isExcel ? <FileSpreadsheet className="text-green-600" /> : <FileText className="text-blue-600" />}
-            {title}
+            {type === 'contract' ? 'Cấu hình Mẫu In Hợp Đồng' : title}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-red-600">
             <X size={24} />
@@ -157,76 +163,133 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
         </div>
 
         <div className="p-6 space-y-4 overflow-y-auto">
-            <div className={`p-4 rounded-lg border flex items-center justify-between ${saved ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+            
+            {/* TOGGLE CHO HỢP ĐỒNG */}
+            {type === 'contract' && (
+                <div className="flex flex-col gap-2 mb-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase">Chọn loại mẫu để cấu hình:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button 
+                            onClick={() => setContractSubType('dodac')}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${contractSubType === 'dodac' ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <Ruler size={14} /> HĐ Đo Đạc
+                        </button>
+                        <button 
+                            onClick={() => setContractSubType('cammoc')}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${contractSubType === 'cammoc' ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <MapPin size={14} /> HĐ Cắm Mốc
+                        </button>
+                        <button 
+                            onClick={() => setContractSubType('liq_dodac')}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${contractSubType === 'liq_dodac' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <FileCheck size={14} /> TL Đo Đạc
+                        </button>
+                        <button 
+                            onClick={() => setContractSubType('liq_cammoc')}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${contractSubType === 'liq_cammoc' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <FileCheck size={14} /> TL Cắm Mốc
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* STATUS BANNER */}
+            <div className={`p-4 rounded-lg border flex items-center justify-between ${savedType !== 'NONE' ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                 <div className="flex items-center gap-3">
-                    {saved ? <CheckCircle className="text-green-600" size={24} /> : <AlertCircle className="text-gray-400" size={24} />}
+                    {savedType !== 'NONE' ? <CheckCircle className="text-green-600" size={24} /> : <AlertCircle className="text-gray-400" size={24} />}
                     <div>
-                        <p className={`font-bold ${saved ? 'text-green-800' : 'text-gray-600'}`}>
-                            {saved ? 'Đã có mẫu in' : 'Chưa có mẫu in'}
+                        <p className={`font-bold ${savedType !== 'NONE' ? 'text-green-800' : 'text-gray-600'}`}>
+                            {title}
                         </p>
                         <p className="text-xs text-gray-500">
-                            {saved ? 'Hệ thống sẽ dùng mẫu này để xuất file.' : `Vui lòng tải lên file ${acceptExt}.`}
+                            {savedType !== 'NONE' 
+                                ? (savedType === 'URL' ? 'Đã kết nối Link Google Docs' : 'Đã tải lên File') 
+                                : 'Chưa cấu hình mẫu này'}
                         </p>
                     </div>
                 </div>
-                {saved && (
-                    <button onClick={handleDelete} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded">
+                {savedType !== 'NONE' && (
+                    <button onClick={handleDelete} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded" title="Xóa mẫu này">
                         <Trash2 size={18} />
                     </button>
                 )}
             </div>
 
-            <div 
-                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 cursor-pointer transition-colors relative"
-                onClick={() => fileInputRef.current?.click()}
-            >
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept={acceptExt} 
-                    className="hidden" 
-                />
-                <Upload className="mx-auto h-10 w-10 text-gray-400 mb-2" />
-                <p className="text-sm font-medium text-gray-700">
-                    {file ? file.name : `Nhấn để chọn file mẫu (${acceptExt})`}
-                </p>
-                {isExcel && <p className="text-xs text-gray-500 mt-1">Nên xóa hết dữ liệu cũ trong file mẫu, chỉ giữ lại tiêu đề.</p>}
+            {/* TAB SELECTOR (Word Only) */}
+            {!isExcel && (
+                <div className="flex border-b border-gray-200">
+                    <button 
+                        onClick={() => setMode('upload')}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${mode === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Upload size={14} /> Upload File (.docx)
+                    </button>
+                    <button 
+                        onClick={() => setMode('url')}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${mode === 'url' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Cloud size={14} /> Link Google Docs
+                    </button>
+                </div>
+            )}
+
+            {/* INPUT AREA */}
+            <div className="py-2">
+                {mode === 'upload' ? (
+                    <div 
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 cursor-pointer transition-colors relative"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleFileChange} 
+                            accept={acceptExt} 
+                            className="hidden" 
+                        />
+                        <Upload className="mx-auto h-10 w-10 text-gray-400 mb-2" />
+                        <p className="text-sm font-medium text-gray-700">
+                            {file ? file.name : `Nhấn để chọn file mẫu ${acceptExt}`}
+                        </p>
+                        {isExcel && <p className="text-xs text-gray-500 mt-1">Nên xóa hết dữ liệu cũ trong file mẫu, chỉ giữ lại tiêu đề.</p>}
+                    </div>
+                ) : (
+                    <div className="space-y-2 animate-fade-in">
+                        <label className="block text-sm font-medium text-gray-700">Dán link Google Docs (Quyền xem/chia sẻ):</label>
+                        <div className="relative">
+                            <input 
+                                type="text"
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 pl-9 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="https://docs.google.com/document/d/..."
+                                value={url}
+                                onChange={(e) => setUrl(e.target.value)}
+                            />
+                            <LinkIcon size={16} className="absolute left-3 top-2.5 text-gray-400" />
+                        </div>
+                        <p className="text-xs text-blue-600 flex items-center gap-1 bg-blue-50 p-2 rounded">
+                            <AlertCircle size={12} />
+                            Hệ thống sẽ tự động tải file từ link này mỗi khi in. Tiện lợi để cập nhật mẫu mà không cần upload lại.
+                        </p>
+                    </div>
+                )}
             </div>
 
             {isExcel && (
                 <>
                     <div className="flex justify-end">
-                        <button 
-                            type="button"
-                            onClick={handleDownloadExcelSample}
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                        >
+                        <button type="button" onClick={handleDownloadExcelSample} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                             <Download size={14} /> Tải file mẫu chuẩn (.xlsx)
                         </button>
                     </div>
-
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-2">
-                        <label className="block text-sm font-bold text-blue-800">
-                            Dữ liệu bắt đầu từ dòng số mấy?
-                        </label>
+                        <label className="block text-sm font-bold text-blue-800">Dữ liệu bắt đầu từ dòng số mấy?</label>
                         <div className="flex gap-2 items-center">
-                            <input 
-                                type="number" min="1" 
-                                className="w-20 border border-blue-300 rounded px-2 py-1 text-center font-bold text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={startRow}
-                                onChange={(e) => setStartRow(parseInt(e.target.value) || 1)}
-                            />
-                            <span className="text-xs text-blue-600">
-                                (Ví dụ: Tiêu đề ở dòng 7, thì dữ liệu bắt đầu dòng 8)
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-blue-500 italic mt-1">
-                            * App sẽ điền dữ liệu từ dòng này trở xuống.
-                        </p>
-                        <div className="mt-2 text-xs bg-white p-2 rounded border border-blue-200">
-                            <strong>Quy tắc cột (Bắt buộc theo thứ tự):</strong><br/>
-                            A: STT | B: Mã HS | C: Tên Chủ HS | D: Địa chỉ | E: Loại HS | F: Hẹn trả | G: Ghi chú
+                            <input type="number" min="1" className="w-20 border border-blue-300 rounded px-2 py-1 text-center font-bold text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500" value={startRow} onChange={(e) => setStartRow(parseInt(e.target.value) || 1)} />
+                            <span className="text-xs text-blue-600">(Ví dụ: Tiêu đề ở dòng 7, thì dữ liệu bắt đầu dòng 8)</span>
                         </div>
                     </div>
                 </>
@@ -244,15 +307,14 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
             )}
 
             <div className="flex justify-end gap-3 pt-4 border-t mt-auto">
-                <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">
-                    Hủy
-                </button>
+                <button onClick={onClose} disabled={isSaving} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md disabled:opacity-50">Đóng</button>
                 <button 
                     onClick={handleSave} 
-                    disabled={!file && !saved}
+                    disabled={(mode === 'upload' ? !file : !url.trim()) || isSaving} 
                     className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 shadow-sm"
                 >
-                    <Save size={18} /> Lưu Cấu Hình
+                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    {isSaving ? 'Đang lưu...' : 'Lưu Cấu Hình'}
                 </button>
             </div>
         </div>

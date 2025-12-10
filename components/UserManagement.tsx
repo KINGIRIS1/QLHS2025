@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Employee } from '../types';
 import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, FileSpreadsheet, Download } from 'lucide-react';
@@ -23,7 +24,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Form state
   const [formData, setFormData] = useState<User>({
     username: '',
     password: '',
@@ -34,7 +34,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
   const [error, setError] = useState('');
 
-  // Reset form khi đóng hoặc mở modal mới
   useEffect(() => {
     if (editingUser) {
       setFormData(editingUser);
@@ -59,7 +58,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
       return;
     }
 
-    // Kiểm tra trùng username nếu là thêm mới
     if (!editingUser) {
       if (users.some(u => u.username === formData.username)) {
         setError('Tên đăng nhập đã tồn tại.');
@@ -88,7 +86,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setIsModalOpen(true);
   };
 
-  // Hàm helper để cập nhật state an toàn với Functional Update
   const handleInputChange = (field: keyof User, value: string) => {
       setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -105,7 +102,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
       XLSX.writeFile(wb, "Tai_Khoan_Mau.xlsx");
   };
 
-  // --- LOGIC NHẬP EXCEL (FIXED) ---
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -114,7 +110,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
     reader.onload = (evt) => {
       try {
         const data = evt.target?.result;
-        // FIX: Đổi 'binary' -> 'array'
         const wb = XLSX.read(data, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
@@ -124,7 +119,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
         let skipCount = 0;
 
         rows.forEach((row: any) => {
-           // Chuẩn hóa tên cột
            const normalizedRow: Record<string, any> = {};
            Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
            
@@ -132,17 +126,16 @@ const UserManagement: React.FC<UserManagementProps> = ({
            const password = String(normalizedRow['MẬT KHẨU'] || normalizedRow['PASSWORD'] || normalizedRow['PASS'] || '123');
            const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '');
            
-           // Xử lý vai trò
            const roleRaw = String(normalizedRow['VAI TRÒ'] || normalizedRow['ROLE'] || '').toUpperCase();
            let role = UserRole.EMPLOYEE;
            if (roleRaw.includes('ADMIN') || roleRaw.includes('QUẢN TRỊ')) role = UserRole.ADMIN;
            else if (roleRaw.includes('PHÓ') || roleRaw.includes('SUB')) role = UserRole.SUBADMIN;
+           else if (roleRaw.includes('TEAM') || roleRaw.includes('NHÓM TRƯỞNG')) role = UserRole.TEAM_LEADER;
+           else if (roleRaw.includes('ONEDOOR') || roleRaw.includes('MỘT CỬA') || roleRaw.includes('1 CỬA')) role = UserRole.ONEDOOR;
 
-           // Mã nhân viên liên kết
            const employeeId = String(normalizedRow['MÃ NV'] || normalizedRow['LIÊN KẾT'] || normalizedRow['EMPLOYEE_ID'] || '');
 
            if (username && name) {
-               // Kiểm tra trùng username
                if (users.some(u => u.username === username)) {
                    skipCount++;
                    return;
@@ -167,14 +160,13 @@ const UserManagement: React.FC<UserManagementProps> = ({
          if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
-    // FIX: Sử dụng readAsArrayBuffer
     reader.readAsArrayBuffer(file);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-[calc(100vh-140px)]">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
+      {/* Header Fixed */}
+      <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0 z-10 bg-white relative">
         <div>
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <Shield className="text-blue-600" size={20} />
@@ -216,11 +208,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto p-6">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-6 min-h-0">
         <div className="overflow-hidden border border-gray-200 rounded-lg">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wider sticky top-0 shadow-sm">
               <tr>
                 <th className="p-4 border-b">Người dùng</th>
                 <th className="p-4 border-b">Vai trò</th>
@@ -250,10 +242,16 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           ? 'bg-purple-50 text-purple-700 border-purple-200' 
                           : user.role === UserRole.SUBADMIN
                             ? 'bg-orange-50 text-orange-700 border-orange-200'
-                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                            : user.role === UserRole.TEAM_LEADER
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : user.role === UserRole.ONEDOOR
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
                       }`}>
                         {user.role === UserRole.ADMIN ? 'Administrator' : 
-                         user.role === UserRole.SUBADMIN ? 'Phó quản trị' : 'Nhân viên'}
+                         user.role === UserRole.SUBADMIN ? 'Phó quản trị' : 
+                         user.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : 
+                         user.role === UserRole.ONEDOOR ? 'Bộ phận Một cửa' : 'Nhân viên'}
                       </span>
                     </td>
                     <td className="p-4 text-gray-600">
@@ -300,7 +298,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
         </div>
       </div>
 
-      {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md animate-fade-in-up">
@@ -367,13 +364,14 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
                 >
                   <option value={UserRole.EMPLOYEE}>Nhân viên</option>
+                  <option value={UserRole.TEAM_LEADER}>Nhóm trưởng (Team Leader)</option>
+                  <option value={UserRole.ONEDOOR}>Cán bộ Một cửa (OneDoor)</option>
                   <option value={UserRole.SUBADMIN}>Phó quản trị (Sub-Admin)</option>
                   <option value={UserRole.ADMIN}>Quản trị viên (Admin)</option>
                 </select>
               </div>
 
-              {/* Chỉ hiện chọn nhân viên nếu Role là EMPLOYEE hoặc SUBADMIN */}
-              {(formData.role === UserRole.EMPLOYEE || formData.role === UserRole.SUBADMIN) && (
+              {(formData.role === UserRole.EMPLOYEE || formData.role === UserRole.SUBADMIN || formData.role === UserRole.TEAM_LEADER || formData.role === UserRole.ONEDOOR) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Liên kết hồ sơ nhân viên</label>
                   <select

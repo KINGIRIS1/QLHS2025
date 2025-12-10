@@ -1,3 +1,4 @@
+
 {
   "name": "he-thong-quan-ly-ho-so",
   "private": true,
@@ -11,7 +12,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "wait-on tcp:5173 && electron .",
-    "electron:build": "npm run build && electron-builder --win --x64"
+    "electron:build": "npm run build && electron-builder --win --x64 -p never"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
@@ -19,6 +20,8 @@
     "cors": "^2.8.5",
     "docx-preview": "^0.3.2",
     "docxtemplater": "^3.46.0",
+    "electron-log": "^5.1.0",
+    "electron-updater": "^6.1.7",
     "file-saver": "^2.0.5",
     "json-server": "^0.17.4",
     "jszip": "^3.10.1",
@@ -69,7 +72,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/vite.svg"
+      "icon": "public/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -77,7 +80,16 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "runAfterFinish": true,
-      "shortcutName": "Quan Ly Ho So"
-    }
+      "shortcutName": "Quan Ly Ho So",
+      "deleteAppDataOnUninstall": true,
+      "differentialPackage": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "THAY_TEN_USER_GITHUB_CUA_BAN_VAO_DAY",
+        "repo": "THAY_TEN_REPOSITORY_CUA_BAN_VAO_DAY"
+      }
+    ]
   }
 }

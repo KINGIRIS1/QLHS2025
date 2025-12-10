@@ -1,10 +1,10 @@
 
 import React, { useState, useRef } from 'react';
 import { RecordFile, Employee, User, UserRole } from '../types';
-import { STATUS_LABELS } from '../constants';
+import { STATUS_LABELS, getNormalizedWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil } from 'lucide-react';
-import { generateDocxBlob, hasTemplate, STORAGE_KEYS } from '../services/docxService';
+import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 
 interface DetailModalProps {
@@ -21,12 +21,18 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   if (!isOpen || !record) return null;
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
+  const isOneDoor = currentUser?.role === UserRole.ONEDOOR;
+
   const canPerformAction = isAdmin || isSubadmin; // Điều kiện để Sửa/Xóa
+  
+  // Điều kiện để In biên nhận: Chỉ Admin hoặc Một cửa mới được thấy nút này
+  const canPrintReceipt = isAdmin || isOneDoor;
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '---';
@@ -43,13 +49,15 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
     return emp ? `${emp.name} (${emp.department})` : 'Không xác định';
   };
 
-  const handlePrintReceipt = () => {
+  const handlePrintReceipt = async () => {
     if (!currentUser) return;
     
     if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
         alert('Chưa có mẫu biên nhận. Vui lòng vào mục "Tiếp nhận hồ sơ" để cấu hình mẫu in trước.');
         return;
     }
+
+    setIsProcessing(true);
 
     const rDate = record.receivedDate ? new Date(record.receivedDate) : new Date();
     const dDate = record.deadline ? new Date(record.deadline) : new Date();
@@ -80,7 +88,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
 
     // Thêm tên Xã/Phường vào tiêu đề
     if (record.ward) {
-        tp1Value += ` tại ${record.ward}`;
+        tp1Value += ` tại ${getNormalizedWard(record.ward)}`;
     }
     
     const day = rDate.getDate().toString().padStart(2, '0');
@@ -99,8 +107,8 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         phoneNumber: val(record.phoneNumber),
         cccd: val(record.cccd),
         content: val(record.content),
-        address: val(record.address || record.ward),
-        ward: val(record.ward),
+        address: val(record.address || getNormalizedWard(record.ward)),
+        ward: val(getNormalizedWard(record.ward)),
         landPlot: val(record.landPlot),
         mapSheet: val(record.mapSheet),
         area: val(record.area),
@@ -112,9 +120,13 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         // Aliases cho template
         MA: val(record.code),
         SO_HS: val(record.code),
-        TEN: val(record.customerName),
-        HO_TEN: val(record.customerName),
-        KHACH_HANG: val(record.customerName),
+        
+        // TỰ ĐỘNG VIẾT HOA TÊN NGƯỜI
+        TEN: val(record.customerName).toUpperCase(),
+        HO_TEN: val(record.customerName).toUpperCase(),
+        KHACH_HANG: val(record.customerName).toUpperCase(),
+        TEN_CHU_SU_DUNG: val(record.customerName).toUpperCase(),
+        
         NGAY_NHAN: rDate.toLocaleDateString('vi-VN'),
         HEN_TRA: dDate.toLocaleDateString('vi-VN'),
         NGAY_HEN: dDate.toLocaleDateString('vi-VN'),
@@ -125,22 +137,23 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         CCCD: val(record.cccd),
         CMND: val(record.cccd),
         NOI_DUNG: val(record.content),
-        DIA_CHI: val(record.address || record.ward),
-        DC: val(record.address || record.ward),
+        DIA_CHI: val(record.address || getNormalizedWard(record.ward)),
+        DC: val(record.address || getNormalizedWard(record.ward)),
         DIA_CHI_CHI_TIET: val(record.address),
         DC_CT: val(record.address),
-        XA: val(record.ward),
-        PHUONG: val(record.ward),
-        XAPHUONG: val(record.ward),
+        XA: val(getNormalizedWard(record.ward)),
+        PHUONG: val(getNormalizedWard(record.ward)),
+        XAPHUONG: val(getNormalizedWard(record.ward)),
         TO: val(record.mapSheet),
         THUA: val(record.landPlot),
         DT: val(record.area),
         DIEN_TICH: val(record.area),
         LOAI_HS: val(record.recordType),
         GIAY_TO_KHAC: val(record.otherDocs),
-        NGUOI_UY_QUYEN: val(record.authorizedBy),
-        UY_QUYEN: val(record.authorizedBy),
-        NGUOI_DUOC_UY_QUYEN: val(record.authorizedBy),
+        
+        NGUOI_UY_QUYEN: val(record.authorizedBy).toUpperCase(),
+        UY_QUYEN: val(record.authorizedBy).toUpperCase(),
+        NGUOI_DUOC_UY_QUYEN: val(record.authorizedBy).toUpperCase(),
         LOAI_UY_QUYEN: val(record.authDocType),
         LOAI_GIAY_TO_UY_QUYEN: val(record.authDocType),
         GIAY_UY_QUYEN: val(record.authDocType),
@@ -152,10 +165,18 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         SO_NGAY: standardDays, 
 
         // TIÊU ĐỀ PHIẾU (MỚI)
-        TP1: tp1Value
+        TP1: tp1Value,
+
+        // ĐỊA DANH HÀNH CHÍNH
+        TINH: "Bình Phước",
+        HUYEN: "thị xã Chơn Thành"
     };
 
-    const blob = generateDocxBlob(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+    // Sử dụng hàm async mới
+    const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+    
+    setIsProcessing(false);
+
     if (blob) {
         setPreviewBlob(blob);
         setPreviewFileName(`BienNhan_${record.code}`);
@@ -179,13 +200,17 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
             <h2 className="text-xl font-bold text-gray-800">{record.recordType}</h2>
           </div>
           <div className="flex items-center gap-2">
-              <button 
-                onClick={handlePrintReceipt}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors shadow-sm text-sm font-medium"
-                title="In biên nhận cho hồ sơ này"
-              >
-                  <Printer size={16} /> In biên nhận
-              </button>
+              {canPrintReceipt && (
+                  <button 
+                    onClick={handlePrintReceipt}
+                    disabled={isProcessing}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors shadow-sm text-sm font-medium disabled:opacity-50"
+                    title="In biên nhận cho hồ sơ này"
+                  >
+                      {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                      {isProcessing ? 'Đang tạo...' : 'In biên nhận'}
+                  </button>
+              )}
               
               {canPerformAction && onEdit && (
                   <button 
@@ -249,7 +274,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
             <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-8">
               <div className="col-span-2 md:col-span-1">
                 <label className="text-xs text-gray-500 mb-1 block">Xã / Phường</label>
-                <div className="font-semibold text-gray-800">{record.ward || '---'}</div>
+                <div className="font-semibold text-gray-800">{getNormalizedWard(record.ward) || '---'}</div>
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label className="text-xs text-gray-500 mb-1 block">Khu vực (Nhóm)</label>
@@ -323,6 +348,15 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                         <div className="flex justify-between items-center border-b border-orange-200 pb-2">
                             <span className="text-sm text-gray-600">Ngày giao NV</span>
                             <span className="font-medium text-gray-900">{formatDate(record.assignedDate)}</span>
+                        </div>
+                        {/* THÊM HIỂN THỊ NGÀY TRÌNH KÝ VÀ NGÀY KÝ DUYỆT */}
+                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                            <span className="text-sm text-gray-600">Ngày trình ký</span>
+                            <span className="font-medium text-purple-700">{formatDate(record.submissionDate)}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                            <span className="text-sm text-gray-600">Ngày ký duyệt</span>
+                            <span className="font-medium text-indigo-700">{formatDate(record.approvalDate)}</span>
                         </div>
                          <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">Ngày hoàn thành</span>

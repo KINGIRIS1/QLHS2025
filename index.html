@@ -3,17 +3,17 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hệ thống Tiếp nhận và Quản lý hồ sơ Đo đạc - Chi nhánh Chơn Thành</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Add ReactCrop CSS for Preview Mode -->
+    <link rel="stylesheet" href="https://unpkg.com/react-image-crop/dist/ReactCrop.css">
+    
     <style>
       body {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
         background-color: #f3f4f6;
       }
-      /* CSS in ấn tối giản - Việc in chính đã được xử lý qua Iframe Isolation */
       @media print {
         @page {
           margin: 10mm;
@@ -22,45 +22,44 @@
       }
     </style>
     <script>
-      // Polyfill thông minh cho process.env
-      // QUAN TRỌNG: Kiểm tra nếu process đã tồn tại (Môi trường Electron) thì KHÔNG ghi đè
+      // Polyfill cho môi trường Browser/Electron
       if (typeof window.process === 'undefined') {
         window.process = { env: {} };
       }
-      
       if (!window.process.env) window.process.env = {};
-      
-      // Thiết lập biến môi trường mặc định nếu chưa có
-      if (!window.process.env.NODE_ENV) window.process.env.NODE_ENV = 'development';
+      if (!window.process.env.NODE_ENV) window.process.env.NODE_ENV = 'production';
       if (!window.process.env.API_KEY) window.process.env.API_KEY = '';
 
-      // Polyfill các hàm NodeJS mà thư viện bên thứ 3 (jszip, docxtemplater) cần
+      // Polyfill cho các thư viện cũ (docxtemplater, jszip)
       if (!window.process.nextTick) window.process.nextTick = function(fn) { setTimeout(fn, 0); };
       if (!window.process.listenerCount) window.process.listenerCount = function() { return 0; };
       if (!window.process.on) window.process.on = function() {};
       if (typeof window.process.browser === 'undefined') window.process.browser = true;
+      
+      // Định nghĩa global Buffer nếu cần thiết cho một số thư viện Node
+      if (typeof window.global === 'undefined') window.global = window;
     </script>
   <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-    "react": "https://esm.sh/react@18.2.0",
-    "react/": "https://esm.sh/react@18.2.0/",
-    "react-dom": "https://esm.sh/react-dom@18.2.0?deps=react@18.2.0",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/?deps=react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react",
-    "recharts": "https://esm.sh/recharts@2.12.2?external=react,react-dom",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs",
-    "xlsx-js-style": "https://esm.sh/xlsx-js-style@1.2.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
-    "pizzip": "https://esm.sh/pizzip@3.1.6",
-    "docxtemplater": "https://esm.sh/docxtemplater@3.46.0",
-    "file-saver": "https://esm.sh/file-saver@2.0.5",
-    "jszip": "https://esm.sh/jszip@3.10.1",
-    "docx-preview": "https://esm.sh/docx-preview@0.3.2",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "xlsx-js-style": "https://aistudiocdn.com/xlsx-js-style@^1.2.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.2",
+    "pizzip": "https://aistudiocdn.com/pizzip@^3.2.0",
+    "docxtemplater": "https://aistudiocdn.com/docxtemplater@^3.67.5",
+    "file-saver": "https://aistudiocdn.com/file-saver@^2.0.5",
+    "docx-preview": "https://aistudiocdn.com/docx-preview@^0.3.7",
+    "react-image-crop": "https://aistudiocdn.com/react-image-crop@^11.0.10",
     "react-image-crop/": "https://aistudiocdn.com/react-image-crop@^11.0.10/",
-    "react-image-crop": "https://aistudiocdn.com/react-image-crop@^11.0.10"
+    "vite": "https://aistudiocdn.com/vite@^7.2.6",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "url": "https://aistudiocdn.com/url@^0.11.4"
   }
 }
 </script>

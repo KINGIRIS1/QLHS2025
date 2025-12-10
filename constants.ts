@@ -1,11 +1,13 @@
 
 import { RecordStatus, Employee, RecordFile, User, UserRole } from './types';
 
-// CẤU HÌNH KẾT NỐI MẠNG LAN
-// ĐÂY LÀ ĐỊA CHỈ QUAN TRỌNG NHẤT
-// Nếu chạy Server trên máy này: 'http://localhost:3000'
-// Nếu Server là máy khác: 'http://192.168.1.X:3000'
-export const API_BASE_URL = 'http://localhost:3000'; 
+// CẤU HÌNH KẾT NỐI
+// QUAN TRỌNG: Để dùng Cloud (Supabase), hãy dán URL dự án vào đây.
+// Nếu dùng Mạng LAN (Local), đổi lại thành 'http://localhost:3000'
+export const API_BASE_URL = 'https://dajjhubrhybodggbqapt.supabase.co'; 
+
+// PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
+export const APP_VERSION = '1.8.2';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
@@ -34,7 +36,7 @@ export const WARDS = [
 ];
 
 // Danh sách loại hồ sơ đầy đủ (Hiển thị trong Form Thêm/Sửa)
-// Đã xóa 'Chỉnh lại' và giữ nguyên tên đầy đủ
+// Đã xóa 'Cung cấp thông tin' theo yêu cầu
 export const RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
   'Trích đo bản đồ địa chính',
@@ -42,6 +44,25 @@ export const RECORD_TYPES = [
   'Đo đạc',     
   'Cắm mốc'
 ];
+
+// Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
+export const getNormalizedWard = (ward: string | undefined): string => {
+  if (!ward) return '';
+  let w = ward.trim();
+  
+  // Xóa các tiền tố hành chính thông dụng (không phân biệt hoa thường)
+  w = w.replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/yi, '');
+
+  const lower = w.toLowerCase();
+
+  // 1. Xử lý các mã viết tắt đặc biệt
+  if (lower === 'ct' || lower === 'chơn thành') return 'Chơn Thành';
+  if (lower === 'nb' || lower === 'nha bích') return 'Nha Bích';
+  if (lower === 'mh' || lower === 'minh hưng') return 'Minh Hưng';
+
+  // 2. Xử lý Title Case (Viết hoa chữ cái đầu mỗi từ)
+  return w.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
 
 // Hàm rút gọn tên loại hồ sơ để hiển thị trong Danh sách (Table)
 export const getShortRecordType = (type: string | undefined): string => {
@@ -61,6 +82,7 @@ export const getShortRecordType = (type: string | undefined): string => {
   if (t.includes('chuyển mục đích')) return 'Chuyển MĐ';
   if (t.includes('cấp đổi')) return 'Cấp đổi';
   if (t.includes('cấp mới')) return 'Cấp mới';
+  if (t.includes('cung cấp thông tin')) return 'CCTT'; // Rút gọn Cung cấp thông tin
   
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };

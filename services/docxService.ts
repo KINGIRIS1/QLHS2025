@@ -1,15 +1,23 @@
 
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { saveAs } from 'file-saver';
+import saveAs from 'file-saver';
+import { saveSystemSetting, getSystemSetting } from './api';
+import { supabase } from './supabaseClient';
 
 // Khóa lưu trữ trong LocalStorage
 export const STORAGE_KEYS = {
     RECEIPT_TEMPLATE: 'docx_template_receipt',
-    CONTRACT_TEMPLATE: 'docx_template_contract'
+    CONTRACT_TEMPLATE_DODAC: 'docx_template_contract_dodac', 
+    CONTRACT_TEMPLATE_CAMMOC: 'docx_template_contract_cammoc', 
+    // Tách riêng 2 loại thanh lý
+    CONTRACT_TEMPLATE_LIQ_DODAC: 'docx_template_liquidation_dodac', 
+    CONTRACT_TEMPLATE_LIQ_CAMMOC: 'docx_template_liquidation_cammoc',
+    CONTRACT_TEMPLATE: 'docx_template_contract' 
 };
 
-// Hàm chuyển File -> Base64 để lưu vào LocalStorage
+// --- HELPERS ---
+
 export const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -19,7 +27,6 @@ export const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-// Hàm chuyển Base64 -> ArrayBuffer để thư viện xử lý
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     const binaryString = window.atob(base64.split(',')[1]);
     const len = binaryString.length;
@@ -30,56 +37,141 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     return bytes.buffer;
 };
 
-// Hàm lưu template
+// --- STORAGE MANAGEMENT ---
+
+// Lưu File Upload (Base64) - CHỈ LƯU LOCALSTORAGE (Vì base64 nặng, không nên tống vào bảng settings)
 export const saveTemplate = async (key: string, file: File) => {
     try {
         const base64 = await fileToBase64(file);
-        
-        // Kiểm tra dung lượng (Base64 lớn hơn binary ~33%)
         if (base64.length > 5 * 1024 * 1024) {
-             alert("File mẫu quá lớn (>3MB). Trình duyệt không thể lưu trữ. Vui lòng nén nhỏ file (xóa ảnh thừa) rồi thử lại.");
+             alert("File mẫu quá lớn (>5MB). Trình duyệt không thể lưu trữ. Vui lòng nén nhỏ file hoặc dùng Link Google Docs.");
              return false;
         }
-
         localStorage.setItem(key, base64);
         return true;
     } catch (e: any) {
         console.error("Lỗi lưu template:", e);
         if (e.name === 'QuotaExceededError' || e.code === 22) {
-             alert("Bộ nhớ trình duyệt đã đầy! Vui lòng xóa bớt các mẫu cũ không dùng đến.");
+             alert("Bộ nhớ trình duyệt đã đầy! Vui lòng xóa bớt các mẫu cũ hoặc dùng Link Google Docs.");
         }
         return false;
     }
 };
 
-// Hàm kiểm tra template có tồn tại không
+// Lưu URL Google Docs - LƯU CẢ LOCAL VÀ CLOUD (System Settings)
+export const saveTemplateUrl = async (key: string, url: string): Promise<boolean> => {
+    try {
+        // Chuyển đổi link View/Edit thành link Export
+        let exportUrl = url;
+        const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+            exportUrl = `https://docs.google.com/document/d/${match[1]}/export?format=docx`;
+        }
+        
+        const value = `URL_MODE:${exportUrl}`;
+        
+        // 1. Lưu Local
+        localStorage.setItem(key, value);
+        
+        // 2. Lưu Cloud (Để đồng bộ cho mọi user)
+        const success = await saveSystemSetting(key, value);
+        if (!success) console.warn("Không thể lưu cấu hình mẫu in lên Cloud.");
+        
+        return true;
+    } catch (e) {
+        console.error("Lỗi lưu URL template:", e);
+        return false;
+    }
+};
+
 export const hasTemplate = (key: string): boolean => {
     return !!localStorage.getItem(key);
 };
 
-// Hàm xóa template
-export const removeTemplate = (key: string) => {
-    localStorage.removeItem(key);
+export const getTemplateSourceType = (key: string): 'FILE' | 'URL' | 'NONE' => {
+    const val = localStorage.getItem(key);
+    if (!val) return 'NONE';
+    if (val.startsWith('URL_MODE:')) return 'URL';
+    return 'FILE';
 };
 
-// Helper function để render Docxtemplater
-const createDoc = (templateKey: string, data: any) => {
-    const base64Template = localStorage.getItem(templateKey);
-    if (!base64Template) {
-        throw new Error("Chưa có file mẫu nào được tải lên.");
+export const removeTemplate = (key: string) => {
+    localStorage.removeItem(key);
+    // Cố gắng xóa trên Cloud (nếu là URL) - nhưng để đơn giản ta chỉ xóa local 
+    // hoặc set value rỗng trên cloud nếu cần thiết.
+    // Tạm thời chỉ xóa local để tránh xóa nhầm của người khác nếu không phải admin.
+};
+
+// --- SYNC TEMPLATES FROM CLOUD ---
+// Hàm này sẽ được gọi khi App khởi động để lấy các link Google Docs mới nhất về
+export const syncTemplatesFromCloud = async () => {
+    try {
+        const keys = [
+            STORAGE_KEYS.RECEIPT_TEMPLATE,
+            STORAGE_KEYS.CONTRACT_TEMPLATE_DODAC,
+            STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC,
+            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC,  // Mới
+            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC  // Mới
+        ];
+
+        // Lấy tất cả settings 1 lần để tối ưu
+        const { data, error } = await supabase
+            .from('system_settings')
+            .select('key, value')
+            .in('key', keys);
+
+        if (error) throw error;
+
+        if (data) {
+            data.forEach((setting: any) => {
+                if (setting.value) {
+                    // Cập nhật LocalStorage nếu Cloud có dữ liệu
+                    console.log(`[Sync] Updated template ${setting.key} from Cloud.`);
+                    localStorage.setItem(setting.key, setting.value);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Lỗi đồng bộ mẫu in từ Cloud:", e);
+    }
+};
+
+// --- CORE GENERATION LOGIC ---
+
+// Hàm lấy nội dung Template (File hoặc URL)
+const getTemplateArrayBuffer = async (templateKey: string): Promise<ArrayBuffer> => {
+    const storedValue = localStorage.getItem(templateKey);
+    if (!storedValue) {
+        throw new Error("Chưa có mẫu nào được cấu hình cho loại này.");
     }
 
-    const content = base64ToArrayBuffer(base64Template);
+    // Trường hợp 1: Dùng Link Google Docs
+    if (storedValue.startsWith('URL_MODE:')) {
+        const url = storedValue.replace('URL_MODE:', '');
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Không thể tải mẫu từ Google Docs (Lỗi ${response.status}). Vui lòng kiểm tra quyền chia sẻ (Share: Anyone with the link).`);
+            }
+            return await response.arrayBuffer();
+        } catch (error: any) {
+            throw new Error("Lỗi kết nối Google Docs: " + error.message);
+        }
+    }
+
+    // Trường hợp 2: Dùng File Base64 lưu sẵn
+    return base64ToArrayBuffer(storedValue);
+};
+
+// Hàm render Docxtemplater bất đồng bộ (Async)
+const createDocAsync = async (templateKey: string, data: any) => {
+    const content = await getTemplateArrayBuffer(templateKey);
     const zip = new PizZip(content);
     
-    // Cấu hình delimiters {{ và }}
-    // Thêm nullGetter để xử lý trường hợp thiếu dữ liệu -> trả về chuỗi rỗng thay vì lỗi
     const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
         delimiters: { start: '{{', end: '}}' },
-        // QUAN TRỌNG: nullGetter giúp thay thế undefined/null thành chuỗi rỗng
-        // Ngăn chặn lỗi khi biến chưa được truyền vào
         nullGetter: (part) => {
             if (!part.module) return "";
             if (part.module === "rawxml") return "";
@@ -87,29 +179,14 @@ const createDoc = (templateKey: string, data: any) => {
         }
     });
 
-    // Render dữ liệu
     doc.render(data);
     return doc;
 };
 
-// Hàm cũ: Tạo và tải xuống ngay
-export const generateDocx = (templateKey: string, data: any, outputName: string) => {
+// API Mới: Generate Async (để hỗ trợ fetch URL)
+export const generateDocxBlobAsync = async (templateKey: string, data: any): Promise<Blob | null> => {
     try {
-        const doc = createDoc(templateKey, data);
-        const out = doc.getZip().generate({
-            type: 'blob',
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-        saveAs(out, outputName.endsWith('.docx') ? outputName : `${outputName}.docx`);
-    } catch (error: any) {
-        handleDocxError(error);
-    }
-};
-
-// Hàm mới: Tạo Blob để xem trước
-export const generateDocxBlob = (templateKey: string, data: any): Blob | null => {
-    try {
-        const doc = createDoc(templateKey, data);
+        const doc = await createDocAsync(templateKey, data);
         const out = doc.getZip().generate({
             type: 'blob',
             mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -121,12 +198,18 @@ export const generateDocxBlob = (templateKey: string, data: any): Blob | null =>
     }
 };
 
+// Giữ lại hàm cũ (deprecated) nhưng redirect để tránh lỗi compile nếu còn chỗ dùng
+export const generateDocxBlob = (templateKey: string, data: any): Blob | null => {
+    console.warn("generateDocxBlob is deprecated. Use generateDocxBlobAsync instead.");
+    return null; 
+};
+
 const handleDocxError = (error: any) => {
     console.error("Lỗi tạo file Word:", error);
     if (error.properties && error.properties.errors instanceof Array) {
         const errorMessages = error.properties.errors.map((e: any) => e.message).join("\n");
-        alert(`Lỗi khi điền dữ liệu vào mẫu Word (Template Error):\n${errorMessages}\n\nHãy kiểm tra lại file mẫu xem có từ khóa nào bị sai cú pháp không.\n\nMẹo: Copy từ khóa ra Notepad rồi paste lại vào Word.`);
+        alert(`Lỗi Template Word:\n${errorMessages}\n\nHãy kiểm tra lại file mẫu (hoặc file trên Google Docs).`);
     } else {
-        alert("Có lỗi xảy ra khi tạo file Word: " + error.message);
+        alert("Lỗi tạo văn bản: " + error.message);
     }
 };

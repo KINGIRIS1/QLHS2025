@@ -1,6 +1,5 @@
 
 import * as XLSX from 'xlsx-js-style';
-import { saveAs } from 'file-saver';
 
 export const EXCEL_STORAGE_KEYS = {
     DAILY_LIST_TEMPLATE: 'excel_template_daily_list',

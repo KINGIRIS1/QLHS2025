@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow, ipcMain, desktopCapturer, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, shell, dialog, Notification } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -10,7 +10,7 @@ const log = require('electron-log');
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
 
-// Cấu hình AutoUpdater cho GitHub
+// Tắt tự động tải về (để người dùng bấm nút mới tải)
 autoUpdater.autoDownload = false;
 autoUpdater.allowDowngrade = false;
 
@@ -54,6 +54,9 @@ function createWindow() {
     autoHideMenuBar: true,
   });
 
+  // Đặt App User Model ID để thông báo hiển thị đúng trên Windows
+  app.setAppUserModelId("com.quanlyhoso.app");
+
   const isDev = !app.isPackaged;
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
@@ -68,15 +71,44 @@ function createWindow() {
   });
 }
 
-// --- IPC Update Handlers (GitHub Mode) ---
+// --- IPC Handlers ---
 
-// 1. Kiểm tra cập nhật (Không cần tham số URL nữa vì lấy từ package.json)
-ipcMain.handle('check-for-update', async () => {
+// Lưu file và trả về đường dẫn để mở (Dùng cho tính năng Xuất & Mở ngay)
+ipcMain.handle('save-and-open-file', async (event, { fileName, base64Data }) => {
+    const downloadsPath = app.getPath('downloads');
+    const filePath = path.join(downloadsPath, fileName);
+    
+    try {
+        const buffer = Buffer.from(base64Data, 'base64');
+        fs.writeFileSync(filePath, buffer);
+        // Tự động mở file sau khi lưu
+        shell.openPath(filePath);
+        return { success: true, path: filePath };
+    } catch (error) {
+        log.error('Save and open error:', error);
+        return { success: false, message: error.message };
+    }
+});
+
+// Chỉ mở file theo đường dẫn
+ipcMain.handle('open-file-path', async (event, filePath) => {
+    if (filePath) {
+        shell.openPath(filePath);
+        return true;
+    }
+    return false;
+});
+
+ipcMain.handle('check-for-update', async (event, serverUrl) => {
   if (!app.isPackaged) return { status: 'dev-mode', message: 'Đang chạy chế độ Dev (Không update)' };
   
   try {
-    log.info('Checking for updates via GitHub...');
-    // autoUpdater sẽ tự đọc cấu hình "publish" trong package.json
+    if (serverUrl) {
+        const feedUrl = `${serverUrl}/updates`;
+        log.info(`Checking updates from: ${feedUrl}`);
+        autoUpdater.setFeedURL(feedUrl);
+    }
+
     const result = await autoUpdater.checkForUpdates();
     
     if (result && result.updateInfo) {
@@ -89,19 +121,16 @@ ipcMain.handle('check-for-update', async () => {
   }
 });
 
-// 2. Bắt đầu tải bản cập nhật
 ipcMain.handle('download-update', async () => {
   log.info("User requested download update...");
   autoUpdater.downloadUpdate();
 });
 
-// 3. Cài đặt và khởi động lại
 ipcMain.handle('quit-and-install', () => {
   log.info("Quitting and installing...");
   autoUpdater.quitAndInstall();
 });
 
-// --- AutoUpdater Events ---
 autoUpdater.on('update-available', (info) => {
   log.info('Update available:', info);
   if(mainWindow) mainWindow.webContents.send('update-status', { status: 'available', info });
@@ -132,7 +161,6 @@ autoUpdater.on('update-downloaded', (info) => {
   if(mainWindow) mainWindow.webContents.send('update-status', { status: 'downloaded', info });
 });
 
-// --- Other Handlers ---
 ipcMain.handle('capture-screenshot', async (event, { hideWindow = true } = {}) => {
   try {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -153,6 +181,41 @@ ipcMain.handle('capture-screenshot', async (event, { hideWindow = true } = {}) =
 
 ipcMain.handle('open-external-link', async (event, url) => {
   await shell.openExternal(url);
+});
+
+ipcMain.handle('show-notification', async (event, { title, body }) => {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: title,
+      body: body,
+      icon: path.join(__dirname, '../public/icon.ico'),
+      silent: false 
+    });
+    notification.show();
+    notification.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+        mainWindow.webContents.send('navigate-to-view', 'internal_chat');
+      }
+    });
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('show-confirm-dialog', async (event, { message, title }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showMessageBox(win, {
+    type: 'question',
+    buttons: ['Không', 'Có'], 
+    defaultId: 1,
+    cancelId: 0,
+    title: title || 'Xác nhận',
+    message: message,
+    icon: path.join(__dirname, '../public/icon.ico')
+  });
+  return result.response === 1; 
 });
 
 app.whenReady().then(() => {

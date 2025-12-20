@@ -1,10 +1,10 @@
-
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { User, Message, ChatGroup, UserRole, Employee } from '../types';
 import { fetchMessages, sendMessageApi, uploadChatFile, fetchChatGroups, createChatGroup, deleteChatGroup, deleteMessageApi, addMemberToGroupApi, toggleReactionApi } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { Send, Paperclip, File as FileIcon, X, Loader2, Image as ImageIcon, Download, Hash, MapPin, Plus, Trash2, Users, Monitor, Camera, UserPlus, Shield, Crop, Smile, Reply, ZoomIn } from 'lucide-react';
 import ScreenshotCropper from './ScreenshotCropper';
+import { confirmAction } from '../utils/appHelpers';
 
 // Định nghĩa kiểu cho window.electronAPI
 declare global {
@@ -12,27 +12,24 @@ declare global {
     electronAPI?: {
       captureScreenshot: (options?: { hideWindow: boolean }) => Promise<string>;
       openExternal: (url: string) => Promise<void>;
-      // Thêm các phương thức cho Auto Update
+      // Sửa lỗi: Thêm các định nghĩa phương thức hỗ trợ lưu và mở file được sử dụng trong UtilitiesView
+      saveAndOpenFile: (data: { fileName: string; base64Data: string }) => Promise<{ success: boolean; path?: string; message?: string }>;
+      openFilePath: (path: string) => Promise<boolean>;
       checkForUpdate: (serverUrl: string) => Promise<any>;
       downloadUpdate: () => Promise<void>;
       quitAndInstall: () => Promise<void>;
       onUpdateStatus: (callback: (data: any) => void) => void;
       removeUpdateListener: () => void;
+      showNotification: (title: string, body: string) => Promise<boolean>;
+      onNavigateToView: (callback: (viewId: string) => void) => void;
+      removeNavigationListener: () => void;
+      showConfirmDialog: (message: string, title?: string) => Promise<boolean>;
     };
   }
 }
 
-interface InternalChatProps {
-  currentUser: User;
-  wards?: string[]; 
-  employees: Employee[]; 
-  users: User[]; // Danh sách tài khoản để thêm vào nhóm
-  onResetUnread?: () => void; // Callback để reset thông báo
-}
-
 const normalizeStr = (str: string) => str ? str.toLowerCase().trim() : '';
 
-// Danh sách Emoji phổ biến
 const EMOJI_LIST = [
   "👍", "❤️", "😆", "😮", "😢", "😡",
   "😀", "😁", "😂", "🤣", "😃", "😅", "😉", "😊", "😋", "😎", "😍", "😘", "🥰", "😗", "🙂", "🤗", "🤔", "😐", "😑", "😶", "🙄", "😏", "😥", "🤐", "😯", "😪", "😫", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😓", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁", "😖", "😞", "😤", "😭", "frowning", "anguished", "fearful", "weary", "exploding_head", "grimacing", "anxious", "scream", "flushed", "crazy", "rage", "mask", "sick", "shushing_face", 
@@ -41,38 +38,171 @@ const EMOJI_LIST = [
   "📅", "✅", "❎", "❌", "🔥", "✨", "🌟", "⭐", "📝", "📁", "📂", "📌", "📍", "📎", "📏", "📐", "✂️", "🖊️", "💻", "📱", "☎️", "📞", "📷", "💡", "💰", "💵", "💸", "💳", "🔨", "🔧", "🏠", "🏢", "🏥", "🚗", "✈️", "🚀", "🚩", "🏁", "🎌", "☕", "🍺", "🍻", "🥂", "🥃", "🎉", "🎊", "🎁", "🎈"
 ];
 
-// Emoji rút gọn cho reaction nhanh
 const QUICK_REACTIONS = ["👍", "❤️", "😆", "😮", "😢", "😡"];
 
-const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], employees, users, onResetUnread }) => {
+// --- COMPONENT TIN NHẮN ĐƠN LẺ (MEMOIZED) ---
+interface MessageItemProps {
+    msg: Message;
+    currentUser: User;
+    isModerator: boolean;
+    isSameSender: boolean;
+    onReply: (msg: Message) => void;
+    onReaction: (msgId: string, emoji: string) => void;
+    onDelete: (msg: Message) => void;
+    onViewImage: (url: string) => void;
+}
+
+const MessageItem = React.memo(({ msg, currentUser, isModerator, isSameSender, onReply, onReaction, onDelete, onViewImage }: MessageItemProps) => {
+    const isMe = msg.sender_username === currentUser.username;
+    const canDelete = isMe || isModerator;
+
+    const formatTime = (isoString: string) => {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    return (
+        <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} group/message`}>
+            {!isMe && !isSameSender && (
+                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 mr-2 shrink-0 self-end mb-1 border-2 border-white shadow-sm">
+                    {msg.sender_name.charAt(0).toUpperCase()}
+                </div>
+            )}
+            {!isMe && isSameSender && <div className="w-8 mr-2 shrink-0" />}
+
+            <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                {!isMe && !isSameSender && <span className="text-[10px] text-gray-500 mb-1 ml-1 font-medium">{msg.sender_name}</span>}
+                
+                <div className={`relative px-4 py-2 shadow-sm border transition-all hover:shadow-md
+                    ${isMe 
+                        ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm border-blue-500' 
+                        : 'bg-white text-gray-800 rounded-2xl rounded-tl-sm border-gray-200'
+                    }
+                `}>
+                    {/* REPLY BLOCK */}
+                    {msg.reply_to_content && (
+                        <div className={`text-xs mb-2 p-2 rounded-lg border-l-4 flex flex-col gap-1 cursor-pointer
+                            ${isMe ? 'bg-blue-700/50 border-blue-300 text-blue-100' : 'bg-gray-100 border-gray-300 text-gray-600'}
+                        `}>
+                            <span className="font-bold flex items-center gap-1">
+                                <Reply size={10} /> {msg.reply_to_sender}
+                            </span>
+                            <span className="italic truncate line-clamp-1">{msg.reply_to_content}</span>
+                        </div>
+                    )}
+
+                    {/* CONTENT */}
+                    {msg.content && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{msg.content}</p>}
+
+                    {msg.file_url && (
+                        <div className={`mt-2 rounded-lg overflow-hidden ${isMe ? '' : 'bg-gray-50 border border-gray-200'}`}>
+                            {msg.file_type === 'image' ? (
+                                <div 
+                                    className="cursor-zoom-in relative group/img"
+                                    onClick={() => onViewImage(msg.file_url!)}
+                                >
+                                    <img src={msg.file_url} alt="attachment" className="max-w-full max-h-[300px] object-cover rounded-lg" loading="lazy" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors flex items-center justify-center">
+                                        <ZoomIn className="text-white opacity-0 group-hover/img:opacity-100 drop-shadow-md" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className={`p-2 flex items-center gap-3 ${isMe ? 'bg-blue-700 text-white' : 'text-gray-700'}`}>
+                                    <FileIcon size={24} />
+                                    <div className="overflow-hidden">
+                                        <p className="text-xs font-bold truncate max-w-[150px]">{msg.file_name}</p>
+                                        <a 
+                                            href={msg.file_url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className={`text-[10px] hover:underline flex items-center gap-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}
+                                        >
+                                            <Download size={10} /> Tải xuống
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* TIMESTAMP */}
+                    <span className={`text-[9px] block text-right mt-1 opacity-70`}>
+                        {formatTime(msg.created_at)}
+                    </span>
+
+                    {/* REACTIONS DISPLAY */}
+                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                        <div className={`absolute -bottom-3 ${isMe ? 'right-0' : 'left-0'} flex -space-x-1`}>
+                            <div className="bg-white border border-gray-200 shadow-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-[10px]">
+                                {Object.entries(msg.reactions).slice(0, 3).map(([usr, reaction], idx) => (
+                                    <span key={idx} title={usr}>{reaction}</span>
+                                ))}
+                                {Object.keys(msg.reactions).length > 3 && <span className="text-gray-500 font-bold">+{Object.keys(msg.reactions).length - 3}</span>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* HOVER ACTIONS */}
+                    <div className={`absolute -top-8 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 bg-white shadow-lg rounded-full p-1 opacity-0 group-hover/message:opacity-100 transition-opacity z-20 border border-gray-200 scale-90`}>
+                        <button onClick={() => onReply(msg)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600" title="Trả lời">
+                            <Reply size={14} />
+                        </button>
+                        
+                        <div className="flex items-center border-l border-gray-200 pl-1 ml-1 gap-1">
+                            {QUICK_REACTIONS.slice(0, 3).map(emoji => (
+                                <button key={emoji} onClick={() => onReaction(msg.id, emoji)} className="hover:scale-125 transition-transform text-sm">{emoji}</button>
+                            ))}
+                        </div>
+
+                        {canDelete && (
+                            <button 
+                                onClick={() => onDelete(msg)} 
+                                className={`p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full border-l border-gray-200 ml-1 ${!isMe ? 'bg-red-50 text-red-400' : ''}`} 
+                                title={isMe ? "Thu hồi" : "Xóa tin nhắn (Quản trị)"}
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}, (prev, next) => {
+    return prev.msg === next.msg && prev.isSameSender === next.isSameSender && prev.currentUser.username === next.currentUser.username;
+});
+
+// Thêm định nghĩa interface InternalChatProps bị thiếu
+interface InternalChatProps {
+  currentUser: User;
+  wards: string[];
+  employees: Employee[];
+  users: User[];
+  onResetUnread?: () => void;
+  notificationEnabled?: boolean;
+}
+
+const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], employees, users, onResetUnread, notificationEnabled = true }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   
-  // Group State
   const [currentGroupId, setCurrentGroupId] = useState<string>('GENERAL');
   const [customGroups, setCustomGroups] = useState<ChatGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   
-  // Add Member State
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [targetGroupForAdd, setTargetGroupForAdd] = useState<ChatGroup | null>(null);
 
-  // Screenshot & Cropping State
   const [screenshotImg, setScreenshotImg] = useState<string | null>(null);
   const [isCropping, setIsCropping] = useState(false);
   const [isScreenshotMenuOpen, setIsScreenshotMenuOpen] = useState(false); 
 
-  // Emoji State
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
-
-  // Reply State
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-
-  // Lightbox State
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,26 +212,20 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   const textareaRef = useRef<HTMLTextAreaElement>(null); 
 
   const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
-  // Quyền quản trị nội dung chat (Bao gồm cả Nhóm trưởng)
   const isModerator = isAdmin || currentUser.role === UserRole.TEAM_LEADER;
 
-  // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Reset notification khi component được mount
   useEffect(() => {
-      if (onResetUnread) {
-          onResetUnread();
-      }
+      if (onResetUnread) onResetUnread();
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Xử lý đóng menu khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (screenshotMenuRef.current && !screenshotMenuRef.current.contains(event.target as Node)) {
@@ -115,29 +239,24 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load Groups
-  useEffect(() => {
-      loadGroups();
-  }, []);
+  useEffect(() => { loadGroups(); }, []);
 
   const loadGroups = async () => {
       const groups = await fetchChatGroups();
       setCustomGroups(groups);
   };
 
-  // Load messages when group changes
   useEffect(() => {
     const loadMessages = async () => {
       setLoading(true);
       const data = await fetchMessages(50, currentGroupId);
       setMessages(data);
       setLoading(false);
-      setReplyingTo(null); // Reset reply khi chuyển nhóm
+      setReplyingTo(null); 
     };
 
     loadMessages();
 
-    // Subscribe to realtime changes
     const channel = supabase
       .channel(`chat:${currentGroupId}`)
       .on('postgres_changes', { 
@@ -147,14 +266,15 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
             const newMsg = payload.new as Message;
+            let shouldAdd = false;
             if (currentGroupId === 'GENERAL') {
-                if (!newMsg.group_id || newMsg.group_id === 'GENERAL') {
-                    setMessages(prev => [...prev, newMsg]);
-                }
+                if (!newMsg.group_id || newMsg.group_id === 'GENERAL') shouldAdd = true;
             } else {
-                if (newMsg.group_id === currentGroupId) {
-                    setMessages(prev => [...prev, newMsg]);
-                }
+                if (newMsg.group_id === currentGroupId) shouldAdd = true;
+            }
+
+            if (shouldAdd) {
+                setMessages(prev => [...prev, newMsg]);
             }
         } 
         else if (payload.eventType === 'DELETE') {
@@ -162,18 +282,47 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
             setMessages(prev => prev.filter(m => m.id !== deletedId));
         }
         else if (payload.eventType === 'UPDATE') {
-            // Xử lý cập nhật (ví dụ: thả Reaction)
             const updatedMsg = payload.new as Message;
             setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
         }
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [currentGroupId]);
 
+  // --- MEMOIZED HANDLERS ---
+  const handleReply = useCallback((msg: Message) => {
+      setReplyingTo(msg);
+      textareaRef.current?.focus();
+  }, []);
+
+  const handleReaction = useCallback(async (msgId: string, emoji: string) => {
+      await toggleReactionApi(msgId, currentUser.username, emoji);
+  }, [currentUser.username]);
+
+  const handleRecallMessage = useCallback(async (msg: Message) => {
+      const isMine = msg.sender_username === currentUser.username;
+      let confirmMessage = "Bạn có chắc chắn muốn thu hồi tin nhắn này?";
+      if (!isMine) {
+          confirmMessage = `[QUẢN TRỊ] Bạn có chắc chắn muốn xóa tin nhắn của ${msg.sender_name}?`;
+      }
+      
+      // SỬ DỤNG ASYNC CONFIRM ACTION
+      if (await confirmAction(confirmMessage)) {
+          // FIX: Focus lại vào ô nhập liệu ngay lập tức sau khi xác nhận xóa
+          if (textareaRef.current) {
+              textareaRef.current.focus();
+          }
+          await deleteMessageApi(msg.id);
+      }
+  }, [currentUser.username]);
+
+  const handleViewImage = useCallback((url: string) => {
+      setLightboxImage(url);
+  }, []);
+
+  // --- STANDARD HANDLERS ---
   const handleScreenshot = async (hideWindow: boolean) => {
       if (sending) return;
       try {
@@ -189,8 +338,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                alert("Chức năng này yêu cầu App Desktop (Electron).");
           }
       } catch (err: any) {
-          console.error("Lỗi chụp màn hình:", err);
-          alert(`Lỗi: ${err.message}`);
+          console.error(err);
       }
   };
 
@@ -228,17 +376,13 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
     try {
         if (file) {
             const url = await uploadChatFile(file);
-            if (!url) {
-                setSending(false);
-                return;
-            }
+            if (!url) { setSending(false); return; }
             fileUrl = url;
             const ext = file.name.split('.').pop()?.toLowerCase();
             if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) fileType = 'image';
             else fileType = 'document';
         }
 
-        // Chuẩn bị nội dung reply (snapshot để tránh query lại)
         let replyData = {};
         if (replyingTo) {
             replyData = {
@@ -261,19 +405,13 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
 
         setNewMessage('');
         setFile(null);
-        setReplyingTo(null); // Clear reply sau khi gửi
+        setReplyingTo(null); 
     } catch (error) {
-        console.error("Error sending message:", error);
-        alert("Gửi tin nhắn thất bại.");
+        console.error(error);
+        alert("Gửi thất bại.");
     } finally {
         setSending(false);
     }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          setFile(e.target.files[0]);
-      }
   };
 
   const handleCreateGroup = async () => {
@@ -289,28 +427,12 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   const handleDeleteGroup = async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
       if (!isAdmin) return;
-      if (confirm("XÁC NHẬN: Bạn có chắc muốn xóa nhóm chat này? Tin nhắn trong nhóm sẽ không thể truy cập.")) {
+      // SỬ DỤNG ASYNC CONFIRM ACTION
+      if (await confirmAction("Xóa nhóm chat này?")) {
           const success = await deleteChatGroup(id);
           if (success) {
               setCustomGroups(prev => prev.filter(g => g.id !== id));
               if (currentGroupId === id) setCurrentGroupId('GENERAL');
-          }
-      }
-  };
-
-  // --- CẬP NHẬT LOGIC XÓA TIN NHẮN ---
-  const handleRecallMessage = async (msg: Message) => {
-      const isMine = msg.sender_username === currentUser.username;
-      
-      let confirmMessage = "Bạn có chắc chắn muốn thu hồi tin nhắn này?";
-      if (!isMine) {
-          confirmMessage = `[QUẢN TRỊ] Bạn có chắc chắn muốn xóa tin nhắn của thành viên ${msg.sender_name}? Hành động này sẽ xóa tin nhắn khỏi cuộc trò chuyện của tất cả mọi người.`;
-      }
-
-      if (confirm(confirmMessage)) {
-          const success = await deleteMessageApi(msg.id);
-          if (!success) {
-              alert("Không thể xóa tin nhắn. Vui lòng thử lại.");
           }
       }
   };
@@ -363,10 +485,6 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
       }
   };
 
-  const handleReaction = async (msgId: string, emoji: string) => {
-      await toggleReactionApi(msgId, currentUser.username, emoji);
-  };
-
   const myCustomGroups = useMemo(() => {
       if (isAdmin) return customGroups;
       return customGroups.filter(g => {
@@ -384,11 +502,6 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
       const empWardsNormalized = currentEmp.managedWards.map(normalizeStr);
       return wards.filter(w => empWardsNormalized.includes(normalizeStr(w)));
   }, [wards, currentUser, employees, isAdmin]);
-
-  const formatTime = (isoString: string) => {
-      const date = new Date(isoString);
-      return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  };
 
   return (
     <div className="flex h-full bg-gray-50 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative">
@@ -528,122 +641,21 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                 </div>
             ) : (
                 messages.length > 0 ? messages.map((msg, index) => {
-                    const isMe = msg.sender_username === currentUser.username;
-                    const canDelete = isMe || isModerator; // Cho phép Admin/Subadmin/TeamLeader xóa
-                    
-                    // Logic group message
                     const prevMsg = messages[index - 1];
                     const isSameSender = prevMsg && prevMsg.sender_username === msg.sender_username;
                     
                     return (
-                        <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group/message`}>
-                            {/* Avatar cho người khác */}
-                            {!isMe && !isSameSender && (
-                                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 mr-2 shrink-0 self-end mb-1 border-2 border-white shadow-sm">
-                                    {msg.sender_name.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                            {!isMe && isSameSender && <div className="w-8 mr-2 shrink-0" />}
-
-                            <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                {!isMe && !isSameSender && <span className="text-[10px] text-gray-500 mb-1 ml-1 font-medium">{msg.sender_name}</span>}
-                                
-                                <div className={`relative px-4 py-2 shadow-sm border transition-all hover:shadow-md
-                                    ${isMe 
-                                        ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm border-blue-500' 
-                                        : 'bg-white text-gray-800 rounded-2xl rounded-tl-sm border-gray-200'
-                                    }
-                                `}>
-                                    {/* REPLY BLOCK */}
-                                    {msg.reply_to_content && (
-                                        <div className={`text-xs mb-2 p-2 rounded-lg border-l-4 flex flex-col gap-1 cursor-pointer
-                                            ${isMe ? 'bg-blue-700/50 border-blue-300 text-blue-100' : 'bg-gray-100 border-gray-300 text-gray-600'}
-                                        `}>
-                                            <span className="font-bold flex items-center gap-1">
-                                                <Reply size={10} /> {msg.reply_to_sender}
-                                            </span>
-                                            <span className="italic truncate line-clamp-1">{msg.reply_to_content}</span>
-                                        </div>
-                                    )}
-
-                                    {/* CONTENT */}
-                                    {msg.content && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{msg.content}</p>}
-
-                                    {msg.file_url && (
-                                        <div className={`mt-2 rounded-lg overflow-hidden ${isMe ? '' : 'bg-gray-50 border border-gray-200'}`}>
-                                            {msg.file_type === 'image' ? (
-                                                <div 
-                                                    className="cursor-zoom-in relative group/img"
-                                                    onClick={() => setLightboxImage(msg.file_url || null)}
-                                                >
-                                                    <img src={msg.file_url} alt="attachment" className="max-w-full max-h-[300px] object-cover rounded-lg" />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors flex items-center justify-center">
-                                                        <ZoomIn className="text-white opacity-0 group-hover/img:opacity-100 drop-shadow-md" />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className={`p-2 flex items-center gap-3 ${isMe ? 'bg-blue-700 text-white' : 'text-gray-700'}`}>
-                                                    <FileIcon size={24} />
-                                                    <div className="overflow-hidden">
-                                                        <p className="text-xs font-bold truncate max-w-[150px]">{msg.file_name}</p>
-                                                        <a 
-                                                            href={msg.file_url} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            className={`text-[10px] hover:underline flex items-center gap-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}
-                                                        >
-                                                            <Download size={10} /> Tải xuống
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    
-                                    {/* TIMESTAMP */}
-                                    <span className={`text-[9px] block text-right mt-1 opacity-70`}>
-                                        {formatTime(msg.created_at)}
-                                    </span>
-
-                                    {/* REACTIONS DISPLAY */}
-                                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                                        <div className={`absolute -bottom-3 ${isMe ? 'right-0' : 'left-0'} flex -space-x-1`}>
-                                            <div className="bg-white border border-gray-200 shadow-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-[10px]">
-                                                {Object.entries(msg.reactions).slice(0, 3).map(([usr, reaction], idx) => (
-                                                    <span key={idx} title={usr}>{reaction}</span>
-                                                ))}
-                                                {Object.keys(msg.reactions).length > 3 && <span className="text-gray-500 font-bold">+{Object.keys(msg.reactions).length - 3}</span>}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* HOVER ACTIONS (Zalo Style) */}
-                                    <div className={`absolute -top-8 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 bg-white shadow-lg rounded-full p-1 opacity-0 group-hover/message:opacity-100 transition-opacity z-20 border border-gray-200 scale-90`}>
-                                        <button onClick={() => setReplyingTo(msg)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600" title="Trả lời">
-                                            <Reply size={14} />
-                                        </button>
-                                        
-                                        {/* Quick React */}
-                                        <div className="flex items-center border-l border-gray-200 pl-1 ml-1 gap-1">
-                                            {QUICK_REACTIONS.slice(0, 3).map(emoji => (
-                                                <button key={emoji} onClick={() => handleReaction(msg.id, emoji)} className="hover:scale-125 transition-transform text-sm">{emoji}</button>
-                                            ))}
-                                            <button className="text-gray-400 hover:text-yellow-500 text-xs px-1">•••</button>
-                                        </div>
-
-                                        {canDelete && (
-                                            <button 
-                                                onClick={() => handleRecallMessage(msg)} 
-                                                className={`p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full border-l border-gray-200 ml-1 ${!isMe ? 'bg-red-50 text-red-400' : ''}`} 
-                                                title={isMe ? "Thu hồi" : "Xóa tin nhắn (Quản trị)"}
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <MessageItem
+                            key={msg.id}
+                            msg={msg}
+                            currentUser={currentUser}
+                            isModerator={isModerator}
+                            isSameSender={isSameSender}
+                            onReply={handleReply}
+                            onReaction={handleReaction}
+                            onDelete={handleRecallMessage}
+                            onViewImage={handleViewImage}
+                        />
                     );
                 }) : (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -687,7 +699,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
 
             <div className="p-4">
                 <form onSubmit={handleSend} className="flex items-end gap-2 bg-gray-100 p-2 rounded-2xl border border-gray-200 focus-within:bg-white focus-within:border-blue-300 focus-within:ring-4 focus-within:ring-blue-50 transition-all">
-                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => { if(e.target.files && e.target.files[0]) setFile(e.target.files[0]); }} />
                     
                     <button 
                         type="button" 

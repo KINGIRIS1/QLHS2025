@@ -1,18 +1,22 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Employee } from '../types';
-import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
+import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Loader2, ShieldCheck, Bell } from 'lucide-react';
 
 interface AccountSettingsViewProps {
   currentUser: User;
   linkedEmployee: Employee | undefined;
   onUpdate: (data: { name: string; password?: string; department?: string }) => Promise<boolean>;
+  notificationEnabled: boolean; // Prop mới
+  setNotificationEnabled: (enabled: boolean) => void; // Prop mới
 }
 
 const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({ 
   currentUser, 
   linkedEmployee, 
-  onUpdate 
+  onUpdate,
+  notificationEnabled,
+  setNotificationEnabled
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,8 +40,6 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
     // Load dữ liệu khi component được mount
     setName(currentUser.name);
     setDepartment(linkedEmployee?.department || '');
-    // KHÔNG reset notification ở đây vì khi update thành công, currentUser thay đổi sẽ kích hoạt effect này
-    // và làm mất thông báo thành công ngay lập tức.
   }, [currentUser, linkedEmployee]);
 
   // Cuộn lên đầu khi có thông báo mới (Không tự động tắt nữa)
@@ -50,6 +52,10 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
   const handleTabChange = (tab: 'info' | 'security') => {
       setActiveTab(tab);
       setNotification(null); // Xóa thông báo khi chuyển tab
+  };
+
+  const handleNotificationToggle = () => {
+      setNotificationEnabled(!notificationEnabled);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -243,6 +249,28 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
                                         </div>
                                     </div>
                                 )}
+
+                                {/* --- SETTING NOTIFICATION TOGGLE --- */}
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                        <Bell size={16} className="text-purple-600"/> Cài đặt thông báo
+                                    </h4>
+                                    <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-800">Thông báo tin nhắn nội bộ</span>
+                                            <p className="text-xs text-gray-500 mt-0.5">Hiển thị thông báo ở góc màn hình khi có tin nhắn mới.</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only peer"
+                                                checked={notificationEnabled}
+                                                onChange={handleNotificationToggle}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

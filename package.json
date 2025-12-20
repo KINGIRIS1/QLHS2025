@@ -2,7 +2,7 @@
 {
   "name": "he-thong-quan-ly-ho-so",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.8.3",
   "main": "electron/main.js",
   "author": "DonViHanhChinh",
   "description": "Phan mem quan ly ho so dia chinh",
@@ -87,8 +87,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "THAY_TEN_USER_GITHUB_CUA_BAN_VAO_DAY",
-        "repo": "THAY_TEN_REPOSITORY_CUA_BAN_VAO_DAY"
+        "owner": "TEN_USER_GITHUB_CUA_BAN",
+        "repo": "TEN_REPO_GITHUB_CUA_BAN"
       }
     ]
   }

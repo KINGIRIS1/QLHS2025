@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, PlusCircle, History, AlertCircle, CheckCircle, MapPin, Hash, BookOpen, Loader2, Settings, X, Save, Trash2, Plus, RotateCcw, LayoutGrid } from 'lucide-react';
 import { User, UserRole, RecordFile } from '../types';
 import { fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters } from '../services/api';
+import { confirmAction } from '../utils/appHelpers';
 
 interface ExcerptRecord {
   id: string;
@@ -165,6 +166,12 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
           onAddWard(name);
           setEditingCounters(prev => ({ ...prev, [name]: 0 }));
           setNewWardName('');
+      }
+  };
+
+  const handleDeleteWard = async (ward: string) => {
+      if(await confirmAction(`Xóa xã "${ward}" khỏi danh sách?`)) {
+          onDeleteWard(ward);
       }
   };
 
@@ -476,7 +483,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                               <div key={ward} className="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                                   <div className="flex items-center gap-2">
                                      <button 
-                                        onClick={() => { if(confirm(`Xóa xã "${ward}" khỏi danh sách?`)) onDeleteWard(ward); }}
+                                        onClick={() => handleDeleteWard(ward)}
                                         className="text-gray-400 hover:text-red-500 p-1 hover:bg-red-50 rounded"
                                         title="Xóa xã này"
                                      >

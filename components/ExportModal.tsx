@@ -24,7 +24,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     records.forEach(r => {
       if (type === 'handover') {
           // Logic cho Giao 1 cửa: Dựa vào exportBatch
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED) && r.exportBatch && r.exportDate) {
+          // Bao gồm cả HANDOVER, SIGNED và WITHDRAWN (nếu đã có batch)
+          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN) && r.exportBatch && r.exportDate) {
             const dateStr = r.exportDate.split('T')[0];
             const key = `${dateStr}_${r.exportBatch}`;
             if (!batches[key]) {
@@ -143,25 +144,75 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         
     const displayDate = `Ngày ${exportDateParts[2]} tháng ${exportDateParts[1]} năm ${exportDateParts[0]}`;
 
-    const tableHeader = [
-        "STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ (Xã)", 
-        "Thửa", "Tờ", "Loại Hồ Sơ", "Số TĐ", "Số TL", 
-        "Hẹn Trả", "Ghi Chú"
-    ];
+    // --- CẤU HÌNH CỘT ĐỘNG ---
+    const isHandover = type === 'handover';
+    const isSpecificWard = selectedWard !== 'all';
 
-    const dataRows = recordsToExport.map((r, index) => [
-        index + 1,
-        r.code || '',
-        r.customerName || '',
-        r.ward || '',
-        r.landPlot || '',
-        r.mapSheet || '',
-        r.recordType || '',
-        r.measurementNumber || '',
-        r.excerptNumber || '',
-        r.deadline ? formatDate(r.deadline) : '',
-        r.notes || ''
-    ]);
+    // 1. Header Array
+    let tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng"];
+    
+    // Nếu là Giao 1 cửa và chọn xã cụ thể thì BỎ cột Địa Chỉ
+    // Nếu là Trình ký hoặc Tất cả xã thì GIỮ cột Địa Chỉ
+    if (!(isHandover && isSpecificWard)) {
+        tableHeader.push("Địa Chỉ (Xã)");
+    }
+
+    tableHeader.push("Thửa", "Tờ", "Loại Hồ Sơ");
+
+    // Chỉ hiện Số TĐ, Số TL ở danh sách Trình Ký (Check List)
+    if (!isHandover) {
+        tableHeader.push("Số TĐ", "Số TL");
+    }
+
+    tableHeader.push("Hẹn Trả");
+
+    // Thêm cột cho Giao 1 cửa
+    if (isHandover) {
+        tableHeader.push("Ngày nhận hồ sơ", "Ký tên"); // Sửa tiêu đề
+    }
+
+    tableHeader.push("Ghi Chú");
+
+    // 2. Data Mapping
+    const dataRows = recordsToExport.map((r, index) => {
+        let noteText = r.notes || '';
+        if (r.status === RecordStatus.WITHDRAWN) {
+            noteText = noteText ? `${noteText} (CSD rút hồ sơ)` : 'CSD rút hồ sơ';
+        }
+
+        const row = [
+            index + 1,
+            r.code || '',
+            r.customerName || ''
+        ];
+
+        if (!(isHandover && isSpecificWard)) {
+            row.push(r.ward || '');
+        }
+
+        row.push(
+            r.landPlot || '',
+            r.mapSheet || '',
+            r.recordType || ''
+        );
+
+        if (!isHandover) {
+            row.push(
+                r.measurementNumber || '',
+                r.excerptNumber || ''
+            );
+        }
+
+        row.push(r.deadline ? formatDate(r.deadline) : '');
+
+        if (isHandover) {
+            row.push("", ""); // Ngày nhận hồ sơ, Ký tên (Để trống)
+        }
+
+        row.push(noteText);
+
+        return row;
+    });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]); 
@@ -181,48 +232,103 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     // Data
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A9" });
 
+    const totalCols = tableHeader.length;
     const lastDataRow = 8 + dataRows.length;
     const footerStartRow = lastDataRow + 2;
 
     // Thêm Footer (Canh đều 2 bên - Justify)
-    // Để canh đều 2 bên cho khổ A4 Landscape, ta đặt:
-    // Bên giao: Cột A -> E (Merge)
-    // Bên nhận: Cột G -> K (Merge)
-    // Cột F ở giữa làm khoảng trắng
-    XLSX.utils.sheet_add_aoa(ws, [
-        ["BÊN GIAO HỒ SƠ", "", "", "", "", "", "BÊN NHẬN HỒ SƠ"],
-        ["(Ký và ghi rõ họ tên)", "", "", "", "", "", "(Ký và ghi rõ họ tên)"]
-    ], { origin: `A${footerStartRow + 1}` });
+    const midPoint = Math.floor(totalCols / 2);
+    const leftStart = 0;
+    const leftEnd = midPoint - 1;
+    const rightStart = midPoint + 1; // Để lại 1 cột trống ở giữa
+    const rightEnd = totalCols - 1;
 
-    // Độ rộng cột tinh chỉnh cho vừa A4 Landscape (Tổng width ~ 140-150)
+    // Nếu không đủ cột để chia đôi đẹp, footer sẽ tự điều chỉnh
+    const footerRow1 = new Array(totalCols).fill("");
+    footerRow1[leftStart] = "BÊN GIAO HỒ SƠ";
+    footerRow1[rightStart] = "BÊN NHẬN HỒ SƠ";
+
+    const footerRow2 = new Array(totalCols).fill("");
+    footerRow2[leftStart] = "(Ký và ghi rõ họ tên)";
+    footerRow2[rightStart] = "(Ký và ghi rõ họ tên)";
+
+    XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: `A${footerStartRow + 1}` });
+
+    // Cấu hình độ rộng cột (Cần mapping với tableHeader)
     const wscols = [
         { wch: 5 },  // STT
         { wch: 14 }, // Mã HS
         { wch: 22 }, // Chủ SD
-        { wch: 15 }, // Xã
+    ];
+
+    if (!(isHandover && isSpecificWard)) {
+        wscols.push({ wch: 15 }); // Địa Chỉ (Xã)
+    }
+
+    wscols.push(
         { wch: 7 },  // Thửa
         { wch: 7 },  // Tờ
-        { wch: 20 }, // Loại
-        { wch: 8 },  // TĐ
-        { wch: 8 },  // TL
-        { wch: 11 }, // Hẹn
-        { wch: 15 }  // Ghi chú
-    ];
+        { wch: 20 }  // Loại
+    );
+
+    if (!isHandover) {
+        wscols.push(
+            { wch: 8 },  // TĐ
+            { wch: 8 }   // TL
+        );
+    }
+
+    wscols.push({ wch: 11 }); // Hẹn
+
+    if (isHandover) {
+        wscols.push(
+            { wch: 15 }, // Ngày nhận hồ sơ
+            { wch: 35 }  // Ký tên (Tăng rộng để ký và ghi tên)
+        );
+    }
+
+    wscols.push({ wch: 8 }); // Ghi chú (Thu nhỏ)
+
     ws['!cols'] = wscols;
 
+    // --- CẤU HÌNH CHIỀU CAO DÒNG (ROWS HEIGHT) ---
+    // Đây là phần quan trọng để tăng chiều cao dòng cho việc ký tên
+    const wsrows = [];
+    
+    // 8 dòng đầu (Tiêu đề, Header bảng): Cao 30px
+    for(let i=0; i<8; i++) {
+        wsrows.push({ hpx: 30 }); 
+    }
+    
+    // Các dòng dữ liệu: Cao 60px (Rất rộng để ký và ghi họ tên)
+    for(let i=0; i < dataRows.length; i++) {
+        wsrows.push({ hpx: 60 });
+    }
+
+    // Các dòng trống và Footer
+    // lastDataRow là dòng trống đầu tiên sau dữ liệu.
+    // Footer bắt đầu từ lastDataRow + 2.
+    wsrows.push({ hpx: 25 }); // Dòng trống sát dữ liệu
+    wsrows.push({ hpx: 25 }); // Dòng trống tiếp theo (để tạo khoảng cách)
+    
+    wsrows.push({ hpx: 30 }); // Dòng tiêu đề Footer (BÊN GIAO...)
+    wsrows.push({ hpx: 30 }); // Dòng ghi chú Footer (Ký và ghi rõ...)
+
+    ws['!rows'] = wsrows;
+
+    // Merge Config
     ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: 10 } },
-        { s: { r: 4, c: 0 }, e: { r: 4, c: 10 } },
-        { s: { r: 5, c: 0 }, e: { r: 5, c: 10 } },
-        // Footer Merges (Canh rộng ra)
-        // Bên trái (5 cột: 0,1,2,3,4)
-        { s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 4 } },     
-        { s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 4 } }, 
-        // Bên phải (5 cột: 6,7,8,9,10)
-        { s: { r: footerStartRow, c: 6 }, e: { r: footerStartRow, c: 10 } },    
-        { s: { r: footerStartRow + 1, c: 6 }, e: { r: footerStartRow + 1, c: 10 } },
+        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
+        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
+        { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
+        // Footer Merges
+        { s: { r: footerStartRow, c: leftStart }, e: { r: footerStartRow, c: leftEnd } },     
+        { s: { r: footerStartRow + 1, c: leftStart }, e: { r: footerStartRow + 1, c: leftEnd } }, 
+        
+        { s: { r: footerStartRow, c: rightStart }, e: { r: footerStartRow, c: rightEnd } },    
+        { s: { r: footerStartRow + 1, c: rightStart }, e: { r: footerStartRow + 1, c: rightEnd } },
     ];
 
     // Styles
@@ -235,7 +341,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         tableHeader: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: borderStyle, fill: { fgColor: { rgb: "E0E0E0" } } },
         tableData: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center", wrapText: true } },
         tableDataCenter: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { horizontal: "center", vertical: "center", wrapText: true } },
-        // Footer: KHÔNG VIỀN (border: undefined)
         sigTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         sigNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } }
     };
@@ -246,7 +351,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     if(ws['A5']) ws['A5'].s = styles.reportSubTitle;
     if(ws['A6']) ws['A6'].s = styles.reportSubTitle;
 
-    for (let c = 0; c <= 10; c++) {
+    for (let c = 0; c < totalCols; c++) {
         const headerCell = XLSX.utils.encode_cell({ r: 7, c: c });
         if (!ws[headerCell]) ws[headerCell] = { v: "", t: "s" };
         ws[headerCell].s = styles.tableHeader;
@@ -254,16 +359,21 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         for (let r = 8; r < lastDataRow; r++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-            if ([0, 4, 5, 7, 8, 9].includes(c)) ws[cellRef].s = styles.tableDataCenter;
+            
+            // Tìm tên cột hiện tại để apply style
+            const colName = tableHeader[c];
+            const centerCols = ["STT", "Thửa", "Tờ", "Số TĐ", "Số TL", "Hẹn Trả", "Đợt Xuất", "Ngày nhận hồ sơ"];
+            
+            if (centerCols.includes(colName)) ws[cellRef].s = styles.tableDataCenter;
             else ws[cellRef].s = styles.tableData;
         }
     }
 
     // Apply Footer Styles (NO BORDER)
-    const giaoRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 0 });
-    const giaoNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 0 });
-    const nhanRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 6 });
-    const nhanNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 6 });
+    const giaoRef = XLSX.utils.encode_cell({ r: footerStartRow, c: leftStart });
+    const giaoNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: leftStart });
+    const nhanRef = XLSX.utils.encode_cell({ r: footerStartRow, c: rightStart });
+    const nhanNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: rightStart });
 
     if(ws[giaoRef]) ws[giaoRef].s = styles.sigTitle;
     if(ws[giaoNoteRef]) ws[giaoNoteRef].s = styles.sigNote;

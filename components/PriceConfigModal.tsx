@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx-js-style';
 import { PriceItem } from '../types';
 import { savePriceListBatch } from '../services/api';
 import { X, Save, Upload, FileSpreadsheet, Trash2, AlertCircle, Download } from 'lucide-react';
+import { confirmAction } from '../utils/appHelpers';
 
 interface PriceConfigModalProps {
   isOpen: boolean;
@@ -97,7 +98,7 @@ const PriceConfigModal: React.FC<PriceConfigModalProps> = ({ isOpen, onClose, cu
   };
 
   const handleSave = async () => {
-      if (!confirm("Hành động này sẽ thay thế toàn bộ bảng giá hiện tại. Bạn có chắc chắn không?")) return;
+      if (!(await confirmAction("Hành động này sẽ thay thế toàn bộ bảng giá hiện tại. Bạn có chắc chắn không?"))) return;
       
       setLoading(true);
       const success = await savePriceListBatch(items);

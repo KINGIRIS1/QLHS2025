@@ -48,6 +48,18 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                     table.prepend(colGroup);
                 }
 
+                // --- NEW: Áp dụng chiều cao dòng (Row Height) từ config !rows ---
+                if (ws['!rows']) {
+                    const rows = table.querySelectorAll('tr');
+                    ws['!rows'].forEach((rowConfig: any, index: number) => {
+                        if (rows[index]) {
+                            // Ưu tiên hpx (pixel), nếu không có dùng hpt (point) * 1.33 để đổi ra px
+                            const h = rowConfig.hpx || (rowConfig.hpt ? rowConfig.hpt * 1.33 : 20);
+                            rows[index].style.height = `${h}px`;
+                        }
+                    });
+                }
+
                 table.style.width = '100%'; 
                 table.style.borderCollapse = 'collapse';
                 table.style.fontFamily = "'Times New Roman', serif";
@@ -149,6 +161,8 @@ const ExcelPreviewModal: React.FC<ExcelPreviewModalProps> = ({ isOpen, onClose, 
                         body { font-family: "Times New Roman", serif; margin: 0; padding: 0; }
                         table { width: 100%; border-collapse: collapse; font-size: 11pt; }
                         td, th { padding: 4px; }
+                        /* Ensure custom heights are preserved in print */
+                        tr { height: auto; } 
                     </style>
                 </head>
                 <body>${content}</body>

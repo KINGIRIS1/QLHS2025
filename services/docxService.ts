@@ -97,24 +97,19 @@ export const getTemplateSourceType = (key: string): 'FILE' | 'URL' | 'NONE' => {
 
 export const removeTemplate = (key: string) => {
     localStorage.removeItem(key);
-    // Cố gắng xóa trên Cloud (nếu là URL) - nhưng để đơn giản ta chỉ xóa local 
-    // hoặc set value rỗng trên cloud nếu cần thiết.
-    // Tạm thời chỉ xóa local để tránh xóa nhầm của người khác nếu không phải admin.
 };
 
 // --- SYNC TEMPLATES FROM CLOUD ---
-// Hàm này sẽ được gọi khi App khởi động để lấy các link Google Docs mới nhất về
 export const syncTemplatesFromCloud = async () => {
     try {
         const keys = [
             STORAGE_KEYS.RECEIPT_TEMPLATE,
             STORAGE_KEYS.CONTRACT_TEMPLATE_DODAC,
             STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC,
-            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC,  // Mới
-            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC  // Mới
+            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC,
+            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC
         ];
 
-        // Lấy tất cả settings 1 lần để tối ưu
         const { data, error } = await supabase
             .from('system_settings')
             .select('key, value')
@@ -125,8 +120,6 @@ export const syncTemplatesFromCloud = async () => {
         if (data) {
             data.forEach((setting: any) => {
                 if (setting.value) {
-                    // Cập nhật LocalStorage nếu Cloud có dữ liệu
-                    console.log(`[Sync] Updated template ${setting.key} from Cloud.`);
                     localStorage.setItem(setting.key, setting.value);
                 }
             });
@@ -138,20 +131,18 @@ export const syncTemplatesFromCloud = async () => {
 
 // --- CORE GENERATION LOGIC ---
 
-// Hàm lấy nội dung Template (File hoặc URL)
 const getTemplateArrayBuffer = async (templateKey: string): Promise<ArrayBuffer> => {
     const storedValue = localStorage.getItem(templateKey);
     if (!storedValue) {
         throw new Error("Chưa có mẫu nào được cấu hình cho loại này.");
     }
 
-    // Trường hợp 1: Dùng Link Google Docs
     if (storedValue.startsWith('URL_MODE:')) {
         const url = storedValue.replace('URL_MODE:', '');
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error(`Không thể tải mẫu từ Google Docs (Lỗi ${response.status}). Vui lòng kiểm tra quyền chia sẻ (Share: Anyone with the link).`);
+                throw new Error(`Không thể tải mẫu từ Google Docs (Lỗi ${response.status}).`);
             }
             return await response.arrayBuffer();
         } catch (error: any) {
@@ -159,11 +150,9 @@ const getTemplateArrayBuffer = async (templateKey: string): Promise<ArrayBuffer>
         }
     }
 
-    // Trường hợp 2: Dùng File Base64 lưu sẵn
     return base64ToArrayBuffer(storedValue);
 };
 
-// Hàm render Docxtemplater bất đồng bộ (Async)
 const createDocAsync = async (templateKey: string, data: any) => {
     const content = await getTemplateArrayBuffer(templateKey);
     const zip = new PizZip(content);
@@ -183,7 +172,6 @@ const createDocAsync = async (templateKey: string, data: any) => {
     return doc;
 };
 
-// API Mới: Generate Async (để hỗ trợ fetch URL)
 export const generateDocxBlobAsync = async (templateKey: string, data: any): Promise<Blob | null> => {
     try {
         const doc = await createDocAsync(templateKey, data);
@@ -193,23 +181,8 @@ export const generateDocxBlobAsync = async (templateKey: string, data: any): Pro
         });
         return out;
     } catch (error: any) {
-        handleDocxError(error);
-        return null;
-    }
-};
-
-// Giữ lại hàm cũ (deprecated) nhưng redirect để tránh lỗi compile nếu còn chỗ dùng
-export const generateDocxBlob = (templateKey: string, data: any): Blob | null => {
-    console.warn("generateDocxBlob is deprecated. Use generateDocxBlobAsync instead.");
-    return null; 
-};
-
-const handleDocxError = (error: any) => {
-    console.error("Lỗi tạo file Word:", error);
-    if (error.properties && error.properties.errors instanceof Array) {
-        const errorMessages = error.properties.errors.map((e: any) => e.message).join("\n");
-        alert(`Lỗi Template Word:\n${errorMessages}\n\nHãy kiểm tra lại file mẫu (hoặc file trên Google Docs).`);
-    } else {
+        console.error("Lỗi tạo file Word:", error);
         alert("Lỗi tạo văn bản: " + error.message);
+        return null;
     }
 };

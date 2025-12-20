@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
-import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, AlertCircle, Terminal, Copy, Calendar, Plus, Trash2, Save, Key, Eye, EyeOff, GitBranch, Link, Activity, RefreshCw, DownloadCloud, Power } from 'lucide-react';
+import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, Activity, Save, Key, Eye, EyeOff, Globe, Calendar, Plus, Trash2 } from 'lucide-react';
 import { testApiConnection, LS_API_KEY } from '../services/geminiService';
 import { Holiday } from '../types';
-import { fetchHolidays, saveHolidays, testDatabaseConnection } from '../services/api';
-import { APP_VERSION, API_BASE_URL } from '../constants';
+import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
+import { APP_VERSION } from '../constants';
+import { confirmAction } from '../utils/appHelpers';
 
 interface SystemSettingsModalProps {
   isOpen: boolean;
@@ -21,63 +23,38 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
   
-  const [showSql, setShowSql] = useState(false);
-  
   // Gemini Key State
   const [customApiKey, setCustomApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   
-  // Update State
-  const [updateStatus, setUpdateStatus] = useState<{
-      state: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-      progress?: number;
-      version?: string;
-      message?: string;
-  }>({ state: 'idle' });
+  // Update State (Manual Config)
+  const [manualVersion, setManualVersion] = useState('');
+  const [manualUrl, setManualUrl] = useState('');
+  const [isSavingUpdate, setIsSavingUpdate] = useState(false);
 
   // Holiday States
   const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [newHoliday, setNewHoliday] = useState<Partial<Holiday>>({ name: '', day: 1, month: 1, isLunar: false });
+  // Form thêm mới ngày lễ
+  const [tempName, setTempName] = useState('');
+  const [tempDay, setTempDay] = useState<number>(1);
+  const [tempMonth, setTempMonth] = useState<number>(1);
+  const [tempIsLunar, setTempIsLunar] = useState(false);
+  
   const [savingHolidays, setSavingHolidays] = useState(false);
-
-  // Helper an toàn để lấy API Key mặc định (env)
-  const envApiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
 
   useEffect(() => {
       if(isOpen) {
           loadHolidays();
+          loadUpdateConfig();
           const storedKey = localStorage.getItem(LS_API_KEY);
           if (storedKey) setCustomApiKey(storedKey);
           else setCustomApiKey('');
       }
   }, [isOpen]);
 
-  // Listener cho sự kiện update từ Electron
-  useEffect(() => {
-      if (window.electronAPI && window.electronAPI.onUpdateStatus) {
-          window.electronAPI.onUpdateStatus((data: any) => {
-              if (data.status === 'available') {
-                  setUpdateStatus({ state: 'available', version: data.info.version });
-              } else if (data.status === 'not-available') {
-                  setUpdateStatus({ state: 'not-available' });
-              } else if (data.status === 'downloading') {
-                  setUpdateStatus({ state: 'downloading', progress: Math.round(data.progress || 0) });
-              } else if (data.status === 'downloaded') {
-                  setUpdateStatus({ state: 'downloaded', version: data.info.version });
-              } else if (data.status === 'error') {
-                  setUpdateStatus({ state: 'error', message: data.message });
-              }
-          });
-      }
-      return () => {
-          if (window.electronAPI && window.electronAPI.removeUpdateListener) {
-              window.electronAPI.removeUpdateListener();
-          }
-      }
-  }, []);
-
   const loadHolidays = async () => {
       const data = await fetchHolidays();
+      // Nếu data rỗng, hiển thị list mặc định nhưng chưa lưu
       if (data.length === 0) {
           setHolidays([
               { id: '1', name: 'Tết Dương Lịch', day: 1, month: 1, isLunar: false },
@@ -86,17 +63,26 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
               { id: '4', name: 'Quốc tế Lao động', day: 1, month: 5, isLunar: false },
               { id: '5', name: 'Quốc Khánh', day: 2, month: 9, isLunar: false },
               { id: '6', name: 'Tết Nguyên Đán (Mùng 1)', day: 1, month: 1, isLunar: true },
+              { id: '7', name: 'Tết Nguyên Đán (Mùng 2)', day: 2, month: 1, isLunar: true },
+              { id: '8', name: 'Tết Nguyên Đán (Mùng 3)', day: 3, month: 1, isLunar: true },
           ]);
       } else {
           setHolidays(data);
       }
   };
 
+  const loadUpdateConfig = async () => {
+      const info = await fetchUpdateInfo();
+      if (info.version) setManualVersion(info.version);
+      else setManualVersion(APP_VERSION); 
+      if (info.url) setManualUrl(info.url);
+  };
+
   if (!isOpen) return null;
 
   const handleConfirmDeleteData = async () => {
-      if (confirm("CẢNH BÁO: Bạn đang xóa TOÀN BỘ dữ liệu trên Cloud.\nHành động này KHÔNG THỂ khôi phục.\nBạn có chắc chắn muốn tiếp tục không?")) {
-          if (confirm("XÁC NHẬN LẦN CUỐI: Dữ liệu sẽ bị mất vĩnh viễn. Nhấn OK để Xóa ngay.")) {
+      if (await confirmAction("CẢNH BÁO: Bạn đang xóa TOÀN BỘ dữ liệu trên Cloud.\nHành động này KHÔNG THỂ khôi phục.\nBạn có chắc chắn muốn tiếp tục không?")) {
+          if (await confirmAction("XÁC NHẬN LẦN CUỐI: Dữ liệu sẽ bị mất vĩnh viễn. Nhấn OK để Xóa ngay.")) {
               setIsDeletingData(true);
               await onDeleteAllData();
               setIsDeletingData(false);
@@ -129,67 +115,61 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
       setDbTestMsg(result.message);
   };
 
-  // --- AUTO UPDATE HANDLERS ---
-  const handleCheckUpdate = async () => {
-      if (!window.electronAPI || !window.electronAPI.checkForUpdate) {
-          alert("Chức năng này chỉ khả dụng trên App Desktop.");
+  const handleSaveUpdateConfig = async () => {
+      if (!manualVersion.trim()) {
+          alert("Vui lòng nhập số phiên bản.");
           return;
       }
-      setUpdateStatus({ state: 'checking' });
-      // Lấy Base URL từ API_BASE_URL (ví dụ: http://192.168.1.5:3000)
-      // Loại bỏ phần /custom/... nếu có
-      let serverUrl = API_BASE_URL;
-      if (serverUrl.endsWith('/')) serverUrl = serverUrl.slice(0, -1);
-      
-      const result = await window.electronAPI.checkForUpdate(serverUrl);
-      if (result.status === 'error') {
-          setUpdateStatus({ state: 'error', message: result.message });
-      } else if (result.status === 'not-available') {
-          setUpdateStatus({ state: 'not-available' });
-      }
-      // Nếu available, event listener sẽ bắt
-  };
-
-  const handleDownloadUpdate = async () => {
-      if (window.electronAPI && window.electronAPI.downloadUpdate) {
-          window.electronAPI.downloadUpdate();
+      setIsSavingUpdate(true);
+      const success = await saveUpdateInfo(manualVersion.trim(), manualUrl.trim());
+      setIsSavingUpdate(false);
+      if (success) {
+          alert(`Đã phát hành phiên bản ${manualVersion}!\nTất cả người dùng sẽ nhận được thông báo cập nhật sau vài giây.`);
+      } else {
+          alert("Lỗi khi lưu cấu hình cập nhật. Vui lòng thử lại.");
       }
   };
 
-  const handleInstallUpdate = async () => {
-      if (window.electronAPI && window.electronAPI.quitAndInstall) {
-          window.electronAPI.quitAndInstall();
-      }
-  };
-
+  // --- HOLIDAY HANDLERS ---
   const handleAddHoliday = () => {
-      if (!newHoliday.name) { alert('Vui lòng nhập tên ngày lễ'); return; }
-      const newItem: Holiday = {
-          id: Math.random().toString(36).substr(2, 9),
-          name: newHoliday.name,
-          day: Number(newHoliday.day),
-          month: Number(newHoliday.month),
-          isLunar: !!newHoliday.isLunar
+      if (!tempName.trim()) { alert("Vui lòng nhập tên ngày lễ"); return; }
+      if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
+
+      const newId = Math.random().toString(36).substr(2, 9);
+      const newHoliday: Holiday = {
+          id: newId,
+          name: tempName,
+          day: tempDay,
+          month: tempMonth,
+          isLunar: tempIsLunar
       };
-      setHolidays([...holidays, newItem]);
-      setNewHoliday({ name: '', day: 1, month: 1, isLunar: false });
+
+      setHolidays(prev => [...prev, newHoliday]);
+      // Reset form
+      setTempName('');
+      setTempDay(1);
+      setTempMonth(1);
+      setTempIsLunar(false);
   };
 
-  const handleRemoveHoliday = (id: string) => {
-      setHolidays(holidays.filter(h => h.id !== id));
+  const handleDeleteHoliday = async (id: string) => {
+      if(await confirmAction("Xóa ngày lễ này?")) {
+          setHolidays(prev => prev.filter(h => h.id !== id));
+      }
   };
 
   const handleSaveHolidays = async () => {
       setSavingHolidays(true);
-      await saveHolidays(holidays);
+      const success = await saveHolidays(holidays);
       setSavingHolidays(false);
-      alert('Đã lưu cấu hình ngày nghỉ!');
+      if (success) alert('Đã lưu danh sách ngày lễ thành công!');
+      else alert('Lỗi khi lưu ngày lễ.');
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-lg shadow-xl w-full ${showSql ? 'max-w-4xl' : 'max-w-2xl'} animate-fade-in-up transition-all duration-300`}>
-        <div className="flex justify-between items-center p-5 border-b">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl animate-fade-in-up transition-all duration-300 flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center p-5 border-b shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <ShieldAlert className="text-red-600" />
             Cấu hình Hệ thống (Admin)
@@ -199,97 +179,142 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
           </button>
         </div>
 
-        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <div className="p-6 space-y-6 overflow-y-auto">
             
-            {/* Auto Update Section */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
-                <h3 className="font-bold text-blue-800 flex items-center gap-2 mb-3">
-                    <GitBranch size={18} /> Cập nhật phần mềm (Auto Update)
-                </h3>
-                <div className="flex flex-col gap-3">
-                    <div className="flex justify-between items-center bg-white p-3 rounded border border-blue-100">
-                        <div>
-                            <p className="text-sm font-semibold text-gray-700">Phiên bản hiện tại: <span className="text-blue-600">{APP_VERSION}</span></p>
-                            <p className="text-xs text-gray-500 mt-1">Kết nối tới máy chủ: {API_BASE_URL}</p>
-                        </div>
-                        <div>
-                            {updateStatus.state === 'idle' && (
-                                <button onClick={handleCheckUpdate} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm">
-                                    <RefreshCw size={16} /> Kiểm tra bản mới
-                                </button>
-                            )}
-                            {updateStatus.state === 'checking' && (
-                                <button disabled className="flex items-center gap-2 bg-gray-300 text-gray-600 px-4 py-2 rounded-md text-sm font-bold">
-                                    <Loader2 size={16} className="animate-spin" /> Đang kiểm tra...
-                                </button>
-                            )}
-                            {updateStatus.state === 'available' && (
-                                <button onClick={handleDownloadUpdate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-bold shadow-sm animate-pulse">
-                                    <DownloadCloud size={16} /> Tải bản mới ({updateStatus.version})
-                                </button>
-                            )}
-                            {updateStatus.state === 'downloading' && (
-                                <div className="text-right">
-                                    <p className="text-sm font-bold text-blue-600 mb-1">Đang tải: {updateStatus.progress}%</p>
-                                    <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${updateStatus.progress}%` }}></div>
-                                    </div>
-                                </div>
-                            )}
-                            {updateStatus.state === 'downloaded' && (
-                                <button onClick={handleInstallUpdate} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm">
-                                    <Power size={16} /> Khởi động lại để cập nhật
-                                </button>
-                            )}
-                            {updateStatus.state === 'not-available' && (
-                                <span className="text-green-600 text-sm font-bold flex items-center gap-1"><CheckCircle size={16} /> Bạn đang dùng bản mới nhất</span>
-                            )}
-                        </div>
-                    </div>
-                    {updateStatus.state === 'error' && (
-                        <p className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 flex items-center gap-1">
-                            <AlertCircle size={14} /> Lỗi: {updateStatus.message}
-                        </p>
-                    )}
-                    <p className="text-xs text-blue-600 italic">
-                        * Hệ thống sử dụng công nghệ <strong>Differential Update</strong>: Chỉ tải về phần thay đổi giúp cập nhật nhanh chóng (yêu cầu cấu hình Server đúng).
-                    </p>
+            {/* 1. Cloud Database Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div>
+                    <h3 className="font-bold text-blue-800 flex items-center gap-2"> <Database size={18} /> Cloud Database </h3>
+                    <p className="text-sm text-blue-700">Kiểm tra kết nối Supabase</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    {dbTestStatus === 'success' && <div className="text-xs font-bold text-green-700 flex items-center gap-1"><CheckCircle size={14} /> Kết nối OK!</div>}
+                    {dbTestStatus === 'error' && <div className="text-xs font-bold text-red-700">{dbTestMsg || 'Lỗi!'}</div>}
+                    <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="px-3 py-1.5 bg-white border border-blue-300 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition-colors shadow-sm text-sm"> {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={14} /> : 'Kiểm tra'} </button>
                 </div>
             </div>
 
-            {/* Supabase Database Setup */}
-            {/* ... Giữ nguyên phần Database SQL cũ ... */}
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* AI Settings */}
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    {/* ... Giữ nguyên phần AI Settings ... */}
-                    <h3 className="font-bold text-purple-800 flex items-center gap-2 mb-2"> <Sparkles size={18} /> Gemini AI </h3>
+                {/* 2. Manual Update Config */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-3">
+                        <Cloud size={18} /> Cập nhật phiên bản
+                    </h3>
                     <div className="space-y-3">
-                        <div className="flex flex-col gap-2">
-                            <div className="relative">
-                                <Key size={14} className="absolute left-2.5 top-2.5 text-purple-400" />
-                                <input type={showKey ? "text" : "password"} placeholder="Nhập API Key..." className="w-full border border-purple-300 rounded-md py-2 pl-8 pr-8 text-sm outline-none focus:ring-1 focus:ring-purple-500" value={customApiKey} onChange={(e) => setCustomApiKey(e.target.value)} />
-                                <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-2 text-gray-400 hover:text-purple-600"> {showKey ? <EyeOff size={14} /> : <Eye size={14} />} </button>
-                            </div>
-                            <button onClick={handleSaveApiKey} className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-700 w-fit ml-auto"> Lưu Key </button>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Phiên bản Mới nhất</label>
+                            <input type="text" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono" placeholder="VD: 1.6.0" value={manualVersion} onChange={(e) => setManualVersion(e.target.value)} />
                         </div>
-                        <button onClick={handleTestAi} disabled={testStatus === 'testing'} className="w-full px-3 py-2 bg-white border border-purple-300 text-purple-700 font-medium rounded-md hover:bg-purple-100 transition-colors shadow-sm flex items-center justify-center gap-2 text-sm"> {testStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : 'Kiểm tra kết nối AI'} </button>
-                        {testStatus === 'success' && <div className="text-xs font-bold text-green-700 flex items-center gap-1"><CheckCircle size={14}/> Kết nối OK!</div>}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Link tải (Google Drive / Web)</label>
+                            <div className="relative">
+                                <Globe size={14} className="absolute left-2 top-2 text-gray-400" />
+                                <input type="text" className="w-full border border-gray-300 rounded px-2 py-1.5 pl-7 text-sm" placeholder="https://..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
+                            </div>
+                        </div>
+                        <button onClick={handleSaveUpdateConfig} disabled={isSavingUpdate} className="w-full flex items-center justify-center gap-2 bg-gray-600 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 text-xs font-bold shadow-sm">
+                            {isSavingUpdate ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Phát hành
+                        </button>
                     </div>
                 </div>
 
-                {/* Cloud Database Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="font-bold text-blue-800 flex items-center gap-2 mb-2"> <Cloud size={18} /> Cloud Database </h3>
-                    <p className="text-sm text-blue-700 mb-3">Kiểm tra kết nối Supabase</p>
-                    <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full px-3 py-2 bg-white border border-blue-300 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2 text-sm"> {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : <Activity size={16} />} Kiểm tra </button>
-                    {dbTestStatus === 'success' && <div className="mt-2 text-xs font-bold text-green-700 flex items-center gap-1"><CheckCircle size={14} /> Kết nối thành công!</div>}
-                    {dbTestStatus === 'error' && <div className="mt-2 text-xs font-bold text-red-700 flex flex-col gap-1"><span>Lỗi kết nối!</span><span className="font-normal opacity-80">{dbTestMsg}</span></div>}
+                {/* 3. AI Settings */}
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <h3 className="font-bold text-purple-800 flex items-center gap-2 mb-3"> <Sparkles size={18} /> Gemini AI </h3>
+                    <div className="space-y-3">
+                        <div className="relative">
+                            <Key size={14} className="absolute left-2 top-2.5 text-purple-400" />
+                            <input type={showKey ? "text" : "password"} placeholder="Nhập API Key..." className="w-full border border-purple-300 rounded-md py-1.5 pl-7 pr-8 text-sm outline-none focus:ring-1 focus:ring-purple-500" value={customApiKey} onChange={(e) => setCustomApiKey(e.target.value)} />
+                            <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-2 text-gray-400 hover:text-purple-600"> {showKey ? <EyeOff size={14} /> : <Eye size={14} />} </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={handleSaveApiKey} className="flex-1 bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-700">Lưu Key</button>
+                            <button onClick={handleTestAi} disabled={testStatus === 'testing'} className="flex-1 bg-white border border-purple-300 text-purple-700 text-xs font-bold rounded hover:bg-purple-50"> {testStatus === 'testing' ? '...' : 'Kiểm tra'} </button>
+                        </div>
+                        {testStatus === 'success' && <div className="text-xs font-bold text-green-700 flex items-center gap-1 justify-center"><CheckCircle size={14}/> Kết nối OK!</div>}
+                    </div>
                 </div>
             </div>
 
-            {/* DANGER ZONE */}
+            {/* 4. Holiday Config */}
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-5">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold text-orange-800 flex items-center gap-2">
+                        <Calendar size={18} /> Cấu hình Ngày nghỉ lễ
+                    </h3>
+                    <button 
+                        onClick={handleSaveHolidays} 
+                        disabled={savingHolidays}
+                        className="bg-orange-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-orange-700 flex items-center gap-1 shadow-sm"
+                    >
+                        {savingHolidays ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Lưu cấu hình
+                    </button>
+                </div>
+                
+                <p className="text-xs text-orange-700 mb-3 bg-orange-100/50 p-2 rounded">
+                    Ngày nghỉ lễ sẽ không được tính vào thời gian hẹn trả kết quả. Hỗ trợ cả lịch Âm và Dương.
+                </p>
+
+                {/* Form thêm mới */}
+                <div className="flex flex-wrap gap-2 mb-4 items-end bg-white p-3 rounded border border-orange-100">
+                    <div className="flex-1 min-w-[150px]">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tên ngày lễ</label>
+                        <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="VD: Giỗ tổ" value={tempName} onChange={e => setTempName(e.target.value)} />
+                    </div>
+                    <div className="w-16">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Ngày</label>
+                        <input type="number" min="1" max="31" className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center" value={tempDay} onChange={e => setTempDay(parseInt(e.target.value))} />
+                    </div>
+                    <div className="w-16">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tháng</label>
+                        <input type="number" min="1" max="12" className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center" value={tempMonth} onChange={e => setTempMonth(parseInt(e.target.value))} />
+                    </div>
+                    <div className="flex items-center pb-2 px-2">
+                        <label className="flex items-center cursor-pointer select-none">
+                            <input type="checkbox" className="mr-2" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
+                            <span className="text-sm text-gray-700 font-medium">Âm lịch</span>
+                        </label>
+                    </div>
+                    <button onClick={handleAddHoliday} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700 mb-[1px]">
+                        <Plus size={16} /> Thêm
+                    </button>
+                </div>
+
+                {/* Danh sách */}
+                <div className="max-h-40 overflow-y-auto border border-orange-200 rounded bg-white">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-orange-100 text-orange-800 text-xs uppercase font-bold sticky top-0">
+                            <tr>
+                                <th className="p-2">Tên ngày lễ</th>
+                                <th className="p-2 text-center">Ngày/Tháng</th>
+                                <th className="p-2 text-center">Loại lịch</th>
+                                <th className="p-2 text-center w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {holidays.map(h => (
+                                <tr key={h.id} className="hover:bg-orange-50">
+                                    <td className="p-2">{h.name}</td>
+                                    <td className="p-2 text-center font-mono">{h.day}/{h.month}</td>
+                                    <td className="p-2 text-center">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                            {h.isLunar ? 'Âm lịch' : 'Dương lịch'}
+                                        </span>
+                                    </td>
+                                    <td className="p-2 text-center">
+                                        <button onClick={() => handleDeleteHoliday(h.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {holidays.length === 0 && (
+                                <tr><td colSpan={4} className="p-4 text-center text-gray-400 italic">Chưa có dữ liệu</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* 5. Danger Zone */}
             <div className="border-t-2 border-red-100 pt-4">
                 <h3 className="text-red-600 font-bold flex items-center gap-2 mb-4 uppercase tracking-wide"> <AlertTriangle size={20} /> Vùng nguy hiểm </h3>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-5 flex flex-col md:flex-row items-center justify-between gap-4">

@@ -1,5 +1,4 @@
 
-
 // Định nghĩa trạng thái của hồ sơ theo quy trình
 export enum RecordStatus {
   RECEIVED = 'RECEIVED',         // Tiếp nhận
@@ -7,7 +6,8 @@ export enum RecordStatus {
   IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
   PENDING_SIGN = 'PENDING_SIGN', // Chờ ký kiểm tra
   SIGNED = 'SIGNED',             // Đã ký (Lập danh sách ký)
-  HANDOVER = 'HANDOVER'          // Giao 1 cửa (Hoàn thành)
+  HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành)
+  WITHDRAWN = 'WITHDRAWN'        // CSD rút hồ sơ (Kết thúc)
 }
 
 export enum UserRole {
@@ -62,6 +62,7 @@ export interface RecordFile {
   assignedTo?: string;    
   notes?: string;         
   privateNotes?: string;  
+  personalNotes?: string; // Ghi chú cá nhân của nhân viên
   
   authorizedBy?: string;  
   authDocType?: string;   
@@ -71,7 +72,11 @@ export interface RecordFile {
   exportDate?: string;    
   
   measurementNumber?: string; 
-  excerptNumber?: string;     
+  excerptNumber?: string;
+  
+  // Tính năng nhắc nhở
+  reminderDate?: string;      // Thời gian đặt lịch nhắc
+  lastRemindedAt?: string;    // Thời gian đã thông báo lần cuối
 }
 
 // Interface cho Item tách thửa

@@ -4,6 +4,7 @@ import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
 import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { getShortRecordType } from '../constants';
+import { confirmAction } from '../utils/appHelpers';
 
 interface PersonalProfileProps {
   user: User;
@@ -88,8 +89,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       setSortConfig({ key, direction });
   };
 
-  const handleForwardToSign = (record: RecordFile) => {
-    if (confirm(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?\nHãy chắc chắn bạn đã hoàn thành công việc.`)) {
+  const handleForwardToSign = async (record: RecordFile) => {
+    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?\nHãy chắc chắn bạn đã hoàn thành công việc.`)) {
       onUpdateStatus(record, RecordStatus.PENDING_SIGN);
     }
   };

@@ -1,5 +1,5 @@
 
-import { RecordStatus, Employee, RecordFile, User, UserRole } from './types';
+import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './types';
 
 // CẤU HÌNH KẾT NỐI
 // QUAN TRỌNG: Để dùng Cloud (Supabase), hãy dán URL dự án vào đây.
@@ -16,6 +16,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.PENDING_SIGN]: 'Chờ ký kiểm tra',
   [RecordStatus.SIGNED]: 'Đã ký duyệt',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
+  [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
 };
 
 export const STATUS_COLORS: Record<RecordStatus, string> = {
@@ -25,24 +26,34 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
   [RecordStatus.SIGNED]: 'bg-indigo-100 text-indigo-800',
   [RecordStatus.HANDOVER]: 'bg-green-100 text-green-800',
+  [RecordStatus.WITHDRAWN]: 'bg-slate-600 text-white',
 };
 
 export const GROUPS = ['Chơn Thành', 'Minh Hưng', 'Nha Bích'];
 
-export const WARDS = [
+export const DEFAULT_WARDS = [
   'Chơn Thành',
   'Minh Hưng',
   'Nha Bích'
 ];
 
-// Danh sách loại hồ sơ đầy đủ (Hiển thị trong Form Thêm/Sửa)
-// Đã xóa 'Cung cấp thông tin' theo yêu cầu
+export const WARDS = DEFAULT_WARDS;
+
+// Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
 export const RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
   'Trích đo bản đồ địa chính',
   'Trích lục bản đồ địa chính',
   'Đo đạc',     
   'Cắm mốc'
+];
+
+// Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
+export const EXTENDED_RECORD_TYPES = [
+  ...RECORD_TYPES,
+  'Cung cấp thông tin',
+  'Thi hành án',
+  'Tòa án'
 ];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
@@ -82,7 +93,11 @@ export const getShortRecordType = (type: string | undefined): string => {
   if (t.includes('chuyển mục đích')) return 'Chuyển MĐ';
   if (t.includes('cấp đổi')) return 'Cấp đổi';
   if (t.includes('cấp mới')) return 'Cấp mới';
-  if (t.includes('cung cấp thông tin')) return 'CCTT'; // Rút gọn Cung cấp thông tin
+  
+  // Các loại mới thêm
+  if (t.includes('cung cấp thông tin')) return 'CCTT';
+  if (t.includes('thi hành án')) return 'Thi hành án';
+  if (t.includes('tòa án')) return 'Tòa án';
   
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };
@@ -157,5 +172,26 @@ export const MOCK_RECORDS: RecordFile[] = [
     status: RecordStatus.RECEIVED,
     group: 'Minh Hưng',
     ward: 'Minh Hưng'
+  }
+];
+
+export const MOCK_CONTRACTS: Contract[] = [
+  {
+    id: 'c1',
+    code: 'HĐ-2024-001',
+    customerName: 'Nguyễn Văn A (Mẫu)',
+    phoneNumber: '0909123456',
+    ward: 'Minh Hưng',
+    contractType: 'Đo đạc',
+    serviceType: 'Đo đạc diện tích dưới 500m2',
+    areaType: 'Đất đô thị',
+    quantity: 1,
+    unitPrice: 1200000,
+    vatRate: 8,
+    vatAmount: 96000,
+    totalAmount: 1296000,
+    deposit: 0,
+    createdDate: getRelativeDate(-1),
+    status: 'PENDING'
   }
 ];

@@ -1,26 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ArrowUpCircle, RefreshCw, CheckCircle, Info, Download, ShieldCheck, Bell } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ArrowUpCircle, RefreshCw, CheckCircle, Info, Download, ShieldCheck, Bell, Power, ExternalLink, DownloadCloud, PenTool, PlayCircle } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { APP_VERSION } from '../constants';
 
 interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
-  onOpenSettings: () => void;
+  onOpenSettings: () => void; // Deprecated but kept for backward compatibility if needed
   onOpenSystemSettings: () => void;
   currentUser: User;
   onLogout: () => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
   isGeneratingReport?: boolean;
+  
+  // Update Props
   isUpdateAvailable?: boolean;
   latestVersion?: string;
   updateUrl?: string | null; 
   onOpenAccountSettings: () => void;
-  // New props for notifications
   unreadMessagesCount: number;
   warningRecordsCount: number;
+  reminderCount: number;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -35,17 +37,64 @@ const Sidebar: React.FC<SidebarProps> = ({
   isGeneratingReport = false,
   isUpdateAvailable = false,
   latestVersion = '',
-  updateUrl = null,
+  updateUrl,
   onOpenAccountSettings,
   unreadMessagesCount,
-  warningRecordsCount
+  warningRecordsCount,
+  reminderCount
 }) => {
   const [isBannerVisible, setIsBannerVisible] = useState(true);
-  const isElectron = navigator.userAgent.toLowerCase().includes(' electron/');
   
+  // State quản lý tiến trình tải cập nhật
+  const [downloadStatus, setDownloadStatus] = useState<'idle' | 'checking' | 'downloading' | 'ready' | 'error'>('idle');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadSpeed, setDownloadSpeed] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Tự động hiện banner khi có update
   useEffect(() => {
       if (isUpdateAvailable) setIsBannerVisible(true);
   }, [isUpdateAvailable]);
+
+  // Hàm chuẩn hóa thông báo lỗi để thân thiện với người dùng
+  const getFriendlyErrorMessage = (msg: string) => {
+      if (!msg) return 'Lỗi không xác định';
+      if (msg.includes('404') || msg.includes('latest.yml') || msg.includes('Cannot find channel')) {
+          return 'Link tải không hỗ trợ tự động (VD: Google Drive). Vui lòng tải thủ công.';
+      }
+      if (msg.includes('NetworkError') || msg.includes('net::ERR')) {
+          return 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+      }
+      return msg; // Trả về lỗi gốc nếu không khớp case nào
+  };
+
+  // Lắng nghe sự kiện update từ Electron
+  useEffect(() => {
+      if (window.electronAPI && window.electronAPI.onUpdateStatus) {
+          window.electronAPI.onUpdateStatus((data: any) => {
+              if (data.status === 'downloading') {
+                  setDownloadStatus('downloading');
+                  setDownloadProgress(Math.round(data.progress));
+                  const speed = (data.bytesPerSecond / 1024 / 1024).toFixed(2);
+                  setDownloadSpeed(`${speed} MB/s`);
+              } else if (data.status === 'downloaded') {
+                  setDownloadStatus('ready');
+                  setDownloadProgress(100);
+              } else if (data.status === 'error') {
+                  setDownloadStatus('error');
+                  setErrorMessage(getFriendlyErrorMessage(data.message));
+                  console.error("Update error from main:", data.message);
+              }
+          });
+
+          // Cleanup listener
+          return () => {
+              if (window.electronAPI?.removeUpdateListener) {
+                  window.electronAPI.removeUpdateListener();
+              }
+          };
+      }
+  }, []);
 
   const isAdmin = currentUser.role === UserRole.ADMIN;
   const isSubadmin = currentUser.role === UserRole.SUBADMIN;
@@ -55,19 +104,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   
   const hasManagerRights = isAdmin || isSubadmin || isTeamLeader;
 
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'assign_tasks', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'assign_tasks', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities'];
 
   const menuItems = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true },
+    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
     { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: true, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
     { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
     { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
     { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
-    // Cập nhật: Badge cảnh báo sẽ hiển thị ở "Tất cả hồ sơ" và ẩn với Một cửa
     { id: 'all_records', label: 'Tất cả hồ sơ', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
     { id: 'assign_tasks', label: 'Giao hồ sơ', icon: UserPlus, visible: hasManagerRights },
     { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
+    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
     { id: 'check_list', label: 'DS Ký kiểm tra', icon: ClipboardList, visible: isAdmin || isSubadmin },
     { id: 'handover_list', label: 'DS Giao 1 cửa', icon: Send, visible: isAdmin || isSubadmin },
     { id: 'reports', label: 'Báo cáo & Thống kê', icon: BarChart3, visible: !isOneDoor },
@@ -76,21 +125,70 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleMenuClick = (viewId: string) => {
     setCurrentView(viewId);
-    // Chỉ đóng menu khi đang ở chế độ mobile (màn hình < 768px)
     if (window.innerWidth < 768) {
         setMobileOpen(false);
     }
   };
 
-  const handleDownloadUpdate = async () => {
-      if (!updateUrl) return;
-      
-      // Kiểm tra nếu chạy trong Electron và có API mở link ngoài
-      if (window.electronAPI && window.electronAPI.openExternal) {
-          await window.electronAPI.openExternal(updateUrl);
+  const handleDownloadInApp = async () => {
+      if (window.electronAPI && window.electronAPI.downloadUpdate && window.electronAPI.checkForUpdate) {
+          try {
+              setDownloadStatus('checking');
+              setErrorMessage('');
+              
+              // Gọi checkForUpdate trước để Electron khởi tạo luồng cập nhật.
+              const checkResult = await window.electronAPI.checkForUpdate(updateUrl || '');
+              
+              if (checkResult?.status === 'dev-mode') {
+                  setDownloadStatus('error');
+                  setErrorMessage('Chế độ Dev không hỗ trợ auto-update');
+                  return;
+              }
+
+              if (checkResult?.status === 'error') {
+                  setDownloadStatus('error');
+                  setErrorMessage(getFriendlyErrorMessage(checkResult.message));
+                  return;
+              }
+
+              if (checkResult && checkResult.status === 'available') {
+                  setDownloadStatus('downloading');
+                  await window.electronAPI.downloadUpdate();
+              } else {
+                  console.warn("AutoUpdate check failed or not available:", checkResult);
+                  setDownloadStatus('error');
+                  if (checkResult?.status === 'not-available') {
+                      setErrorMessage('Không tìm thấy file cấu hình cập nhật.');
+                  } else {
+                      setErrorMessage('Link tải không hỗ trợ tự động.');
+                  }
+              }
+          } catch (e: any) {
+              console.error("AutoUpdate flow error:", e);
+              setDownloadStatus('error');
+              setErrorMessage(getFriendlyErrorMessage(e.message));
+          }
       } else {
-          // Fallback cho trình duyệt web thường
-          window.open(updateUrl, '_blank');
+          // Fallback nếu không phải môi trường Electron
+          handleDownloadExternal();
+      }
+  };
+
+  const handleQuitAndInstall = async () => {
+      if (window.electronAPI && window.electronAPI.quitAndInstall) {
+          await window.electronAPI.quitAndInstall();
+      }
+  };
+
+  const handleDownloadExternal = () => {
+      if (updateUrl) {
+          if (window.electronAPI && window.electronAPI.openExternal) {
+              window.electronAPI.openExternal(updateUrl);
+          } else {
+              window.open(updateUrl, '_blank');
+          }
+      } else {
+          alert("Không tìm thấy link tải về. Vui lòng liên hệ Admin.");
       }
   };
 
@@ -103,7 +201,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* THÊM class 'shrink-0' ĐỂ NGĂN SIDEBAR BỊ CO LẠI */}
       <div className={`
         fixed md:static inset-y-0 left-0 z-50 w-64 shrink-0 bg-[#0f172a] text-white min-h-screen flex flex-col shadow-xl transition-transform duration-300 ease-in-out
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -126,43 +223,83 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* UPDATE NOTIFICATION */}
+        {/* UPDATE NOTIFICATION BANNER (AUTO UPDATER) */}
         {isUpdateAvailable && isBannerVisible && (
-            <div className="bg-amber-600/90 backdrop-blur-sm text-white text-xs px-4 py-3 border-b border-amber-700 flex flex-col gap-2 shadow-inner relative animate-fade-in shrink-0">
+            <div className="bg-gradient-to-b from-amber-600/90 to-amber-700/90 backdrop-blur-sm text-white text-xs px-4 py-3 border-b border-amber-800 flex flex-col gap-2 shadow-inner relative animate-fade-in shrink-0">
                 <button 
                     onClick={() => setIsBannerVisible(false)}
                     className="absolute top-1 right-1 text-amber-200 hover:text-white p-1 rounded-full hover:bg-amber-700/50"
                 >
                     <X size={14} />
                 </button>
-                <div className="flex items-center gap-2 font-bold animate-pulse">
-                    <ArrowUpCircle size={16} />
+                
+                <div className="flex items-center gap-2 font-bold animate-pulse text-amber-100">
+                    <DownloadCloud size={16} />
                     <span>CÓ BẢN CẬP NHẬT MỚI</span>
                 </div>
-                <div className="flex justify-between items-center opacity-90">
-                    <span>Server: v{latestVersion}</span>
+                
+                <div className="flex justify-between items-center opacity-90 text-[10px] text-amber-200 font-mono">
+                    <span>Mới: v{latestVersion}</span>
+                    <span>Hiện tại: v{APP_VERSION}</span>
                 </div>
                 
-                {isElectron ? (
-                    <div className="bg-black/20 p-2 rounded text-[10px] border border-white/10 mt-1">
-                        {updateUrl ? (
-                            <>
-                                <button onClick={handleDownloadUpdate} className="bg-emerald-600 hover:bg-emerald-500 w-full py-1.5 rounded flex items-center justify-center gap-1 font-bold text-white mb-1 transition-colors">
-                                    <Download size={12} /> Tải bản cập nhật
-                                </button>
-                                <p className="text-center italic opacity-80">Tải và chạy file cài đặt.</p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="flex gap-1 mb-1"><Info size={12} className="shrink-0 mt-0.5" /> <span>Vui lòng chạy file cập nhật thủ công.</span></p>
-                            </>
-                        )}
-                    </div>
-                ) : (
-                    <button onClick={() => window.location.reload()} className="bg-white/20 hover:bg-white/30 px-2 py-1.5 rounded text-[10px] font-bold uppercase transition-colors flex items-center justify-center gap-1 mt-1 w-full">
-                        <RefreshCw size={10} /> Tải lại trang
-                    </button>
-                )}
+                <div className="bg-black/20 p-2 rounded text-[10px] border border-white/10 mt-1">
+                    {downloadStatus === 'idle' && (
+                        <button 
+                            onClick={handleDownloadInApp} 
+                            className="bg-emerald-600 hover:bg-emerald-500 w-full py-1.5 rounded flex items-center justify-center gap-1 font-bold text-white mb-1 transition-colors shadow-sm"
+                        >
+                            <Download size={12} /> Tải & Cài đặt ngay
+                        </button>
+                    )}
+
+                    {downloadStatus === 'checking' && (
+                        <div className="text-center text-emerald-100 py-1 flex items-center justify-center gap-2">
+                            <Loader2 size={12} className="animate-spin" />
+                            Đang kiểm tra...
+                        </div>
+                    )}
+
+                    {downloadStatus === 'downloading' && (
+                        <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[9px] text-emerald-100">
+                                <span>Đang tải xuống...</span>
+                                <span>{downloadProgress}%</span>
+                            </div>
+                            <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                    className="bg-emerald-400 h-full transition-all duration-300" 
+                                    style={{ width: `${downloadProgress}%` }}
+                                ></div>
+                            </div>
+                            <div className="text-[9px] text-center text-emerald-200 italic">{downloadSpeed}</div>
+                        </div>
+                    )}
+
+                    {downloadStatus === 'ready' && (
+                        <button 
+                            onClick={handleQuitAndInstall} 
+                            className="bg-blue-600 hover:bg-blue-500 w-full py-2 rounded flex items-center justify-center gap-1 font-bold text-white mb-1 transition-colors shadow-sm animate-pulse"
+                        >
+                            <PlayCircle size={14} /> Khởi động lại để cập nhật
+                        </button>
+                    )}
+
+                    {downloadStatus === 'error' && (
+                        <>
+                            <div className="text-red-200 bg-red-900/40 p-2 rounded mb-2 border border-red-500/30 flex flex-col items-center">
+                                <span className="font-bold mb-1">Tải tự động thất bại!</span>
+                                <span className="text-[9px] text-center opacity-90 leading-tight">{errorMessage}</span>
+                            </div>
+                            <button 
+                                onClick={handleDownloadExternal} 
+                                className="bg-gray-200 hover:bg-white text-gray-800 w-full py-1.5 rounded flex items-center justify-center gap-1 font-bold transition-colors shadow-sm"
+                            >
+                                <ExternalLink size={12} /> Tải thủ công (Mở Link)
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
         )}
 
@@ -206,7 +343,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {item.id === 'reports' && isGeneratingReport && (
                     <Loader2 size={14} className="animate-spin text-amber-400" />
                   )}
-                  {/* NOTIFICATION BADGE */}
                   {item.badge !== undefined && item.badge > 0 && (
                       <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm animate-pulse ${item.badgeColor || 'bg-red-500'}`}>
                           {item.badge > 99 ? '99+' : item.badge}
@@ -228,13 +364,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               )}
 
               <button 
-                onClick={() => { 
-                    onOpenSettings(); 
-                    if(window.innerWidth < 768) setMobileOpen(false); 
-                }} 
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors duration-200 group"
+                onClick={() => handleMenuClick('employee_management')} 
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${currentView === 'employee_management' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} `}
               >
-                <Settings size={18} className="text-slate-500 group-hover:text-white" />
+                <Settings size={18} className={currentView === 'employee_management' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
                 <span className="font-medium text-sm">Nhân sự</span>
               </button>
 

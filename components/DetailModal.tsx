@@ -1,11 +1,12 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole } from '../types';
 import { STATUS_LABELS, getNormalizedWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
+import { updateRecordApi } from '../services/api';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -22,6 +23,28 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // State cho Ghi chú cá nhân
+  const [personalNote, setPersonalNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // State cho Nhắc nhở
+  const [reminderDate, setReminderDate] = useState('');
+  const [isSavingReminder, setIsSavingReminder] = useState(false);
+
+  useEffect(() => {
+      if (record) {
+          setPersonalNote(record.personalNotes || '');
+          // Chuyển ISO string sang format datetime-local (yyyy-MM-ddTHH:mm) để hiển thị trong input
+          if (record.reminderDate) {
+              const d = new Date(record.reminderDate);
+              const localIso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+              setReminderDate(localIso);
+          } else {
+              setReminderDate('');
+          }
+      }
+  }, [record]);
 
   if (!isOpen || !record) return null;
 
@@ -29,7 +52,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
   const isOneDoor = currentUser?.role === UserRole.ONEDOOR;
 
-  const canPerformAction = isAdmin || isSubadmin; // Điều kiện để Sửa/Xóa
+  const canPerformAction = isAdmin || isSubadmin || isOneDoor; // Điều kiện để Sửa, Xóa
   
   // Điều kiện để In biên nhận: Chỉ Admin hoặc Một cửa mới được thấy nút này
   const canPrintReceipt = isAdmin || isOneDoor;
@@ -49,6 +72,43 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
     return emp ? `${emp.name} (${emp.department})` : 'Không xác định';
   };
 
+  const handleSavePersonalNote = async () => {
+      setIsSavingNote(true);
+      const updatedRecord = { ...record, personalNotes: personalNote };
+      const result = await updateRecordApi(updatedRecord);
+      setIsSavingNote(false);
+      
+      if (result) {
+          alert('Đã lưu ghi chú cá nhân thành công!');
+      } else {
+          alert('Lỗi khi lưu ghi chú.');
+      }
+  };
+
+  const handleSaveReminder = async () => {
+      setIsSavingReminder(true);
+      
+      // Nếu user xóa trắng input -> xóa nhắc nhở
+      const newReminderDate = reminderDate ? new Date(reminderDate).toISOString() : null;
+      
+      // Reset lastRemindedAt khi đặt lịch mới để hệ thống nhắc lại từ đầu
+      const updatedRecord = { 
+          ...record, 
+          reminderDate: newReminderDate as string, 
+          lastRemindedAt: null as any 
+      };
+      
+      const result = await updateRecordApi(updatedRecord);
+      setIsSavingReminder(false);
+      
+      if (result) {
+          alert('Đã lưu lịch nhắc nhở!');
+          // Cập nhật lại record local nếu cần thiết (thường App sẽ auto refresh)
+      } else {
+          alert('Lỗi khi lưu nhắc nhở.');
+      }
+  };
+
   const handlePrintReceipt = async () => {
     if (!currentUser) return;
     
@@ -62,9 +122,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
     const rDate = record.receivedDate ? new Date(record.receivedDate) : new Date();
     const dDate = record.deadline ? new Date(record.deadline) : new Date();
     
-    // --- CẬP NHẬT LOGIC IN BIÊN NHẬN (SỬ DỤNG SỐ NGÀY CỐ ĐỊNH) ---
-    // Để tránh lỗi sai lệch khi in lại hồ sơ cũ, ta gán cứng số ngày theo loại hồ sơ
-    let standardDays = "30"; // Mặc định
+    let standardDays = "30"; 
     const type = (record.recordType || '').toLowerCase();
 
     // Logic tính số ngày
@@ -76,22 +134,19 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         standardDays = "30";
     }
 
-    // --- LOGIC XÁC ĐỊNH TP1 (TIÊU ĐỀ PHIẾU) VỚI ĐỊA ĐIỂM ---
+    // Logic Tiêu đề phiếu
     let tp1Value = 'Phiếu yêu cầu';
-    // Logic gộp nhóm theo yêu cầu:
     if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     } 
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
-
-    // Thêm tên Xã/Phường vào tiêu đề
     if (record.ward) {
         tp1Value += ` tại ${getNormalizedWard(record.ward)}`;
     }
     
-    // --- LOGIC TỰ ĐỘNG SDTLH (SỐ ĐIỆN THOẠI LIÊN HỆ) ---
+    // Logic SĐT Liên hệ tự động
     let sdtLienHe = "";
     const wRaw = (record.ward || "").toLowerCase();
     if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
@@ -106,87 +161,111 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
     const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
     const year = rDate.getFullYear();
     const dateFullString = `ngày ${day} tháng ${month} năm ${year}`;
+    const dateShortString = `${day}/${month}/${year}`;
+    
+    const dayDead = dDate.getDate().toString().padStart(2, '0');
+    const monthDead = (dDate.getMonth() + 1).toString().padStart(2, '0');
+    const yearDead = dDate.getFullYear();
+    const deadlineFullString = `ngày ${dayDead} tháng ${monthDead} năm ${yearDead}`;
+    const deadlineShortString = `${dayDead}/${monthDead}/${yearDead}`;
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
     const printData = {
+        // --- ENGLISH RAW KEYS (Requested) ---
         code: val(record.code),
         customerName: val(record.customerName),
-        receivedDate: rDate.toLocaleDateString('vi-VN'),
-        deadline: dDate.toLocaleDateString('vi-VN'),
-        currentUser: val(currentUser.name),
-        phoneNumber: val(record.phoneNumber),
-        cccd: val(record.cccd),
-        content: val(record.content),
-        address: val(record.address || getNormalizedWard(record.ward)),
-        ward: val(getNormalizedWard(record.ward)),
         landPlot: val(record.landPlot),
         mapSheet: val(record.mapSheet),
-        area: val(record.area),
-        recordType: val(record.recordType),
-        otherDocs: val(record.otherDocs),
-        authorizedBy: val(record.authorizedBy),
-        authDocType: val(record.authDocType),
         
-        // Aliases cho template
-        MA: val(record.code),
-        SO_HS: val(record.code),
+        // --- VIETNAMESE KEYS (Formatted per request) ---
+        XAPHUONG: val(getNormalizedWard(record.ward)),
         
-        // TỰ ĐỘNG VIẾT HOA TÊN NGƯỜI
-        TEN: val(record.customerName).toUpperCase(),
+        // NGAYNHAN: ngày tháng năm
+        NGAYNHAN: dateFullString,
+        
+        // NGAY_NHAN: dd/mm/yyyy
+        NGAY_NHAN: dateShortString, 
+        
+        LOAI_GIAY_TO_UY_QUYEN: val(record.authDocType),
+        DIA_CHI_CHI_TIET: val(record.address),
+
+        // --- NHÓM THÔNG TIN CƠ BẢN ---
+        MA: val(record.code), 
+        SO_HS: val(record.code), 
+        MA_HO_SO: val(record.code),
+        CODE: val(record.code),
+
+        // --- NHÓM CHỦ SỬ DỤNG ---
+        TEN: val(record.customerName).toUpperCase(), 
         HO_TEN: val(record.customerName).toUpperCase(),
+        CHU_SU_DUNG: val(record.customerName).toUpperCase(),
         KHACH_HANG: val(record.customerName).toUpperCase(),
-        TEN_CHU_SU_DUNG: val(record.customerName).toUpperCase(),
-        
-        NGAY_NHAN: rDate.toLocaleDateString('vi-VN'),
-        HEN_TRA: dDate.toLocaleDateString('vi-VN'),
-        NGAY_HEN: dDate.toLocaleDateString('vi-VN'),
-        NGUOI_NHAN: val(currentUser.name),
-        CAN_BO: val(currentUser.name),
-        SDT: val(record.phoneNumber),
+        ONG_BA: val(record.customerName).toUpperCase(),
+
+        // --- NHÓM LIÊN HỆ ---
+        SDT: val(record.phoneNumber), 
         DIEN_THOAI: val(record.phoneNumber),
-        CCCD: val(record.cccd),
+        PHONE: val(record.phoneNumber),
+        CCCD: val(record.cccd), 
         CMND: val(record.cccd),
-        NOI_DUNG: val(record.content),
+
+        // --- NHÓM ĐỊA CHỈ ---
         DIA_CHI: val(record.address || getNormalizedWard(record.ward)),
         DC: val(record.address || getNormalizedWard(record.ward)),
-        DIA_CHI_CHI_TIET: val(record.address),
-        DC_CT: val(record.address),
-        XA: val(getNormalizedWard(record.ward)),
+        ADDRESS: val(record.address || getNormalizedWard(record.ward)),
+        XA: val(getNormalizedWard(record.ward)), 
         PHUONG: val(getNormalizedWard(record.ward)),
-        XAPHUONG: val(getNormalizedWard(record.ward)),
-        TO: val(record.mapSheet),
-        THUA: val(record.landPlot),
-        DT: val(record.area),
+        WARD: val(getNormalizedWard(record.ward)),
+        
+        // --- NHÓM THỬA ĐẤT ---
+        TO: val(record.mapSheet), 
+        SO_TO: val(record.mapSheet),
+        THUA: val(record.landPlot), 
+        SO_THUA: val(record.landPlot),
+        DT: val(record.area), 
         DIEN_TICH: val(record.area),
-        LOAI_HS: val(record.recordType),
+        
+        // --- NHÓM NGÀY THÁNG (ALIASES) ---
+        NGAY_NHAN_FULL: dateFullString,
+        NGAY: day, 
+        THANG: month, 
+        NAM: year,
+        RECEIVED_DATE: dateShortString,
+        
+        HEN_TRA: deadlineShortString, 
+        NGAY_HEN: deadlineShortString,
+        DEADLINE: deadlineShortString,
+        HEN_TRA_FULL: deadlineFullString,
+        NGAY_HEN_FULL: deadlineFullString,
+        
+        // --- NHÓM CÁN BỘ ---
+        NGUOI_NHAN: val(currentUser.name), 
+        CAN_BO: val(currentUser.name),
+        USER: val(currentUser.name),
+        
+        // --- NHÓM NỘI DUNG ---
+        NOI_DUNG: val(record.content),
+        CONTENT: val(record.content),
+        LOAI_HS: val(record.recordType), 
+        RECORD_TYPE: val(record.recordType),
         GIAY_TO_KHAC: val(record.otherDocs),
         
+        // --- NHÓM ỦY QUYỀN ---
         NGUOI_UY_QUYEN: val(record.authorizedBy).toUpperCase(),
         UY_QUYEN: val(record.authorizedBy).toUpperCase(),
-        NGUOI_DUOC_UY_QUYEN: val(record.authorizedBy).toUpperCase(),
         LOAI_UY_QUYEN: val(record.authDocType),
-        LOAI_GIAY_TO_UY_QUYEN: val(record.authDocType),
-        GIAY_UY_QUYEN: val(record.authDocType),
-        NGAYNHAN: dateFullString,
-        NGAY_THANG_NAM: dateFullString,
         
-        // SỐ NGÀY TRẢ KẾT QUẢ
+        // --- CẤU HÌNH ---
         TGTRA: standardDays, 
-        SO_NGAY: standardDays, 
-
-        // TIÊU ĐỀ PHIẾU (MỚI)
-        TP1: tp1Value,
-
-        // SỐ ĐIỆN THOẠI LIÊN HỆ THEO XÃ (MỚI)
-        SDTLH: sdtLienHe,
-
-        // ĐỊA DANH HÀNH CHÍNH
-        TINH: "Bình Phước",
+        SO_NGAY: standardDays,
+        TP1: tp1Value, 
+        TIEU_DE: tp1Value,
+        SDTLH: sdtLienHe, 
+        TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành"
     };
 
-    // Sử dụng hàm async mới
     const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
     
     setIsProcessing(false);
@@ -258,6 +337,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         </div>
 
         <div className="p-6 space-y-8">
+          {/* ... Phần hiển thị chi tiết (Giữ nguyên) ... */}
           {/* 1. Thông tin khách hàng */}
           <section>
             <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-wide mb-4 border-l-4 border-blue-500 pl-2">
@@ -330,6 +410,31 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                         </div>
                     </div>
 
+                    {/* Ghi chú cá nhân */}
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 shadow-inner">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 text-blue-800 font-bold text-sm">
+                                <StickyNote size={16} />
+                                <span>Ghi chú cá nhân (Của bạn)</span>
+                            </div>
+                            <button 
+                                onClick={handleSavePersonalNote} 
+                                disabled={isSavingNote}
+                                className="text-xs bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                Lưu ghi chú
+                            </button>
+                        </div>
+                        <textarea
+                            rows={3}
+                            className="w-full bg-white border border-blue-300 rounded p-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            placeholder="Nhập ghi chú riêng của bạn về hồ sơ này..."
+                            value={personalNote}
+                            onChange={(e) => setPersonalNote(e.target.value)}
+                        />
+                    </div>
+
                     {/* Ghi chú riêng tư (Chỉ hiển thị nếu có) */}
                     {record.privateNotes && (
                       <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 shadow-inner">
@@ -345,40 +450,66 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                     )}
                 </div>
 
-                <div className="md:col-span-1">
-                    <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-wide mb-4 border-l-4 border-orange-500 pl-2">
-                        <Calendar size={18} className="text-orange-500" />
-                        Tiến độ & Thời gian
-                    </h3>
-                    <div className="space-y-4 bg-orange-50 p-4 rounded-lg border border-orange-100">
-                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                            <span className="text-sm text-gray-600">Ngày tiếp nhận</span>
-                            <span className="font-medium text-gray-900">{formatDate(record.receivedDate)}</span>
-                        </div>
-                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                            <span className="text-sm text-gray-600">Hẹn trả kết quả</span>
-                            <span className="font-bold text-blue-700">{formatDate(record.deadline)}</span>
-                        </div>
-                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                            <span className="text-sm text-gray-600">Ngày giao NV</span>
-                            <span className="font-medium text-gray-900">{formatDate(record.assignedDate)}</span>
-                        </div>
-                        {/* THÊM HIỂN THỊ NGÀY TRÌNH KÝ VÀ NGÀY KÝ DUYỆT */}
-                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                            <span className="text-sm text-gray-600">Ngày trình ký</span>
-                            <span className="font-medium text-purple-700">{formatDate(record.submissionDate)}</span>
-                        </div>
-                        <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                            <span className="text-sm text-gray-600">Ngày ký duyệt</span>
-                            <span className="font-medium text-indigo-700">{formatDate(record.approvalDate)}</span>
-                        </div>
-                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Ngày hoàn thành</span>
-                            <span className="font-medium text-green-700">{formatDate(record.completedDate)}</span>
+                <div className="md:col-span-1 space-y-4">
+                    <div>
+                        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-wide mb-4 border-l-4 border-orange-500 pl-2">
+                            <Calendar size={18} className="text-orange-500" />
+                            Tiến độ & Thời gian
+                        </h3>
+                        <div className="space-y-4 bg-orange-50 p-4 rounded-lg border border-orange-100">
+                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                <span className="text-sm text-gray-600">Ngày tiếp nhận</span>
+                                <span className="font-medium text-gray-900">{formatDate(record.receivedDate)}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                <span className="text-sm text-gray-600">Hẹn trả kết quả</span>
+                                <span className="font-bold text-blue-700">{formatDate(record.deadline)}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                <span className="text-sm text-gray-600">Ngày giao NV</span>
+                                <span className="font-medium text-gray-900">{formatDate(record.assignedDate)}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                <span className="text-sm text-gray-600">Ngày trình ký</span>
+                                <span className="font-medium text-purple-700">{formatDate(record.submissionDate)}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                <span className="text-sm text-gray-600">Ngày ký duyệt</span>
+                                <span className="font-medium text-indigo-700">{formatDate(record.approvalDate)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-600">Ngày hoàn thành</span>
+                                <span className="font-medium text-green-700">{formatDate(record.completedDate)}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="mt-4">
+                    {/* PHẦN HẸN GIỜ NHẮC VIỆC */}
+                    <div className="bg-pink-50 p-4 rounded-lg border border-pink-200">
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="text-xs font-bold text-pink-700 uppercase flex items-center gap-2">
+                                <Bell size={14} /> Hẹn giờ nhắc việc
+                            </h4>
+                            <button 
+                                onClick={handleSaveReminder} 
+                                disabled={isSavingReminder}
+                                className="text-[10px] bg-pink-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-pink-700 disabled:opacity-50"
+                            >
+                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
+                            </button>
+                        </div>
+                        <input 
+                            type="datetime-local" 
+                            className="w-full border border-pink-300 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:border-pink-500"
+                            value={reminderDate}
+                            onChange={(e) => setReminderDate(e.target.value)}
+                        />
+                        <p className="text-[10px] text-pink-600 mt-2 italic leading-tight">
+                            * Hệ thống sẽ gửi thông báo khi đến giờ hẹn. Sẽ nhắc lại mỗi 2 giờ nếu hồ sơ chưa được xử lý xong.
+                        </p>
+                    </div>
+
+                    <div className="mt-2">
                         <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Người xử lý</h4>
                         <div className="flex items-center gap-2 p-2 bg-gray-100 rounded text-sm font-medium text-gray-700">
                             <UserIcon size={14} />
@@ -389,7 +520,6 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
             </div>
            </section>
 
-           {/* Footer Info */}
            {record.exportBatch && (
              <div className="bg-green-50 p-3 rounded text-center text-sm text-green-800 border border-green-200 flex items-center justify-center gap-2">
                 <Info size={16} />

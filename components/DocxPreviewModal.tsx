@@ -1,7 +1,9 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { renderAsync } from 'docx-preview';
 import { X, Printer, Download, Loader2, PenLine, AlertCircle } from 'lucide-react';
 import saveAs from 'file-saver';
+import RichTextToolbar from './RichTextToolbar';
 
 interface DocxPreviewModalProps {
   isOpen: boolean;
@@ -21,7 +23,7 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
 
       renderAsync(docxBlob, containerRef.current, undefined, {
         inWrapper: false,
-        ignoreWidth: true,      // cho phép mình control width full khung
+        ignoreWidth: true,
         experimental: true,
         useBase64URL: true,
       })
@@ -37,6 +39,13 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
   }, [isOpen, docxBlob]);
 
   if (!isOpen) return null;
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+    }
+  };
 
   const handlePrint = () => {
     if (!containerRef.current) return;
@@ -66,7 +75,6 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
               }
               html, body { 
                 width: 100%;
-                height: 100%;
                 margin: 0; 
                 padding: 0;
                 background: white;
@@ -131,16 +139,13 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col relative overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col relative overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               Xem trước: <span className="text-blue-600 truncate max-w-[260px]">{fileName}</span>
             </h2>
-            <p className="text-xs text-green-600 flex items-center gap-1 font-semibold mt-1">
-              <PenLine size={12} /> Bạn có thể sửa trực tiếp nội dung trước khi in
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -165,28 +170,16 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
           </div>
         </div>
 
-        {/* Content – luôn full khung */}
-        <div className="flex-1 overflow-auto bg-gray-100 p-4 relative">
+        {/* Toolbar Integration */}
+        <RichTextToolbar editorRef={containerRef} />
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto bg-gray-100 p-4 relative flex justify-center">
           <style>
             {`
-              /* Bắt nội dung docx co theo chiều ngang khung */
-              .docx-viewer-container .docx {
-                width: 100% !important;
-                max-width: 100% !important;
-              }
-              .docx-viewer-container section {
-                width: 100% !important;
-                max-width: 100% !important;
-              }
-              .docx-viewer-container hr {
-                border-top: 1px solid #000 !important;
-                display: block !important;
-                margin: 10px 0 !important;
-                opacity: 1 !important;
-              }
-              .docx-viewer-container p[style*="border-bottom"] {
-                border-bottom: 1px solid #000 !important;
-              }
+              .docx-viewer-container .docx { width: 100% !important; max-width: 100% !important; }
+              .docx-viewer-container section { width: 100% !important; max-width: 100% !important; }
+              .docx-viewer-container hr { border-top: 1px solid #000 !important; display: block !important; margin: 10px 0 !important; opacity: 1 !important; }
             `}
           </style>
 
@@ -201,23 +194,22 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
             ref={containerRef}
             contentEditable={true}
             suppressContentEditableWarning={true}
+            onKeyDown={handleKeyDown}
             spellCheck={false}
-            className="bg-white shadow-lg p-6 md:p-8 text-left transition-opacity duration-300 docx-viewer-container outline-none ring-0 focus:ring-4 focus:ring-blue-100/50 cursor-text border border-gray-200"
+            className="bg-white shadow-lg p-10 text-left transition-opacity duration-300 docx-viewer-container outline-none ring-0 focus:ring-4 focus:ring-blue-100/50 cursor-text border border-gray-200"
             style={{
-              width: '100%',
-              maxWidth: '100%',
-              minHeight: '100%',
-              margin: 0,
+              width: '210mm',
+              minHeight: '297mm',
+              margin: '0 auto',
               opacity: loading ? 0 : 1,
-              overflowX: 'visible',
-              overflowY: 'visible',
+              fontFamily: '"Times New Roman", serif'
             }}
           />
         </div>
 
-        <div className="p-2 text-center text-xs text-gray-500 bg-gray-100 border-t shrink-0 flex justify-center items-center gap-2">
-          <AlertCircle size={14} className="text-orange-500" />
-          <span>Xem toàn khung, in vẫn dùng khổ A4. Nếu cần chỉnh lề chuẩn tuyệt đối thì chỉnh trực tiếp trong Word/Google Docs.</span>
+        <div className="p-2 text-center text-[10px] text-gray-500 bg-gray-50 border-t shrink-0 flex justify-center items-center gap-2">
+          <AlertCircle size={12} className="text-orange-500" />
+          <span>Lưu ý: Các thay đổi định dạng tại đây chỉ có tác dụng khi bấm "In ngay". Để thay đổi mẫu vĩnh viễn, hãy sửa file mẫu gốc.</span>
         </div>
       </div>
     </div>

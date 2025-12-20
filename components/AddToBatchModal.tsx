@@ -32,13 +32,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
       };
   }, [records, todayStr]);
 
-  // 2. Tổng hợp danh sách các đợt cũ
+  // 2. Tổng hợp danh sách các đợt cũ (Bao gồm HANDOVER và WITHDRAWN đã xuất)
   const historyBatches = useMemo(() => {
       const batches: Record<string, { date: string, batch: number, count: number, fullDate: string }> = {};
       
       records.forEach(r => {
           // Chỉ lấy những hồ sơ đã chốt (có exportBatch và exportDate)
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED) && r.exportBatch && r.exportDate) {
+          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN) && r.exportBatch && r.exportDate) {
               const datePart = r.exportDate.split('T')[0];
               const key = `${datePart}_${r.exportBatch}`;
               

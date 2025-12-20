@@ -4,6 +4,7 @@ import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, 
 import { saveTemplate, hasTemplate, removeTemplate, saveTemplateUrl, getTemplateSourceType, STORAGE_KEYS } from '../services/docxService';
 import { saveExcelTemplate, hasExcelTemplate, removeExcelTemplate, EXCEL_STORAGE_KEYS } from '../services/excelTemplateService';
 import * as XLSX from 'xlsx-js-style';
+import { confirmAction } from '../utils/appHelpers';
 
 interface TemplateConfigModalProps {
   isOpen: boolean;
@@ -119,8 +120,8 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
     setIsSaving(false);
   };
 
-  const handleDelete = () => {
-      if(confirm(`Bạn có chắc muốn xóa mẫu "${title}" hiện tại?`)) {
+  const handleDelete = async () => {
+      if(await confirmAction(`Bạn có chắc muốn xóa mẫu "${title}" hiện tại?`)) {
           if (isExcel) removeExcelTemplate(storageKey);
           else removeTemplate(storageKey);
           setSavedType('NONE');
@@ -150,7 +151,7 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg animate-fade-in-up max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-5 border-b shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">

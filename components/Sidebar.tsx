@@ -110,9 +110,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
   
+  // Quyền quản lý: Admin, Subadmin, Team Leader
   const hasManagerRights = isAdmin || isSubadmin || isTeamLeader;
 
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities'];
+  // Danh sách các view cho phép đối với bộ phận Một cửa
+  // Thêm 'handover_list' để xem danh sách giao/trả kết quả
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list'];
+  
   const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'assign_tasks', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities'];
 
   const menuItems = [
@@ -122,11 +126,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
     { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
     { id: 'all_records', label: 'Tất cả hồ sơ', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
+    
+    // Giao hồ sơ: Chỉ dành cho Admin, Subadmin, Team Leader
     { id: 'assign_tasks', label: 'Giao hồ sơ', icon: UserPlus, visible: hasManagerRights },
+    
     { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
     { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
+    
+    // Check list chỉ cho Admin/Subadmin
     { id: 'check_list', label: 'DS Ký kiểm tra', icon: ClipboardList, visible: isAdmin || isSubadmin },
-    { id: 'handover_list', label: 'DS Giao 1 cửa', icon: Send, visible: isAdmin || isSubadmin },
+    
+    // Giao 1 cửa: Cho phép Admin, Subadmin VÀ Một Cửa (để xem lịch sử/trả kết quả)
+    { id: 'handover_list', label: 'DS Giao 1 cửa', icon: Send, visible: isAdmin || isSubadmin || isOneDoor },
+    
     { id: 'reports', label: 'Báo cáo & Thống kê', icon: BarChart3, visible: !isOneDoor },
     { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: true },
   ];

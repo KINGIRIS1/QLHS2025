@@ -200,8 +200,8 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
     XLSX.writeFile(wb, fileName);
 };
 
-// --- NEW FUNCTION: Export Returned List ---
-export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: string) => {
+// --- Export Returned List (Updated for Header/Row Styles & Dynamic Title) ---
+export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: string, wardName?: string) => {
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -234,26 +234,53 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
         ? `Ngày ${dateStr.split('-')[2]} tháng ${dateStr.split('-')[1]} năm ${dateStr.split('-')[0]}` 
         : `Tính đến ngày ${new Date().toLocaleDateString('vi-VN')}`;
 
+    // --- LOGIC TIÊU ĐỀ ĐỘNG ---
+    let title = "DANH SÁCH HỒ SƠ ĐÃ TRẢ KẾT QUẢ";
+    if (wardName && wardName !== 'all') {
+        title += ` - ${wardName.toUpperCase()}`;
+    }
+
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]);
 
-    // Styles
+    // Base Styles
     const border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const titleStyle = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    
+    // Header Style (FIXED: IN ĐẬM VÀ TÔ MÀU)
     const headerStyle = { 
         font: { name: "Times New Roman", sz: 11, bold: true }, 
-        border, fill: { fgColor: { rgb: "E0E0E0" } }, 
+        border, 
+        fill: { fgColor: { rgb: "E0E0E0" } }, // Màu xám nhẹ
         alignment: { horizontal: "center", vertical: "center", wrapText: true } 
     };
-    const cellStyle = { font: { name: "Times New Roman", sz: 11 }, border, alignment: { vertical: "center", wrapText: true } };
+
+    // Cell Style Thường
+    const cellStyle = { 
+        font: { name: "Times New Roman", sz: 11 }, 
+        border, 
+        alignment: { vertical: "center", wrapText: true } 
+    };
     const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+    // Highlight Style (DÒNG SỐ 1 - DỮ LIỆU): In đậm + Tô màu xám (Tùy chọn, giữ nguyên logic cũ nếu muốn nhấn mạnh dòng 1)
+    // Nhưng vì user yêu cầu fix header, nên ta tập trung vào headerStyle.
+    // Tuy nhiên, logic cũ cũng tô màu dòng dữ liệu đầu tiên, ta có thể giữ hoặc bỏ. 
+    // Ở đây ta giữ nguyên logic tô màu dòng dữ liệu đầu tiên để phân biệt.
+    const highlightStyle = { 
+        font: { name: "Times New Roman", sz: 11, bold: true }, 
+        border, 
+        fill: { fgColor: { rgb: "F5F5F5" } }, // Màu xám rất nhẹ khác header
+        alignment: { vertical: "center", wrapText: true } 
+    };
+    const highlightCenterStyle = { ...highlightStyle, alignment: { horizontal: "center", vertical: "center" } };
 
     // Content
     XLSX.utils.sheet_add_aoa(ws, [
         ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
-        ["DANH SÁCH HỒ SƠ ĐÃ TRẢ KẾT QUẢ"],
+        [title], // Sử dụng tiêu đề động
         [displayDate.toUpperCase()],
         [""],
         tableHeader
@@ -279,22 +306,33 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     // Apply Styles
     if(ws['A1']) ws['A1'].s = titleStyle;
     if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } }; // Tiêu đề xanh
     if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
 
-    const headerRow = 7;
+    const headerRow = 7; // Dòng chứa STT, Mã Hồ Sơ...
     const dataStart = 8;
     
     for (let c = 0; c <= lastColIdx; c++) {
+        // Áp dụng Style cho Header (FIXED)
         const headerRef = XLSX.utils.encode_cell({ r: headerRow, c });
         if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
-        ws[headerRef].s = headerStyle;
+        ws[headerRef].s = headerStyle; 
 
+        // Áp dụng Style cho Dữ liệu
         for (let r = dataStart; r < dataStart + dataRows.length; r++) {
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-            if ([0, 5, 6, 7].includes(c)) ws[cellRef].s = centerStyle;
-            else ws[cellRef].s = cellStyle;
+            
+            const isFirstDataRow = (r === dataStart); 
+
+            if (isFirstDataRow) {
+                // Giữ logic highlight dòng đầu tiên (nếu muốn)
+                if ([0, 5, 6, 7].includes(c)) ws[cellRef].s = highlightCenterStyle;
+                else ws[cellRef].s = highlightStyle;
+            } else {
+                if ([0, 5, 6, 7].includes(c)) ws[cellRef].s = centerStyle;
+                else ws[cellRef].s = cellStyle;
+            }
         }
     }
 
@@ -319,6 +357,13 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
 
     XLSX.utils.book_append_sheet(wb, ws, "DS_Tra_KQ");
-    const fileName = `DS_Tra_KQ_${dateStr || 'Tat_Ca'}.xlsx`;
+    
+    // Tên file cũng nên có tên xã nếu lọc
+    let safeName = dateStr || 'Tat_Ca';
+    if (wardName && wardName !== 'all') {
+        safeName += `_${wardName.replace(/\s+/g, '_')}`;
+    }
+    const fileName = `DS_Tra_KQ_${safeName}.xlsx`;
+    
     XLSX.writeFile(wb, fileName);
 };

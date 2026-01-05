@@ -368,7 +368,8 @@ function App() {
   const handleExportReturnedList = () => {
       if (!canPerformAction) return;
       // Xuất các record đang được lọc (có thể là tất cả hoặc theo ngày)
-      exportReturnedListToExcel(filteredRecords, filterSpecificDate || filterDate);
+      // CẬP NHẬT: TRUYỀN filterWard để hiển thị tên xã trong tiêu đề
+      exportReturnedListToExcel(filteredRecords, filterSpecificDate || filterDate, filterWard);
   };
 
   // --- LIQUIDATION HANDLER ---

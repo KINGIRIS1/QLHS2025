@@ -8,11 +8,23 @@ interface OverdueRecord {
   code: string;
 }
 
+const GEMINI_KEY_STORAGE = 'USER_GEMINI_API_KEY';
+
+export const saveGeminiKey = (key: string) => {
+    if (!key) return;
+    localStorage.setItem(GEMINI_KEY_STORAGE, key.trim());
+};
+
+export const getGeminiKey = () => {
+    return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+};
+
 const getAiClient = (): GoogleGenAI | null => {
-  const apiKey = process.env.API_KEY;
+  // Ưu tiên lấy key người dùng nhập trong cài đặt, sau đó mới đến biến môi trường
+  const apiKey = localStorage.getItem(GEMINI_KEY_STORAGE) || process.env.API_KEY;
   
   if (!apiKey) {
-    console.warn("API Key not found in environment variables.");
+    console.warn("API Key not found in localStorage or environment variables.");
     return null;
   }
   return new GoogleGenAI({ apiKey: apiKey });
@@ -41,7 +53,7 @@ export const generateReport = async (
 ): Promise<string> => {
   try {
     const ai = getAiClient();
-    if (!ai) return "<div class='text-red-600 p-4 border border-red-200 bg-red-50 rounded'>Chưa cấu hình API Key trong hệ thống (process.env.API_KEY).</div>";
+    if (!ai) return "<div class='text-red-600 p-4 border border-red-200 bg-red-50 rounded'>Chưa cấu hình API Key. Vui lòng bấm vào nút 'Cấu hình AI' để nhập Key.</div>";
 
     const total = records.length;
     let completedCount = 0;
@@ -114,6 +126,6 @@ export const generateReport = async (
 
     return response.text || "Lỗi tạo nội dung.";
   } catch (error) {
-    return "<div class='p-4 bg-red-50 text-red-700'>Lỗi kết nối AI hoặc quota đã hết.</div>";
+    return "<div class='p-4 bg-red-50 text-red-700'>Lỗi kết nối AI hoặc quota đã hết. Vui lòng kiểm tra lại API Key.</div>";
   }
 };

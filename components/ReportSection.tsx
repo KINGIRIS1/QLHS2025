@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save } from 'lucide-react';
 import { RecordFile, RecordStatus } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue } from '../utils/appHelpers';
+import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -24,6 +25,22 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const [activeTab, setActiveTab] = useState<'list' | 'ai'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
+
+    // States cho Modal nhập Key
+    const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+    const [apiKey, setApiKey] = useState('');
+
+    useEffect(() => {
+        if (isKeyModalOpen) {
+            setApiKey(getGeminiKey());
+        }
+    }, [isKeyModalOpen]);
+
+    const handleSaveKey = () => {
+        saveGeminiKey(apiKey);
+        setIsKeyModalOpen(false);
+        alert("Đã lưu API Key thành công!");
+    };
 
     // --- LOGIC TÍNH TOÁN DỮ LIỆU ---
     const filteredData = useMemo(() => {
@@ -66,6 +83,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const handleGenerateClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
+        
+        // Kiểm tra Key trước khi chạy
+        const currentKey = getGeminiKey();
+        if (!currentKey && !process.env.API_KEY) {
+            setIsKeyModalOpen(true);
+            return;
+        }
+
         setActiveTab('ai');
         onGenerate(fromDate, toDate);
     };
@@ -249,6 +274,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                 </div>
                             </div>
                             <div className="flex gap-2">
+                                <button onClick={() => setIsKeyModalOpen(true)} className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm shadow-sm transition-all" title="Cài đặt API Key">
+                                    <Settings size={16} /> Cấu hình AI
+                                </button>
                                 <button onClick={handleGenerateClick} disabled={isGenerating} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold text-sm shadow-md transition-all disabled:opacity-50">
                                     {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
                                     Tạo báo cáo ngay
@@ -277,6 +305,44 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 )}
             </div>
+
+            {/* API Key Modal */}
+            {isKeyModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up">
+                        <div className="p-5 border-b flex justify-between items-center">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <Key className="text-purple-600" size={20} /> Cấu hình Gemini API Key
+                            </h3>
+                            <button onClick={() => setIsKeyModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                Để sử dụng tính năng viết báo cáo tự động, bạn cần nhập Google Gemini API Key.
+                                Key này sẽ được lưu trong trình duyệt của bạn.
+                            </p>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">API Key</label>
+                                <input 
+                                    type="password" 
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                    placeholder="Dán API Key vào đây..."
+                                    value={apiKey}
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={() => setIsKeyModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium text-sm">Hủy</button>
+                                <button onClick={handleSaveKey} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold text-sm shadow-sm">
+                                    <Save size={16} /> Lưu Cấu Hình
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

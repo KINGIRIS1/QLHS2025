@@ -529,8 +529,8 @@ function App() {
                                 <FileSignature size={18} /> Ký Duyệt Tất Cả ({filteredRecords.length})
                             </button>
                         )}
-                        {/* BUTTON GIAO VIỆC HÀNG LOẠT (MỚI THÊM) */}
-                        {canPerformAction && currentView === 'assign_tasks' && selectedRecordIds.size > 0 && (
+                        {/* BUTTON GIAO VIỆC HÀNG LOẠT (Updated condition) */}
+                        {canPerformAction && (currentView === 'assign_tasks' || currentView === 'all_records') && selectedRecordIds.size > 0 && (
                             <button 
                                 onClick={() => {
                                     const targets = records.filter(r => selectedRecordIds.has(r.id));

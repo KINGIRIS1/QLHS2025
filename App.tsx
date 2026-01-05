@@ -106,6 +106,14 @@ function App() {
       itemsPerPage, setItemsPerPage
   } = useRecordFilter(records, currentUser, currentView, employees);
 
+  // --- LOGIC TỰ ĐỘNG CHUYỂN TAB CHO 1 CỬA ---
+  // Nếu là 1 cửa và đang ở tab 'today' (Chờ giao) -> Chuyển ngay sang 'history'
+  useEffect(() => {
+      if (currentView === 'handover_list' && currentUser?.role === UserRole.ONEDOOR && handoverTab === 'today') {
+          setHandoverTab('history');
+      }
+  }, [currentView, currentUser, handoverTab, setHandoverTab]);
+
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
       try { return JSON.parse(localStorage.getItem('visible_columns') || '') || DEFAULT_VISIBLE_COLUMNS; } catch { return DEFAULT_VISIBLE_COLUMNS; }
@@ -399,7 +407,10 @@ function App() {
                 <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
                      {currentView === 'handover_list' && (
                          <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
-                             <button onClick={() => setHandoverTab('today')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'today' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><ListChecks size={16} /> Chờ giao</button>
+                             {/* CHỈ HIỂN THỊ NÚT 'CHỜ GIAO' NẾU KHÔNG PHẢI LÀ 1 CỬA */}
+                             {currentUser?.role !== UserRole.ONEDOOR && (
+                                <button onClick={() => setHandoverTab('today')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'today' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><ListChecks size={16} /> Chờ giao</button>
+                             )}
                              <button onClick={() => setHandoverTab('history')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'history' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><History size={16} /> Lịch sử</button>
                              {/* TAB MỚI: ĐÃ TRẢ KẾT QUẢ */}
                              <button onClick={() => setHandoverTab('returned')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'returned' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><FileCheck size={16} /> Đã trả KQ</button>

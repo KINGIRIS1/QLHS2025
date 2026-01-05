@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, Activity, Save, Key, Eye, EyeOff, Globe, Calendar, Plus, Trash2, FolderOpen } from 'lucide-react';
-import { testApiConnection, LS_API_KEY } from '../services/geminiService';
+import { X, Database, AlertTriangle, ShieldAlert, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2 } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
@@ -19,13 +18,8 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
   onDeleteAllData 
 }) => {
   const [isDeletingData, setIsDeletingData] = useState(false);
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
-  
-  // Gemini Key State
-  const [customApiKey, setCustomApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -46,9 +40,6 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
       if(isOpen) {
           loadHolidays();
           loadUpdateConfig();
-          const storedKey = localStorage.getItem(LS_API_KEY);
-          if (storedKey) setCustomApiKey(storedKey);
-          else setCustomApiKey('');
       }
   }, [isOpen]);
 
@@ -88,23 +79,6 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
               setIsDeletingData(false);
           }
       }
-  };
-
-  const handleSaveApiKey = () => {
-      if (customApiKey.trim()) {
-          localStorage.setItem(LS_API_KEY, customApiKey.trim());
-          alert('Đã lưu API Key thành công!');
-      } else {
-          localStorage.removeItem(LS_API_KEY);
-          alert('Đã xóa API Key tùy chỉnh.');
-      }
-      setTestStatus('idle'); 
-  };
-
-  const handleTestAi = async () => {
-    setTestStatus('testing');
-    const result = await testApiConnection();
-    setTestStatus(result ? 'success' : 'error');
   };
 
   const handleTestDatabase = async () => {
@@ -217,26 +191,9 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
                         </button>
                     </div>
                 </div>
-
-                {/* 3. AI Settings */}
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <h3 className="font-bold text-purple-800 flex items-center gap-2 mb-3"> <Sparkles size={18} /> Gemini AI </h3>
-                    <div className="space-y-3">
-                        <div className="relative">
-                            <Key size={14} className="absolute left-2 top-2.5 text-purple-400" />
-                            <input type={showKey ? "text" : "password"} placeholder="Nhập API Key..." className="w-full border border-purple-300 rounded-md py-1.5 pl-7 pr-8 text-sm outline-none focus:ring-1 focus:ring-purple-500" value={customApiKey} onChange={(e) => setCustomApiKey(e.target.value)} />
-                            <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-2 text-gray-400 hover:text-purple-600"> {showKey ? <EyeOff size={14} /> : <Eye size={14} />} </button>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleSaveApiKey} className="flex-1 bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-700">Lưu Key</button>
-                            <button onClick={handleTestAi} disabled={testStatus === 'testing'} className="flex-1 bg-white border border-purple-300 text-purple-700 text-xs font-bold rounded hover:bg-purple-50"> {testStatus === 'testing' ? '...' : 'Kiểm tra'} </button>
-                        </div>
-                        {testStatus === 'success' && <div className="text-xs font-bold text-green-700 flex items-center gap-1 justify-center"><CheckCircle size={14}/> Kết nối OK!</div>}
-                    </div>
-                </div>
             </div>
 
-            {/* 4. Holiday Config */}
+            {/* 3. Holiday Config */}
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-5">
                 <div className="flex justify-between items-center mb-3">
                     <h3 className="font-bold text-orange-800 flex items-center gap-2">
@@ -314,7 +271,7 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
                 </div>
             </div>
 
-            {/* 5. Danger Zone */}
+            {/* 4. Danger Zone */}
             <div className="border-t-2 border-red-100 pt-4">
                 <h3 className="text-red-600 font-bold flex items-center gap-2 mb-4 uppercase tracking-wide"> <AlertTriangle size={20} /> Vùng nguy hiểm </h3>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-5 flex flex-col md:flex-row items-center justify-between gap-4">

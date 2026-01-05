@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, Settings, Key, Save, X, Eye, EyeOff, ListFilter, CheckCircle2, Clock, AlertTriangle, Archive } from 'lucide-react';
-import { LS_API_KEY } from '../services/geminiService';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { RecordFile, RecordStatus } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue } from '../utils/appHelpers';
@@ -24,18 +23,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     });
 
     const [activeTab, setActiveTab] = useState<'list' | 'ai'>('list');
-
-    // API Key State
-    const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-    const [customApiKey, setCustomApiKey] = useState('');
-    const [showKey, setShowKey] = useState(false);
-
     const previewRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const storedKey = localStorage.getItem(LS_API_KEY);
-        if (storedKey) setCustomApiKey(storedKey);
-    }, []);
 
     // --- LOGIC TÍNH TOÁN DỮ LIỆU ---
     const filteredData = useMemo(() => {
@@ -85,17 +73,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         onExportExcel(fromDate, toDate);
-    };
-
-    const handleSaveApiKey = () => {
-        if (customApiKey.trim()) {
-            localStorage.setItem(LS_API_KEY, customApiKey.trim());
-            alert('Đã lưu API Key thành công!');
-        } else {
-            localStorage.removeItem(LS_API_KEY);
-            alert('Đã xóa API Key tùy chỉnh.');
-        }
-        setIsApiKeyModalOpen(false);
     };
 
     const handlePrint = () => {
@@ -267,9 +244,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         {/* AI Toolbar */}
                         <div className="w-full flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
                             <div className="flex items-center gap-2">
-                                <button onClick={() => setIsApiKeyModalOpen(true)} className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Cấu hình API Key">
-                                    <Settings size={20} />
-                                </button>
                                 <div className="text-sm text-gray-600">
                                     Sử dụng <strong>Gemini AI</strong> để viết báo cáo nhận xét tiến độ.
                                 </div>
@@ -303,53 +277,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 )}
             </div>
-
-            {/* API KEY CONFIG MODAL */}
-            {isApiKeyModalOpen && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
-                        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Key className="text-purple-600" size={20} />
-                                Cấu hình Gemini AI Key
-                            </h3>
-                            <button onClick={() => setIsApiKeyModalOpen(false)} className="text-gray-400 hover:text-red-500"><X size={20} /></button>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <p className="text-sm text-gray-600">
-                                Nhập API Key của Google Gemini để sử dụng tính năng tạo báo cáo thông minh.
-                                <br />
-                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
-                                    Lấy API Key tại đây
-                                </a>
-                            </p>
-                            <div className="relative">
-                                <Key size={16} className="absolute left-3 top-3 text-gray-400" />
-                                <input 
-                                    type={showKey ? "text" : "password"} 
-                                    className="w-full border border-gray-300 rounded-lg py-2.5 pl-9 pr-10 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                                    placeholder="Paste API Key vào đây..."
-                                    value={customApiKey}
-                                    onChange={(e) => setCustomApiKey(e.target.value)}
-                                />
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowKey(!showKey)}
-                                    className="absolute right-3 top-3 text-gray-400 hover:text-purple-600"
-                                >
-                                    {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 flex justify-end gap-2 border-t border-gray-100">
-                            <button onClick={() => setIsApiKeyModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm font-medium">Hủy</button>
-                            <button onClick={handleSaveApiKey} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-bold shadow-sm">
-                                <Save size={16} /> Lưu cấu hình
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

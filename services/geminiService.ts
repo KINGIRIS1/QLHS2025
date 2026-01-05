@@ -3,28 +3,18 @@ import { GoogleGenAI } from "@google/genai";
 import { RecordFile, RecordStatus } from "../types";
 import { STATUS_LABELS, getNormalizedWard, getShortRecordType } from "../constants";
 
-// Key lưu trong LocalStorage
-export const LS_API_KEY = 'GEMINI_API_KEY_CUSTOM';
-
 interface OverdueRecord {
   date: string;
   code: string;
 }
 
 const getAiClient = (): GoogleGenAI | null => {
-  let apiKey = '';
-  try {
-    const customKey = localStorage.getItem(LS_API_KEY);
-    if (customKey) apiKey = customKey;
-  } catch (e) {
-    console.warn("Không thể đọc LocalStorage");
-  }
-
-  if (!apiKey && typeof process !== 'undefined' && process.env.API_KEY) {
-    apiKey = process.env.API_KEY;
-  }
+  const apiKey = process.env.API_KEY;
   
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.warn("API Key not found in environment variables.");
+    return null;
+  }
   return new GoogleGenAI({ apiKey: apiKey });
 };
 
@@ -38,6 +28,7 @@ export const testApiConnection = async (): Promise<boolean> => {
     });
     return true;
   } catch (error) {
+    console.error("AI Connection Test Failed:", error);
     return false;
   }
 };
@@ -50,7 +41,7 @@ export const generateReport = async (
 ): Promise<string> => {
   try {
     const ai = getAiClient();
-    if (!ai) return "<div class='text-red-600 p-4 border border-red-200 bg-red-50 rounded'>Chưa cấu hình API Key AI.</div>";
+    if (!ai) return "<div class='text-red-600 p-4 border border-red-200 bg-red-50 rounded'>Chưa cấu hình API Key trong hệ thống (process.env.API_KEY).</div>";
 
     const total = records.length;
     let completedCount = 0;
@@ -123,6 +114,6 @@ export const generateReport = async (
 
     return response.text || "Lỗi tạo nội dung.";
   } catch (error) {
-    return "<div class='p-4 bg-red-50 text-red-700'>Lỗi kết nối AI.</div>";
+    return "<div class='p-4 bg-red-50 text-red-700'>Lỗi kết nối AI hoặc quota đã hết.</div>";
   }
 };

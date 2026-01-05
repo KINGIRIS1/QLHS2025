@@ -15,21 +15,16 @@ if (typeof window !== 'undefined') {
   }
 
   // Mock Electron API cho trình duyệt Web
+  // LƯU Ý: Chỉ expose những API an toàn trên Web. Các tính năng native (file system, capture, folder pickers, auto-update,...) cần kiểm tra tồn tại trước khi dùng.
   if (!(window as any).electronAPI) {
     console.warn("⚠️ Đang chạy trên trình duyệt Web. Các tính năng Native (Electron) sẽ bị giả lập.");
-    
+
     (window as any).electronAPI = {
-      captureScreenshot: async () => { alert("Tính năng chụp màn hình chỉ hỗ trợ trên App Desktop."); return ""; },
+      // Đánh dấu rõ đây là môi trường Web
+      isElectron: false,
+
+      // Các API an toàn để dùng trên trình duyệt
       openExternal: async (url: string) => { window.open(url, '_blank'); },
-      saveAndOpenFile: async () => { 
-        alert("Trên bản Web, file sẽ được tải xuống thư mục Download mặc định.");
-        return { success: false, message: "Web Mode: Use standard download" }; 
-      },
-      openFilePath: async () => false,
-      selectFolder: async () => { alert("Trình duyệt không hỗ trợ chọn đường dẫn lưu mặc định."); return null; },
-      checkForUpdate: async () => ({ status: 'web-mode', message: 'Bạn đang dùng bản Web' }),
-      downloadUpdate: async () => {},
-      quitAndInstall: async () => {},
       showNotification: async (title: string, body: string) => {
         if (Notification.permission === 'granted') {
           new Notification(title, { body });
@@ -43,13 +38,24 @@ if (typeof window !== 'undefined') {
         }
         return false;
       },
-      showConfirmDialog: async (message: string) => {
+
+      // Dialog xác nhận (đơn giản)
+      showConfirmDialog: async (message: string, title?: string) => {
         return window.confirm(message);
       },
-      onUpdateStatus: () => {},
-      removeUpdateListener: () => {},
-      onNavigateToView: () => {},
-      removeNavigationListener: () => {}
+
+      // Tất cả các API native khác được đặt thành undefined để các kiểm tra `if (window.electronAPI && window.electronAPI.foo)` vẫn hoạt động
+      captureScreenshot: undefined,
+      saveAndOpenFile: undefined,
+      openFilePath: undefined,
+      selectFolder: undefined,
+      checkForUpdate: async () => ({ status: 'web-mode', message: 'Bạn đang dùng bản Web' }),
+      downloadUpdate: undefined,
+      quitAndInstall: undefined,
+      onUpdateStatus: undefined,
+      removeUpdateListener: undefined,
+      onNavigateToView: undefined,
+      removeNavigationListener: undefined
     };
   }
 }

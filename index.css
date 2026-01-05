@@ -19,14 +19,17 @@ html, body, #root {
   overflow: hidden; /* Ngăn cuộn ở body, để App tự quản lý vùng cuộn nội bộ */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #f3f4f6; /* bg-gray-100 sáng hơn chút cho clean */
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #0f172a; /* Đặt nền tối mặc định để khớp với Login */
+  color: #1e293b;
 }
 
-/* --- CUSTOM SCROLLBAR (Cho giao diện giống App Native) --- */
+/* --- CUSTOM SCROLLBAR (GIỐNG ELECTRON APP) --- */
+/* Áp dụng cho toàn bộ các thành phần có scroll */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -37,21 +40,44 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1; /* slate-300 */
+  background: #cbd5e1; /* slate-300 - Màu xám nhẹ */
   border-radius: 10px;
+  transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8; /* slate-400 */
+  background: #94a3b8; /* slate-400 - Đậm hơn khi hover */
 }
 
-/* Ẩn scrollbar khi không cần thiết nhưng vẫn cuộn được */
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Class tiện ích để ẩn scrollbar nhưng vẫn cuộn được */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* Class tiện ích cho scrollbar tùy chỉnh trong các vùng nội dung */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.02);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0,0,0,0.4);
 }
 
 /* Animation Utilities */

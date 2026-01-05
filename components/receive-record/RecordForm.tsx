@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { RecordFile, Holiday, RecordStatus } from '../../types';
+import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
 import { RECORD_TYPES } from '../../constants';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map } from 'lucide-react';
 
@@ -14,9 +14,11 @@ interface RecordFormProps {
   onPrint?: (data: Partial<RecordFile>) => void;
   initialData?: RecordFile | null; // Dữ liệu khi sửa
   onCancelEdit?: () => void; // Hủy sửa
+  currentUser: User;
+  employees: Employee[];
 }
 
-const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holidays, calculateDeadline, generateCode, onPrint, initialData, onCancelEdit }) => {
+const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holidays, calculateDeadline, generateCode, onPrint, initialData, onCancelEdit, currentUser, employees }) => {
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
@@ -51,13 +53,23 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       }
   }, [notification]);
 
-  // Tự động tạo mã khi Xã hoặc Ngày thay đổi (CHỈ KHI THÊM MỚI)
+  // LOGIC SINH MÃ MỚI
+  // Tìm nhân viên tương ứng với user hiện tại
+  const linkedEmp = employees.find(e => e.id === currentUser.employeeId);
+  // Lấy xã/phường đầu tiên trong danh sách quản lý để làm mã (Theo yêu cầu: mã theo địa bàn phụ trách)
+  // Nếu không có, mặc định là Chơn Thành
+  const processingWard = linkedEmp?.managedWards?.[0] || 'Chơn Thành';
+
+  // Tự động tạo mã (CHỈ KHI THÊM MỚI)
+  // Logic cũ: Dựa vào formData.ward (vị trí đất)
+  // Logic mới: Dựa vào processingWard (đơn vị phụ trách)
   useEffect(() => {
-    if (!initialData && formData.ward) {
-        const newCode = generateCode(formData.ward, formData.receivedDate || '');
+    if (!initialData) {
+        // Sử dụng processingWard thay vì formData.ward
+        const newCode = generateCode(processingWard, formData.receivedDate || '');
         setFormData(prev => ({ ...prev, code: newCode }));
     }
-  }, [formData.ward, formData.receivedDate, records, initialData]);
+  }, [processingWard, formData.receivedDate, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -205,10 +217,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             </div>
                         </div>
                         <div className="relative"> 
-                            <label className={labelClass}>Mã hồ sơ {initialData ? '' : '(Tự động)'}</label> 
+                            <label className={labelClass}>Mã hồ sơ {initialData ? '' : '(Tự động theo đơn vị)'}</label> 
                             <Hash size={16} className={iconWrapperClass} />
                             <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700 border-blue-300' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code} onChange={(e) => initialData && handleChange('code', e.target.value)} /> 
                         </div>
+                        {!initialData && (
+                            <div className="text-[10px] text-blue-600 italic px-1">
+                                * Mã hồ sơ được sinh theo đơn vị quản lý: <b>{processingWard}</b>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -224,7 +241,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     
                     <div className="space-y-5 flex-1">
                         <div> 
-                            <label className={labelClass}>Chọn Xã / Phường <span className="text-red-500">*</span></label>
+                            <label className={labelClass}>Chọn Xã / Phường (Vị trí đất) <span className="text-red-500">*</span></label>
                             <div className="flex flex-col gap-2">
                                 {wards.map(w => (
                                     <button

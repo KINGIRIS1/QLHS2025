@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
 
@@ -11,6 +11,7 @@ interface PersonalProfileProps {
   records: RecordFile[];
   onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
   onViewRecord: (record: RecordFile) => void;
+  onCreateLiquidation?: (record: RecordFile) => void; // New Prop
 }
 
 function removeVietnameseTones(str: string): string {
@@ -30,7 +31,8 @@ function removeVietnameseTones(str: string): string {
     return str;
 }
 
-const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord }) => {
+const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation }) => {
+  const [activeTab, setActiveTab] = useState<'pending' | 'reminder'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -44,6 +46,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     return records.filter(r => user.employeeId && r.assignedTo === user.employeeId);
   }, [records, user.employeeId]);
   
+  // 1. Hồ sơ Đang thực hiện
   const pendingRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
 
@@ -72,14 +75,44 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       });
   }, [myRecords, searchTerm, sortConfig]);
 
+  // 2. Hồ sơ Có hẹn nhắc việc
+  const reminderRecords = useMemo(() => {
+      let list = myRecords.filter(r => 
+          r.reminderDate && 
+          r.status !== RecordStatus.HANDOVER && 
+          r.status !== RecordStatus.WITHDRAWN
+      );
+
+      if (searchTerm) {
+          const lowerSearch = removeVietnameseTones(searchTerm);
+          const rawSearch = searchTerm.toLowerCase();
+          list = list.filter(r => {
+             const nameNorm = removeVietnameseTones(r.customerName || '');
+             const codeRaw = (r.code || '').toLowerCase();
+             return nameNorm.includes(lowerSearch) || codeRaw.includes(rawSearch);
+          });
+      }
+
+      // Mặc định sắp xếp theo thời gian nhắc (gần nhất lên đầu)
+      return list.sort((a, b) => {
+          const timeA = new Date(a.reminderDate!).getTime();
+          const timeB = new Date(b.reminderDate!).getTime();
+          return timeA - timeB;
+      });
+  }, [myRecords, searchTerm]);
+
   const reviewRecords = myRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
   const completedRecords = myRecords.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER);
 
-  const totalPages = Math.ceil(pendingRecords.length / itemsPerPage);
-  const paginatedPendingRecords = useMemo(() => {
+  // Xác định danh sách hiển thị dựa trên Tab đang chọn
+  const displayRecords = activeTab === 'pending' ? pendingRecords : reminderRecords;
+
+  const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
+  
+  const paginatedDisplayRecords = useMemo(() => {
       const startIndex = (currentPage - 1) * itemsPerPage;
-      return pendingRecords.slice(startIndex, startIndex + itemsPerPage);
-  }, [pendingRecords, currentPage, itemsPerPage]);
+      return displayRecords.slice(startIndex, startIndex + itemsPerPage);
+  }, [displayRecords, currentPage, itemsPerPage]);
 
   const handleSort = (key: keyof RecordFile) => {
       let direction: 'asc' | 'desc' = 'asc';
@@ -102,6 +135,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const y = date.getFullYear();
     return `${d}/${m}/${y}`;
+  };
+
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '---';
+    const date = new Date(dateStr);
+    const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    return `${time} ${d}/${m}`;
   };
 
   const getDeadlineStatus = (deadlineStr?: string) => {
@@ -181,12 +223,32 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         </div>
       </div>
 
-      {/* DANH SÁCH ĐANG XỬ LÝ (SCROLLABLE CONTENT) */}
+      {/* DANH SÁCH CÔNG VIỆC CHÍNH (SCROLLABLE CONTENT) */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
+        
+        {/* TAB NAVIGATION & SEARCH */}
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-            <div className="flex items-center gap-2">
-                <Clock size={18} className="text-orange-500" />
-                <h3 className="font-bold text-gray-700">Hồ sơ đang thực hiện ({pendingRecords.length})</h3>
+            <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                <button 
+                    onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                        activeTab === 'pending' 
+                        ? 'bg-blue-600 text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <Clock size={16} /> Đang thực hiện ({pendingRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('reminder'); setCurrentPage(1); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                        activeTab === 'reminder' 
+                        ? 'bg-pink-600 text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <Bell size={16} /> Có hẹn nhắc việc ({reminderRecords.length})
+                </button>
             </div>
             
             <div className="relative w-full md:w-64">
@@ -202,45 +264,77 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         </div>
         
         <div className="flex-1 overflow-y-auto">
-            {pendingRecords.length > 0 ? (
+            {displayRecords.length > 0 ? (
                 <table className="w-full text-left table-fixed min-w-[900px]">
                     <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                         <tr>
                             <th className="p-3 w-10 text-center">#</th>
                             <th className="p-3 w-[120px]">{renderSortHeader('Mã HS', 'code')}</th>
                             <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
-                            {/* THU HẸP CỘT LOẠI HỒ SƠ */}
                             <th className="p-3 w-[130px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
-                            <th className="p-3 w-[150px]">{renderSortHeader('Hẹn trả', 'deadline')}</th>
+                            
+                            {/* Cột thời gian thay đổi tùy theo Tab */}
+                            <th className="p-3 w-[150px]">
+                                {activeTab === 'pending' 
+                                    ? renderSortHeader('Hẹn trả', 'deadline') 
+                                    : <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>
+                                }
+                            </th>
+                            
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
-                            <th className="p-3 text-center w-[120px]">Thao tác chính</th>
+                            <th className="p-3 text-center w-[160px]">Thao tác chính</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
-                        {paginatedPendingRecords.map((r, index) => {
+                        {paginatedDisplayRecords.map((r, index) => {
                             const deadlineStatus = getDeadlineStatus(r.deadline);
+                            // Highlight màu hồng nhạt nếu là tab reminder
+                            const rowClass = activeTab === 'reminder' ? 'hover:bg-pink-50/50 bg-pink-50/10' : 'hover:bg-blue-50/50';
+                            
                             return (
-                                <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                                <tr key={r.id} className={`${rowClass} transition-colors`}>
                                     <td className="p-3 text-center text-gray-400 text-xs align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                                     <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code}>{r.code}</div></td>
                                     <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName}>{r.customerName}</div></td>
                                     <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType}>{getShortRecordType(r.recordType)}</div></td>
+                                    
+                                    {/* Hiển thị thời gian */}
                                     <td className="p-3 align-middle">
-                                        <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
-                                            {deadlineStatus.icon}
-                                            <span>{formatDate(r.deadline)}</span>
-                                            <span className="text-[10px] uppercase ml-1">{deadlineStatus.text}</span>
-                                        </div>
+                                        {activeTab === 'pending' ? (
+                                            <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
+                                                {deadlineStatus.icon}
+                                                <span>{formatDate(r.deadline)}</span>
+                                                <span className="text-[10px] uppercase ml-1">{deadlineStatus.text}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 text-pink-700 font-bold bg-pink-100 px-2 py-1 rounded w-fit text-xs">
+                                                <Bell size={12} className="fill-pink-700"/>
+                                                {formatDateTime(r.reminderDate)}
+                                            </div>
+                                        )}
                                     </td>
+
                                     <td className="p-3 text-center align-middle"><StatusBadge status={r.status} /></td>
                                     <td className="p-3 align-middle">
                                         <div className="flex justify-center gap-2">
                                             <button 
                                                 onClick={() => onViewRecord(r)}
-                                                className="px-3 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm"
+                                                className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm"
                                             >
                                                 Chi tiết
                                             </button>
+                                            
+                                            {/* Nút Thanh lý */}
+                                            {onCreateLiquidation && (
+                                                <button 
+                                                    onClick={() => onCreateLiquidation(r)}
+                                                    className="px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                                                    title="Thanh lý hợp đồng"
+                                                >
+                                                    <FileCheck size={14} /> Thanh lý
+                                                </button>
+                                            )}
+
                                             <button 
                                                 onClick={() => handleForwardToSign(r)}
                                                 title="Chuyển sang bước Ký kiểm tra"
@@ -258,16 +352,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                     <CheckCircle size={48} className="text-gray-200 mb-2" />
-                    <p>{searchTerm ? 'Không tìm thấy hồ sơ phù hợp.' : 'Tuyệt vời! Bạn không còn hồ sơ tồn đọng.'}</p>
+                    <p>{searchTerm ? 'Không tìm thấy hồ sơ phù hợp.' : (activeTab === 'pending' ? 'Tuyệt vời! Bạn không còn hồ sơ tồn đọng.' : 'Không có lịch hẹn nhắc việc nào.')}</p>
                 </div>
             )}
         </div>
 
         {/* PAGINATION FOOTER */}
-        {pendingRecords.length > 0 && (
+        {displayRecords.length > 0 && (
             <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-between items-center shrink-0">
                 <span className="text-xs text-gray-500">
-                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, pendingRecords.length)}</strong> trên tổng <strong>{pendingRecords.length}</strong>
+                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, displayRecords.length)}</strong> trên tổng <strong>{displayRecords.length}</strong>
                 </span>
                 <div className="flex items-center gap-1">
                     <button 

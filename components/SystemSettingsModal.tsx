@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, Activity, Save, Key, Eye, EyeOff, Globe, Calendar, Plus, Trash2 } from 'lucide-react';
+import { X, Database, AlertTriangle, ShieldAlert, Cloud, Sparkles, Loader2, CheckCircle, Activity, Save, Key, Eye, EyeOff, Globe, Calendar, Plus, Trash2, FolderOpen } from 'lucide-react';
 import { testApiConnection, LS_API_KEY } from '../services/geminiService';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';

@@ -73,10 +73,25 @@ function createWindow() {
 
 // --- IPC Handlers ---
 
+// Chọn thư mục lưu
+ipcMain.handle('select-folder', async (event) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Chọn thư mục lưu file xuất',
+        buttonLabel: 'Chọn thư mục này'
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+        return result.filePaths[0];
+    }
+    return null;
+});
+
 // Lưu file và trả về đường dẫn để mở (Dùng cho tính năng Xuất & Mở ngay)
-ipcMain.handle('save-and-open-file', async (event, { fileName, base64Data }) => {
-    const downloadsPath = app.getPath('downloads');
-    const filePath = path.join(downloadsPath, fileName);
+// Cập nhật: Chấp nhận outputFolder
+ipcMain.handle('save-and-open-file', async (event, { fileName, base64Data, outputFolder }) => {
+    // Nếu có outputFolder thì dùng, nếu không thì mặc định Downloads
+    const folder = outputFolder || app.getPath('downloads');
+    const filePath = path.join(folder, fileName);
     
     try {
         const buffer = Buffer.from(base64Data, 'base64');

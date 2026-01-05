@@ -14,7 +14,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      // Đảm bảo buffer được resolve đúng về package cài đặt
+      buffer: 'buffer',
     },
+  },
+  define: {
+    // Polyfill global cho các thư viện cũ
+    'global': 'window',
+    // Polyfill process.env rỗng để tránh lỗi "process is not defined"
+    'process.env': {}
   },
   build: {
     outDir: 'dist',

@@ -9,9 +9,10 @@ interface ContractListProps {
   onEdit: (c: Contract) => void;
   onDelete: (id: string) => void;
   onPrint: (c: Contract, type: 'contract' | 'liquidation') => void;
+  onCreateLiquidation: (c: Contract) => void; // Prop mới
 }
 
-const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint }) => {
+const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, onCreateLiquidation }) => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -87,9 +88,10 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint }
                                 <td className="p-4 text-right font-mono font-bold text-gray-800 align-middle">{c.totalAmount?.toLocaleString('vi-VN')}</td>
                                 <td className="p-4 text-center align-middle">
                                     <div className="flex justify-center gap-1">
-                                        <button onClick={() => onEdit(c)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa"><Edit size={16} /></button>
+                                        <button onClick={() => onEdit(c)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa Hợp Đồng"><Edit size={16} /></button>
                                         <button onClick={() => onPrint(c, 'contract')} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="In Hợp đồng"><Printer size={16} /></button>
-                                        <button onClick={() => onPrint(c, 'liquidation')} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="In Thanh lý"><FileCheck size={16} /></button>
+                                        {/* Nút Tạo Thanh Lý thay vì In Thanh Lý */}
+                                        <button onClick={() => onCreateLiquidation(c)} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="Tạo Thanh Lý (Điền vào form)"><FileCheck size={16} /></button>
                                         <button onClick={async () => { if(await confirmAction('Xóa hợp đồng?')) { onDelete(c.id); loadContracts(); } }} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa"><Trash2 size={16} /></button>
                                     </div>
                                 </td>

@@ -1,15 +1,20 @@
 
-import React, { useState, useRef } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, Settings, Key, Save, X, Eye, EyeOff, ListFilter, CheckCircle2, Clock, AlertTriangle, Archive } from 'lucide-react';
+import { LS_API_KEY } from '../services/geminiService';
+import { RecordFile, RecordStatus } from '../types';
+import { getNormalizedWard, STATUS_LABELS } from '../constants';
+import { isRecordOverdue } from '../utils/appHelpers';
 
 interface ReportSectionProps {
     reportContent: string;
     isGenerating: boolean;
     onGenerate: (fromDate: string, toDate: string) => void;
     onExportExcel: (fromDate: string, toDate: string) => void;
+    records: RecordFile[]; // Thêm prop records để tính toán client-side
 }
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel }) => {
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records }) => {
     const [fromDate, setFromDate] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -18,7 +23,40 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return new Date().toISOString().split('T')[0];
     });
 
+    const [activeTab, setActiveTab] = useState<'list' | 'ai'>('list');
+
+    // API Key State
+    const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+    const [customApiKey, setCustomApiKey] = useState('');
+    const [showKey, setShowKey] = useState(false);
+
     const previewRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const storedKey = localStorage.getItem(LS_API_KEY);
+        if (storedKey) setCustomApiKey(storedKey);
+    }, []);
+
+    // --- LOGIC TÍNH TOÁN DỮ LIỆU ---
+    const filteredData = useMemo(() => {
+        const start = new Date(fromDate); start.setHours(0,0,0,0);
+        const end = new Date(toDate); end.setHours(23,59,59,999);
+
+        return records.filter(r => {
+            if (!r.receivedDate) return false;
+            const rDate = new Date(r.receivedDate);
+            return rDate >= start && rDate <= end;
+        });
+    }, [records, fromDate, toDate]);
+
+    const stats = useMemo(() => {
+        const total = filteredData.length;
+        const completed = filteredData.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED).length;
+        const withdrawn = filteredData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
+        const overdue = filteredData.filter(r => isRecordOverdue(r)).length;
+        const processing = total - completed - withdrawn;
+        return { total, completed, withdrawn, overdue, processing };
+    }, [filteredData]);
 
     const handleQuickReport = (type: 'week' | 'month') => {
         const now = new Date();
@@ -35,15 +73,29 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const toStr = new Date().toISOString().split('T')[0];
         setFromDate(fromStr);
         setToDate(toStr);
-        onGenerate(fromStr, toStr);
+        setActiveTab('list'); // Chuyển về tab list để xem kết quả ngay
     };
 
     const handleGenerateClick = () => {
-        if (!fromDate || !toDate) {
-            alert("Vui lòng chọn đầy đủ Từ ngày và Đến ngày.");
-            return;
-        }
+        if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
+        setActiveTab('ai');
         onGenerate(fromDate, toDate);
+    };
+
+    const handleExportExcelClick = () => {
+        if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
+        onExportExcel(fromDate, toDate);
+    };
+
+    const handleSaveApiKey = () => {
+        if (customApiKey.trim()) {
+            localStorage.setItem(LS_API_KEY, customApiKey.trim());
+            alert('Đã lưu API Key thành công!');
+        } else {
+            localStorage.removeItem(LS_API_KEY);
+            alert('Đã xóa API Key tùy chỉnh.');
+        }
+        setIsApiKeyModalOpen(false);
     };
 
     const handlePrint = () => {
@@ -63,28 +115,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             doc.write(`
                 <html>
                 <head>
-                    <title>Báo cáo A4</title>
-                    <script src="https://cdn.tailwindcss.com"></script>
+                    <title>Báo cáo</title>
                     <style>
-                        @page { size: A4 portrait; margin: 0; }
-                        body { margin: 0; padding: 0; }
-                        .a4-page {
-                            width: 210mm;
-                            height: 297mm;
-                            padding: 20mm 15mm 20mm 25mm;
-                            font-family: 'Times New Roman', Times, serif;
-                            font-size: 12pt;
-                            line-height: 1.4;
-                            background: white;
-                        }
-                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-                        th, td { border: 1px solid black; padding: 5px; text-align: left; }
-                        .no-print { display: none; }
+                        @page { size: A4 portrait; margin: 2cm; }
+                        body { font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.3; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { border: 1px solid black; padding: 5px; text-align: left; font-size: 11pt; }
+                        th { text-align: center; font-weight: bold; background-color: #f0f0f0; }
                     </style>
                 </head>
-                <body>
-                    <div class="a4-page">${reportContent}</div>
-                </body>
+                <body>${reportContent}</body>
                 </html>
             `);
             doc.close();
@@ -96,98 +136,220 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     };
 
+    const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+
     return (
-        <div className="flex flex-col h-full gap-4 overflow-hidden">
+        <div className="flex flex-col h-full overflow-hidden relative bg-slate-50">
             {/* Toolbar */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-2">
-                    <div className="bg-blue-100 p-2 rounded-lg">
-                        <BarChart3 className="text-blue-600" size={24} />
+            <div className="bg-white p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2.5 rounded-xl text-blue-600">
+                            <BarChart3 size={24} />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-gray-800 text-lg">Báo cáo & Thống kê</h2>
+                            <p className="text-xs text-gray-500">Lập danh sách kết quả, báo cáo tuần/tháng</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="font-bold text-gray-800 text-lg">Báo cáo Hồ sơ chuẩn A4</h2>
-                        <p className="text-xs text-gray-500">Tự động phân trang & tối ưu nội dung</p>
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                    <button 
-                        onClick={() => handleQuickReport('week')}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200 flex items-center gap-1"
-                    >
-                        <CalendarDays size={14} /> Báo cáo Tuần
-                    </button>
-                    <button 
-                        onClick={() => handleQuickReport('month')}
-                        className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100 border border-purple-200 flex items-center gap-1"
-                    >
-                        <Layout size={14} /> Báo cáo Tháng
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-lg border border-gray-200 ml-auto">
-                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white" />
-                    <span className="text-gray-400">→</span>
-                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white" />
-
-                    <button 
-                        onClick={handleGenerateClick}
-                        disabled={isGenerating}
-                        className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-md hover:opacity-90 disabled:opacity-50 font-bold text-sm"
-                    >
-                        {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                        Tạo báo cáo AI
-                    </button>
-
-                    {reportContent && (
-                        <button onClick={handlePrint} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-md hover:bg-gray-50 font-medium text-sm">
-                            <Printer size={16} /> In A4
+                    
+                    <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <button onClick={() => handleQuickReport('week')} className="px-3 py-1.5 rounded-md text-xs font-bold hover:bg-white hover:shadow-sm transition-all text-slate-600 flex items-center gap-1">
+                            <CalendarDays size={14} /> Tuần này
                         </button>
-                    )}
+                        <button onClick={() => handleQuickReport('month')} className="px-3 py-1.5 rounded-md text-xs font-bold hover:bg-white hover:shadow-sm transition-all text-slate-600 flex items-center gap-1">
+                            <Layout size={14} /> Tháng này
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-auto">
+                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-sm">
+                            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="text-sm outline-none text-gray-700 font-medium" />
+                            <span className="text-gray-400">➜</span>
+                            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="text-sm outline-none text-gray-700 font-medium" />
+                        </div>
+                        
+                        <button onClick={handleExportExcelClick} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">
+                            <FileSpreadsheet size={18} /> Xuất Excel
+                        </button>
+                    </div>
+                </div>
+
+                {/* Stat Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
+                        <div><div className="text-2xl font-bold text-blue-800">{stats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
+                        <div><div className="text-2xl font-bold text-green-800">{stats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
+                        <div><div className="text-2xl font-bold text-orange-800">{stats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
+                    </div>
+                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
+                        <div><div className="text-2xl font-bold text-red-800">{stats.overdue}</div><div className="text-xs text-red-600 uppercase font-bold">Trễ hạn</div></div>
+                    </div>
                 </div>
             </div>
 
-            {/* A4 Preview Container */}
-            <div className="flex-1 bg-slate-200 overflow-y-auto p-10 flex flex-col items-center custom-scrollbar">
-                {isGenerating && (
-                    <div className="absolute inset-0 bg-slate-200/50 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
-                        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                        <p className="text-lg font-bold text-blue-900">Đang tổng hợp số liệu vào 01 trang A4...</p>
+            {/* Content Tabs */}
+            <div className="flex bg-white border-b border-gray-200 px-4">
+                <button 
+                    onClick={() => setActiveTab('list')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'list' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <ListFilter size={16}/> Danh sách kết quả ({filteredData.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ai')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Sparkles size={16}/> Văn bản Báo cáo (AI)
+                </button>
+            </div>
+
+            {/* TAB CONTENT */}
+            <div className="flex-1 overflow-hidden bg-slate-100 p-4">
+                {activeTab === 'list' && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-hidden flex flex-col animate-fade-in-up">
+                        <div className="flex-1 overflow-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10">
+                                    <tr>
+                                        <th className="p-3 w-10 text-center">#</th>
+                                        <th className="p-3 w-32">Mã HS</th>
+                                        <th className="p-3 w-48">Chủ sử dụng</th>
+                                        <th className="p-3 w-32">Xã/Phường</th>
+                                        <th className="p-3 w-24">Ngày nhận</th>
+                                        <th className="p-3 w-24">Hẹn trả</th>
+                                        <th className="p-3 w-24">Hoàn thành</th>
+                                        <th className="p-3 w-32 text-center">Trạng thái</th>
+                                        <th className="p-3">Ghi chú</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredData.length > 0 ? filteredData.map((r, i) => (
+                                        <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                                            <td className="p-3 text-center text-gray-400">{i + 1}</td>
+                                            <td className="p-3 font-medium text-blue-600">{r.code}</td>
+                                            <td className="p-3 font-medium">{r.customerName}</td>
+                                            <td className="p-3 text-gray-600">{getNormalizedWard(r.ward)}</td>
+                                            <td className="p-3 text-gray-600">{formatDate(r.receivedDate)}</td>
+                                            <td className="p-3 text-gray-600">{formatDate(r.deadline)}</td>
+                                            <td className="p-3 text-green-700 font-medium">{formatDate(r.completedDate)}</td>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs border ${
+                                                    r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
+                                                    r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                    isRecordOverdue(r) ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
+                                                    'bg-blue-50 text-blue-700 border-blue-100'
+                                                }`}>
+                                                    {STATUS_LABELS[r.status]}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-gray-500 italic truncate max-w-xs">{r.notes || r.content}</td>
+                                        </tr>
+                                    )) : (
+                                        <tr><td colSpan={9} className="p-8 text-center text-gray-400">Không có dữ liệu trong khoảng thời gian này.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 
-                {reportContent ? (
-                    <div className="relative shadow-2xl">
-                        {/* Thước đo giả lập lề */}
-                        <div className="absolute -left-8 top-0 bottom-0 w-8 flex flex-col justify-between text-[10px] text-slate-400 font-bold py-10 pointer-events-none">
-                           <span>0</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>29.7cm</span>
+                {activeTab === 'ai' && (
+                    <div className="h-full flex flex-col items-center">
+                        {/* AI Toolbar */}
+                        <div className="w-full flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setIsApiKeyModalOpen(true)} className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Cấu hình API Key">
+                                    <Settings size={20} />
+                                </button>
+                                <div className="text-sm text-gray-600">
+                                    Sử dụng <strong>Gemini AI</strong> để viết báo cáo nhận xét tiến độ.
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleGenerateClick} disabled={isGenerating} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold text-sm shadow-md transition-all disabled:opacity-50">
+                                    {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                                    Tạo báo cáo ngay
+                                </button>
+                                {reportContent && (
+                                    <button onClick={handlePrint} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm shadow-sm">
+                                        <Printer size={16} /> In
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        
-                        <div 
-                            ref={previewRef}
-                            className="bg-white p-[20mm_15mm_20mm_25mm] shadow-inner transition-all duration-500 animate-fade-in-up overflow-hidden"
-                            style={{ 
-                                width: '210mm', 
-                                minHeight: '297mm', 
-                                maxHeight: '297mm', // Cố định để ép nội dung vào 1 trang
-                                fontFamily: '"Times New Roman", Times, serif',
-                                fontSize: '13pt'
-                            }}
-                            dangerouslySetInnerHTML={{ __html: reportContent }}
-                        />
-                        
-                        <div className="absolute -bottom-10 left-0 right-0 text-center text-xs text-slate-500 font-bold uppercase tracking-widest">
-                            --- KẾT THÚC TRANG 1 (210mm x 297mm) ---
+
+                        {/* Preview */}
+                        <div className="flex-1 w-full overflow-y-auto bg-slate-200 p-8 rounded-xl custom-scrollbar flex justify-center border border-slate-300 shadow-inner">
+                            {reportContent ? (
+                                <div className="bg-white shadow-2xl p-[20mm_15mm_20mm_25mm] w-[210mm] min-h-[297mm] animate-fade-in-up">
+                                    <div ref={previewRef} style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '13pt', lineHeight: 1.4 }} dangerouslySetInnerHTML={{ __html: reportContent }} />
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center text-slate-400 opacity-60">
+                                    <FileText size={64} className="mb-4" />
+                                    <p>Chưa có nội dung báo cáo.</p>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                        <FileText size={80} className="opacity-20 mb-4" />
-                        <p className="text-lg font-medium">Chưa có dữ liệu báo cáo</p>
-                        <p className="text-sm">Hãy chọn khoảng thời gian và bấm "Tạo báo cáo AI"</p>
                     </div>
                 )}
             </div>
+
+            {/* API KEY CONFIG MODAL */}
+            {isApiKeyModalOpen && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
+                        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <Key className="text-purple-600" size={20} />
+                                Cấu hình Gemini AI Key
+                            </h3>
+                            <button onClick={() => setIsApiKeyModalOpen(false)} className="text-gray-400 hover:text-red-500"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-gray-600">
+                                Nhập API Key của Google Gemini để sử dụng tính năng tạo báo cáo thông minh.
+                                <br />
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
+                                    Lấy API Key tại đây
+                                </a>
+                            </p>
+                            <div className="relative">
+                                <Key size={16} className="absolute left-3 top-3 text-gray-400" />
+                                <input 
+                                    type={showKey ? "text" : "password"} 
+                                    className="w-full border border-gray-300 rounded-lg py-2.5 pl-9 pr-10 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                    placeholder="Paste API Key vào đây..."
+                                    value={customApiKey}
+                                    onChange={(e) => setCustomApiKey(e.target.value)}
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowKey(!showKey)}
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-purple-600"
+                                >
+                                    {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 flex justify-end gap-2 border-t border-gray-100">
+                            <button onClick={() => setIsApiKeyModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm font-medium">Hủy</button>
+                            <button onClick={handleSaveApiKey} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-bold shadow-sm">
+                                <Save size={16} /> Lưu cấu hình
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

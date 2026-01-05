@@ -29,7 +29,7 @@ import {
   Plus, Search, CheckSquare, Square, Users, FileSpreadsheet,
   SlidersHorizontal, AlertTriangle, Clock, Lock, WifiOff,
   ArrowUpDown, ChevronLeft, ChevronRight, Bell, MapPin, RotateCcw, Menu, FileOutput, FileSignature, ListChecks, History,
-  Calendar, X, Filter, User as UserIcon, Eye, CalendarRange, CheckCircle, UserPlus, Send
+  Calendar, X, Filter, User as UserIcon, Eye, CalendarRange, CheckCircle, UserPlus, Send, Layers
 } from 'lucide-react';
 
 import { useAppData } from './hooks/useAppData';
@@ -47,6 +47,9 @@ function App() {
   });
 
   const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // Contract Liquidation Request State
+  const [recordToLiquidate, setRecordToLiquidate] = useState<RecordFile | null>(null);
 
   useEffect(() => {
       if (toast) {
@@ -125,6 +128,9 @@ function App() {
   const [isExcelPreviewOpen, setIsExcelPreviewOpen] = useState(false);
   const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [previewExcelName, setPreviewExcelName] = useState('');
+  
+  // NEW: State for Bulk Update Modal
+  const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
 
   const [globalReportContent, setGlobalReportContent] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -161,9 +167,9 @@ function App() {
 
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
 
-  const handleExportReportExcel = (fromDateStr: string, toDateStr: string) => {
+  const handleExportReportExcel = async (fromDateStr: string, toDateStr: string) => {
       if (!currentUser) return;
-      exportReportToExcel(records, fromDateStr, toDateStr);
+      await exportReportToExcel(records, fromDateStr, toDateStr);
   };
 
   const handleUpdateCurrentAccount = async (data: { name: string; password?: string; department?: string }) => {
@@ -239,6 +245,36 @@ function App() {
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
   };
 
+  // --- NEW: HANDLER CHO BULK UPDATE (ADMIN) ---
+  const handleBulkUpdate = async (field: keyof RecordFile, value: any) => {
+      const selectedIds = Array.from(selectedRecordIds);
+      const updates: any = { [field]: value };
+      
+      // Tự động set ngày kèm theo nếu đổi trạng thái
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (field === 'status') {
+          if (value === RecordStatus.ASSIGNED) updates.assignedDate = todayStr;
+          if (value === RecordStatus.PENDING_SIGN) updates.submissionDate = todayStr;
+          if (value === RecordStatus.SIGNED) updates.approvalDate = todayStr;
+          if (value === RecordStatus.HANDOVER) updates.completedDate = todayStr;
+          if (value === RecordStatus.RETURNED) updates.resultReturnedDate = todayStr;
+      }
+      if (field === 'assignedTo') {
+          updates.assignedDate = todayStr;
+          updates.status = RecordStatus.ASSIGNED; // Tự động chuyển status nếu giao việc
+      }
+
+      // Optimistic Update UI
+      setRecords(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, ...updates } : r));
+
+      // Call API Loop
+      const targets = records.filter(r => selectedIds.includes(r.id));
+      await Promise.all(targets.map(r => updateRecordApi({ ...r, ...updates })));
+
+      setToast({ type: 'success', message: `Đã cập nhật ${selectedIds.length} hồ sơ thành công!` });
+      setSelectedRecordIds(new Set()); // Clear selection
+  };
+
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
       setRecords(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
       const record = records.find(r => r.id === id); 
@@ -253,6 +289,18 @@ function App() {
           await updateRecordApi({ ...tempRecord, [field]: value });
       }
   }, [records]);
+
+  // Xử lý trả kết quả cho dân
+  const handleReturnResult = useCallback(async (record: RecordFile) => {
+      const today = new Date().toISOString().split('T')[0];
+      if(await confirmAction(`Xác nhận trả kết quả cho hồ sơ ${record.code} vào ngày hôm nay (${today})?`)) {
+          // UPDATE: Chuyển trạng thái sang RETURNED thay vì HANDOVER
+          const updates = { resultReturnedDate: today, status: RecordStatus.RETURNED }; 
+          setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
+          await updateRecordApi({ ...record, ...updates });
+          setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${record.code}.` });
+      }
+  }, []);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
       if (record.status === RecordStatus.RECEIVED) { 
@@ -309,14 +357,27 @@ function App() {
       }
   };
 
+  // --- LIQUIDATION HANDLER ---
+  const handleRequestLiquidation = useCallback((record: RecordFile) => {
+      setRecordToLiquidate(record);
+      setCurrentView('receive_contract');
+  }, []);
+
   const handleEditRecord = useCallback((r: RecordFile) => { setEditingRecord(r); setIsModalOpen(true); }, []);
   const handleViewRecord = useCallback((r: RecordFile) => setViewingRecord(r), []);
   const handleDeleteConfirm = useCallback((r: RecordFile) => { setDeletingRecord(r); setIsDeleteModalOpen(true); }, []);
 
+  const handleExcelPreview = (wb: XLSX.WorkBook, name: string) => {
+      setPreviewWorkbook(wb);
+      setPreviewExcelName(name);
+      setIsExcelPreviewOpen(true);
+  };
+
+  // Render Record List Table
   const renderRecordList = () => {
     const isListView = currentView === 'check_list' || currentView === 'handover_list';
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
             <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -370,172 +431,151 @@ function App() {
                      {currentUser?.role !== UserRole.ONEDOOR && currentView === 'all_records' && (
                         <div className="flex gap-2">
                             <button onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'none' : 'overdue')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${warningFilter === 'overdue' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}><AlertTriangle size={16} /> {warningCount.overdue}</button>
-                            <button onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${warningFilter === 'approaching' ? 'bg-amber-500 text-white' : 'bg-white text-amber-600'}`}><Clock size={16} /> {warningCount.approaching}</button>
+                            <button onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${warningFilter === 'approaching' ? 'bg-orange-500 text-white' : 'bg-white text-orange-600'}`}><Clock size={16} /> {warningCount.approaching}</button>
                         </div>
-                    )}
+                     )}
 
-                     <div className="relative" ref={columnSelectorRef}>
-                        <button onClick={() => setShowColumnSelector(!showColumnSelector)} className="flex items-center gap-2 bg-white text-gray-700 px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors text-sm font-medium shadow-sm"><SlidersHorizontal size={16} /> Cột</button>
-                        {showColumnSelector && (<div className="absolute top-full mt-2 left-0 w-60 bg-white rounded-lg shadow-xl border border-gray-200 z-50 p-3 max-h-80 overflow-y-auto"><div className="flex justify-between items-center mb-3 border-b pb-2"><h4 className="text-xs font-semibold text-gray-500 uppercase">Hiển thị cột</h4><button onClick={() => setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)} className="text-[11px] text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:bg-blue-50 px-2 py-1 rounded"><RotateCcw size={10} /> Mặc định</button></div><div className="space-y-1">{COLUMN_DEFS.map(col => (<label key={col.key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors select-none"><input type="checkbox" checked={visibleColumns[col.key]} onChange={() => setVisibleColumns(prev => ({ ...prev, [col.key]: !prev[col.key] }))} className="rounded text-blue-600 focus:ring-blue-500 border-gray-300 w-4 h-4" /><span className="text-sm text-gray-700">{col.label}</span></label>))}</div></div>)}
-                    </div>
-
-                    <div className="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-
-                    {canPerformAction && currentView === 'all_records' && (
+                     {canPerformAction && (
                         <>
-                            <button onClick={() => { setEditingRecord(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"><Plus size={16} /> Mới</button>
-                            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"><FileSpreadsheet size={16} /> Excel</button>
+                            <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                            <button onClick={() => { setIsModalOpen(true); setEditingRecord(null); }} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 shadow-sm text-sm font-bold"><Plus size={16} /> Nhập</button>
+                            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 shadow-sm text-sm font-bold"><FileSpreadsheet size={16} /> Excel</button>
                         </>
-                    )}
+                     )}
 
-                    {canPerformAction && selectedRecordIds.size > 0 && (currentView === 'all_records' || currentView === 'assign_tasks') && (
-                        <button onClick={() => { setAssignTargetRecords(records.filter(r => selectedRecordIds.has(r.id))); setIsAssignModalOpen(true); }} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"><UserPlus size={16} /> Giao ({selectedRecordIds.size})</button>
-                    )}
+                     {/* NEW: ADMIN BULK ACTIONS BUTTON */}
+                     {(isAdmin || isSubadmin) && selectedRecordIds.size > 0 && (
+                        <button 
+                            onClick={() => setIsBulkUpdateModalOpen(true)} 
+                            className="ml-2 flex items-center gap-1 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse"
+                        >
+                            <Layers size={16} /> Admin: Xử lý hàng loạt ({selectedRecordIds.size})
+                        </button>
+                     )}
 
-                    {currentView === 'check_list' && canPerformAction && (
-                        <div className="flex gap-2 ml-auto">
-                            <button onClick={handleConfirmSignBatch} className="bg-purple-600 text-white px-3 py-1.5 rounded-md text-sm font-bold shadow-sm hover:bg-purple-700"><CheckCircle size={16} className="inline mr-1"/> Duyệt ký ({paginatedRecords.length})</button>
-                            <button onClick={() => { setExportModalType('check_list'); setIsExportModalOpen(true); }} className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-gray-50"><FileOutput size={16} className="inline mr-1"/> Xuất DS</button>
-                        </div>
-                    )}
-
-                    {currentView === 'handover_list' && canPerformAction && (
-                        <div className="flex gap-2 ml-auto">
-                            {handoverTab === 'today' ? (
-                                <button onClick={() => setIsAddToBatchModalOpen(true)} disabled={paginatedRecords.length === 0} className="bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-bold shadow-sm hover:bg-green-700 disabled:opacity-50"><Send size={16} className="inline mr-1"/> Chốt danh sách giao ({selectedRecordIds.size > 0 ? selectedRecordIds.size : 'Tất cả'})</button>
-                            ) : (
-                                <button onClick={() => { setExportModalType('handover'); setIsExportModalOpen(true); }} className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-gray-50"><FileOutput size={16} className="inline mr-1"/> Xuất Excel Đợt Giao</button>
+                     {currentView === 'all_records' && (
+                        <div className="relative ml-auto" ref={columnSelectorRef}>
+                            <button onClick={() => setShowColumnSelector(!showColumnSelector)} className="p-2 bg-white border border-gray-200 rounded-md hover:bg-gray-100"><SlidersHorizontal size={16} /></button>
+                            {showColumnSelector && (
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2">
+                                    {COLUMN_DEFS.map(col => (
+                                        <label key={col.key} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input type="checkbox" checked={visibleColumns[col.key]} onChange={() => setVisibleColumns(prev => ({ ...prev, [col.key]: !prev[col.key] }))} className="rounded text-blue-600 focus:ring-blue-500" />
+                                            <span className="text-sm text-gray-700">{col.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
                             )}
                         </div>
-                    )}
+                     )}
                 </div>
 
                 {showAdvancedDateFilter && (
-                    <div className="bg-blue-50 p-2 rounded-lg border border-blue-100 flex items-center gap-3 animate-fade-in">
-                        <span className="text-xs font-bold text-blue-700 uppercase">Lọc theo khoảng thời gian:</span>
-                        <div className="flex items-center gap-2">
-                            <input type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)} className="text-sm border rounded px-2 py-1" />
-                            <span>-</span>
-                            <input type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)} className="text-sm border rounded px-2 py-1" />
-                        </div>
-                        <button onClick={() => { setFilterFromDate(''); setFilterToDate(''); }} className="text-xs text-blue-600 hover:underline">Xóa lọc</button>
+                    <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200 animate-fade-in text-sm">
+                        <span className="text-gray-600 font-medium">Từ ngày:</span>
+                        <input type="date" className="border rounded px-2 py-1" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)} />
+                        <span className="text-gray-600 font-medium">Đến ngày:</span>
+                        <input type="date" className="border rounded px-2 py-1" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)} />
+                        {(filterFromDate || filterToDate) && <button onClick={() => { setFilterFromDate(''); setFilterToDate(''); }} className="text-red-500 hover:underline text-xs">Xóa</button>}
+                    </div>
+                )}
+                
+                {/* Check List / Handover Actions */}
+                {isListView && (
+                    <div className="flex justify-end gap-3 mt-2">
+                        {canPerformAction && currentView === 'handover_list' && handoverTab === 'today' && selectedRecordIds.size > 0 && (
+                            <button onClick={() => setIsAddToBatchModalOpen(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-bold shadow-md transition-all animate-pulse">
+                                <CheckCircle size={18} /> Chốt Danh Sách Giao ({selectedRecordIds.size})
+                            </button>
+                        )}
+                        {canPerformAction && currentView === 'check_list' && filteredRecords.length > 0 && (
+                            <button onClick={handleConfirmSignBatch} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-md">
+                                <FileSignature size={18} /> Ký Duyệt Tất Cả ({filteredRecords.length})
+                            </button>
+                        )}
+                        <button onClick={() => { setExportModalType(currentView === 'check_list' ? 'check_list' : 'handover'); setIsExportModalOpen(true); }} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium shadow-sm">
+                            <FileOutput size={18} /> Xuất Danh Sách
+                        </button>
                     </div>
                 )}
             </div>
 
-            <div className="flex-1 overflow-auto relative">
-                <table className="w-full text-left table-fixed border-collapse min-w-[1200px]">
-                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-semibold sticky top-0 z-20 shadow-sm">
+            <div className="flex-1 overflow-auto min-h-0 bg-white">
+                <table className="w-full text-left table-fixed min-w-[1200px] border-collapse">
+                    <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                         <tr>
-                            <th className="p-3 w-10 text-center bg-gray-50">
-                                {canPerformAction ? <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600">{selectedRecordIds.size === paginatedRecords.length && paginatedRecords.length > 0 ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}</button> : '#'}
+                            <th className="p-3 w-10 text-center">
+                                {canPerformAction ? <button onClick={toggleSelectAll}>{selectedRecordIds.size === paginatedRecords.length && paginatedRecords.length > 0 ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-gray-400" />}</button> : '#'}
                             </th>
-                            {visibleColumns.code && <th className="p-3 w-[120px] bg-gray-50 cursor-pointer hover:bg-gray-100" onClick={() => setSortConfig({ key: 'code', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}><div className="flex items-center gap-1">Mã Hồ Sơ <ArrowUpDown size={12} /></div></th>}
-                            {visibleColumns.customer && <th className="p-3 w-[180px] bg-gray-50 cursor-pointer hover:bg-gray-100" onClick={() => setSortConfig({ key: 'customerName', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}><div className="flex items-center gap-1">Chủ Sử Dụng <ArrowUpDown size={12} /></div></th>}
-                            {visibleColumns.phone && <th className="p-3 w-[100px] bg-gray-50">SĐT</th>}
-                            {visibleColumns.received && <th className="p-3 w-[110px] bg-gray-50 cursor-pointer hover:bg-gray-100" onClick={() => setSortConfig({ key: 'receivedDate', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}><div className="flex items-center gap-1">Ngày Nhận <ArrowUpDown size={12} /></div></th>}
-                            {visibleColumns.deadline && <th className="p-3 w-[110px] bg-gray-50 cursor-pointer hover:bg-gray-100" onClick={() => setSortConfig({ key: 'deadline', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}><div className="flex items-center gap-1">Hẹn Trả <ArrowUpDown size={12} /></div></th>}
-                            {visibleColumns.ward && <th className="p-3 w-[120px] bg-gray-50">Xã / Phường</th>}
-                            {visibleColumns.group && <th className="p-3 w-[100px] bg-gray-50">Nhóm (Khu vực)</th>}
-                            {visibleColumns.mapSheet && <th className="p-3 w-[60px] text-center bg-gray-50">Tờ</th>}
-                            {visibleColumns.landPlot && <th className="p-3 w-[60px] text-center bg-gray-50">Thửa</th>}
-                            {visibleColumns.assigned && <th className="p-3 w-[110px] text-center bg-gray-50">Giao NV</th>}
-                            {visibleColumns.completed && <th className="p-3 w-[110px] text-center bg-gray-50">Ngày Xong</th>}
-                            {visibleColumns.type && <th className="p-3 w-[130px] bg-gray-50">Loại HS</th>}
-                            {visibleColumns.tech && <th className="p-3 w-[100px] bg-gray-50">Kỹ Thuật</th>}
-                            {visibleColumns.batch && <th className="p-3 w-[100px] text-center bg-gray-50">Đợt Xuất</th>}
-                            {visibleColumns.status && <th className="p-3 w-[120px] text-center bg-gray-50">Trạng Thái</th>}
-                            {canPerformAction && <th className="p-3 w-[140px] text-center bg-gray-50 sticky right-0 shadow-l z-30">Thao Tác</th>}
+                            {COLUMN_DEFS.map(col => visibleColumns[col.key] && (
+                                <th key={col.key} className={`p-3 cursor-pointer hover:bg-gray-100 transition-colors group select-none ${col.className || ''}`} onClick={() => { if (sortConfig.key === col.sortKey) { setSortConfig({ key: col.sortKey, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' }); } else { setSortConfig({ key: col.sortKey, direction: 'asc' }); } }}>
+                                    <div className={`flex items-center gap-1 ${col.className?.includes('text-center') ? 'justify-center' : ''}`}>
+                                        {col.label}
+                                        {sortConfig.key === col.sortKey ? (sortConfig.direction === 'asc' ? <ArrowUpDown size={14} className="text-blue-600" /> : <ArrowUpDown size={14} className="text-blue-600 rotate-180" />) : <ArrowUpDown size={14} className="text-gray-300 opacity-0 group-hover:opacity-100" />}
+                                    </div>
+                                </th>
+                            ))}
+                            {canPerformAction && <th className="p-3 w-28 text-center bg-gray-50 sticky right-0 shadow-l">Thao Tác</th>}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 text-sm text-gray-700 bg-white">
-                        {paginatedRecords.length > 0 ? (
-                            paginatedRecords.map((record) => (
-                                <RecordRow
-                                    key={record.id}
-                                    record={record}
-                                    employees={employees}
-                                    visibleColumns={visibleColumns}
-                                    isSelected={selectedRecordIds.has(record.id)}
-                                    canPerformAction={canPerformAction}
-                                    onToggleSelect={toggleSelectRecord}
-                                    onView={handleViewRecord}
-                                    onEdit={handleEditRecord}
-                                    onDelete={handleDeleteConfirm}
-                                    onAdvanceStatus={advanceStatus}
-                                    onQuickUpdate={handleQuickUpdate}
-                                />
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan={20} className="p-8 text-center text-gray-400 italic">
-                                    Không tìm thấy hồ sơ nào phù hợp.
-                                </td>
-                            </tr>
+                    <tbody className="divide-y divide-gray-100 text-sm">
+                        {paginatedRecords.length > 0 ? paginatedRecords.map(r => (
+                            <RecordRow 
+                                key={r.id} 
+                                record={r} 
+                                employees={employees} 
+                                visibleColumns={visibleColumns} 
+                                isSelected={selectedRecordIds.has(r.id)} 
+                                canPerformAction={canPerformAction} 
+                                onToggleSelect={toggleSelectRecord} 
+                                onView={handleViewRecord} 
+                                onEdit={handleEditRecord} 
+                                onDelete={handleDeleteConfirm} 
+                                onAdvanceStatus={advanceStatus}
+                                onQuickUpdate={handleQuickUpdate}
+                                onReturnResult={handleReturnResult}
+                            />
+                        )) : (
+                            <tr><td colSpan={Object.values(visibleColumns).filter(v => v).length + 2} className="p-8 text-center text-gray-400 italic">Không có dữ liệu hiển thị.</td></tr>
                         )}
                     </tbody>
                 </table>
             </div>
 
-            <div className="p-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center text-xs text-gray-500 shrink-0">
-                <span>Hiển thị {paginatedRecords.length} / {filteredRecords.length} hồ sơ</span>
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-50"><ChevronLeft size={16} /></button>
-                    <span>Trang {currentPage} / {totalPages}</span>
-                    <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="p-1 rounded hover:bg-gray-200 disabled:opacity-50"><ChevronRight size={16} /></button>
-                    <select value={itemsPerPage} onChange={(e) => setItemsPerPage(Number(e.target.value))} className="ml-2 border border-gray-300 rounded px-2 py-1 outline-none bg-white">
-                        <option value={20}>20 dòng</option>
-                        <option value={50}>50 dòng</option>
-                        <option value={100}>100 dòng</option>
-                    </select>
+            {paginatedRecords.length > 0 && (
+                <div className="border-t border-gray-200 p-3 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-xs text-gray-600">
+                    <div className="flex items-center gap-4">
+                        <span>Tổng số: <strong>{filteredRecords.length}</strong> bản ghi</span>
+                        <div className="flex items-center gap-2">
+                            <span>Hiển thị</span>
+                            <select value={itemsPerPage} onChange={(e) => setItemsPerPage(Number(e.target.value))} className="border border-gray-300 rounded px-2 py-1 bg-white outline-none">
+                                <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"><ChevronLeft size={16} /></button>
+                        <span className="font-medium">Trang {currentPage} / {totalPages}</span>
+                        <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="p-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"><ChevronRight size={16} /></button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
   };
 
-  const renderContent = () => {
-    // SỬA LỖI: Thêm guard clause để đảm bảo currentUser không null khi render các component con
-    if (!currentUser) return null;
-
-    switch (currentView) {
-      case 'dashboard': return <DashboardView records={records} />;
-      case 'internal_chat': return <InternalChat currentUser={currentUser} wards={wards} employees={employees} users={users} onResetUnread={() => setUnreadMessages(0)} notificationEnabled={notificationEnabled} />;
-      case 'personal_profile': return <PersonalProfile user={currentUser} records={records} onUpdateStatus={advanceStatus} onViewRecord={handleViewRecord} />;
-      case 'receive_record': return <ReceiveRecord onSave={handleAddOrUpdateRecord} onDelete={handleDeleteRecord} wards={wards} employees={employees} currentUser={currentUser} records={records} />;
-      case 'receive_contract': return <ReceiveContract onSave={handleAddOrUpdateRecord} wards={wards} currentUser={currentUser} records={records} />;
-      case 'all_records':
-      case 'assign_tasks':
-      case 'check_list':
-      case 'handover_list': return renderRecordList();
-      case 'user_management': return isAdmin ? <UserManagement users={users} employees={employees} onAddUser={(u) => handleUpdateUser(u, false)} onUpdateUser={(u) => handleUpdateUser(u, true)} onDeleteUser={handleDeleteUser} /> : null;
-      case 'employee_management': return <EmployeeManagement employees={employees} onSaveEmployee={handleSaveEmployee} onDeleteEmployee={handleDeleteEmployee} wards={wards} currentUser={currentUser} />;
-      case 'excerpt_management': return <ExcerptManagement currentUser={currentUser} records={records} onUpdateRecord={(id, num) => handleQuickUpdate(id, 'excerptNumber', num)} wards={wards} onAddWard={(w) => setWards(prev => [...prev, w])} onDeleteWard={(w) => setWards(prev => prev.filter(x => x !== w))} onResetWards={() => setWards(STATIC_WARDS)} />;
-      case 'reports': return <ReportSection reportContent={globalReportContent} isGenerating={isGeneratingReport} onGenerate={handleGlobalGenerateReport} onExportExcel={handleExportReportExcel} />;
-      case 'account_settings': return <AccountSettingsView currentUser={currentUser} linkedEmployee={employees.find(e => e.id === currentUser.employeeId)} onUpdate={handleUpdateCurrentAccount} notificationEnabled={notificationEnabled} setNotificationEnabled={setNotificationEnabled} />;
-      case 'utilities': return <UtilitiesView currentUser={currentUser} />;
-      default: return <div className="p-8 text-center text-gray-500">Chức năng đang phát triển...</div>;
-    }
-  };
-
-  if (!currentUser) {
-    return <Login onLogin={setCurrentUser} users={users} />;
-  }
+  if (!currentUser) return <Login onLogin={setCurrentUser} users={users} />;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100 font-sans text-gray-900">
-      {/* Mobile Menu Overlay */}
-      <div className={`md:hidden fixed inset-0 z-40 bg-black/50 transition-opacity ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsMobileMenuOpen(false)}></div>
-      
-      {/* Sidebar */}
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <Sidebar 
         currentView={currentView} 
         setCurrentView={setCurrentView} 
-        onOpenSettings={() => {}} 
+        onOpenSettings={() => {}} // Deprecated
         onOpenSystemSettings={() => setIsSystemSettingsOpen(true)}
         currentUser={currentUser} 
-        onLogout={() => setCurrentUser(null)}
-        mobileOpen={isMobileMenuOpen}
+        onLogout={() => setCurrentUser(null)} 
+        mobileOpen={isMobileMenuOpen} 
         setMobileOpen={setIsMobileMenuOpen}
         isGeneratingReport={isGeneratingReport}
         isUpdateAvailable={isUpdateAvailable}
@@ -544,68 +584,143 @@ function App() {
         onOpenAccountSettings={() => setCurrentView('account_settings')}
         unreadMessagesCount={unreadMessages}
         warningRecordsCount={warningCount.overdue + warningCount.approaching}
-        reminderCount={activeRemindersCount} // Truyền số lượng nhắc nhở vào Sidebar
+        reminderCount={activeRemindersCount}
       />
+      
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="md:hidden bg-[#0f172a] text-white p-4 flex justify-between items-center shadow-md z-20">
+            <h1 className="font-bold text-sm truncate">QLHS Đo Đạc</h1>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-white/10 rounded-lg transition-colors"><Menu size={24} /></button>
+        </header>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b border-gray-200 p-3 flex justify-between items-center shadow-sm shrink-0 z-30">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-600"><Menu size={24} /></button>
-            <span className="font-bold text-gray-800 text-sm truncate">QL Hồ Sơ - {currentUser.name}</span>
-            <div className="w-6"></div>
-        </div>
-
-        {/* Desktop Header - NEW ADDITION */}
-        <div className="hidden md:flex bg-white border-b border-gray-200 px-6 py-3 justify-between items-center shadow-sm shrink-0 z-20">
-            <h1 className="text-xl font-bold text-slate-800">Hệ thống Quản lý Hồ sơ</h1>
-            <div className="flex items-center gap-3">
-                <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
-                    <Bell size={20} />
-                    {activeRemindersCount > 0 && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-pink-500 rounded-full ring-1 ring-white"></span>
-                    )}
-                </button>
-            </div>
-        </div>
-
-        {/* Global Notifications/Toast */}
-        {toast && (
-            <div className={`absolute top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-fade-in-up ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-                {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
-                <span className="font-medium text-sm">{toast.message}</span>
-                <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80"><X size={16} /></button>
-            </div>
-        )}
-
-        {/* Connection Status Indicator */}
         {connectionStatus === 'offline' && (
-            <div className="bg-red-500 text-white text-xs px-2 py-1 text-center font-bold flex items-center justify-center gap-2 shadow-md z-40">
-                <WifiOff size={12} /> Mất kết nối máy chủ - Đang chạy chế độ Offline (Dữ liệu cache)
+            <div className="bg-red-600 text-white text-xs py-1 px-4 text-center font-bold flex items-center justify-center gap-2 shadow-sm z-30">
+                <WifiOff size={14} /> MẤT KẾT NỐI SERVER - ĐANG CHẠY CHẾ ĐỘ OFFLINE (Chỉ xem)
             </div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-hidden relative">
-            {renderContent()}
+        <main className="flex-1 p-4 overflow-hidden relative">
+            {currentView === 'dashboard' && <DashboardView records={records} />}
+            
+            {currentView === 'internal_chat' && (
+                <InternalChat 
+                    currentUser={currentUser} 
+                    wards={wards} 
+                    employees={employees} 
+                    users={users}
+                    onResetUnread={() => setUnreadMessages(0)} 
+                    notificationEnabled={notificationEnabled}
+                />
+            )}
+            
+            {currentView === 'personal_profile' && currentUser && (
+                <PersonalProfile 
+                    user={currentUser} 
+                    records={records} 
+                    onUpdateStatus={() => {}} 
+                    onViewRecord={handleViewRecord} 
+                    onCreateLiquidation={handleRequestLiquidation}
+                />
+            )}
+            
+            {currentView === 'receive_record' && (
+                <ReceiveRecord 
+                    onSave={handleAddOrUpdateRecord} 
+                    onDelete={handleDeleteRecord} 
+                    wards={wards} 
+                    employees={employees}
+                    currentUser={currentUser}
+                    records={records}
+                />
+            )}
+            
+            {currentView === 'receive_contract' && (
+                <ReceiveContract 
+                    onSave={(r) => handleAddOrUpdateRecord(r)} // Using record update for contract (if mapped correctly) or separate api
+                    wards={wards} 
+                    currentUser={currentUser} 
+                    records={records}
+                    recordToLiquidate={recordToLiquidate}
+                    onClearRecordToLiquidate={() => setRecordToLiquidate(null)}
+                />
+            )}
+            
+            {currentView === 'user_management' && isAdmin && (
+                <UserManagement 
+                    users={users} 
+                    employees={employees}
+                    onAddUser={(u) => handleUpdateUser(u, false)} 
+                    onUpdateUser={(u) => handleUpdateUser(u, true)} 
+                    onDeleteUser={handleDeleteUser} 
+                />
+            )}
+
+            {currentView === 'employee_management' && (
+                <EmployeeManagement 
+                    employees={employees} 
+                    onSaveEmployee={handleSaveEmployee} 
+                    onDeleteEmployee={handleDeleteEmployee} 
+                    wards={wards} 
+                    currentUser={currentUser} 
+                />
+            )}
+
+            {currentView === 'excerpt_management' && (
+                <ExcerptManagement 
+                    currentUser={currentUser} 
+                    records={records} 
+                    onUpdateRecord={(id, num) => handleQuickUpdate(id, 'excerptNumber', num)}
+                    wards={wards}
+                    onAddWard={(w) => setWards(prev => [...prev, w])}
+                    onDeleteWard={(w) => setWards(prev => prev.filter(x => x !== w))}
+                    onResetWards={() => setWards(STATIC_WARDS)}
+                />
+            )}
+
+            {currentView === 'utilities' && <UtilitiesView currentUser={currentUser} />}
+
+            {currentView === 'account_settings' && (
+                <AccountSettingsView 
+                    currentUser={currentUser} 
+                    linkedEmployee={employees.find(e => e.id === currentUser.employeeId)}
+                    onUpdate={handleUpdateCurrentAccount}
+                    notificationEnabled={notificationEnabled}
+                    setNotificationEnabled={setNotificationEnabled}
+                />
+            )}
+
+            {currentView === 'reports' && (
+                <ReportSection 
+                    reportContent={globalReportContent} 
+                    isGenerating={isGeneratingReport} 
+                    onGenerate={handleGlobalGenerateReport} 
+                    onExportExcel={handleExportReportExcel}
+                    records={records} // Truyền data
+                />
+            )}
+
+            {['all_records', 'check_list', 'handover_list', 'assign_tasks'].includes(currentView) && renderRecordList()}
         </main>
       </div>
 
       <AppModals 
           isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen}
           isImportModalOpen={isImportModalOpen} setIsImportModalOpen={setIsImportModalOpen}
-          isSettingsOpen={false} setIsSettingsOpen={() => {}}
+          isSettingsOpen={false} setIsSettingsOpen={() => {}} // Deprecated
           isSystemSettingsOpen={isSystemSettingsOpen} setIsSystemSettingsOpen={setIsSystemSettingsOpen}
           isAssignModalOpen={isAssignModalOpen} setIsAssignModalOpen={setIsAssignModalOpen}
           isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}
           isExportModalOpen={isExportModalOpen} setIsExportModalOpen={setIsExportModalOpen}
           isAddToBatchModalOpen={isAddToBatchModalOpen} setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
           isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
+          isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
           
           editingRecord={editingRecord} setEditingRecord={setEditingRecord}
           viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
           deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
           assignTargetRecords={assignTargetRecords}
           exportModalType={exportModalType}
+          
           previewWorkbook={previewWorkbook} previewExcelName={previewExcelName}
 
           handleAddOrUpdate={handleAddOrUpdateRecord}
@@ -615,14 +730,28 @@ function App() {
           handleDeleteAllData={handleDeleteAllData}
           confirmAssign={confirmAssign}
           handleDeleteRecord={() => { if(deletingRecord) handleDeleteRecord(deletingRecord.id); }}
-          confirmDelete={handleDeleteConfirm}
+          confirmDelete={(r) => handleDeleteRecord(r.id)}
           handleExcelPreview={(wb, name) => { setPreviewWorkbook(wb); setPreviewExcelName(name); setIsExcelPreviewOpen(true); }}
           executeBatchExport={executeBatchExport}
+          onCreateLiquidation={handleRequestLiquidation}
+          handleBulkUpdate={handleBulkUpdate}
 
-          employees={employees} currentUser={currentUser} wards={wards}
-          filteredRecords={filteredRecords} records={records} selectedCount={selectedRecordIds.size}
+          employees={employees}
+          currentUser={currentUser}
+          wards={wards}
+          filteredRecords={filteredRecords}
+          records={records}
+          selectedCount={selectedRecordIds.size}
           canPerformAction={canPerformAction}
+          selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
       />
+
+      {toast && (
+          <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-xl text-white font-bold animate-fade-in-up z-50 flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+              {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+              {toast.message}
+          </div>
+      )}
     </div>
   );
 }

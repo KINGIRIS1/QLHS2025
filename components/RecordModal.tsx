@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS } from '../constants';
-import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar } from 'lucide-react';
+import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck } from 'lucide-react';
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -37,12 +37,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     excerptNumber: '',
     privateNotes: '', 
     authorizedBy: '', 
-    authDocType: ''
+    authDocType: '',
+    receiptNumber: '',
+    resultReturnedDate: ''
   };
 
   const [formData, setFormData] = useState<Partial<RecordFile>>(defaultState);
 
   const hasAdminRights = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
+  const isOneDoor = currentUser.role === UserRole.ONEDOOR;
+  const canEditResult = hasAdminRights || isOneDoor;
 
   useEffect(() => {
     if (isOpen) {
@@ -68,6 +72,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     // Logic tự động set ngày hoàn thành nếu chọn WITHDRAWN
     if (finalData.status === RecordStatus.WITHDRAWN && !finalData.completedDate) {
         finalData.completedDate = new Date().toISOString().split('T')[0];
+    }
+    
+    // Logic tự động set trạng thái RETURNED nếu đã điền ngày trả kết quả và chưa là RETURNED
+    if (finalData.resultReturnedDate && finalData.status !== RecordStatus.RETURNED) {
+        finalData.status = RecordStatus.RETURNED;
+        if (!finalData.completedDate) {
+             finalData.completedDate = finalData.resultReturnedDate;
+        }
     }
 
     onSubmit(finalData as any);
@@ -145,8 +157,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         {Object.values(RecordStatus).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
                                     </select>
                                 </div>
-                                {/* HIỂN THỊ THÊM NGÀY XONG NẾU TRẠNG THÁI LÀ WITHDRAWN HOẶC HANDOVER */}
-                                {(formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.WITHDRAWN) && (
+                                {/* HIỂN THỊ THÊM NGÀY XONG NẾU TRẠNG THÁI LÀ WITHDRAWN HOẶC HANDOVER HOẶC RETURNED */}
+                                {(formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.RETURNED) && (
                                     <div>
                                         <label className="block text-xs font-bold text-green-700 mb-1">{formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : 'Ngày hoàn thành'}</label>
                                         <input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-800" value={val(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
@@ -279,6 +291,35 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 </select>
                             </div>
                         </div>
+
+                        {canEditResult && (
+                            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3">
+                                    <FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
+                                        <input 
+                                            type="date" 
+                                            className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" 
+                                            value={val(formData.resultReturnedDate)} 
+                                            onChange={(e) => handleChange('resultReturnedDate', e.target.value)} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số Biên Lai</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" 
+                                            value={val(formData.receiptNumber)} 
+                                            onChange={(e) => handleChange('receiptNumber', e.target.value)} 
+                                            placeholder="Nhập số biên lai..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {hasAdminRights && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">

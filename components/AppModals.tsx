@@ -11,6 +11,7 @@ import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
+import BulkUpdateModal from './BulkUpdateModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -24,6 +25,7 @@ interface AppModalsProps {
     isExportModalOpen: boolean;
     isAddToBatchModalOpen: boolean;
     isExcelPreviewOpen: boolean;
+    isBulkUpdateModalOpen: boolean; // New Prop
     
     // Data States
     editingRecord: RecordFile | null;
@@ -46,6 +48,7 @@ interface AppModalsProps {
     setIsExportModalOpen: (v: boolean) => void;
     setIsAddToBatchModalOpen: (v: boolean) => void;
     setIsExcelPreviewOpen: (v: boolean) => void;
+    setIsBulkUpdateModalOpen: (v: boolean) => void; // New Prop
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -62,6 +65,8 @@ interface AppModalsProps {
     confirmDelete: (r: RecordFile) => void;
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;
     executeBatchExport: (batch: number, date: string) => void;
+    onCreateLiquidation: (record: RecordFile) => void;
+    handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>; // New Handler
 
     // Shared Data
     employees: Employee[];
@@ -71,6 +76,7 @@ interface AppModalsProps {
     records: RecordFile[];
     selectedCount: number;
     canPerformAction: boolean;
+    selectedRecordsForBulk: RecordFile[]; // New Prop
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
@@ -93,8 +99,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees} 
             />
             
-            {/* SettingsModal has been replaced by EmployeeManagement View */}
-
             <SystemSettingsModal 
                 isOpen={props.isSystemSettingsOpen} 
                 onClose={() => props.setIsSystemSettingsOpen(false)} 
@@ -117,6 +121,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 currentUser={props.currentUser} 
                 onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
                 onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                onCreateLiquidation={props.onCreateLiquidation}
             />
             
             <DeleteConfirmModal 
@@ -148,6 +153,15 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onClose={() => props.setIsExcelPreviewOpen(false)} 
                 workbook={props.previewWorkbook} 
                 fileName={props.previewExcelName} 
+            />
+
+            <BulkUpdateModal 
+                isOpen={props.isBulkUpdateModalOpen}
+                onClose={() => props.setIsBulkUpdateModalOpen(false)}
+                selectedRecords={props.selectedRecordsForBulk}
+                employees={props.employees}
+                wards={props.wards}
+                onConfirm={props.handleBulkUpdate}
             />
         </>
     );

@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Contract, PriceItem, User } from '../types';
-import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi } from '../services/api';
-import { FileSignature, PlusCircle, LayoutList, Settings, Settings2, Loader2, Printer, FileCheck } from 'lucide-react';
+import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts } from '../services/api';
+import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
 
 // Child Components
 import ContractForm from './receive-contract/ContractForm';
@@ -18,6 +18,9 @@ interface ReceiveContractProps {
   wards: string[];
   currentUser: User;
   records: RecordFile[]; 
+  // New props for handling external liquidation request
+  recordToLiquidate: RecordFile | null;
+  onClearRecordToLiquidate: () => void;
 }
 
 // --- HÀM ĐỌC SỐ TIỀN ---
@@ -54,9 +57,11 @@ function _nd(s: string): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, records }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list'>('create');
+const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, records, recordToLiquidate, onClearRecordToLiquidate }) => {
+  // Thay đổi: activeModule giờ bao gồm cả 'list'
+  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list'>('list'); 
   const [priceList, setPriceList] = useState<PriceItem[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]); // Move contracts state up to handle logic
   
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
@@ -68,8 +73,109 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
   
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined);
 
-  useEffect(() => { loadPrices(); }, []);
+  useEffect(() => { 
+      loadPrices(); 
+      loadContracts();
+  }, []);
+
   const loadPrices = async () => { const prices = await fetchPriceList(); setPriceList(prices); };
+  const loadContracts = async () => { const data = await fetchContracts(); setContracts(data); };
+
+  // --- LOGIC XỬ LÝ KHI CÓ YÊU CẦU THANH LÝ TỪ BÊN NGOÀI ---
+  useEffect(() => {
+      // Quan trọng: Chỉ chạy logic khi recordToLiquidate có giá trị VÀ danh sách contracts ĐÃ ĐƯỢC TẢI
+      // Điều này ngăn chặn việc tìm kiếm thất bại khi contracts chưa load xong (mảng rỗng)
+      if (recordToLiquidate && contracts.length > 0) {
+          
+          const normalize = (s: string) => String(s || '').trim().toLowerCase();
+          const recCode = normalize(recordToLiquidate.code);
+          
+          // 1. Tìm xem hồ sơ này đã có hợp đồng chưa
+          const existingContract = contracts.find(c => normalize(c.code) === recCode);
+
+          if (existingContract) {
+              // NẾU CÓ HỢP ĐỒNG: Load toàn bộ dữ liệu hợp đồng đó (bao gồm splitItems, serviceType...)
+              setEditingContract({
+                  ...existingContract,
+                  // Cập nhật lại diện tích thanh lý mới nhất từ hồ sơ (diện tích thực tế sau khi đo)
+                  // Ưu tiên: recordToLiquidate.area > liquidationArea cũ > area hợp đồng
+                  liquidationArea: recordToLiquidate.area || existingContract.liquidationArea || existingContract.area,
+                  // Đảm bảo trạng thái hiển thị đúng để form hiển thị nút
+                  status: 'PENDING'
+              });
+          } else {
+              // NẾU CHƯA CÓ HỢP ĐỒNG: Tạo Contract ảo từ Record (AUTO MAP THÔNG MINH)
+              
+              // 1. Detect Area Type (Khu vực)
+              let areaType = '';
+              const w = (recordToLiquidate.ward || '').toLowerCase();
+              if (w.includes('phường') || w.includes('tt.') || w.includes('thị trấn') || w.includes('minh hưng') || w.includes('chơn thành')) {
+                  areaType = 'Đất đô thị';
+              } else {
+                  areaType = 'Đất nông thôn';
+              }
+
+              // 2. Detect Contract & Service Type (Loại dịch vụ)
+              const recType = (recordToLiquidate.recordType || '').toLowerCase();
+              let serviceType = '';
+              let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' = 'Đo đạc';
+
+              if (recType.includes('trích lục')) {
+                  // Cố gắng map chính xác tên dịch vụ trong bảng giá
+                  const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
+                  serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
+              } else if (recType.includes('cắm mốc')) {
+                  contractType = 'Cắm mốc';
+                  const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
+                  serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
+              } else if (recType.includes('tách thửa')) {
+                  contractType = 'Tách thửa';
+                  serviceType = 'Đo đạc tách thửa';
+              } else if (recType.includes('đo đạc')) {
+                  // Map theo diện tích
+                  const area = recordToLiquidate.area || 0;
+                  const match = priceList.find(p => 
+                      p.serviceName.toLowerCase().includes('đo đạc') && 
+                      area >= p.minArea && area < p.maxArea
+                  );
+                  serviceType = match ? match.serviceName : 'Đo đạc hiện trạng';
+              }
+
+              const newContract: Contract = {
+                  id: Math.random().toString(36).substr(2, 9),
+                  code: recordToLiquidate.code || generateContractCode(),
+                  customerName: recordToLiquidate.customerName,
+                  phoneNumber: recordToLiquidate.phoneNumber,
+                  address: recordToLiquidate.address,
+                  ward: recordToLiquidate.ward,
+                  landPlot: recordToLiquidate.landPlot,
+                  mapSheet: recordToLiquidate.mapSheet,
+                  area: recordToLiquidate.area || 0,
+                  
+                  // Các trường quan trọng cần điền tự động
+                  contractType: contractType,
+                  serviceType: serviceType, 
+                  areaType: areaType,       
+                  
+                  plotCount: 1,
+                  markerCount: 1,
+                  quantity: 1, 
+                  unitPrice: 0, // Form sẽ tự tính lại dựa trên serviceType
+                  vatRate: 8, 
+                  vatAmount: 0, 
+                  totalAmount: 0, 
+                  deposit: 0,
+                  createdDate: new Date().toISOString().split('T')[0],
+                  status: 'PENDING',
+                  liquidationArea: recordToLiquidate.area || 0
+              };
+              setEditingContract(newContract);
+          }
+          
+          setActiveModule('liquidation');
+          onClearRecordToLiquidate(); // Reset flag
+      }
+  }, [recordToLiquidate, contracts, priceList]);
 
   const generateContractCode = () => {
     const year = new Date().getFullYear();
@@ -77,12 +183,24 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
     return `HĐ-${year}-${randomNum}`;
   };
 
-  const handleEdit = (c: Contract) => { setEditingContract(c); setViewMode('create'); };
+  const handleEdit = (c: Contract) => { 
+      setEditingContract(c); 
+      setActiveModule('contract'); // Chuyển sang tab Lập HĐ để sửa
+  };
+
+  // Logic mới: Tạo thanh lý từ Hợp đồng có sẵn (trong danh sách HĐ)
+  const handleCreateLiquidation = (c: Contract) => {
+      setEditingContract(c); // Đưa dữ liệu hợp đồng vào form
+      setActiveModule('liquidation'); // Chuyển sang tab Thanh lý
+  };
+
   const handleDelete = async (id: string) => { 
-      if(await confirmAction("Bạn có chắc chắn muốn xóa hợp đồng này không?")) await deleteContractApi(id); 
+      if(await confirmAction("Bạn có chắc chắn muốn xóa hợp đồng này không?")) {
+          await deleteContractApi(id);
+          loadContracts(); // Reload list
+      } 
   }; 
 
-  // Updated: Trả về Promise<boolean> và không alert/switch view tại đây nữa
   const handleSaveContract = async (contract: Contract, isUpdate: boolean): Promise<boolean> => {
       let success = false;
       if (isUpdate) {
@@ -90,15 +208,17 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       } else {
           success = await createContractApi(contract);
       }
+      if (success) loadContracts(); // Reload list
       return success;
   };
 
-  // --- LOGIC IN ẤN HỢP ĐỒNG (CẬP NHẬT FULL PLACEHOLDER) ---
+  // --- LOGIC IN ẤN HỢP ĐỒNG ---
   const handlePreviewDocx = async (dataToPrint: Partial<Contract> | undefined, printType: 'contract' | 'liquidation') => {
       if (!dataToPrint || !dataToPrint.customerName) { alert("Vui lòng nhập Tên khách hàng để in."); return; }
       
       let templateKey = '', typeName = '';
       const isCamMoc = dataToPrint.contractType === 'Cắm mốc';
+      const isTachThua = dataToPrint.contractType === 'Tách thửa'; 
       
       if (printType === 'liquidation') {
           templateKey = isCamMoc ? STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC : STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC;
@@ -120,17 +240,15 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
       const money = (v: any) => (v === undefined || v === null) ? "0" : Number(v).toLocaleString('vi-VN');
       
-      // --- LOGIC MAP DỮ LIỆU ĐẶC THÙ (BÊN B & ĐỊA DANH) ---
+      // ... (Logic map dữ liệu giữ nguyên như cũ) ...
       const rawWard = val(dataToPrint.ward);
       const normWard = _nd(rawWard);
       
-      // 1. Phân biệt Xã / Phường
       let unitPrefix = 'Xã/Phường';
       if (normWard.includes('nha bich')) unitPrefix = 'Xã';
       else if (normWard.includes('minh hung') || normWard.includes('chon thanh') || normWard.includes('hung long') || normWard.includes('thanh tam')) unitPrefix = 'Phường';
 
-      // 2. Logic người ký & Chức vụ (Có thể tùy chỉnh theo thực tế)
-      let signerName = 'PHẠM VĂN NAM'; // Mặc định
+      let signerName = 'PHẠM VĂN NAM'; 
       let signerPosition = 'PHÓ GIÁM ĐỐC';
       
       if (normWard.includes('nha bich')) {
@@ -141,7 +259,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           signerPosition = 'PHÓ GIÁM ĐỐC';
       }
 
-      // 3. Logic SĐT Liên hệ
       let sdtLienHe = ""; 
       if (normWard.includes("minh hung")) {
           sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
@@ -156,20 +273,44 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       const qty = dataToPrint.contractType === 'Cắm mốc' ? (dataToPrint.markerCount || 0) : (dataToPrint.plotCount || 0);
       const preTaxAmount = (dataToPrint.unitPrice || 0) * qty;
 
-      // THUE_LABEL logic
       const vatRate = dataToPrint.vatRate || 0;
       const thueLabel = vatRate > 0 ? `Thuế GTGT (${vatRate}%)` : 'Thuế GTGT';
 
+      const dsArray = (dataToPrint.splitItems || []).map((item, index) => ({
+          STT: index + 1,
+          TEN: item.serviceName,
+          SL: item.quantity,
+          GIA: money(item.price),
+          THANH_TIEN: money(item.price * item.quantity),
+          NOI_DUNG: item.serviceName,
+          QTY: item.quantity,
+          PRICE: money(item.price),
+          TOTAL: money(item.price * item.quantity),
+          DT_THUA: item.area ? val(item.area) : "",
+          AREA: item.area ? val(item.area) : ""
+      }));
+
+      const finalDS = dsArray.length > 0 ? dsArray : [{
+          STT: 1,
+          TEN: val(dataToPrint.serviceType || dataToPrint.contractType),
+          SL: qty,
+          GIA: money(dataToPrint.unitPrice),
+          THANH_TIEN: money(preTaxAmount),
+          NOI_DUNG: val(dataToPrint.serviceType || dataToPrint.contractType),
+          QTY: qty,
+          PRICE: money(dataToPrint.unitPrice),
+          TOTAL: money(preTaxAmount),
+          DT_THUA: "",
+          AREA: ""
+      }];
+
       const printData = {
-          // --- ENGLISH RAW KEYS (Added for consistency) ---
           code: val(dataToPrint.code),
           customerName: val(dataToPrint.customerName),
           landPlot: val(dataToPrint.landPlot),
           mapSheet: val(dataToPrint.mapSheet),
-          address: val(dataToPrint.address), // Maps to DIA_CHI_CHI_TIET
+          address: val(dataToPrint.address),
           DIA_CHI_CHI_TIET: val(dataToPrint.address),
-
-          // --- THÔNG TIN CHUNG ---
           MA_HS: val(dataToPrint.code),
           SO_HD: val(dataToPrint.code),
           NGAY: cDate.getDate().toString().padStart(2, '0'),
@@ -177,8 +318,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           NAM: cDate.getFullYear(),
           NGAY_KY: cDate.toLocaleDateString('vi-VN'),
           NGUOI_LAP: val(currentUser.name),
-          
-          // --- BÊN A (KHÁCH HÀNG) ---
           BEN_A: val(dataToPrint.customerName).toUpperCase(),
           TEN: val(dataToPrint.customerName).toUpperCase(),
           KHACH_HANG: val(dataToPrint.customerName).toUpperCase(),
@@ -186,23 +325,20 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           DIACHI: val(dataToPrint.address || dataToPrint.ward),
           SDT: val(dataToPrint.phoneNumber),
           SDT_A: val(dataToPrint.phoneNumber),
-          
-          // --- BÊN B (CÔNG TY - DYNAMIC) ---
           BEN_B: "CN VPĐKĐĐ THỊ XÃ CHƠN THÀNH",
           DAI_DIEN_B: signerName,
           CHUC_VU_B: signerPosition,
           NGUOI_KY: signerName,
           CHUCVU_KY: signerPosition,
-          SDTLH: sdtLienHe, // SĐT Liên hệ cán bộ
-
-          // --- THÔNG TIN ĐẤT ---
+          SDTLH: sdtLienHe, 
           THUA: val(dataToPrint.landPlot),
           SO_THUA: val(dataToPrint.landPlot),
           TO: val(dataToPrint.mapSheet),
           SO_TO: val(dataToPrint.mapSheet),
-          DT: val(dataToPrint.area),
-          DIEN_TICH: val(dataToPrint.area),
-          
+          DT: isTachThua ? "" : val(dataToPrint.area),
+          DIEN_TICH: isTachThua ? "" : val(dataToPrint.area),
+          DIEN_TICH_TL: val(dataToPrint.liquidationArea || dataToPrint.area),
+          DT_TL: val(dataToPrint.liquidationArea || dataToPrint.area),
           DIACHIDAT: fullLandAddress,
           DIA_CHI_THUA_DAT: fullLandAddress,
           XA_PHUONG: unitPrefix,
@@ -211,40 +347,33 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           KHUVUC: val(dataToPrint.areaType),
           TINH: "Bình Phước",
           HUYEN: "thị xã Chơn Thành",
-
-          // --- CHI TIẾT CÔNG VIỆC ---
           LOAIHS: val(dataToPrint.contractType),
           LOAIDV: val(dataToPrint.serviceType || dataToPrint.contractType),
           NOI_DUNG_CV: val(dataToPrint.serviceType || dataToPrint.contractType),
           GHICHU: val(dataToPrint.content),
-          
-          // --- TÀI CHÍNH ---
           SOLUONG: qty,
           SO_LUONG: qty,
           SOTHUA_SOMOC_LABEL: dataToPrint.contractType === 'Cắm mốc' ? 'Số mốc' : 'Số thửa',
           SOTHUA_SOMOC_VALUE: val(qty),
-          
           DONGIA: money(dataToPrint.unitPrice),
           DON_GIA: money(dataToPrint.unitPrice),
           DONGIA_TEXT: money(dataToPrint.unitPrice),
-          
           THANHTIEN: money(preTaxAmount),
           THANH_TIEN: money(preTaxAmount),
           THANHTIEN_TEXT: money(preTaxAmount),
-          
           VAT: val(dataToPrint.vatRate),
           THUE_VAT: val(dataToPrint.vatRate),
           TIEN_THUE: money(dataToPrint.vatAmount),
           VAT_AMOUNT: money(dataToPrint.vatAmount),
-          THUE_LABEL: thueLabel, // <--- BIẾN MỚI
-          
+          THUE_LABEL: thueLabel,
           TONGTIEN: money(dataToPrint.totalAmount),
           TONG_TIEN: money(dataToPrint.totalAmount),
           TONGTIEN_TEXT: money(dataToPrint.totalAmount),
-          
           BANG_CHU: moneyText,
           TONGTIEN_CHU: moneyText,
-          SO_TIEN_BANG_CHU: moneyText
+          SO_TIEN_BANG_CHU: moneyText,
+          DS: finalDS,
+          SPLIT_ITEMS: finalDS
       };
 
       const blob = await generateDocxBlobAsync(templateKey, printData);
@@ -254,44 +383,83 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
-      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-purple-50/50 shrink-0 z-10 relative">
-        <div><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
-        
-        <div className="flex gap-2">
-            <div className="flex bg-white p-1 rounded-lg border border-gray-200">
-                <button onClick={() => { setViewMode('create'); setEditingContract(undefined); }} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'create' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><PlusCircle size={16} /> Tiếp nhận mới</button>
-                <button onClick={() => { setViewMode('list'); }} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><LayoutList size={16} /> Danh sách hợp đồng</button>
-            </div>
+      
+      {/* HEADER WITH TABS */}
+      <div className="p-0 border-b border-gray-100 flex flex-col bg-purple-50/50 shrink-0 z-10 relative">
+        <div className="flex justify-between items-center p-4">
+            <div><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
             
-            <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
-                <Settings2 size={20} />
+            <div className="flex gap-2">
+                <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
+                    <Settings2 size={20} />
+                </button>
+                <button onClick={() => setIsTemplateModalOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Mẫu in Hợp đồng">
+                    <Settings size={20} />
+                </button>
+            </div>
+        </div>
+
+        {/* MAIN TABS */}
+        <div className="flex px-4 gap-2">
+            <button 
+                onClick={() => { setActiveModule('contract'); setEditingContract(undefined); }}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+            >
+                <FileText size={16} className="inline mr-2" /> Lập Hợp Đồng
             </button>
-            <button onClick={() => setIsTemplateModalOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Mẫu in Hợp đồng">
-                <Settings size={20} />
+            <button 
+                onClick={() => { setActiveModule('liquidation'); setEditingContract(undefined); }}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+            >
+                <FileCheck size={16} className="inline mr-2" /> Thanh Lý Hợp Đồng
+            </button>
+            {/* Tab Danh sách riêng biệt */}
+            <button 
+                onClick={() => { setActiveModule('list'); }}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+            >
+                <LayoutList size={16} className="inline mr-2" /> Danh sách Hợp đồng
             </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-        {viewMode === 'create' && (
-            <ContractForm 
-                initialData={editingContract}
-                onSave={handleSaveContract}
-                onPrint={handlePreviewDocx}
-                priceList={priceList}
-                wards={wards}
-                records={records}
-                generateCode={generateContractCode}
-            />
-        )}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            {activeModule === 'contract' && (
+                <ContractForm 
+                    initialData={editingContract}
+                    onSave={handleSaveContract}
+                    onPrint={handlePreviewDocx}
+                    priceList={priceList}
+                    wards={wards}
+                    records={records}
+                    generateCode={generateContractCode}
+                    mode='contract'
+                />
+            )}
 
-        {viewMode === 'list' && (
-            <ContractList 
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onPrint={handlePreviewDocx}
-            />
-        )}
+            {activeModule === 'liquidation' && (
+                <ContractForm 
+                    initialData={editingContract}
+                    onSave={handleSaveContract}
+                    onPrint={handlePreviewDocx}
+                    priceList={priceList}
+                    wards={wards}
+                    records={records}
+                    generateCode={generateContractCode}
+                    mode='liquidation'
+                />
+            )}
+
+            {activeModule === 'list' && (
+                <ContractList 
+                    onEdit={handleEdit} // Chỉnh sửa hợp đồng
+                    onDelete={handleDelete}
+                    onPrint={handlePreviewDocx} 
+                    onCreateLiquidation={handleCreateLiquidation} // Nút tạo thanh lý từ danh sách
+                />
+            )}
+        </div>
       </div>
 
       {/* Modals */}

@@ -65,12 +65,13 @@ export const generateReport = async (
     today.setHours(0,0,0,0);
 
     records.forEach(r => {
-        if (r.status === RecordStatus.HANDOVER) completedCount++;
+        // Cập nhật: Tính cả RETURNED vào completedCount
+        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) completedCount++;
         else if (r.status === RecordStatus.PENDING_SIGN) pendingSignCount++;
         else if (r.status === RecordStatus.WITHDRAWN) withdrawnCount++;
         else processingCount++;
         
-        if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.WITHDRAWN && r.deadline) {
+        if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.WITHDRAWN && r.deadline) {
             if (new Date(r.deadline) < today) overdueCount++;
         }
 
@@ -82,7 +83,7 @@ export const generateReport = async (
             wardStats[wardName] = { total: 0, done: 0, pending: 0, overdue: 0 };
         }
         wardStats[wardName].total++;
-        if (r.status === RecordStatus.HANDOVER) wardStats[wardName].done++;
+        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) wardStats[wardName].done++;
         else wardStats[wardName].pending++;
     });
 

@@ -59,9 +59,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Hàm chuẩn hóa thông báo lỗi để thân thiện với người dùng
   const getFriendlyErrorMessage = (msg: string) => {
       if (!msg) return 'Lỗi không xác định';
-      if (msg.includes('404') || msg.includes('latest.yml') || msg.includes('Cannot find channel')) {
-          return 'Link tải không hỗ trợ tự động (VD: Google Drive). Vui lòng tải thủ công.';
+      
+      // Lỗi 404 từ GitHub
+      if (msg.includes('404') && msg.includes('github')) {
+          return 'File cài đặt không tồn tại trên GitHub. Admin vui lòng kiểm tra lại Release.';
       }
+
+      // Lỗi 404 chung chung hoặc link khác
+      if (msg.includes('404') || msg.includes('latest.yml') || msg.includes('Cannot find channel')) {
+          return 'Không tìm thấy thông tin cập nhật. Vui lòng thử lại sau.';
+      }
+
       if (msg.includes('NetworkError') || msg.includes('net::ERR')) {
           return 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
       }
@@ -289,7 +297,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <>
                             <div className="text-red-200 bg-red-900/40 p-2 rounded mb-2 border border-red-500/30 flex flex-col items-center">
                                 <span className="font-bold mb-1">Tải tự động thất bại!</span>
-                                <span className="text-[9px] text-center opacity-90 leading-tight">{errorMessage}</span>
+                                <span className="text-[9px] text-center opacity-90 leading-tight break-words max-w-full">{errorMessage}</span>
                             </div>
                             <button 
                                 onClick={handleDownloadExternal} 

@@ -16,6 +16,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.PENDING_SIGN]: 'Chờ ký kiểm tra',
   [RecordStatus.SIGNED]: 'Đã ký duyệt',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
+  [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
 };
 
@@ -26,6 +27,7 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
   [RecordStatus.SIGNED]: 'bg-indigo-100 text-indigo-800',
   [RecordStatus.HANDOVER]: 'bg-green-100 text-green-800',
+  [RecordStatus.RETURNED]: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold',
   [RecordStatus.WITHDRAWN]: 'bg-slate-600 text-white',
 };
 

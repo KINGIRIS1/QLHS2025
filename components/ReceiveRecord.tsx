@@ -26,9 +26,7 @@ interface ReceiveRecordProps {
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
-// Hỗ trợ: Tết Nguyên Đán (Mùng 1, 2, 3) và Giỗ Tổ Hùng Vương (10/3)
 const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year: number): Date | null => {
-    // Mapping: Year -> "Day/Month" (Lunar) -> "YYYY-MM-DD" (Solar)
     const lunarMapping: Record<number, Record<string, string>> = {
         2024: { 
             "1/1": "2024-02-10", "2/1": "2024-02-11", "3/1": "2024-02-12", // Tết
@@ -75,31 +73,49 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       load();
   }, []);
 
-  // --- LOGIC TẠO MÃ HỒ SƠ ---
+  // --- LOGIC TẠO MÃ HỒ SƠ (CẬP NHẬT CHÍNH XÁC THEO ĐỊA BÀN) ---
   const getShortCode = (ward: string) => {
+      // Chuẩn hóa chuỗi nhập vào: chữ thường, bỏ khoảng trắng thừa
       const normalized = ward.toLowerCase().trim();
-      if (normalized.includes('minh hưng') || normalized.includes('minhhung')) return 'MH';
-      if (normalized.includes('chơn thành') || normalized.includes('chonthanh')) return 'CT';
-      if (normalized.includes('nha bích') || normalized.includes('nhabich')) return 'NB';
-      return 'KH';
+      
+      // Loại bỏ các tiền tố hành chính để so sánh chính xác hơn
+      const cleanName = normalized
+          .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '') // Xóa tiền tố đầu câu
+          .replace(/\s+(xã|phường|thị trấn)\s+/g, ' '); // Xóa tiền tố giữa câu (nếu có)
+
+      if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
+      if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT'; // Hưng Long thuộc Chơn Thành cũ
+      if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
+      if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
+      if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
+      if (cleanName.includes('quang minh') || cleanName.includes('quangminh')) return 'QM';
+      if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
+      if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
+      
+      return 'CT'; // Mặc định về Chơn Thành nếu không khớp
   };
 
   const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = []) => {
+    if (!wardName || !dateStr) return '';
+
     const d = new Date(dateStr);
     const yy = d.getFullYear().toString().slice(-2);
     const mm = ('0' + (d.getMonth() + 1)).slice(-2);
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
+    
+    // QUAN TRỌNG: Mã hậu tố (suffix) phụ thuộc hoàn toàn vào wardName được truyền vào (Địa bàn quản lý của NV)
     const suffix = getShortCode(wardName);
     
     let maxSeq = 0;
     
-    // Check in existing DB records
+    // 1. Kiểm tra trong DB (các hồ sơ đã lưu)
     records.forEach(r => {
         if (!r.code) return;
         const parts = r.code.split('-');
         if (parts.length === 3) {
             const [rPrefix, rSeq, rSuffix] = parts;
+            // So sánh cả Prefix ngày và Suffix địa bàn
             if (rPrefix === datePrefix && rSuffix === suffix) {
                 const seqNum = parseInt(rSeq, 10);
                 if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
@@ -107,7 +123,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         }
     });
 
-    // Check in existingCodes (temporary from Bulk Import)
+    // 2. Kiểm tra trong existingCodes (các hồ sơ đang chờ nhập Excel)
     existingCodes.forEach(code => {
         if (!code) return;
         const parts = code.split('-');
@@ -124,25 +140,22 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     return `${datePrefix}-${nextSeq}-${suffix}`;
   };
 
-  // --- LOGIC TÍNH HẠN TRẢ (CẬP NHẬT) ---
+  // --- LOGIC TÍNH HẠN TRẢ ---
   const calculateDeadline = (type: string, receivedDateStr: string) => {
       let daysToAdd = 30; 
       const lowerType = type.toLowerCase();
 
       if (lowerType.includes('trích lục')) daysToAdd = 10; 
       else if (lowerType.includes('trích đo chỉnh lý')) daysToAdd = 15; 
-      else if (lowerType.includes('trích đo')) daysToAdd = 30; 
-      else if (lowerType.includes('đo đạc') || lowerType.includes('cắm mốc')) daysToAdd = 30; 
+      else if (lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc')) daysToAdd = 30; 
       
       const startDate = new Date(receivedDateStr);
       let count = 0;
       let currentDate = new Date(startDate);
       
-      // Tạo danh sách các ngày nghỉ lễ (Dương lịch) trong năm hiện tại và năm sau
       const currentYear = startDate.getFullYear();
       const solarHolidayStrings: string[] = [];
 
-      // Hàm helper thêm ngày vào danh sách chặn
       const addBlockedDate = (d: Date) => {
           solarHolidayStrings.push(d.toISOString().split('T')[0]);
       };
@@ -150,24 +163,15 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       [currentYear, currentYear + 1].forEach(year => {
           holidays.forEach(h => {
               if (h.isLunar) {
-                  // Chuyển đổi Âm -> Dương
                   const solarDate = getSolarDateFromLunar(h.day, h.month, year);
                   if (solarDate) addBlockedDate(solarDate);
-                  
-                  // Đặc biệt: Nếu là Tết (1/1 Âm), thường nghỉ thêm các ngày tiếp theo (Mùng 2, 3)
-                  // Logic này nên được cấu hình trong bảng Holidays (nhập nhiều dòng), 
-                  // nhưng nếu chỉ có 1 dòng 1/1 thì ta tự động thêm nếu cần.
-                  // Ở đây giả định bảng Holidays đã chứa đủ các ngày nghỉ (ví dụ có cả dòng 2/1, 3/1 Âm lịch)
               } else {
-                  // Dương lịch cố định
-                  // Lưu ý: Month trong JS bắt đầu từ 0
                   const solarDate = new Date(year, h.month - 1, h.day);
                   addBlockedDate(solarDate);
               }
           });
       });
 
-      // Vòng lặp cộng ngày
       while (count < daysToAdd) {
           currentDate.setDate(currentDate.getDate() + 1);
           
@@ -177,7 +181,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
           const isSunday = dayOfWeek === 0;
           const isHoliday = solarHolidayStrings.includes(dateString);
 
-          // Chỉ tăng biến đếm nếu là ngày làm việc (Không phải CN và không phải Lễ)
           if (!isSunday && !isHoliday) {
               count++;
           }
@@ -335,10 +338,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       setIsExcelPreviewOpen(true);
   };
 
-  // --- HANDLERS CHO DANH SÁCH ---
   const handleEditFromList = (record: RecordFile) => {
       setEditingRecord(record);
-      setViewMode('create'); // Chuyển sang tab nhập mới để sửa
+      setViewMode('create');
   };
 
   const handleDeleteFromList = async (record: RecordFile) => {
@@ -349,7 +351,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
-      {/* HEADER TABS */}
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
         <div className="flex bg-white p-1 rounded-lg border border-gray-200">
             <button 
@@ -375,19 +376,20 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         )}
       </div>
 
-      {/* CONTENT AREA */}
       <div className="flex-1 overflow-y-auto p-6 min-h-0">
         {viewMode === 'create' && (
             <RecordForm 
-                initialData={editingRecord} // Truyền dữ liệu cần sửa vào
+                initialData={editingRecord}
                 onSave={onSave}
                 wards={wards}
                 records={records}
                 holidays={holidays}
                 calculateDeadline={calculateDeadline}
-                generateCode={(w, d) => calculateNextCode(w, d, [])}
+                generateCode={calculateNextCode} 
                 onPrint={handlePreviewDocx}
-                onCancelEdit={() => setEditingRecord(null)} // Reset
+                onCancelEdit={() => setEditingRecord(null)}
+                currentUser={currentUser} // Pass currentUser down
+                employees={employees} // Pass employees down
             />
         )}
 
@@ -395,7 +397,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <BulkImport 
                 onSave={onSave}
                 calculateDeadline={calculateDeadline}
-                calculateNextCode={calculateNextCode}
+                calculateNextCode={(w, d, exist) => calculateNextCode(w, d, exist)}
                 onPreview={handlePreviewDocx}
             />
         )}
@@ -406,7 +408,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 wards={wards}
                 currentUser={currentUser}
                 onPreviewExcel={handlePreviewExcel}
-                // Truyền handlers xuống
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}
                 onPrint={handlePreviewDocx}
@@ -414,7 +415,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         )}
       </div>
 
-      {/* SHARED MODALS */}
       <TemplateConfigModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} type={templateType as any} />
       <DocxPreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} docxBlob={previewBlob} fileName={previewFileName} />
       <ExcelPreviewModal isOpen={isExcelPreviewOpen} onClose={() => setIsExcelPreviewOpen(false)} workbook={previewWorkbook} fileName={previewExcelName} />

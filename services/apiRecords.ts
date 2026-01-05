@@ -11,7 +11,8 @@ const RECORD_DB_COLUMNS = [
     'notes', 'privateNotes', 'personalNotes', 
     'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 
     'measurementNumber', 'excerptNumber',
-    'reminderDate', 'lastRemindedAt'
+    'reminderDate', 'lastRemindedAt',
+    'receiptNumber', 'resultReturnedDate'
 ];
 
 export const fetchRecords = async (): Promise<RecordFile[]> => {

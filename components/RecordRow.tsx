@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
-import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell } from 'lucide-react';
+import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
@@ -18,6 +18,7 @@ interface RecordRowProps {
   onDelete: (record: RecordFile) => void;
   onAdvanceStatus: (record: RecordFile) => void;
   onQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
+  onReturnResult?: (record: RecordFile) => void;
 }
 
 const formatDate = (dateStr?: string) => {
@@ -37,124 +38,213 @@ const RecordRow: React.FC<RecordRowProps> = ({
   onEdit,
   onDelete,
   onAdvanceStatus,
-  onQuickUpdate
+  onQuickUpdate,
+  onReturnResult
 }) => {
   const employee = employees.find(e => e.id === record.assignedTo);
   const isOverdue = isRecordOverdue(record);
   const isApproaching = isRecordApproaching(record);
   
-  // Check if reminder is set and active (not finished)
   const hasActiveReminder = record.reminderDate && 
                             record.status !== RecordStatus.HANDOVER && 
                             record.status !== RecordStatus.WITHDRAWN;
 
+  const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
+
+  // Class chung cho các ô: Căn trên (align-top)
+  const cellClass = "p-3 align-top";
+
   return (
     <tr className={`transition-all duration-200 group border-l-4 ${isOverdue ? 'bg-red-50 border-l-red-500 hover:bg-red-100' : isApproaching ? 'bg-orange-50 border-l-orange-500 hover:bg-orange-100' : isSelected ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100' : 'border-l-transparent hover:bg-blue-50/60 hover:shadow-sm'}`} onDoubleClick={() => onView(record)}>
-      <td className="p-3 text-center align-middle">
-        {canPerformAction ? (
-          <button onClick={() => onToggleSelect(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
-            {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-          </button>
-        ) : (
-          <div className="w-4 h-4" />
-        )}
+      <td className={`${cellClass} text-center`}>
+        <div className="mt-1">
+            {canPerformAction ? (
+            <button onClick={() => onToggleSelect(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
+                {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            </button>
+            ) : (
+            <div className="w-4 h-4" />
+            )}
+        </div>
       </td>
       
       {visibleColumns.code && (
-        <td className="p-3 font-medium text-blue-600 cursor-pointer align-middle" onClick={() => { if(canPerformAction) onEdit(record); else onView(record); }}>
-          <div className="flex items-center gap-1">
-              <div className="truncate" title={record.code}>{record.code}</div>
-              {hasActiveReminder && <Bell size={12} className="text-pink-500 fill-pink-500 shrink-0" />}
+        <td className={`${cellClass} font-medium text-blue-600 cursor-pointer`} onClick={() => { if(canPerformAction) onEdit(record); else onView(record); }}>
+          <div className="flex flex-col items-center gap-1">
+              <div className="break-words font-bold leading-normal text-sm" title={record.code}>
+                  {record.code}
+              </div>
+              {hasActiveReminder && <div className="flex items-center gap-1 text-xs text-pink-600 font-bold bg-pink-100 px-1.5 py-0.5 rounded"><Bell size={12} className="fill-pink-600" /> Nhắc hẹn</div>}
           </div>
-          {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold mt-1">Quá hạn</span>}
+          {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">Quá hạn</span>}
         </td>
       )}
       
-      {visibleColumns.customer && <td className="p-3 font-medium text-gray-900 align-middle"><div className="truncate" title={record.customerName}>{toTitleCase(record.customerName)}</div></td>}
-      {visibleColumns.phone && <td className="p-3 text-gray-500 align-middle">{record.phoneNumber || '--'}</td>}
-      {visibleColumns.received && <td className="p-3 text-gray-600 align-middle">{formatDate(record.receivedDate)}</td>}
+      {visibleColumns.customer && (
+          <td className={cellClass}>
+              <div className="flex flex-col gap-1 items-center text-center">
+                  {/* Tên chủ sử dụng: text-sm */}
+                  <div className="break-words leading-normal text-sm font-medium text-gray-900" title={record.customerName}>
+                      {toTitleCase(record.customerName)}
+                  </div>
+                  {/* Số điện thoại: text-sm (trước là text-xs) */}
+                  {record.phoneNumber && (
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Phone size={14} className="shrink-0" />
+                          <span className="font-mono">{record.phoneNumber}</span>
+                      </div>
+                  )}
+              </div>
+          </td>
+      )}
       
       {visibleColumns.deadline && (
-        <td className="p-3 align-middle">
-          <div className="flex items-center gap-1">
-            <span className={`font-medium ${isOverdue ? 'text-red-700' : isApproaching ? 'text-orange-700' : 'text-gray-600'}`}>{formatDate(record.deadline)}</span>
-            {isOverdue && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
-            {isApproaching && <Clock size={14} className="text-orange-500 animate-pulse" />}
+        <td className={cellClass}>
+          <div className="flex flex-col w-full bg-white/50 rounded border border-gray-100 overflow-hidden shadow-sm">
+             {/* Ngày nhận - Thêm mr-3 để tách biệt */}
+             <div className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50/80 border-b border-gray-100" title="Ngày tiếp nhận">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight mr-3">Nhận</span>
+                <span className="text-sm font-semibold text-slate-600 font-mono whitespace-nowrap">{formatDate(record.receivedDate)}</span>
+             </div>
+             
+             {/* Hẹn trả - Thêm mr-3 để tách biệt */}
+             <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
+                <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
+                <div className="flex items-center gap-1.5">
+                    <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
+                        {formatDate(record.deadline)}
+                    </span>
+                    {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
+                    {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
+                </div>
+             </div>
           </div>
         </td>
       )}
       
-      {visibleColumns.ward && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={getNormalizedWard(record.ward)}>{getNormalizedWard(record.ward) || '--'}</div></td>}
-      {visibleColumns.group && <td className="p-3 align-middle"><div className="truncate" title={record.group}><span className="inline-block px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">{record.group}</span></div></td>}
+      {visibleColumns.ward && (
+          <td className={`${cellClass} text-center text-gray-700`}>
+              {/* Xã phường: text-sm - CĂN GIỮA */}
+              <div className="break-words leading-normal text-sm" title={getNormalizedWard(record.ward)}> 
+                  {getNormalizedWard(record.ward) || '--'}
+              </div>
+          </td>
+      )}
       
-      {/* Tách cột Tờ/Thửa */}
-      {visibleColumns.mapSheet && <td className="p-3 text-center align-middle font-mono text-sm">{record.mapSheet || '-'}</td>}
-      {visibleColumns.landPlot && <td className="p-3 text-center align-middle font-mono text-sm">{record.landPlot || '-'}</td>}
+      {visibleColumns.mapSheet && <td className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>{record.mapSheet || '-'}</td>}
+      {visibleColumns.landPlot && <td className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>{record.landPlot || '-'}</td>}
 
-      {visibleColumns.assigned && <td className="p-3 text-center align-middle">{record.assignedDate ? <div className="flex flex-col items-center"><span className="text-xs">{formatDate(record.assignedDate)}</span>{employee && <span className="text-[10px] text-indigo-600 font-medium truncate max-w-full" title={employee.name}>({employee.name})</span>}</div> : '--'}</td>}
+      {visibleColumns.assigned && (
+          <td className={`${cellClass} text-center`}>
+              {record.assignedDate ? (
+                  <div className="flex flex-col items-center gap-1">
+                      {/* Ngày giao: text-sm */}
+                      <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
+                      {/* Tên NV: text-xs */}
+                      {employee && <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>}
+                  </div>
+              ) : '--'}
+          </td>
+      )}
       
       {visibleColumns.completed && (
-        <td className="p-3 text-center text-gray-600 align-middle">
+        <td className={`${cellClass} text-center text-gray-600`}>
           {record.status === RecordStatus.WITHDRAWN ? (
             <div className="flex flex-col items-center">
-              <span className="text-xs font-bold text-slate-600">{formatDate(record.completedDate)}</span>
-              <span className="text-[10px] text-slate-400 italic">(Ngày rút)</span>
+              <span className="text-sm font-bold text-slate-600">{formatDate(record.completedDate)}</span>
+              <span className="text-xs text-slate-400 italic">(Ngày rút)</span>
             </div>
           ) : (
-            formatDate(record.completedDate) || '--'
+            <span className="text-sm font-bold text-green-700">{formatDate(record.completedDate) || '--'}</span>
           )}
         </td>
       )}
 
-      {visibleColumns.type && <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={record.recordType}>{getShortRecordType(record.recordType)}</div></td>}
+      {visibleColumns.type && (
+          <td className={`${cellClass} text-center text-gray-700`}>
+              {/* Loại hồ sơ: text-sm - CĂN GIỮA */}
+              <div className="break-words leading-normal text-sm" title={record.recordType}> 
+                  {getShortRecordType(record.recordType)}
+              </div>
+          </td>
+      )}
       
       {visibleColumns.tech && (
-        <td className="p-3 align-middle">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-bold text-gray-500 w-6 shrink-0">TĐ:</span>
-              {canPerformAction ? (
-                <input type="text" className="w-full text-xs border border-gray-200 rounded px-1 py-1 focus:border-blue-500 outline-none bg-white/50" value={record.measurementNumber || ''} onChange={(e) => onQuickUpdate(record.id, 'measurementNumber', e.target.value)} onClick={(e) => e.stopPropagation()} placeholder="Số TĐ" />
-              ) : (
-                <span className="text-xs text-gray-800 font-mono truncate">{record.measurementNumber || '---'}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-bold text-gray-500 w-6 shrink-0">TL:</span>
-              {canPerformAction ? (
-                <input type="text" className="w-full text-xs border border-gray-200 rounded px-1 py-1 focus:border-blue-500 outline-none bg-white/50" value={record.excerptNumber || ''} onChange={(e) => onQuickUpdate(record.id, 'excerptNumber', e.target.value)} onClick={(e) => e.stopPropagation()} placeholder="Số TL" />
-              ) : (
-                <span className="text-xs text-gray-800 font-mono truncate">{record.excerptNumber || '---'}</span>
-              )}
-            </div>
+        <td className={cellClass}>
+          <div className="flex flex-col gap-1.5 items-center">
+            {canPerformAction ? (
+                <>
+                    <input type="text" className="w-full text-sm border border-gray-200 rounded px-1 py-1 focus:border-blue-500 outline-none bg-white/50 text-center" value={record.measurementNumber || ''} onChange={(e) => onQuickUpdate(record.id, 'measurementNumber', e.target.value)} onClick={(e) => e.stopPropagation()} placeholder="TĐ" />
+                    <input type="text" className="w-full text-sm border border-gray-200 rounded px-1 py-1 focus:border-blue-500 outline-none bg-white/50 text-center" value={record.excerptNumber || ''} onChange={(e) => onQuickUpdate(record.id, 'excerptNumber', e.target.value)} onClick={(e) => e.stopPropagation()} placeholder="TL" />
+                </>
+            ) : (
+                <>
+                    <span className="text-sm text-gray-800 font-mono truncate block text-center" title="Số TĐ">{record.measurementNumber || '-'}</span>
+                    <span className="text-sm text-gray-800 font-mono truncate block text-center" title="Số TL">{record.excerptNumber || '-'}</span>
+                </>
+            )}
           </div>
         </td>
       )}
 
       {visibleColumns.batch && (
-        <td className="p-3 text-center align-middle">
+        <td className={`${cellClass} text-center`}>
           {record.status === RecordStatus.WITHDRAWN && !record.exportBatch ? (
-            <span className="inline-flex flex-col items-center px-2 py-1 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300">
-              <span className="font-bold">CSD rút hồ sơ</span>
-              <span className="text-[10px] text-slate-500 italic whitespace-nowrap">(Chờ giao trả)</span>
+            <span className="inline-flex flex-col items-center px-1 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300">
+              <span className="font-bold">Rút HS</span>
             </span>
           ) : (
             record.exportBatch ? (
-              <span className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-medium border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-800 border-green-200'}`}>
-                <span className="font-bold">Đợt {record.exportBatch}</span>
-                <span className="text-[10px] whitespace-nowrap">({formatDate(record.exportDate)})</span>
+              <span className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-bold border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                <span>Đợt {record.exportBatch}</span>
+                <span className="text-[10px] font-normal whitespace-nowrap">{formatDate(record.exportDate)}</span>
               </span>
             ) : '-'
           )}
         </td>
       )}
 
-      {visibleColumns.status && <td className="p-3 text-center align-middle"><StatusBadge status={record.status} /></td>}
+      {visibleColumns.receipt && (
+        <td className={`${cellClass} text-center`}>
+            {canPerformAction ? (
+                <input 
+                    type="text" 
+                    className="w-full text-sm border border-gray-200 rounded px-1 py-1.5 focus:border-purple-500 outline-none bg-white/50 text-center font-bold text-purple-700 placeholder-gray-300" 
+                    value={record.receiptNumber || ''} 
+                    onChange={(e) => onQuickUpdate(record.id, 'receiptNumber', e.target.value)} 
+                    onClick={(e) => e.stopPropagation()} 
+                    placeholder="BL" 
+                />
+            ) : (
+                <span className="text-sm text-purple-700 font-bold font-mono">{record.receiptNumber || '-'}</span>
+            )}
+        </td>
+      )}
+
+      {visibleColumns.status && (
+        <td className={`${cellClass} text-center`}>
+            {record.resultReturnedDate ? (
+                <span className="inline-flex flex-col items-center px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 w-full leading-tight">
+                    <span>Đã trả KQ</span>
+                    <span className="text-[10px] font-normal">{resultReturnedDateStr}</span>
+                </span>
+            ) : (
+                <div className="transform origin-top pt-1"><StatusBadge status={record.status} /></div> 
+            )}
+        </td>
+      )}
       
       {canPerformAction && (
-        <td className={`p-3 sticky right-0 shadow-l text-center align-middle ${isOverdue ? 'bg-red-50 group-hover:bg-red-100' : isApproaching ? 'bg-orange-50 group-hover:bg-orange-100' : 'bg-white group-hover:bg-blue-50/60'}`}>
-          <div className="flex items-center justify-center gap-1">
+        <td className={`${cellClass} sticky right-0 shadow-l text-center ${isOverdue ? 'bg-red-50 group-hover:bg-red-100' : isApproaching ? 'bg-orange-50 group-hover:bg-orange-100' : 'bg-white group-hover:bg-blue-50/60'}`}>
+          <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
             <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Xem chi tiết"><Eye size={16} /></button>
+            
+            {onReturnResult && (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+                <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded transition-colors" title="Trả kết quả">
+                    <FileCheck size={16} />
+                </button>
+            )}
+
             {record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && (
               <button onClick={() => onAdvanceStatus(record)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Chuyển bước"><ArrowRight size={16} /></button>
             )}

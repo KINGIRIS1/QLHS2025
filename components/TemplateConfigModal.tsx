@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, FileSpreadsheet, MapPin, Ruler, Link as LinkIcon, Cloud, Loader2, FileCheck } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, FileSpreadsheet, MapPin, Ruler, Link as LinkIcon, Cloud, Loader2, FileCheck, Gavel } from 'lucide-react';
 import { saveTemplate, hasTemplate, removeTemplate, saveTemplateUrl, getTemplateSourceType, STORAGE_KEYS } from '../services/docxService';
 import { saveExcelTemplate, hasExcelTemplate, removeExcelTemplate, EXCEL_STORAGE_KEYS } from '../services/excelTemplateService';
 import * as XLSX from 'xlsx-js-style';
@@ -9,7 +8,7 @@ import { confirmAction } from '../utils/appHelpers';
 interface TemplateConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
-  type: 'receipt' | 'contract' | 'excel_list';
+  type: 'receipt' | 'contract' | 'excel_list' | 'vphc';
 }
 
 const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClose, type }) => {
@@ -23,6 +22,8 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
   
   // State mới để chọn loại hợp đồng con (4 loại)
   const [contractSubType, setContractSubType] = useState<'dodac' | 'cammoc' | 'liq_dodac' | 'liq_cammoc'>('dodac');
+  // State mới cho loại VPHC
+  const [vphcSubType, setVphcSubType] = useState<'mau01' | 'mau02'>('mau01');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -56,6 +57,15 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
           title = 'Cấu hình Mẫu Danh Sách Ngày (.xlsx)';
           acceptExt = '.xlsx';
           isExcel = true;
+          break;
+      case 'vphc':
+          if (vphcSubType === 'mau01') {
+              storageKey = STORAGE_KEYS.VPHC_TEMPLATE_01;
+              title = 'Mẫu 01: Biên bản Vi Phạm HC';
+          } else {
+              storageKey = STORAGE_KEYS.VPHC_TEMPLATE_02;
+              title = 'Mẫu 02: Biên bản Làm Việc';
+          }
           break;
   }
 
@@ -156,7 +166,7 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
         <div className="flex justify-between items-center p-5 border-b shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             {isExcel ? <FileSpreadsheet className="text-green-600" /> : <FileText className="text-blue-600" />}
-            {type === 'contract' ? 'Cấu hình Mẫu In Hợp Đồng' : title}
+            {type === 'contract' ? 'Cấu hình Mẫu In Hợp Đồng' : type === 'vphc' ? 'Cấu hình Mẫu VPHC' : title}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-red-600">
             <X size={24} />
@@ -193,6 +203,27 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
                             className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${contractSubType === 'liq_cammoc' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                         >
                             <FileCheck size={14} /> TL Cắm Mốc
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* TOGGLE CHO VPHC */}
+            {type === 'vphc' && (
+                <div className="flex flex-col gap-2 mb-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase">Chọn loại mẫu VPHC:</p>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setVphcSubType('mau01')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${vphcSubType === 'mau01' ? 'bg-red-100 border-red-300 text-red-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <Gavel size={14} /> Mẫu 01 (VPHC)
+                        </button>
+                        <button 
+                            onClick={() => setVphcSubType('mau02')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${vphcSubType === 'mau02' ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <FileText size={14} /> Mẫu 02 (Làm Việc)
                         </button>
                     </div>
                 </div>

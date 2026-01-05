@@ -6,7 +6,8 @@ export enum RecordStatus {
   IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
   PENDING_SIGN = 'PENDING_SIGN', // Chờ ký kiểm tra
   SIGNED = 'SIGNED',             // Đã ký (Lập danh sách ký)
-  HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành)
+  HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
+  RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)
   WITHDRAWN = 'WITHDRAWN'        // CSD rút hồ sơ (Kết thúc)
 }
 
@@ -77,6 +78,10 @@ export interface RecordFile {
   // Tính năng nhắc nhở
   reminderDate?: string;      // Thời gian đặt lịch nhắc
   lastRemindedAt?: string;    // Thời gian đã thông báo lần cuối
+
+  // Tính năng trả kết quả
+  receiptNumber?: string;     // Số biên lai
+  resultReturnedDate?: string; // Ngày trả kết quả cho dân
 }
 
 // Interface cho Item tách thửa
@@ -84,6 +89,7 @@ export interface SplitItem {
   serviceName: string; // Loại sản phẩm (VD: Tách thửa < 100m2)
   quantity: number;
   price: number;
+  area?: number; // Diện tích thửa mới tách
 }
 
 // Interface riêng cho Hợp Đồng (Lưu table khác)
@@ -119,6 +125,9 @@ export interface Contract {
   
   createdDate: string;    
   status: 'PENDING' | 'COMPLETED';
+
+  // Thanh lý
+  liquidationArea?: number; // Diện tích thanh lý thực tế
 }
 
 // Interface cho Bảng giá (Cập nhật theo hình ảnh)

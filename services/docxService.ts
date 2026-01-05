@@ -1,4 +1,3 @@
-
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import saveAs from 'file-saver';
@@ -13,7 +12,11 @@ export const STORAGE_KEYS = {
     // Tách riêng 2 loại thanh lý
     CONTRACT_TEMPLATE_LIQ_DODAC: 'docx_template_liquidation_dodac', 
     CONTRACT_TEMPLATE_LIQ_CAMMOC: 'docx_template_liquidation_cammoc',
-    CONTRACT_TEMPLATE: 'docx_template_contract' 
+    CONTRACT_TEMPLATE: 'docx_template_contract',
+    
+    // MỚI: Template cho VPHC
+    VPHC_TEMPLATE_01: 'docx_template_vphc_01', // Biên bản VPHC
+    VPHC_TEMPLATE_02: 'docx_template_vphc_02'  // Biên bản Làm việc
 };
 
 // --- HELPERS ---
@@ -107,7 +110,9 @@ export const syncTemplatesFromCloud = async () => {
             STORAGE_KEYS.CONTRACT_TEMPLATE_DODAC,
             STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC,
             STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC,
-            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC
+            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC,
+            STORAGE_KEYS.VPHC_TEMPLATE_01,
+            STORAGE_KEYS.VPHC_TEMPLATE_02
         ];
 
         const { data, error } = await supabase

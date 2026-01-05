@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, History, AlertCircle, CheckCircle, MapPin, Hash, BookOpen, Loader2, Settings, X, Save, Trash2, Plus, RotateCcw, LayoutGrid } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, PlusCircle, History, AlertCircle, CheckCircle, MapPin, Hash, BookOpen, Loader2, Settings, X, Save, Trash2, Plus, RotateCcw, LayoutGrid, CalendarRange, Copy, Check } from 'lucide-react';
 import { User, UserRole, RecordFile } from '../types';
 import { fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters } from '../services/api';
 import { confirmAction } from '../utils/appHelpers';
@@ -37,6 +37,21 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
   const [mapSheet, setMapSheet] = useState<string>('');
   const [landPlot, setLandPlot] = useState<string>('');
   
+  // State quản lý Năm: Mặc định lấy năm hiện tại của hệ thống
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
+
+  // DANH SÁCH NĂM ĐỘNG: Tự động sinh từ 2024 đến Năm hiện tại + 1
+  const availableYears = useMemo(() => {
+      const startYear = 2024;
+      const thisYear = new Date().getFullYear();
+      const years = [];
+      // Tạo danh sách năm đến tương lai gần (năm sau) để chuẩn bị trước
+      for (let y = startYear; y <= thisYear + 1; y++) {
+          years.push(y);
+      }
+      return years;
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [resultNumber, setResultNumber] = useState<number | null>(null);
   const [history, setHistory] = useState<ExcerptRecord[]>([]);
@@ -50,18 +65,28 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
   const [editingCounters, setEditingCounters] = useState<Record<string, number>>({});
   const [newWardName, setNewWardName] = useState('');
 
+  // State cho nút Copy
+  const [isCopied, setIsCopied] = useState(false);
+
   const hasAdminRights = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
 
   useEffect(() => {
-    const loadServerData = async () => {
-        const serverHistory = await fetchExcerptHistory();
-        setHistory(serverHistory);
-
-        const serverCounters = await fetchExcerptCounters();
-        setCounters(prev => ({ ...prev, ...serverCounters }));
-    };
     loadServerData();
   }, []);
+
+  const loadServerData = async () => {
+      const serverHistory = await fetchExcerptHistory();
+      setHistory(serverHistory);
+
+      const serverCounters = await fetchExcerptCounters();
+      setCounters(prev => ({ ...prev, ...serverCounters }));
+  };
+
+  // --- LOGIC PHÂN BIỆT KHÓA THEO NĂM (QUAN TRỌNG) ---
+  const getCounterKey = (ward: string, year: number) => {
+      if (year <= 2025) return ward;
+      return `${ward}_${year}`;
+  };
 
   const handleSearchRecord = () => {
     if (!searchCode.trim()) return;
@@ -79,6 +104,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
         if (record.mapSheet) setMapSheet(record.mapSheet);
         if (record.landPlot) setLandPlot(record.landPlot);
         setResultNumber(null);
+        setIsCopied(false);
     } else {
         alert('Không tìm thấy hồ sơ với mã này.');
         setLinkedRecord(null);
@@ -90,9 +116,11 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
           onAddWard(missingWard);
           setSelectedWard(missingWard);
           setMissingWard(null);
-          if (counters[missingWard] === undefined) {
+          // Khi thêm xã mới, khởi tạo counter cho năm hiện tại
+          const key = getCounterKey(missingWard, currentYear);
+          if (counters[key] === undefined) {
               setCounters(prev => {
-                  const newState = { ...prev, [missingWard]: 0 };
+                  const newState = { ...prev, [key]: 0 };
                   saveExcerptCounters(newState); 
                   return newState;
               });
@@ -108,44 +136,72 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
     setLoading(true);
     setResultNumber(null);
+    setIsCopied(false);
 
-    const currentCount = counters[selectedWard] || 0;
-    const nextCount = currentCount + 1;
+    try {
+        // Lấy dữ liệu Counter mới nhất từ Server
+        const serverCounters = await fetchExcerptCounters();
+        
+        // Xác định Key dựa theo Năm đang chọn
+        const counterKey = getCounterKey(selectedWard, currentYear);
 
-    const newRecord: ExcerptRecord = {
-      id: Math.random().toString(36).substr(2, 9),
-      ward: selectedWard,
-      mapSheet,
-      landPlot,
-      excerptNumber: nextCount,
-      createdAt: new Date().toISOString(),
-      createdBy: currentUser.name,
-      linkedRecordCode: linkedRecord?.code
-    };
+        // Tính số tiếp theo
+        const currentCountOnServer = serverCounters[counterKey] || 0;
+        const nextCount = currentCountOnServer + 1;
 
-    await saveExcerptRecord(newRecord);
-    
-    const newCounters = { ...counters, [selectedWard]: nextCount };
-    await saveExcerptCounters(newCounters);
+        const newRecord: ExcerptRecord = {
+          id: Math.random().toString(36).substr(2, 9),
+          ward: selectedWard,
+          mapSheet,
+          landPlot,
+          excerptNumber: nextCount,
+          createdAt: new Date().toISOString(),
+          createdBy: currentUser.name,
+          linkedRecordCode: linkedRecord?.code
+        };
 
-    setCounters(newCounters);
-    setHistory(prev => [newRecord, ...prev]);
-    setResultNumber(nextCount);
-    setLoading(false);
+        // Lưu lịch sử
+        await saveExcerptRecord(newRecord);
+        
+        // Cập nhật lại counter lên Server
+        const newCounters = { ...serverCounters, [counterKey]: nextCount };
+        await saveExcerptCounters(newCounters);
 
-    if (linkedRecord) {
-        onUpdateRecord(linkedRecord.id, nextCount.toString());
-        setLinkedRecord(null);
-        setSearchCode('');
-        setMissingWard(null);
+        // Cập nhật UI
+        setCounters(newCounters);
+        setHistory(prev => [newRecord, ...prev]);
+        setResultNumber(nextCount);
+
+        if (linkedRecord) {
+            onUpdateRecord(linkedRecord.id, nextCount.toString());
+            setLinkedRecord(null);
+            setSearchCode('');
+            setMissingWard(null);
+        }
+
+        setMapSheet('');
+        setLandPlot('');
+    } catch (error) {
+        console.error(error);
+        alert("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+        setLoading(false);
     }
-
-    setMapSheet('');
-    setLandPlot('');
   };
 
-  const openConfig = () => {
-      setEditingCounters({...counters});
+  // Hàm xử lý copy
+  const handleCopyResult = () => {
+      if (resultNumber) {
+          navigator.clipboard.writeText(resultNumber.toString());
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+      }
+  };
+
+  const openConfig = async () => {
+      const latest = await fetchExcerptCounters();
+      setCounters(prev => ({ ...prev, ...latest }));
+      setEditingCounters({...latest});
       setNewWardName('');
       setIsConfigOpen(true);
   };
@@ -164,7 +220,8 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
               return;
           }
           onAddWard(name);
-          setEditingCounters(prev => ({ ...prev, [name]: 0 }));
+          const key = getCounterKey(name, currentYear);
+          setEditingCounters(prev => ({ ...prev, [key]: 0 }));
           setNewWardName('');
       }
   };
@@ -175,9 +232,19 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
       }
   };
 
-  const filteredHistory = selectedWard 
-    ? history.filter(h => h.ward === selectedWard) 
-    : history;
+  const filteredHistory = useMemo(() => {
+      return history.filter(h => {
+          const itemYear = new Date(h.createdAt).getFullYear();
+          let yearMatch = false;
+          if (currentYear <= 2025) {
+              yearMatch = itemYear <= 2025;
+          } else {
+              yearMatch = itemYear === currentYear;
+          }
+          const wardMatch = selectedWard ? h.ward === selectedWard : true;
+          return yearMatch && wardMatch;
+      });
+  }, [history, selectedWard, currentYear]);
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
@@ -191,26 +258,55 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
   return (
     <div className="h-full flex flex-col space-y-4 animate-fade-in-up overflow-hidden">
-      {/* DASHBOARD TỔNG QUAN - FIXED (Shrink-0) */}
+      {/* DASHBOARD TỔNG QUAN - FIXED */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 shrink-0">
-         <div className="flex items-center gap-2 mb-4 text-gray-700 font-bold border-b pb-2">
-             <LayoutGrid size={20} className="text-blue-600" />
-             <h2>Theo dõi Số Trích Lục hiện tại (Theo Xã/Phường)</h2>
-         </div>
-         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-40 overflow-y-auto">
-             {wards.map(ward => (
-                 <div 
-                    key={ward} 
-                    onClick={() => setSelectedWard(ward)}
-                    className={`cursor-pointer rounded-lg p-4 border transition-all hover:shadow-md flex flex-col items-center justify-center gap-1 ${selectedWard === ward ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
-                 >
-                     <div className="text-xs text-gray-500 font-bold uppercase text-center">{ward}</div>
-                     <div className="text-3xl font-black text-gray-800 font-mono">
-                         {counters[ward] || 0}
-                     </div>
-                     <div className="text-[10px] text-gray-400">Số hiện tại</div>
+         <div className="flex items-center justify-between mb-4 border-b pb-2">
+             <div className="flex items-center gap-2 text-gray-700 font-bold">
+                <LayoutGrid size={20} className="text-blue-600" />
+                <h2>Theo dõi Số Trích Lục (Theo Xã/Phường)</h2>
+             </div>
+             
+             <div className="flex items-center gap-3">
+                 <div className="flex items-center bg-blue-50 px-2 py-1 rounded-lg border border-blue-200">
+                    <CalendarRange size={16} className="text-blue-600 mr-2" />
+                    <span className="text-sm font-bold text-blue-800 mr-2">Năm:</span>
+                    <select 
+                        value={currentYear} 
+                        onChange={(e) => { setCurrentYear(parseInt(e.target.value)); setResultNumber(null); setIsCopied(false); }}
+                        className="bg-transparent text-sm font-bold text-blue-700 outline-none cursor-pointer"
+                    >
+                        {availableYears.map(y => (
+                            <option key={y} value={y}>{y}</option>
+                        ))}
+                    </select>
                  </div>
-             ))}
+
+                 <button onClick={loadServerData} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                    <RotateCcw size={12}/> Làm mới
+                 </button>
+             </div>
+         </div>
+         
+         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-40 overflow-y-auto custom-scrollbar">
+             {wards.map(ward => {
+                 const key = getCounterKey(ward, currentYear);
+                 const count = counters[key] || 0;
+                 return (
+                     <div 
+                        key={ward} 
+                        onClick={() => setSelectedWard(ward)}
+                        className={`cursor-pointer rounded-lg p-4 border transition-all hover:shadow-md flex flex-col items-center justify-center gap-1 ${selectedWard === ward ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
+                     >
+                         <div className="text-xs text-gray-500 font-bold uppercase text-center">{ward}</div>
+                         <div className="text-3xl font-black text-gray-800 font-mono">
+                             {count}
+                         </div>
+                         <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                            Số hiện tại ({currentYear})
+                         </div>
+                     </div>
+                 );
+             })}
          </div>
       </div>
 
@@ -233,7 +329,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
                 <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4 border-b pb-2">
                 <PlusCircle className="text-blue-600" />
-                Cấp Số Mới
+                Cấp Số Mới ({currentYear})
                 </h2>
                 
                 <div className="space-y-4">
@@ -287,7 +383,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                     <select
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white font-medium text-gray-800"
                         value={selectedWard}
-                        onChange={(e) => { setSelectedWard(e.target.value); setResultNumber(null); }}
+                        onChange={(e) => { setSelectedWard(e.target.value); setResultNumber(null); setIsCopied(false); }}
                     >
                         <option value="">-- Chọn địa bàn để cấp số --</option>
                         {wards.map(w => (
@@ -327,14 +423,14 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                     className="w-full mt-2 bg-blue-600 text-white py-3 rounded-lg font-semibold shadow-md hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {loading ? <Loader2 className="animate-spin" /> : <BookOpen size={20} />}
-                    Cấp số tiếp theo: {selectedWard ? (counters[selectedWard] || 0) + 1 : '?'}
+                    Cấp số tiếp theo: {selectedWard ? ((counters[getCounterKey(selectedWard, currentYear)] || 0) + 1) : '?'}
                 </button>
                 </div>
                 
                 <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200 text-sm text-gray-600">
                 <p className="flex items-start gap-2">
                     <AlertCircle size={16} className="mt-0.5 shrink-0 text-blue-500" />
-                    <span>Hệ thống sẽ tự động tìm số thứ tự lớn nhất hiện tại của xã <strong>{selectedWard || '...'}</strong> và cộng thêm 1.</span>
+                    <span>Hệ thống đang cấp số cho năm <strong>{currentYear}</strong>. Số thứ tự sẽ tự động bắt đầu lại từ 1 khi chuyển sang năm mới.</span>
                 </p>
                 </div>
             </div>
@@ -343,12 +439,20 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
             {/* RIGHT COLUMN: RESULT & HISTORY */}
             <div className="lg:col-span-2 space-y-6">
                 <div className={`bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl shadow-sm border border-orange-100 p-8 text-center transition-all duration-500 ${resultNumber ? 'opacity-100 scale-100' : 'opacity-50 scale-95 grayscale'}`}>
-                    <h3 className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">Số trích lục vừa cấp</h3>
+                    <h3 className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">Số trích lục vừa cấp ({currentYear})</h3>
                     <div className="flex items-center justify-center gap-4">
                         <div className="text-6xl font-black text-orange-600 drop-shadow-sm font-mono">
                             {resultNumber ? resultNumber : '---'}
                         </div>
-                        {resultNumber && <CheckCircle className="text-green-500 w-10 h-10 animate-bounce" />}
+                        {resultNumber && (
+                            <button 
+                                onClick={handleCopyResult}
+                                className={`p-3 rounded-full transition-all shadow-sm ${isCopied ? 'bg-green-100 text-green-600' : 'bg-white text-orange-400 hover:text-orange-600 hover:bg-orange-50 hover:shadow-md'}`}
+                                title="Sao chép số trích lục"
+                            >
+                                {isCopied ? <Check size={28} className="animate-bounce" /> : <Copy size={28} />}
+                            </button>
+                        )}
                     </div>
                     {resultNumber && (
                         <p className="mt-4 text-orange-800 font-medium animate-pulse">
@@ -361,7 +465,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl shrink-0">
                         <h3 className="font-bold text-gray-800 flex items-center gap-2">
                             <History className="text-gray-500" />
-                            {selectedWard ? `Lịch sử cấp số xã: ${selectedWard}` : 'Lịch sử cấp số (Toàn bộ)'}
+                            {selectedWard ? `Lịch sử cấp số xã: ${selectedWard} (${currentYear})` : `Lịch sử cấp số năm ${currentYear}`}
                         </h3>
                         <div className="flex items-center gap-3">
                             {selectedWard && (
@@ -422,7 +526,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                                 ) : (
                                     <tr>
                                         <td colSpan={7} className="p-10 text-center text-gray-400 italic">
-                                            Chưa có dữ liệu lịch sử cho khu vực này.
+                                            Chưa có dữ liệu lịch sử cho năm {currentYear}.
                                         </td>
                                     </tr>
                                 )}
@@ -440,7 +544,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                   <div className="flex justify-between items-center p-5 border-b">
                       <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                           <Settings className="text-blue-600" />
-                          Cấu hình Xã Phường & Số trích lục
+                          Cấu hình Xã Phường & Số trích lục ({currentYear})
                       </h3>
                       <button onClick={() => setIsConfigOpen(false)} className="text-gray-500 hover:text-red-600">
                           <X size={24} />
@@ -450,7 +554,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                   <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
                       <p className="text-sm text-gray-600 mb-4 bg-yellow-50 p-3 rounded border border-yellow-200">
                           <AlertCircle size={14} className="inline mr-1 text-yellow-600" />
-                          Quản lý danh sách các Xã/Phường và thiết lập số thứ tự hiện tại. Số cấp tiếp theo sẽ là <strong>Số hiện tại + 1</strong>.
+                          Điều chỉnh số hiện tại cho từng xã trong năm <strong>{currentYear}</strong>.
                       </p>
 
                       <div className="flex gap-2 mb-4">
@@ -479,29 +583,32 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                        </button>
                       
                       <div className="space-y-3">
-                          {wards.map(ward => (
-                              <div key={ward} className="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex items-center gap-2">
-                                     <button 
-                                        onClick={() => handleDeleteWard(ward)}
-                                        className="text-gray-400 hover:text-red-500 p-1 hover:bg-red-50 rounded"
-                                        title="Xóa xã này"
-                                     >
-                                         <Trash2 size={14} />
-                                     </button>
-                                     <span className="text-sm font-medium text-gray-700">{ward}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                      <span className="text-xs text-gray-400">Hiện tại:</span>
-                                      <input 
-                                          type="number" 
-                                          className="w-20 border border-gray-300 rounded px-2 py-1 text-right font-mono font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          value={editingCounters[ward] ?? 0}
-                                          onChange={(e) => setEditingCounters({...editingCounters, [ward]: parseInt(e.target.value) || 0})}
-                                      />
-                                  </div>
-                              </div>
-                          ))}
+                          {wards.map(ward => {
+                              const key = getCounterKey(ward, currentYear);
+                              return (
+                                <div key={ward} className="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => handleDeleteWard(ward)}
+                                            className="text-gray-400 hover:text-red-500 p-1 hover:bg-red-50 rounded"
+                                            title="Xóa xã này"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                        <span className="text-sm font-medium text-gray-700">{ward}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">Hiện tại:</span>
+                                        <input 
+                                            type="number" 
+                                            className="w-20 border border-gray-300 rounded px-2 py-1 text-right font-mono font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            value={editingCounters[key] ?? 0}
+                                            onChange={(e) => setEditingCounters({...editingCounters, [key]: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
+                                </div>
+                              );
+                          })}
                       </div>
                   </div>
 

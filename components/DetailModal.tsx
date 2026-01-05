@@ -1,12 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { RecordFile, Employee, User, UserRole } from '../types';
+import { RecordFile, Employee, User, UserRole, Contract, SplitItem } from '../types';
 import { STATUS_LABELS, getNormalizedWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell } from 'lucide-react';
+import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell, Receipt, DollarSign, CheckCircle2, Circle, Clock, ArrowDown, Send, FileSignature, CheckSquare, CalendarClock, FileCheck } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
-import { updateRecordApi } from '../services/api';
+import { updateRecordApi, fetchContracts } from '../services/api';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -16,9 +16,10 @@ interface DetailModalProps {
   currentUser: User | null;
   onEdit?: (record: RecordFile) => void;
   onDelete?: (record: RecordFile) => void;
+  onCreateLiquidation?: (record: RecordFile) => void; // New Prop
 }
 
-const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, currentUser, onEdit, onDelete }) => {
+const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, currentUser, onEdit, onDelete, onCreateLiquidation }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
@@ -32,6 +33,10 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
   const [reminderDate, setReminderDate] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
 
+  // State cho giá hợp đồng
+  const [contractPrice, setContractPrice] = useState<number | null>(null);
+  const [contractSplitItems, setContractSplitItems] = useState<SplitItem[] | null>(null);
+
   useEffect(() => {
       if (record) {
           setPersonalNote(record.personalNotes || '');
@@ -43,6 +48,28 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
           } else {
               setReminderDate('');
           }
+
+          // Fetch Contract Price & Details
+          const fetchPrice = async () => {
+              const contracts = await fetchContracts();
+              // Tìm hợp đồng có cùng mã hồ sơ (Case insensitive)
+              const match = contracts.find(c => c.code && record.code && c.code.trim().toLowerCase() === record.code.trim().toLowerCase());
+              
+              if (match) {
+                  setContractPrice(match.totalAmount);
+                  setContractSplitItems(match.splitItems || null);
+              } else {
+                  // LOGIC MỚI: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
+                  const type = (record.recordType || '').toLowerCase();
+                  if (type.includes('trích lục')) {
+                      setContractPrice(53163);
+                  } else {
+                      setContractPrice(null);
+                  }
+                  setContractSplitItems(null);
+              }
+          };
+          fetchPrice();
       }
   }, [record]);
 
@@ -277,6 +304,27 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
     }
   };
 
+  // Helper cho Timeline
+  const TimelineItem = ({ date, label, icon: Icon, isLast, colorClass }: any) => (
+      <div className="relative flex gap-4">
+          <div className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 bg-white ${date ? colorClass.border : 'border-gray-200'}`}>
+                  {date ? <CheckCircle2 size={16} className={colorClass.text} /> : <Circle size={16} className="text-gray-300" />}
+              </div>
+              {!isLast && <div className={`w-0.5 grow ${date ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
+          </div>
+          <div className={`pb-6 ${!isLast ? '' : ''}`}>
+              <p className={`text-xs font-bold uppercase mb-0.5 ${date ? colorClass.text : 'text-gray-400'}`}>{label}</p>
+              <div className="flex items-center gap-2">
+                  <Icon size={14} className={date ? 'text-gray-500' : 'text-gray-300'} />
+                  <span className={`text-sm font-medium ${date ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                      {formatDate(date) || 'Chưa thực hiện'}
+                  </span>
+              </div>
+          </div>
+      </div>
+  );
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto flex flex-col animate-fade-in-up">
@@ -293,6 +341,17 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
             <h2 className="text-xl font-bold text-gray-800">{record.recordType}</h2>
           </div>
           <div className="flex items-center gap-2">
+              {/* Nút Thanh lý Hợp đồng */}
+              {onCreateLiquidation && (
+                  <button
+                      onClick={() => { onClose(); onCreateLiquidation(record); }}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-green-200 text-green-700 rounded-lg hover:bg-green-50 transition-colors shadow-sm text-sm font-medium"
+                      title="Chuyển sang thanh lý hợp đồng"
+                  >
+                      <FileCheck size={16} /> Thanh lý HĐ
+                  </button>
+              )}
+
               {canPrintReceipt && (
                   <button 
                     onClick={handlePrintReceipt}
@@ -407,6 +466,47 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                                     <span className="font-medium">{record.excerptNumber || '---'}</span>
                                 </div>
                             </div>
+
+                            {/* Cập nhật: Số biên lai và Giá tiền */}
+                            <div className="mt-4 pt-4 border-t border-dashed border-gray-200 grid grid-cols-2 gap-4">
+                                <div className="flex items-center gap-2">
+                                    <Receipt size={16} className="text-blue-500" />
+                                    <div>
+                                        <span className="text-xs text-gray-500 block">Số biên lai</span>
+                                        <span className="font-mono font-bold text-blue-700">{record.receiptNumber || '---'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <DollarSign size={16} className="text-green-600" />
+                                    <div>
+                                        <span className="text-xs text-gray-500 block">Phí đo đạc (HĐ)</span>
+                                        <span className="font-mono font-bold text-green-700">
+                                            {contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Chi tiết tách thửa nếu có */}
+                            {contractSplitItems && contractSplitItems.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+                                    <span className="text-xs font-bold text-gray-500 block mb-2 uppercase">Chi tiết tách thửa:</span>
+                                    <div className="space-y-1.5">
+                                        {contractSplitItems.map((item, idx) => (
+                                            <div key={idx} className="text-xs flex justify-between bg-gray-50 p-2 rounded border border-gray-100">
+                                                <span className="text-gray-700">
+                                                    <span className="font-bold text-blue-600 mr-1">Thửa {idx + 1}:</span> 
+                                                    Diện tích: <span className="font-bold">{item.area || 0} m²</span>
+                                                    {item.serviceName ? <span className="text-gray-500 ml-1 italic">- {item.serviceName}</span> : ''}
+                                                </span>
+                                                <span className="font-mono font-bold text-green-700">
+                                                    Thành tiền: {(item.price * item.quantity).toLocaleString('vi-VN')} đ
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -451,36 +551,56 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                 </div>
 
                 <div className="md:col-span-1 space-y-4">
-                    <div>
-                        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-wide mb-4 border-l-4 border-orange-500 pl-2">
-                            <Calendar size={18} className="text-orange-500" />
-                            Tiến độ & Thời gian
-                        </h3>
-                        <div className="space-y-4 bg-orange-50 p-4 rounded-lg border border-orange-100">
-                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                                <span className="text-sm text-gray-600">Ngày tiếp nhận</span>
-                                <span className="font-medium text-gray-900">{formatDate(record.receivedDate)}</span>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        {/* Header Timeline */}
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white">
+                            <h3 className="font-bold flex items-center gap-2 text-sm">
+                                <CalendarClock size={18} /> Tiến độ & Thời gian
+                            </h3>
+                        </div>
+                        
+                        {/* Highlight Card: Deadline */}
+                        <div className="p-4 bg-blue-50 border-b border-blue-100 flex flex-col items-center justify-center gap-1 text-center">
+                            <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">Hạn trả kết quả</span>
+                            <span className="text-lg font-black text-blue-800">{formatDate(record.deadline)}</span>
+                            <div className="text-[10px] text-blue-500 font-medium">
+                                Ngày nhận: {formatDate(record.receivedDate)}
                             </div>
-                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                                <span className="text-sm text-gray-600">Hẹn trả kết quả</span>
-                                <span className="font-bold text-blue-700">{formatDate(record.deadline)}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                                <span className="text-sm text-gray-600">Ngày giao NV</span>
-                                <span className="font-medium text-gray-900">{formatDate(record.assignedDate)}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                                <span className="text-sm text-gray-600">Ngày trình ký</span>
-                                <span className="font-medium text-purple-700">{formatDate(record.submissionDate)}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-orange-200 pb-2">
-                                <span className="text-sm text-gray-600">Ngày ký duyệt</span>
-                                <span className="font-medium text-indigo-700">{formatDate(record.approvalDate)}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">Ngày hoàn thành</span>
-                                <span className="font-medium text-green-700">{formatDate(record.completedDate)}</span>
-                            </div>
+                        </div>
+
+                        {/* Timeline Body */}
+                        <div className="p-5 pl-6">
+                            <TimelineItem 
+                                date={record.assignedDate} 
+                                label="Giao nhân viên" 
+                                icon={UserIcon}
+                                colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                            />
+                            <TimelineItem 
+                                date={record.submissionDate} 
+                                label="Trình ký" 
+                                icon={Send}
+                                colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
+                            />
+                            <TimelineItem 
+                                date={record.approvalDate} 
+                                label="Ký duyệt" 
+                                icon={FileSignature}
+                                colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                            />
+                            <TimelineItem 
+                                date={record.completedDate} 
+                                label="Hoàn thành" 
+                                icon={CheckSquare}
+                                colorClass={{text: 'text-green-700', border: 'border-green-600', bg: 'bg-green-600'}}
+                            />
+                            <TimelineItem 
+                                date={record.resultReturnedDate} 
+                                label="Trả kết quả" 
+                                icon={FileCheck}
+                                isLast={true}
+                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                            />
                         </div>
                     </div>
 

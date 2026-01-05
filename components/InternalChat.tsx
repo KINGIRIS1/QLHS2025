@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { User, Message, ChatGroup, UserRole, Employee } from '../types';
 import { fetchMessages, sendMessageApi, uploadChatFile, fetchChatGroups, createChatGroup, deleteChatGroup, deleteMessageApi, addMemberToGroupApi, toggleReactionApi } from '../services/api';
@@ -13,8 +14,9 @@ declare global {
       captureScreenshot: (options?: { hideWindow: boolean }) => Promise<string>;
       openExternal: (url: string) => Promise<void>;
       // Sửa lỗi: Thêm các định nghĩa phương thức hỗ trợ lưu và mở file được sử dụng trong UtilitiesView
-      saveAndOpenFile: (data: { fileName: string; base64Data: string }) => Promise<{ success: boolean; path?: string; message?: string }>;
+      saveAndOpenFile: (data: { fileName: string; base64Data: string; outputFolder?: string | null }) => Promise<{ success: boolean; path?: string; message?: string }>;
       openFilePath: (path: string) => Promise<boolean>;
+      selectFolder: () => Promise<string | null>; // API Chọn thư mục mới
       checkForUpdate: (serverUrl: string) => Promise<any>;
       downloadUpdate: () => Promise<void>;
       quitAndInstall: () => Promise<void>;
@@ -32,7 +34,7 @@ const normalizeStr = (str: string) => str ? str.toLowerCase().trim() : '';
 
 const EMOJI_LIST = [
   "👍", "❤️", "😆", "😮", "😢", "😡",
-  "😀", "😁", "😂", "🤣", "😃", "😅", "😉", "😊", "😋", "😎", "😍", "😘", "🥰", "😗", "🙂", "🤗", "🤔", "😐", "😑", "😶", "🙄", "😏", "😥", "🤐", "😯", "😪", "😫", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😓", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁", "😖", "😞", "😤", "😭", "frowning", "anguished", "fearful", "weary", "exploding_head", "grimacing", "anxious", "scream", "flushed", "crazy", "rage", "mask", "sick", "shushing_face", 
+  "😀", "😁", "😂", "🤣", "😃", "😅", "😉", "😊", "😋", "😎", "😍", "😘", "🥰", "😗", "🙂", "🤗", "🤔", "😐", "😑", "😶", "🙄", "😏", "😥", "🤐", "😯", "😪", "😫", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😥", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁", "😖", "😞", "😤", "😭", "frowning", "anguished", "fearful", "weary", "exploding_head", "grimacing", "anxious", "scream", "flushed", "crazy", "rage", "mask", "sick", "shushing_face", 
   "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "✋", "👋", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "💪", "👀", "🧠", "👤", "👥",
   "🧡", "💛", "💚", "💙", "💜", "🖤", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💯", "💢", "💥", "💫", "💦", "💨", "🕳️",
   "📅", "✅", "❎", "❌", "🔥", "✨", "🌟", "⭐", "📝", "📁", "📂", "📌", "📍", "📎", "📏", "📐", "✂️", "🖊️", "💻", "📱", "☎️", "📞", "📷", "💡", "💰", "💵", "💸", "💳", "🔨", "🔧", "🏠", "🏢", "🏥", "🚗", "✈️", "🚀", "🚩", "🏁", "🎌", "☕", "🍺", "🍻", "🥂", "🥃", "🎉", "🎊", "🎁", "🎈"

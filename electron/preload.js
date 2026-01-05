@@ -6,8 +6,12 @@ window.electronAPI = {
   openExternal: (url) => ipcRenderer.invoke('open-external-link', url),
   
   // API Lưu và mở file trực tiếp (Dành cho Tiện ích)
+  // Updated: Chấp nhận outputFolder
   saveAndOpenFile: (data) => ipcRenderer.invoke('save-and-open-file', data),
   openFilePath: (path) => ipcRenderer.invoke('open-file-path', path),
+  
+  // API Chọn thư mục
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
 
   // API Update
   checkForUpdate: (serverUrl) => ipcRenderer.invoke('check-for-update', serverUrl),

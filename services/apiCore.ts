@@ -99,7 +99,7 @@ export const logError = (context: string, error: any) => {
          console.warn(`⚠️ [Info] ${context}: Không tìm thấy dữ liệu (406).`);
     } else if (code === '22007' || code === '22008') {
          console.error(`❌ Lỗi tại ${context}: Dữ liệu ngày tháng không hợp lệ (Lỗi ${code}).`);
-         alert(`LỖI DỮ LIỆU: File Excel chứa ngày tháng không hợp lệ (Ví dụ: "619-0032" hoặc "2025-06-60").\nVui lòng kiểm tra lại file Excel.`);
+         alert(`LỖI DỮ LIỆU: Dữ liệu chứa ngày tháng không hợp lệ hoặc sai định dạng (Ví dụ: 30/02).\nHệ thống đã cố gắng xử lý nhưng Server từ chối.`);
     } else if (code === '21000') {
          console.error(`❌ Lỗi tại ${context}: Dữ liệu trùng lặp trong cùng một yêu cầu (Lỗi ${code}).`);
          alert(`LỖI TRÙNG LẶP: File Excel có chứa nhiều dòng cùng Mã Hồ Sơ. Hệ thống đã cố gắng xử lý nhưng Server từ chối.\nVui lòng kiểm tra file Excel và xóa các dòng trùng lặp mã.`);
@@ -137,12 +137,22 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
             clean[field] = null;
         }
     });
-    const dateFields = ['receivedDate', 'deadline', 'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'createdDate', 'exportDate'];
+    
+    // CẬP NHẬT: Thêm đầy đủ các trường ngày tháng để tránh lỗi 22007
+    const dateFields = [
+        'receivedDate', 'deadline', 'assignedDate', 
+        'submissionDate', 'approvalDate', 'completedDate', 
+        'createdDate', 'exportDate',
+        'resultReturnedDate', 'reminderDate', 'lastRemindedAt'
+    ];
+    
     dateFields.forEach(field => {
-        if (clean[field] === '' || clean[field] === undefined) {
+        // Chuyển chuỗi rỗng, undefined, hoặc chuỗi không hợp lệ thành NULL
+        if (clean[field] === '' || clean[field] === undefined || clean[field] === null) {
             clean[field] = null;
         }
     });
+    
     const sanitized: any = {};
     allowedColumns.forEach(col => {
         if (clean.hasOwnProperty(col)) {

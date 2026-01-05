@@ -1,7 +1,8 @@
+
 {
   "name": "he-thong-quan-ly-ho-so",
   "private": true,
-  "version": "1.8.3",
+  "version": "1.9.6",
   "main": "electron/main.js",
   "author": "DonViHanhChinh",
   "description": "Phan mem quan ly ho so dia chinh",

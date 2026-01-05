@@ -22,7 +22,8 @@ export const useRecordFilter = (
     const [filterEmployee, setFilterEmployee] = useState('all');
     const [warningFilter, setWarningFilter] = useState<'none' | 'overdue' | 'approaching'>('none');
     
-    const [handoverTab, setHandoverTab] = useState<'today' | 'history'>('today');
+    // Cập nhật type cho handoverTab để hỗ trợ 'returned'
+    const [handoverTab, setHandoverTab] = useState<'today' | 'history' | 'returned'>('today');
 
     // Sorting & Pagination
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
@@ -72,8 +73,16 @@ export const useRecordFilter = (
                     r.status === RecordStatus.SIGNED || 
                     (r.status === RecordStatus.WITHDRAWN && !r.exportBatch)
                 );
+            } else if (handoverTab === 'returned') {
+                // Tab Đã trả kết quả: Status = RETURNED
+                result = result.filter(r => r.status === RecordStatus.RETURNED);
+                
+                // Lọc theo ngày trả kết quả (nếu có chọn ngày)
+                if (filterDate) {
+                    result = result.filter(r => r.resultReturnedDate === filterDate);
+                }
             } else {
-                // Tab Lịch sử: Bao gồm Đã giao HOẶC (Đã rút VÀ đã có đợt xuất)
+                // Tab Lịch sử giao: Bao gồm Đã giao HOẶC (Đã rút VÀ đã có đợt xuất)
                 result = result.filter(r => 
                     r.status === RecordStatus.HANDOVER || 
                     (r.status === RecordStatus.WITHDRAWN && r.exportBatch)
@@ -114,7 +123,7 @@ export const useRecordFilter = (
             else result = result.filter(r => r.assignedTo === filterEmployee);
         }
 
-        // Date Filters
+        // Date Filters (General for other views)
         if (currentView !== 'handover_list') {
             if (filterSpecificDate) {
                 result = result.filter(r => r.receivedDate === filterSpecificDate);

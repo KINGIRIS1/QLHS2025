@@ -19,7 +19,7 @@ import RecordRow from './components/RecordRow';
 import UtilitiesView from './components/UtilitiesView'; 
 
 import { COLUMN_DEFS, DEFAULT_VISIBLE_COLUMNS, confirmAction } from './utils/appHelpers';
-import { exportReportToExcel } from './utils/excelExport';
+import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi } from './services/api';
@@ -29,7 +29,7 @@ import {
   Plus, Search, CheckSquare, Square, Users, FileSpreadsheet,
   SlidersHorizontal, AlertTriangle, Clock, Lock, WifiOff,
   ArrowUpDown, ChevronLeft, ChevronRight, Bell, MapPin, RotateCcw, Menu, FileOutput, FileSignature, ListChecks, History,
-  Calendar, X, Filter, User as UserIcon, Eye, CalendarRange, CheckCircle, UserPlus, Send, Layers
+  Calendar, X, Filter, User as UserIcon, Eye, CalendarRange, CheckCircle, UserPlus, Send, Layers, FileCheck
 } from 'lucide-react';
 
 import { useAppData } from './hooks/useAppData';
@@ -357,6 +357,12 @@ function App() {
       }
   };
 
+  const handleExportReturnedList = () => {
+      if (!canPerformAction) return;
+      // Xuất các record đang được lọc (có thể là tất cả hoặc theo ngày)
+      exportReturnedListToExcel(filteredRecords, filterSpecificDate || filterDate);
+  };
+
   // --- LIQUIDATION HANDLER ---
   const handleRequestLiquidation = useCallback((record: RecordFile) => {
       setRecordToLiquidate(record);
@@ -395,10 +401,24 @@ function App() {
                          <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
                              <button onClick={() => setHandoverTab('today')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'today' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><ListChecks size={16} /> Chờ giao</button>
                              <button onClick={() => setHandoverTab('history')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'history' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><History size={16} /> Lịch sử</button>
+                             {/* TAB MỚI: ĐÃ TRẢ KẾT QUẢ */}
+                             <button onClick={() => setHandoverTab('returned')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'returned' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><FileCheck size={16} /> Đã trả KQ</button>
                          </div>
                      )}
                      
+                     {/* Ẩn bộ lọc ngày chung nếu đang ở tab handover_list history/returned vì nó có logic lọc riêng */}
                      {currentView !== 'handover_list' && !showAdvancedDateFilter && ( <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm"><Calendar size={16} className="text-gray-500" /><input type="date" value={filterSpecificDate} onChange={(e) => setFilterSpecificDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700" title="Lọc theo ngày tiếp nhận" />{filterSpecificDate && (<button onClick={() => setFilterSpecificDate('')} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}</div>)}
+                     
+                     {/* Logic lọc ngày riêng cho History và Returned */}
+                     {currentView === 'handover_list' && (handoverTab === 'history' || handoverTab === 'returned') && (
+                         <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
+                             <Calendar size={16} className="text-gray-500" />
+                             <span className="text-xs text-gray-500 font-bold uppercase">{handoverTab === 'returned' ? 'Ngày trả:' : 'Ngày giao:'}</span>
+                             <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700" />
+                             {filterDate && (<button onClick={() => setFilterDate('')} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}
+                         </div>
+                     )}
+
                      {currentView !== 'handover_list' && <button onClick={() => setShowAdvancedDateFilter(!showAdvancedDateFilter)} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${showAdvancedDateFilter ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}><CalendarRange size={16} /></button>}
                      
                      <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm"><MapPin size={16} className="text-gray-500" /><select value={filterWard} onChange={(e) => setFilterWard(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[120px]"><option value="all">Tất cả Xã</option>{wards.map(w => (<option key={w} value={w}>{w}</option>))}</select></div>
@@ -443,7 +463,6 @@ function App() {
                         </>
                      )}
 
-                     {/* NEW: ADMIN BULK ACTIONS BUTTON */}
                      {(isAdmin || isSubadmin) && selectedRecordIds.size > 0 && (
                         <button 
                             onClick={() => setIsBulkUpdateModalOpen(true)} 
@@ -488,14 +507,21 @@ function App() {
                                 <CheckCircle size={18} /> Chốt Danh Sách Giao ({selectedRecordIds.size})
                             </button>
                         )}
+                        {canPerformAction && currentView === 'handover_list' && handoverTab === 'returned' && (
+                            <button onClick={handleExportReturnedList} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-bold shadow-md transition-all">
+                                <FileSpreadsheet size={18} /> Xuất Excel (Đã trả KQ)
+                            </button>
+                        )}
                         {canPerformAction && currentView === 'check_list' && filteredRecords.length > 0 && (
                             <button onClick={handleConfirmSignBatch} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-md">
                                 <FileSignature size={18} /> Ký Duyệt Tất Cả ({filteredRecords.length})
                             </button>
                         )}
-                        <button onClick={() => { setExportModalType(currentView === 'check_list' ? 'check_list' : 'handover'); setIsExportModalOpen(true); }} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium shadow-sm">
-                            <FileOutput size={18} /> Xuất Danh Sách
-                        </button>
+                        {(currentView !== 'handover_list' || handoverTab !== 'returned') && (
+                            <button onClick={() => { setExportModalType(currentView === 'check_list' ? 'check_list' : 'handover'); setIsExportModalOpen(true); }} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium shadow-sm">
+                                <FileOutput size={18} /> Xuất Danh Sách
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

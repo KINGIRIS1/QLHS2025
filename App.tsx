@@ -390,7 +390,8 @@ function App() {
 
   // Render Record List Table
   const renderRecordList = () => {
-    const isListView = currentView === 'check_list' || currentView === 'handover_list' || currentView === 'assign_tasks';
+    // UPDATE: Thêm 'all_records' vào danh sách isListView để hiển thị thanh công cụ phía dưới
+    const isListView = currentView === 'check_list' || currentView === 'handover_list' || currentView === 'assign_tasks' || currentView === 'all_records';
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
             <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
@@ -542,7 +543,8 @@ function App() {
                                 <UserPlus size={18} /> Giao Nhân Viên ({selectedRecordIds.size})
                             </button>
                         )}
-                        {(currentView !== 'handover_list' || handoverTab !== 'returned') && currentView !== 'assign_tasks' && (
+                        {/* UPDATE: Ẩn nút Xuất Danh Sách cho all_records vì đã có nút Excel ở trên */}
+                        {(currentView !== 'handover_list' || handoverTab !== 'returned') && currentView !== 'assign_tasks' && currentView !== 'all_records' && (
                             <button onClick={() => { setExportModalType(currentView === 'check_list' ? 'check_list' : 'handover'); setIsExportModalOpen(true); }} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium shadow-sm">
                                 <FileOutput size={18} /> Xuất Danh Sách
                             </button>

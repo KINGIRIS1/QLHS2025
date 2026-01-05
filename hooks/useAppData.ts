@@ -27,25 +27,41 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            const [recData, empData, userData, updateInfo] = await Promise.all([
+            // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("Timeout")), 8000)
+            );
+
+            const dataPromise = Promise.all([
                 fetchRecords(),
                 fetchEmployees(),
                 fetchUsers(),
                 fetchUpdateInfo()
             ]);
+
+            // Race giữa fetch data và timeout
+            const [recData, empData, userData, updateInfo] = await Promise.race([dataPromise, timeoutPromise]) as any;
+
             setRecords(recData);
             setEmployees(empData);
             setUsers(userData);
             setConnectionStatus('connected');
 
-            if (updateInfo.version && updateInfo.version !== APP_VERSION) {
+            if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
                 setIsUpdateAvailable(true);
                 setLatestVersion(updateInfo.version);
                 setUpdateUrl(updateInfo.url);
             }
         } catch (error) {
-            console.error("Lỗi tải dữ liệu:", error);
+            console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
+            // Quan trọng: Khi lỗi, chuyển sang OFFLINE nhưng vẫn cho phép App hoạt động
+            // Dữ liệu sẽ được lấy từ Cache (đã xử lý trong apiCore)
             setConnectionStatus('offline');
+            
+            // Nếu cache cũng rỗng (lần đầu chạy), khởi tạo mảng rỗng để không crash UI
+            setRecords((prev) => prev.length > 0 ? prev : []);
+            setEmployees((prev) => prev.length > 0 ? prev : []);
+            setUsers((prev) => prev.length > 0 ? prev : []);
         }
     }, []);
 

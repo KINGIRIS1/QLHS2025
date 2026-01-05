@@ -1,3 +1,4 @@
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -10,24 +11,32 @@ const __dirname = path.dirname(__filename);
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // QUAN TRỌNG: Đường dẫn tương đối để Electron tải được assets từ file://
+  // QUAN TRỌNG: Dùng './' để hỗ trợ mọi đường dẫn con (GitHub Pages, Subfolder, Electron)
+  base: './', 
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
-      // Đảm bảo buffer được resolve đúng về package cài đặt
       buffer: 'buffer',
     },
   },
   define: {
-    // Polyfill global cho các thư viện cũ
     'global': 'window',
-    // Polyfill process.env rỗng để tránh lỗi "process is not defined"
     'process.env': {}
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    target: 'esnext',
+    target: 'es2020', // Đảm bảo tương thích tốt hơn
+    rollupOptions: {
+        output: {
+            // Tách nhỏ file vendor để tránh lỗi load file quá lớn
+            manualChunks: {
+                vendor: ['react', 'react-dom'],
+                utils: ['xlsx-js-style', 'docxtemplater', 'pizzip', 'file-saver'],
+                icons: ['lucide-react']
+            }
+        }
+    }
   },
   server: {
     port: 5173,

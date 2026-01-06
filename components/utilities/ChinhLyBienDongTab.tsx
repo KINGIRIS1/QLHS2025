@@ -4,7 +4,7 @@ import { User as UserType, RecordFile } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { ChinhLyRecord, fetchChinhLyRecords, saveChinhLyRecord, deleteChinhLyRecord } from '../../services/apiUtilities';
 import { NotifyFunction } from '../../components/UtilitiesView';
-import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, PlusCircle, X, Layers, Copy, CheckSquare } from 'lucide-react';
+import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, PlusCircle, X, Layers, Copy, CheckSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -141,10 +141,40 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         }
     };
 
+    // --- LOGIC TÍNH TOÁN DIỆN TÍCH ---
+    const calculateTotals = useMemo(() => {
+        const totalBefore = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_CU) || 0), 0);
+        const totalAfter = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_MOI) || 0), 0);
+        // Làm tròn 2 chữ số thập phân để so sánh
+        const diff = Math.abs(totalBefore - totalAfter);
+        const isMismatch = diff > 0.1; // Cho phép sai số nhỏ do làm tròn (0.1m2)
+
+        return {
+            totalBefore: parseFloat(totalBefore.toFixed(2)),
+            totalAfter: parseFloat(totalAfter.toFixed(2)),
+            isMismatch,
+            diff: parseFloat(diff.toFixed(2))
+        };
+    }, [detailRows]);
+
     const handleSaveGroup = async () => {
         if (!commonData.XA) { notify("Vui lòng chọn Xã/Phường.", 'error'); return; }
         
         setIsSaving(true);
+
+        // KIỂM TRA TỔNG DIỆN TÍCH
+        if (calculateTotals.isMismatch) {
+            const warningMsg = `CẢNH BÁO SAI LỆCH DIỆN TÍCH!\n\n` +
+                `- Tổng diện tích TRƯỚC biến động: ${calculateTotals.totalBefore} m²\n` +
+                `- Tổng diện tích SAU biến động: ${calculateTotals.totalAfter} m²\n` +
+                `- Chênh lệch: ${calculateTotals.diff} m²\n\n` +
+                `Bạn có chắc chắn muốn lưu không?`;
+            
+            if (!(await confirmAction(warningMsg, 'Xác nhận lưu dữ liệu lệch'))) {
+                setIsSaving(false);
+                return;
+            }
+        }
         
         // 1. Nếu đang sửa, xóa các record cũ thuộc nhóm này (client-side filter để lấy IDs)
         if (editingGroupId) {
@@ -549,6 +579,31 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                         </td>
                                     </tr>
                                 </tbody>
+                                {/* FOOTER: HIỂN THỊ TỔNG CỘNG ĐỂ KIỂM TRA */}
+                                <tfoot>
+                                    <tr className="bg-gray-100 font-bold border-t-2 border-gray-300 text-sm">
+                                        <td colSpan={3} className="p-2 text-right text-gray-600 border-r border-gray-200">Tổng cộng Trước:</td>
+                                        <td className={`p-2 text-center border-r border-gray-200 ${calculateTotals.isMismatch ? 'text-red-600' : 'text-blue-600'}`}>
+                                            {calculateTotals.totalBefore}
+                                        </td>
+                                        <td className="p-2 border-r border-gray-200"></td>
+                                        <td colSpan={3} className="p-2 text-right text-gray-600 border-r border-gray-200">Tổng cộng Sau:</td>
+                                        <td className={`p-2 text-center border-r border-gray-200 ${calculateTotals.isMismatch ? 'text-red-600' : 'text-green-600'}`}>
+                                            {calculateTotals.totalAfter}
+                                        </td>
+                                        <td colSpan={2} className="p-2 text-left">
+                                            {calculateTotals.isMismatch ? (
+                                                <span className="text-xs text-red-500 flex items-center gap-1 animate-pulse">
+                                                    <AlertTriangle size={14}/> Lệch {calculateTotals.diff} m²
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-green-600 flex items-center gap-1">
+                                                    <CheckCircle2 size={14}/> Khớp
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
 

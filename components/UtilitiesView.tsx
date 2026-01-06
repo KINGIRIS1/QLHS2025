@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info } from 'lucide-react';
+import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2 } from 'lucide-react';
 import { User as UserType } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
 import VPHCTab from './utilities/VPHCTab';
 import SaiSoTab from './utilities/SaiSoTab';
+import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -15,7 +16,7 @@ export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -87,7 +88,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser }) => {
                   onClick={() => setActiveTab('bienban')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'bienban' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                  <FileText size={16} /> Soạn Biên Bản (KT Hiện Trạng)
+                  <FileText size={16} /> Soạn Biên Bản
               </button>
               <button 
                   onClick={() => setActiveTab('vphc')}
@@ -102,14 +103,20 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser }) => {
                   <Info size={16} /> Cung Cấp Thông Tin
               </button>
               <button 
+                  onClick={() => setActiveTab('chinhly')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chinhly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Table2 size={16} /> DS Chỉnh lý biến động
+              </button>
+              <button 
                   onClick={() => setActiveTab('saiso')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'saiso' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                  <Calculator size={16} /> Tính sai số đo đạc
+                  <Calculator size={16} /> Tính sai số
               </button>
           </div>
           
-          {activeTab !== 'saiso' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -138,7 +145,12 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser }) => {
               <CungCapThongTinTab currentUser={currentUser} notify={notify} />
           </div>
 
-          {/* TAB 4: TÍNH SAI SỐ */}
+          {/* TAB 4: CHỈNH LÝ BIẾN ĐỘNG */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'chinhly' ? 'block' : 'hidden'}`}>
+              <ChinhLyBienDongTab currentUser={currentUser} notify={notify} />
+          </div>
+
+          {/* TAB 5: TÍNH SAI SỐ */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'saiso' ? 'block' : 'hidden'}`}>
               <SaiSoTab />
           </div>

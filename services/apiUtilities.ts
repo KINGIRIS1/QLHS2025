@@ -23,10 +23,15 @@ export interface ThongTinRecord extends GenericRecord {
     // data chứa formData
 }
 
+export interface ChinhLyRecord extends GenericRecord {
+    // data chứa các trường chỉnh lý biến động
+}
+
 // Mock Data Stores
 const MOCK_VPHC: VphcRecord[] = [];
 const MOCK_BIENBAN: BienBanRecord[] = [];
 const MOCK_THONGTIN: ThongTinRecord[] = [];
+const MOCK_CHINHLY: ChinhLyRecord[] = [];
 
 // Helper sinh ID ngẫu nhiên
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -233,6 +238,72 @@ export const deleteThongTinRecord = async (id: string): Promise<boolean> => {
         return true;
     } catch (error) {
         logError("deleteThongTinRecord", error);
+        return false;
+    }
+};
+
+// ============================================================================
+// 4. DANH SÁCH CHỈNH LÝ BIẾN ĐỘNG (NEW)
+// ============================================================================
+
+export const fetchChinhLyRecords = async (): Promise<ChinhLyRecord[]> => {
+    if (!isConfigured) return MOCK_CHINHLY;
+    try {
+        const { data, error } = await supabase
+            .from('chinhly_records')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data as ChinhLyRecord[];
+    } catch (error) {
+        // Fallback or ignore if table not created
+        return MOCK_CHINHLY;
+    }
+};
+
+export const saveChinhLyRecord = async (record: Partial<ChinhLyRecord>): Promise<boolean> => {
+    if (!isConfigured) {
+        if (!record.id) {
+            const newRec = { ...record, id: generateId(), created_at: new Date().toISOString() } as ChinhLyRecord;
+            MOCK_CHINHLY.unshift(newRec);
+        } else {
+            const idx = MOCK_CHINHLY.findIndex(r => r.id === record.id);
+            if (idx !== -1) MOCK_CHINHLY[idx] = { ...MOCK_CHINHLY[idx], ...record } as ChinhLyRecord;
+        }
+        return true;
+    }
+    try {
+        if (record.id) {
+            const { error } = await supabase.from('chinhly_records').update({ 
+                customer_name: record.customer_name,
+                data: record.data,
+                created_by: record.created_by
+            }).eq('id', record.id);
+            if (error) throw error;
+        } else {
+            const newRecord = { ...record, id: generateId() };
+            const { error } = await supabase.from('chinhly_records').insert([newRecord]);
+            if (error) throw error;
+        }
+        return true;
+    } catch (error) {
+        logError("saveChinhLyRecord", error);
+        return false;
+    }
+};
+
+export const deleteChinhLyRecord = async (id: string): Promise<boolean> => {
+    if (!isConfigured) {
+        const idx = MOCK_CHINHLY.findIndex(r => r.id === id);
+        if (idx !== -1) MOCK_CHINHLY.splice(idx, 1);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('chinhly_records').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteChinhLyRecord", error);
         return false;
     }
 };

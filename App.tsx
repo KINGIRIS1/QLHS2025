@@ -140,6 +140,10 @@ function App() {
   // NEW: State for Bulk Update Modal
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
 
+  // NEW: State for Return Result Modal
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnRecord, setReturnRecord] = useState<RecordFile | null>(null);
+
   const [globalReportContent, setGlobalReportContent] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -298,17 +302,34 @@ function App() {
       }
   }, [records]);
 
-  // Xử lý trả kết quả cho dân
-  const handleReturnResult = useCallback(async (record: RecordFile) => {
-      const today = new Date().toISOString().split('T')[0];
-      if(await confirmAction(`Xác nhận trả kết quả cho hồ sơ ${record.code} vào ngày hôm nay (${today})?`)) {
-          // UPDATE: Chuyển trạng thái sang RETURNED thay vì HANDOVER
-          const updates = { resultReturnedDate: today, status: RecordStatus.RETURNED }; 
-          setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
-          await updateRecordApi({ ...record, ...updates });
-          setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${record.code}.` });
-      }
+  // Xử lý nút mở Modal trả kết quả (Thay vì confirm trực tiếp)
+  const handleOpenReturnModal = useCallback((record: RecordFile) => {
+      setReturnRecord(record);
+      setIsReturnModalOpen(true);
   }, []);
+
+  // Xử lý xác nhận trả kết quả từ Modal
+  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string) => {
+      if (!returnRecord) return;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const newNotes = returnRecord.notes 
+          ? `${returnRecord.notes}. Người nhận: ${receiverName}`
+          : `Người nhận: ${receiverName}`;
+
+      const updates = { 
+          resultReturnedDate: today, 
+          status: RecordStatus.RETURNED,
+          receiptNumber: receiptNumber,
+          notes: newNotes
+      }; 
+
+      setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
+      await updateRecordApi({ ...returnRecord, ...updates });
+      
+      setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
+      setReturnRecord(null);
+  }, [returnRecord]);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
       if (record.status === RecordStatus.RECEIVED) { 
@@ -586,7 +607,7 @@ function App() {
                                 onDelete={handleDeleteConfirm} 
                                 onAdvanceStatus={advanceStatus}
                                 onQuickUpdate={handleQuickUpdate}
-                                onReturnResult={handleReturnResult}
+                                onReturnResult={handleOpenReturnModal}
                             />
                         )) : (
                             <tr><td colSpan={Object.values(visibleColumns).filter(v => v).length + 2} className="p-8 text-center text-gray-400 italic">Không có dữ liệu hiển thị.</td></tr>
@@ -767,10 +788,12 @@ function App() {
           isAddToBatchModalOpen={isAddToBatchModalOpen} setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
           isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
           isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
+          isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
           
           editingRecord={editingRecord} setEditingRecord={setEditingRecord}
           viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
           deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
+          returnRecord={returnRecord} setReturnRecord={setReturnRecord}
           assignTargetRecords={assignTargetRecords}
           exportModalType={exportModalType}
           
@@ -788,6 +811,7 @@ function App() {
           executeBatchExport={executeBatchExport}
           onCreateLiquidation={handleRequestLiquidation}
           handleBulkUpdate={handleBulkUpdate}
+          confirmReturnResult={handleConfirmReturnResult}
 
           employees={employees}
           currentUser={currentUser}

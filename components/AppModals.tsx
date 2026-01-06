@@ -12,6 +12,7 @@ import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
 import BulkUpdateModal from './BulkUpdateModal';
+import ReturnResultModal from './ReturnResultModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -25,12 +26,14 @@ interface AppModalsProps {
     isExportModalOpen: boolean;
     isAddToBatchModalOpen: boolean;
     isExcelPreviewOpen: boolean;
-    isBulkUpdateModalOpen: boolean; // New Prop
+    isBulkUpdateModalOpen: boolean;
+    isReturnModalOpen: boolean; // New Prop
     
     // Data States
     editingRecord: RecordFile | null;
     viewingRecord: RecordFile | null;
     deletingRecord: RecordFile | null;
+    returnRecord: RecordFile | null; // New Prop
     assignTargetRecords: RecordFile[];
     exportModalType: 'handover' | 'check_list';
     
@@ -48,11 +51,13 @@ interface AppModalsProps {
     setIsExportModalOpen: (v: boolean) => void;
     setIsAddToBatchModalOpen: (v: boolean) => void;
     setIsExcelPreviewOpen: (v: boolean) => void;
-    setIsBulkUpdateModalOpen: (v: boolean) => void; // New Prop
+    setIsBulkUpdateModalOpen: (v: boolean) => void;
+    setIsReturnModalOpen: (v: boolean) => void; // New Prop
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
     setDeletingRecord: (r: RecordFile | null) => void;
+    setReturnRecord: (r: RecordFile | null) => void; // New Prop
 
     // Handlers
     handleAddOrUpdate: (data: any) => Promise<boolean>;
@@ -66,7 +71,8 @@ interface AppModalsProps {
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;
     executeBatchExport: (batch: number, date: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
-    handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>; // New Handler
+    handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>;
+    confirmReturnResult: (receiptNumber: string, receiverName: string) => void; // New Handler
 
     // Shared Data
     employees: Employee[];
@@ -76,7 +82,7 @@ interface AppModalsProps {
     records: RecordFile[];
     selectedCount: number;
     canPerformAction: boolean;
-    selectedRecordsForBulk: RecordFile[]; // New Prop
+    selectedRecordsForBulk: RecordFile[];
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
@@ -128,7 +134,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 isOpen={props.isDeleteModalOpen} 
                 onClose={() => props.setIsDeleteModalOpen(false)} 
                 onConfirm={props.handleDeleteRecord} 
-                message={`Bạn có chắc muốn xóa hồ sơ ${props.deletingRecord?.code}?`} 
+                message={`Bạn có chắc chắn muốn xóa hồ sơ ${props.deletingRecord?.code}?`} 
             />
             
             <ExportModal 
@@ -162,6 +168,13 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees}
                 wards={props.wards}
                 onConfirm={props.handleBulkUpdate}
+            />
+
+            <ReturnResultModal
+                isOpen={props.isReturnModalOpen}
+                onClose={() => { props.setIsReturnModalOpen(false); props.setReturnRecord(null); }}
+                record={props.returnRecord}
+                onConfirm={props.confirmReturnResult}
             />
         </>
     );

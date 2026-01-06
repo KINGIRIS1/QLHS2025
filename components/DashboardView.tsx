@@ -77,28 +77,28 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
     }, [recordsInYear]);
 
     return (
-        <div className="h-full overflow-y-auto space-y-6 p-2 flex flex-col">
+        <div className="h-full overflow-y-auto space-y-4 md:space-y-6 p-2 flex flex-col custom-scrollbar">
             
             {/* HEADER: BỘ ĐẾM NĂM */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0 sticky top-0 z-10">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="bg-blue-600 text-white p-2 rounded-lg shadow-blue-200 shadow-md">
                         <CalendarRange size={24} />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-gray-800">Tổng quan tình hình hồ sơ</h2>
+                        <h2 className="text-lg font-bold text-gray-800">Tổng quan tình hình</h2>
                         <p className="text-xs text-gray-500 font-medium">Thống kê dữ liệu tự động theo năm</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200 w-full md:w-auto justify-between md:justify-start">
                     <div className="px-3 py-1 text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Filter size={14} /> Chọn năm:
+                        <Filter size={14} /> <span className="hidden md:inline">Chọn năm:</span>
                     </div>
                     <select 
                         value={selectedYear} 
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="bg-white border border-slate-300 text-gray-800 text-sm font-bold rounded-md focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none cursor-pointer hover:border-blue-400 transition-colors shadow-sm min-w-[100px]"
+                        className="bg-white border border-slate-300 text-gray-800 text-sm font-bold rounded-md focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none cursor-pointer hover:border-blue-400 transition-colors shadow-sm min-w-[100px] flex-1 md:flex-none"
                     >
                         {availableYears.map(year => (
                             <option key={year} value={year}>Năm {year}</option>
@@ -107,8 +107,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                 </div>
             </div>
 
-            {/* CARDS: THỐNG KÊ CHI TIẾT */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* CARDS: THỐNG KÊ CHI TIẾT - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
                     <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:opacity-20 transition-all duration-300 transform rotate-12 z-0">
                         <FileText size={80} className="text-blue-600" />

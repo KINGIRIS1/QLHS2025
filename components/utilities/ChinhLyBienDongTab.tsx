@@ -4,7 +4,7 @@ import { User as UserType, RecordFile } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { ChinhLyRecord, fetchChinhLyRecords, saveChinhLyRecord, deleteChinhLyRecord } from '../../services/apiUtilities';
 import { NotifyFunction } from '../../components/UtilitiesView';
-import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, PlusCircle, X, Layers, Copy, CheckSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, Layers, CheckSquare, Square, ArrowRight, FolderCheck, RotateCcw, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -23,10 +23,10 @@ const CHON_THANH_WARDS = [
 // Dữ liệu dùng chung cho cả nhóm (Header)
 interface CommonData {
     XA: string;
-    // TEN_CSD: string; // Đã bỏ theo yêu cầu
     SO_HD: string; // Key để gom nhóm
     CAN_CU_PHAP_LY: string;
     GHI_CHU: string;
+    STATUS?: 'pending' | 'sent'; // Trạng thái: Chờ xử lý | Đã chuyển
 }
 
 // Dữ liệu chi tiết từng dòng (Detail)
@@ -36,12 +36,13 @@ interface DetailData {
     // Sau BĐ
     TO_MOI: string; THUA_TAM: string; THUA_CHINH_THUC: string; DT_MOI: string; LOAI_DAT_MOI: string;
     
-    TONG_DT: string; // Tổng DT thường gắn với từng thửa hoặc tổng chung, ở đây để ở detail cho linh hoạt
+    TONG_DT: string; 
 }
 
 const DEFAULT_COMMON: CommonData = {
     XA: '', SO_HD: '', 
-    CAN_CU_PHAP_LY: 'Phiếu yêu cầu nộp hồ sơ GQ TTHC', GHI_CHU: ''
+    CAN_CU_PHAP_LY: 'Phiếu yêu cầu nộp hồ sơ GQ TTHC', GHI_CHU: '',
+    STATUS: 'pending'
 };
 
 const DEFAULT_DETAIL: DetailData = {
@@ -52,10 +53,17 @@ const DEFAULT_DETAIL: DetailData = {
 
 const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, notify }) => {
     const [mode, setMode] = useState<'create' | 'list'>('list');
+    
+    // Tab con trong màn hình danh sách
+    const [listTab, setListTab] = useState<'pending' | 'sent'>('pending');
+
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [savedList, setSavedList] = useState<ChinhLyRecord[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     
+    // Selection State
+    const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+
     // State Form
     const [commonData, setCommonData] = useState<CommonData>(DEFAULT_COMMON);
     const [detailRows, setDetailRows] = useState<DetailData[]>([ { ...DEFAULT_DETAIL } ]);
@@ -63,12 +71,16 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
     const [searchQuery, setSearchQuery] = useState(''); 
     const [isSaving, setIsSaving] = useState(false);
     
-    // State để quản lý việc sửa (Nếu sửa 1 dòng trong nhóm, ta load cả nhóm lên để sửa)
     const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
     }, []);
+
+    // Reset selection khi đổi tab danh sách
+    useEffect(() => {
+        setSelectedGroups(new Set());
+    }, [listTab]);
 
     const loadData = async () => {
         const [appRecords, utilityRecords] = await Promise.all([
@@ -86,7 +98,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
 
     const handleRemoveDetailRow = (index: number) => {
         if (detailRows.length === 1) {
-            setDetailRows([{ ...DEFAULT_DETAIL }]); // Clear nếu là dòng cuối
+            setDetailRows([{ ...DEFAULT_DETAIL }]); 
         } else {
             setDetailRows(prev => prev.filter((_, i) => i !== index));
         }
@@ -103,15 +115,12 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         const found = records.find(r => r.code.toLowerCase() === searchQuery.toLowerCase().trim());
         
         if (found) {
-            // Fill Common Info
             setCommonData(prev => ({
                 ...prev,
-                // TEN_CSD: found.customerName, // Bỏ điền tên
-                XA: found.ward ? found.ward : '', // Giữ nguyên tên xã/phường đầy đủ
+                XA: found.ward ? found.ward : '',
                 SO_HD: found.code
             }));
 
-            // Fill Detail (Vào dòng cuối cùng hoặc dòng mới)
             const newDetail: DetailData = {
                 ...DEFAULT_DETAIL,
                 TO_CU: found.mapSheet || '',
@@ -122,7 +131,6 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                 TO_MOI: found.mapSheet || '',
             };
 
-            // Nếu dòng cuối đang trống thì điền đè, không thì thêm mới
             const lastIdx = detailRows.length - 1;
             const isLastEmpty = !detailRows[lastIdx].TO_CU && !detailRows[lastIdx].THUA_CU;
             
@@ -145,9 +153,8 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
     const calculateTotals = useMemo(() => {
         const totalBefore = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_CU) || 0), 0);
         const totalAfter = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_MOI) || 0), 0);
-        // Làm tròn 2 chữ số thập phân để so sánh
         const diff = Math.abs(totalBefore - totalAfter);
-        const isMismatch = diff > 0.1; // Cho phép sai số nhỏ do làm tròn (0.1m2)
+        const isMismatch = diff > 0.1; 
 
         return {
             totalBefore: parseFloat(totalBefore.toFixed(2)),
@@ -162,7 +169,6 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         
         setIsSaving(true);
 
-        // KIỂM TRA TỔNG DIỆN TÍCH
         if (calculateTotals.isMismatch) {
             const warningMsg = `CẢNH BÁO SAI LỆCH DIỆN TÍCH!\n\n` +
                 `- Tổng diện tích TRƯỚC biến động: ${calculateTotals.totalBefore} m²\n` +
@@ -176,7 +182,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
         
-        // 1. Nếu đang sửa, xóa các record cũ thuộc nhóm này (client-side filter để lấy IDs)
+        // 1. Xóa cũ nếu đang sửa
         if (editingGroupId) {
             const oldRecords = savedList.filter(r => r.data.SO_HD === editingGroupId);
             for (const rec of oldRecords) {
@@ -184,9 +190,8 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
-        // 2. Insert các dòng mới
+        // 2. Insert mới
         let successCount = 0;
-        // Filter empty rows
         const validRows = detailRows.filter(r => r.TO_CU || r.THUA_CU || r.TO_MOI || r.THUA_CHINH_THUC);
         
         if (validRows.length === 0) {
@@ -198,11 +203,14 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         for (const row of validRows) {
             const recordData = {
                 ...commonData,
+                // Khi tạo mới hoặc sửa, nếu chưa có status thì set là pending. 
+                // Nếu đang sửa và đã có status cũ, giữ nguyên (logic này có thể tùy chỉnh)
+                STATUS: commonData.STATUS || 'pending', 
                 ...row
             };
             
             const recordToSave: Partial<ChinhLyRecord> = {
-                customer_name: `${commonData.XA} - ${commonData.SO_HD}`, // Dùng Xã + HĐ làm tên gợi nhớ
+                customer_name: `${commonData.XA} - ${commonData.SO_HD}`, 
                 data: recordData,
                 created_by: currentUser.name
             };
@@ -219,19 +227,17 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
     };
 
     const handleEditGroup = (soHD: string) => {
-        // Tìm tất cả records có cùng SO_HD
         const groupRecords = savedList.filter(r => r.data.SO_HD === soHD);
-        
         if (groupRecords.length === 0) return;
 
         const first = groupRecords[0].data;
         
         setCommonData({
             XA: first.XA || '',
-            // TEN_CSD: first.TEN_CSD || '',
             SO_HD: first.SO_HD || '',
             CAN_CU_PHAP_LY: first.CAN_CU_PHAP_LY || '',
-            GHI_CHU: first.GHI_CHU || ''
+            GHI_CHU: first.GHI_CHU || '',
+            STATUS: first.STATUS || 'pending'
         });
 
         const details: DetailData[] = groupRecords.map(r => ({
@@ -263,10 +269,72 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         setSearchQuery('');
     };
 
-    // --- GROUPING LOGIC FOR LIST VIEW ---
+    // --- SELECTION LOGIC ---
+    const toggleSelectGroup = (soHD: string) => {
+        if (!soHD) return;
+        const newSet = new Set(selectedGroups);
+        if (newSet.has(soHD)) {
+            newSet.delete(soHD);
+        } else {
+            newSet.add(soHD);
+        }
+        setSelectedGroups(newSet);
+    };
+
+    const toggleSelectAll = () => {
+        // Lấy tất cả SO_HD duy nhất trong danh sách HIỆN TẠI (đã lọc)
+        const allGroups = new Set<string>();
+        groupedList.forEach(item => {
+            if (item.data.SO_HD) allGroups.add(item.data.SO_HD);
+        });
+
+        if (selectedGroups.size === allGroups.size) {
+            setSelectedGroups(new Set()); // Bỏ chọn hết
+        } else {
+            setSelectedGroups(allGroups); // Chọn hết
+        }
+    };
+
+    // --- TRANSFER / REVERT LOGIC ---
+    const handleChangeStatus = async (targetStatus: 'pending' | 'sent') => {
+        if (selectedGroups.size === 0) {
+            notify("Vui lòng chọn ít nhất 1 hồ sơ.", 'error');
+            return;
+        }
+
+        const actionName = targetStatus === 'sent' ? 'LẬP DANH SÁCH (Chuyển đi)' : 'HUỶ DANH SÁCH (Trả lại)';
+        if (!(await confirmAction(`Bạn có chắc chắn muốn ${actionName} cho ${selectedGroups.size} hồ sơ đã chọn?`))) return;
+
+        setIsSaving(true);
+        let count = 0;
+
+        // Tìm tất cả các record thuộc các nhóm đã chọn
+        const recordsToUpdate = savedList.filter(r => r.data.SO_HD && selectedGroups.has(r.data.SO_HD));
+
+        for (const rec of recordsToUpdate) {
+            // Cập nhật status trong data JSON
+            const newData = { ...rec.data, STATUS: targetStatus };
+            await saveChinhLyRecord({ ...rec, data: newData });
+            count++;
+        }
+
+        await loadData();
+        setIsSaving(false);
+        setSelectedGroups(new Set());
+        notify(`Đã cập nhật trạng thái cho ${count} dòng dữ liệu.`, 'success');
+    };
+
+    // --- GROUPING & FILTERING LOGIC ---
     const groupedList = useMemo(() => {
-        // 1. Filter
         let list = savedList;
+
+        // 1. Filter by Tab (Status)
+        list = list.filter(item => {
+            const status = item.data.STATUS || 'pending';
+            return status === listTab;
+        });
+
+        // 2. Filter by Search
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
             list = list.filter(item => 
@@ -276,12 +344,10 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             );
         }
 
-        // 2. Sort by SO_HD (để gom nhóm)
-        // Những dòng có cùng SO_HD sẽ nằm cạnh nhau
+        // 3. Sort by SO_HD
         list.sort((a, b) => {
             const hdA = a.data.SO_HD || '';
             const hdB = b.data.SO_HD || '';
-            // Nếu không có số HD, xếp xuống dưới
             if (!hdA && !hdB) return 0;
             if (!hdA) return 1;
             if (!hdB) return -1;
@@ -289,22 +355,18 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         });
 
         return list;
-    }, [savedList, searchTerm]);
+    }, [savedList, searchTerm, listTab]);
 
-    // Hàm tính toán rowSpan
-    // Trả về số dòng cần span nếu là dòng đầu tiên của nhóm, trả về 0 nếu là dòng tiếp theo (để ẩn)
     const getRowSpan = (index: number, field: string) => {
         const current = groupedList[index];
         const prev = groupedList[index - 1];
         
-        // Chỉ gộp khi có SO_HD. Nếu không có SO_HD, không gộp.
         if (!current.data.SO_HD) return 1;
 
         if (prev && prev.data.SO_HD === current.data.SO_HD) {
-            return 0; // Đã được gộp vào dòng trên
+            return 0; // Đã được gộp
         }
 
-        // Đếm xem có bao nhiêu dòng tiếp theo cùng SO_HD
         let count = 1;
         for (let i = index + 1; i < groupedList.length; i++) {
             if (groupedList[i].data.SO_HD === current.data.SO_HD) {
@@ -316,25 +378,21 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         return count;
     };
     
-    // Tính STT nhóm (Group Index) thay vì Row Index
     const getGroupSTT = (index: number) => {
         const current = groupedList[index];
-        if (!current.data.SO_HD) return index + 1; // Fallback
+        if (!current.data.SO_HD) return index + 1;
 
-        // Tìm index của dòng đầu tiên trong nhóm này
         let firstIdx = index;
         while(firstIdx > 0 && groupedList[firstIdx - 1].data.SO_HD === current.data.SO_HD) {
             firstIdx--;
         }
         
-        // Đếm số nhóm ĐỘC LẬP đứng trước firstIdx
         let groupCount = 0;
         let i = 0;
         while (i < firstIdx) {
             groupCount++;
             const hd = groupedList[i].data.SO_HD;
             if (hd) {
-                // Skip qua các dòng cùng nhóm
                 while (i < firstIdx && groupedList[i].data.SO_HD === hd) i++;
             } else {
                 i++;
@@ -343,61 +401,55 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         return groupCount + 1;
     }
 
-    // --- EXCEL EXPORT (MERGED) ---
     const handleExportExcel = () => {
         if (groupedList.length === 0) { notify("Danh sách trống.", 'error'); return; }
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
+        const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ CHỜ LẬP" : "DANH SÁCH ĐÃ CHUYỂN CHỈNH LÝ";
         const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
         const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", ""];
 
-        // Add Header
         XLSX.utils.sheet_add_aoa(ws, [
-            ["DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC"],
+            [title],
             [""],
             header1,
             header2
         ], { origin: "A1" });
 
-        // Build Data Rows & Merges
         const dataRows: any[] = [];
         const merges: any[] = [];
         
-        // Base merges for Header
-        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }); // Title
-        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // STT
-        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Xã
-        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ
-        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
-        merges.push({ s: { r: 2, c: 11 }, e: { r: 3, c: 11 } }); // Tổng DT
-        merges.push({ s: { r: 2, c: 12 }, e: { r: 3, c: 12 } }); // Căn cứ
-        merges.push({ s: { r: 2, c: 13 }, e: { r: 3, c: 13 } }); // Số HĐ
-        merges.push({ s: { r: 2, c: 14 }, e: { r: 3, c: 14 } }); // Ghi chú
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }); 
+        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); 
+        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); 
+        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); 
+        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); 
+        merges.push({ s: { r: 2, c: 11 }, e: { r: 3, c: 11 } }); 
+        merges.push({ s: { r: 2, c: 12 }, e: { r: 3, c: 12 } }); 
+        merges.push({ s: { r: 2, c: 13 }, e: { r: 3, c: 13 } }); 
+        merges.push({ s: { r: 2, c: 14 }, e: { r: 3, c: 14 } }); 
 
-        let currentRow = 4; // Data starts at row index 4 (A5)
+        let currentRow = 4;
 
-        // Loop through groupedList to build rows and merges
         for (let i = 0; i < groupedList.length; i++) {
             const item = groupedList[i];
             const d = item.data;
             const span = getRowSpan(i, 'SO_HD');
             
             dataRows.push([
-                span > 0 ? getGroupSTT(i) : '', // STT chỉ hiện ở dòng đầu
-                span > 0 ? d.XA : '',           // Xã
+                span > 0 ? getGroupSTT(i) : '', 
+                span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
                 d.TONG_DT,
-                span > 0 ? d.CAN_CU_PHAP_LY : '', // Căn cứ
-                span > 0 ? d.SO_HD : '',          // Số HĐ
-                span > 0 ? d.GHI_CHU : ''         // Ghi chú
+                span > 0 ? d.CAN_CU_PHAP_LY : '', 
+                span > 0 ? d.SO_HD : '',          
+                span > 0 ? d.GHI_CHU : ''         
             ]);
 
-            // Add merges for Common Columns if span > 1
             if (span > 1) {
-                // Cột STT (0), Xã (1), Tổng DT (11) - nếu muốn gộp, Căn cứ (12), Số HĐ (13), Ghi chú (14)
                 [0, 1, 12, 13, 14].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
@@ -408,12 +460,10 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A5" });
         ws['!merges'] = merges;
 
-        // Styling
         const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
         const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
 
-        // Apply Header Styles
         for (let r = 2; r <= 3; r++) {
             for (let c = 0; c <= 14; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
@@ -422,12 +472,10 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
-        // Apply Data Styles
         for (let r = 4; r < 4 + dataRows.length; r++) {
             for (let c = 0; c <= 14; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
-                // Center align specific columns: STT, Tờ, Thửa
                 if ([0, 2, 3, 6, 7, 8, 13].includes(c)) ws[ref].s = centerStyle;
                 else ws[ref].s = cellStyle;
             }
@@ -441,7 +489,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_ChinhLy");
-        XLSX.writeFile(wb, `DS_ChinhLy_BienDong_${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(wb, `DS_ChinhLy_${listTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const commonInputClass = "w-full border border-gray-300 rounded px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white";
@@ -455,7 +503,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                     <Plus size={16} /> Nhập liệu
                 </button>
                 <button onClick={() => setMode('list')} className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <List size={16} /> Danh sách ({savedList.length})
+                    <List size={16} /> Danh sách
                 </button>
             </div>
 
@@ -471,7 +519,6 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                     {editingGroupId ? `Đang chỉnh sửa hồ sơ: ${editingGroupId}` : 'Thông tin chung (Nhóm)'}
                                 </h3>
                                 
-                                {/* Quick Search & Fill */}
                                 {!editingGroupId && (
                                     <div className="flex gap-2">
                                         <div className="relative">
@@ -503,7 +550,6 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                         ))}
                                     </select>
                                 </div>
-                                {/* ĐÃ BỎ Ô TÊN CHỦ */}
                                 <div className="md:col-span-1">
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số Hợp đồng / Mã HS *</label>
                                     <input className={`${commonInputClass} font-mono font-bold text-blue-700`} value={commonData.SO_HD} onChange={e => setCommonData({...commonData, SO_HD: e.target.value})} placeholder="0902/HĐ..." />
@@ -617,8 +663,24 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                     </div>
                 ) : (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
+                        {/* LIST SUB-NAVIGATION */}
+                        <div className="flex border-b border-gray-200 bg-gray-50 px-4">
+                            <button 
+                                onClick={() => setListTab('pending')}
+                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${listTab === 'pending' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <List size={16} /> Chờ lập danh sách
+                            </button>
+                            <button 
+                                onClick={() => setListTab('sent')}
+                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${listTab === 'sent' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <FolderCheck size={16} /> Đã chuyển chỉnh lý
+                            </button>
+                        </div>
+
                         {/* List Toolbar */}
-                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white">
                             <div className="relative w-64">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                 <input 
@@ -628,15 +690,47 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                     onChange={e => setSearchTerm(e.target.value)}
                                 />
                             </div>
-                            <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm">
-                                <FileSpreadsheet size={16} /> Xuất Excel
-                            </button>
+                            
+                            <div className="flex items-center gap-2">
+                                {/* TRANSFER BUTTON (Only visible in Pending Tab with Selection) */}
+                                {listTab === 'pending' && selectedGroups.size > 0 && (
+                                    <button 
+                                        onClick={() => handleChangeStatus('sent')} 
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm animate-pulse"
+                                    >
+                                        <ArrowRight size={16} /> Lập danh sách ({selectedGroups.size})
+                                    </button>
+                                )}
+
+                                {/* REVERT BUTTON (Only visible in Sent Tab with Selection) */}
+                                {listTab === 'sent' && selectedGroups.size > 0 && (
+                                    <button 
+                                        onClick={() => handleChangeStatus('pending')} 
+                                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-bold hover:bg-orange-700 shadow-sm"
+                                    >
+                                        <RotateCcw size={16} /> Trả lại danh sách ({selectedGroups.size})
+                                    </button>
+                                )}
+
+                                <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm">
+                                    <FileSpreadsheet size={16} /> Xuất Excel
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-auto">
                             <table className="w-full text-left border-collapse text-sm">
                                 <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0 shadow-sm z-10 text-xs uppercase">
                                     <tr>
+                                        {/* CHECKBOX HEADER */}
+                                        <th className="p-3 border-b border-r w-10 text-center bg-gray-200">
+                                            <button onClick={toggleSelectAll}>
+                                                {selectedGroups.size > 0 && selectedGroups.size === new Set(groupedList.map(i => i.data.SO_HD)).size 
+                                                    ? <CheckSquare size={16} className="text-blue-600" /> 
+                                                    : <Square size={16} className="text-gray-400" />
+                                                }
+                                            </button>
+                                        </th>
                                         <th className="p-3 border-b text-center w-12 border-r bg-gray-200">STT</th>
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Xã / Phường</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Trước BĐ</th>
@@ -655,11 +749,20 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                         const shouldRenderCommon = rowSpan > 0;
                                         const isFirstInGroup = shouldRenderCommon; // Dòng đầu của nhóm
                                         
-                                        // Chỉ hiện border-top đậm cho dòng đầu nhóm
                                         const rowClass = isFirstInGroup ? "border-t-2 border-gray-300" : "hover:bg-blue-50/30";
+                                        const isSelected = item.data.SO_HD && selectedGroups.has(item.data.SO_HD);
 
                                         return (
-                                            <tr key={item.id} className={rowClass}>
+                                            <tr key={item.id} className={`${rowClass} ${isSelected ? 'bg-blue-50' : ''}`}>
+                                                {/* CHECKBOX COLUMN (Render with RowSpan) */}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-center border-r align-middle bg-white" rowSpan={rowSpan}>
+                                                        <button onClick={() => toggleSelectGroup(item.data.SO_HD)}>
+                                                            {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-gray-300" />}
+                                                        </button>
+                                                    </td>
+                                                )}
+
                                                 {/* COMMON COLUMNS (Render with RowSpan) */}
                                                 {shouldRenderCommon && (
                                                     <td className="p-3 text-center text-gray-500 border-r align-middle bg-white" rowSpan={rowSpan}>
@@ -719,7 +822,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                             </tr>
                                         );
                                     }) : (
-                                        <tr><td colSpan={9} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>
+                                        <tr><td colSpan={11} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>
                                     )}
                                 </tbody>
                             </table>

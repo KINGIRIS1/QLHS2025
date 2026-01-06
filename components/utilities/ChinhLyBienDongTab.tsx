@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User as UserType, RecordFile } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { ChinhLyRecord, fetchChinhLyRecords, saveChinhLyRecord, deleteChinhLyRecord } from '../../services/apiUtilities';
 import { NotifyFunction } from '../../components/UtilitiesView';
-import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, PlusCircle, X, Check } from 'lucide-react';
+import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, PlusCircle, X, Layers, Copy, CheckSquare } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -13,27 +13,34 @@ interface ChinhLyBienDongTabProps {
     notify: NotifyFunction;
 }
 
-// Định nghĩa cấu trúc dữ liệu cho một dòng nhập liệu
-interface RowData {
+// Dữ liệu dùng chung cho cả nhóm (Header)
+interface CommonData {
     XA: string;
-    TO_CU: string; THUA_CU: string; DT_CU: string; LOAI_DAT_CU: string;
-    TO_MOI: string; THUA_TAM: string; THUA_CHINH_THUC: string; DT_MOI: string; LOAI_DAT_MOI: string;
-    TONG_DT: string;
+    // TEN_CSD: string; // Đã bỏ theo yêu cầu
+    SO_HD: string; // Key để gom nhóm
     CAN_CU_PHAP_LY: string;
-    SO_HD: string;
     GHI_CHU: string;
-    TEN_CSD: string;
 }
 
-const EMPTY_ROW: RowData = {
-    XA: '',
+// Dữ liệu chi tiết từng dòng (Detail)
+interface DetailData {
+    // Trước BĐ
+    TO_CU: string; THUA_CU: string; DT_CU: string; LOAI_DAT_CU: string;
+    // Sau BĐ
+    TO_MOI: string; THUA_TAM: string; THUA_CHINH_THUC: string; DT_MOI: string; LOAI_DAT_MOI: string;
+    
+    TONG_DT: string; // Tổng DT thường gắn với từng thửa hoặc tổng chung, ở đây để ở detail cho linh hoạt
+}
+
+const DEFAULT_COMMON: CommonData = {
+    XA: '', SO_HD: '', 
+    CAN_CU_PHAP_LY: 'Phiếu yêu cầu nộp hồ sơ GQ TTHC', GHI_CHU: ''
+};
+
+const DEFAULT_DETAIL: DetailData = {
     TO_CU: '', THUA_CU: '', DT_CU: '', LOAI_DAT_CU: '',
     TO_MOI: '', THUA_TAM: '', THUA_CHINH_THUC: '', DT_MOI: '', LOAI_DAT_MOI: '',
-    TONG_DT: '',
-    CAN_CU_PHAP_LY: 'Phiếu yêu cầu nộp hồ sơ GQ TTHC',
-    SO_HD: '',
-    GHI_CHU: '',
-    TEN_CSD: ''
+    TONG_DT: ''
 };
 
 const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, notify }) => {
@@ -42,11 +49,15 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
     const [savedList, setSavedList] = useState<ChinhLyRecord[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // State cho Input dạng bảng
-    const [inputRows, setInputRows] = useState<RowData[]>([ { ...EMPTY_ROW } ]);
+    // State Form
+    const [commonData, setCommonData] = useState<CommonData>(DEFAULT_COMMON);
+    const [detailRows, setDetailRows] = useState<DetailData[]>([ { ...DEFAULT_DETAIL } ]);
+    
     const [searchQuery, setSearchQuery] = useState(''); 
-    const [editingId, setEditingId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // State để quản lý việc sửa (Nếu sửa 1 dòng trong nhóm, ta load cả nhóm lên để sửa)
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -61,24 +72,23 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         setSavedList(utilityRecords);
     };
 
-    // --- LOGIC XỬ LÝ DÒNG ---
-    const handleAddRow = () => {
-        setInputRows(prev => [...prev, { ...EMPTY_ROW }]);
+    // --- LOGIC FORM ---
+    const handleAddDetailRow = () => {
+        setDetailRows(prev => [...prev, { ...DEFAULT_DETAIL }]);
     };
 
-    const handleRemoveRow = (index: number) => {
-        if (inputRows.length === 1 && !editingId) {
-            // Nếu chỉ còn 1 dòng thì clear data chứ không xóa
-            setInputRows([{ ...EMPTY_ROW }]);
+    const handleRemoveDetailRow = (index: number) => {
+        if (detailRows.length === 1) {
+            setDetailRows([{ ...DEFAULT_DETAIL }]); // Clear nếu là dòng cuối
         } else {
-            setInputRows(prev => prev.filter((_, i) => i !== index));
+            setDetailRows(prev => prev.filter((_, i) => i !== index));
         }
     };
 
-    const handleRowChange = (index: number, field: keyof RowData, value: string) => {
-        const newRows = [...inputRows];
+    const handleDetailChange = (index: number, field: keyof DetailData, value: string) => {
+        const newRows = [...detailRows];
         newRows[index] = { ...newRows[index], [field]: value };
-        setInputRows(newRows);
+        setDetailRows(newRows);
     };
 
     const handleSearchAndFill = () => {
@@ -86,189 +96,323 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         const found = records.find(r => r.code.toLowerCase() === searchQuery.toLowerCase().trim());
         
         if (found) {
-            const newRow: RowData = {
-                ...EMPTY_ROW,
-                TEN_CSD: found.customerName,
+            // Fill Common Info
+            setCommonData(prev => ({
+                ...prev,
+                // TEN_CSD: found.customerName, // Bỏ điền tên
                 XA: found.ward ? found.ward.replace(/^(xã|phường|thị trấn)\s+/i, '') : '',
+                SO_HD: found.code
+            }));
+
+            // Fill Detail (Vào dòng cuối cùng hoặc dòng mới)
+            const newDetail: DetailData = {
+                ...DEFAULT_DETAIL,
                 TO_CU: found.mapSheet || '',
                 THUA_CU: found.landPlot || '',
                 DT_CU: found.area ? found.area.toString() : '',
                 DT_MOI: found.area ? found.area.toString() : '',
                 TONG_DT: found.area ? found.area.toString() : '',
                 TO_MOI: found.mapSheet || '',
-                SO_HD: found.code
             };
 
-            // Nếu dòng cuối cùng đang trống thì điền vào đó, ngược lại thêm dòng mới
-            const lastRow = inputRows[inputRows.length - 1];
-            const isLastRowEmpty = !lastRow.TEN_CSD && !lastRow.XA && !lastRow.TO_CU;
-
-            if (isLastRowEmpty) {
-                const updatedRows = [...inputRows];
-                updatedRows[updatedRows.length - 1] = newRow;
-                setInputRows(updatedRows);
+            // Nếu dòng cuối đang trống thì điền đè, không thì thêm mới
+            const lastIdx = detailRows.length - 1;
+            const isLastEmpty = !detailRows[lastIdx].TO_CU && !detailRows[lastIdx].THUA_CU;
+            
+            if (isLastEmpty) {
+                const updated = [...detailRows];
+                updated[lastIdx] = newDetail;
+                setDetailRows(updated);
             } else {
-                setInputRows(prev => [...prev, newRow]);
+                setDetailRows(prev => [...prev, newDetail]);
             }
             
-            notify(`Đã thêm hồ sơ: ${found.code}`, 'success');
-            setSearchQuery(''); // Clear search
+            notify(`Đã lấy dữ liệu từ hồ sơ: ${found.code}`, 'success');
+            setSearchQuery('');
         } else {
             notify('Không tìm thấy mã hồ sơ này.', 'error');
         }
     };
 
-    // --- CRUD ---
-    const handleSaveAll = async () => {
-        // Filter rows that have meaningful data
-        const validRows = inputRows.filter(row => row.XA || row.TEN_CSD || row.TO_CU);
+    const handleSaveGroup = async () => {
+        if (!commonData.XA) { notify("Vui lòng nhập Xã/Thị trấn.", 'error'); return; }
+        
+        setIsSaving(true);
+        
+        // 1. Nếu đang sửa, xóa các record cũ thuộc nhóm này (client-side filter để lấy IDs)
+        if (editingGroupId) {
+            const oldRecords = savedList.filter(r => r.data.SO_HD === editingGroupId);
+            for (const rec of oldRecords) {
+                await deleteChinhLyRecord(rec.id);
+            }
+        }
+
+        // 2. Insert các dòng mới
+        let successCount = 0;
+        // Filter empty rows
+        const validRows = detailRows.filter(r => r.TO_CU || r.THUA_CU || r.TO_MOI || r.THUA_CHINH_THUC);
         
         if (validRows.length === 0) {
-            notify("Vui lòng nhập ít nhất một dòng dữ liệu.", 'error');
+            setIsSaving(false);
+            notify("Vui lòng nhập ít nhất 1 dòng chi tiết thửa đất.", 'error');
             return;
         }
 
-        setIsSaving(true);
-        let successCount = 0;
-
-        for (const rowData of validRows) {
+        for (const row of validRows) {
+            const recordData = {
+                ...commonData,
+                ...row
+            };
+            
             const recordToSave: Partial<ChinhLyRecord> = {
-                id: editingId || undefined, // Nếu đang edit thì dùng ID cũ (lúc này validRows chỉ có 1 row)
-                customer_name: rowData.TEN_CSD || rowData.XA,
-                data: rowData,
+                customer_name: `${commonData.XA} - ${commonData.SO_HD}`, // Dùng Xã + HĐ làm tên gợi nhớ
+                data: recordData,
                 created_by: currentUser.name
             };
-            const res = await saveChinhLyRecord(recordToSave);
-            if (res) successCount++;
+            
+            await saveChinhLyRecord(recordToSave);
+            successCount++;
         }
 
         setIsSaving(false);
-        if (successCount > 0) {
-            await loadData();
-            notify(`Đã lưu thành công ${successCount} dòng!`, 'success');
-            setMode('list');
-            handleReset();
-        } else {
-            notify("Lỗi khi lưu dữ liệu.", 'error');
-        }
+        await loadData();
+        notify(`Đã lưu thành công ${successCount} dòng!`, 'success');
+        setMode('list');
+        handleReset();
     };
 
-    const handleDelete = async (id: string) => {
-        if (await confirmAction("Xóa dòng này khỏi danh sách?")) {
-            const success = await deleteChinhLyRecord(id);
-            if (success) {
-                setSavedList(prev => prev.filter(r => r.id !== id));
-                notify("Đã xóa.", 'success');
-            }
-        }
-    };
+    const handleEditGroup = (soHD: string) => {
+        // Tìm tất cả records có cùng SO_HD
+        const groupRecords = savedList.filter(r => r.data.SO_HD === soHD);
+        
+        if (groupRecords.length === 0) return;
 
-    const handleEdit = (item: ChinhLyRecord) => {
-        setEditingId(item.id);
-        setInputRows([item.data]); // Load data vào bảng (chỉ 1 dòng)
+        const first = groupRecords[0].data;
+        
+        setCommonData({
+            XA: first.XA || '',
+            // TEN_CSD: first.TEN_CSD || '',
+            SO_HD: first.SO_HD || '',
+            CAN_CU_PHAP_LY: first.CAN_CU_PHAP_LY || '',
+            GHI_CHU: first.GHI_CHU || ''
+        });
+
+        const details: DetailData[] = groupRecords.map(r => ({
+            TO_CU: r.data.TO_CU, THUA_CU: r.data.THUA_CU, DT_CU: r.data.DT_CU, LOAI_DAT_CU: r.data.LOAI_DAT_CU,
+            TO_MOI: r.data.TO_MOI, THUA_TAM: r.data.THUA_TAM, THUA_CHINH_THUC: r.data.THUA_CHINH_THUC, DT_MOI: r.data.DT_MOI, LOAI_DAT_MOI: r.data.LOAI_DAT_MOI,
+            TONG_DT: r.data.TONG_DT
+        }));
+
+        setDetailRows(details);
+        setEditingGroupId(soHD);
         setMode('create');
     };
 
+    const handleDeleteGroup = async (soHD: string) => {
+        const groupRecords = savedList.filter(r => r.data.SO_HD === soHD);
+        if (await confirmAction(`Xóa toàn bộ ${groupRecords.length} dòng thuộc hợp đồng ${soHD}?`)) {
+            for (const rec of groupRecords) {
+                await deleteChinhLyRecord(rec.id);
+            }
+            await loadData();
+            notify("Đã xóa nhóm hồ sơ.", 'success');
+        }
+    };
+
     const handleReset = () => {
-        setEditingId(null);
-        setInputRows([ { ...EMPTY_ROW } ]);
+        setEditingGroupId(null);
+        setCommonData(DEFAULT_COMMON);
+        setDetailRows([{ ...DEFAULT_DETAIL }]);
         setSearchQuery('');
     };
 
-    // --- EXCEL EXPORT ---
+    // --- GROUPING LOGIC FOR LIST VIEW ---
+    const groupedList = useMemo(() => {
+        // 1. Filter
+        let list = savedList;
+        if (searchTerm) {
+            const lower = searchTerm.toLowerCase();
+            list = list.filter(item => 
+                (item.customer_name || '').toLowerCase().includes(lower) ||
+                (item.data.XA || '').toLowerCase().includes(lower) ||
+                (item.data.SO_HD || '').toLowerCase().includes(lower)
+            );
+        }
+
+        // 2. Sort by SO_HD (để gom nhóm)
+        // Những dòng có cùng SO_HD sẽ nằm cạnh nhau
+        list.sort((a, b) => {
+            const hdA = a.data.SO_HD || '';
+            const hdB = b.data.SO_HD || '';
+            // Nếu không có số HD, xếp xuống dưới
+            if (!hdA && !hdB) return 0;
+            if (!hdA) return 1;
+            if (!hdB) return -1;
+            return hdA.localeCompare(hdB);
+        });
+
+        return list;
+    }, [savedList, searchTerm]);
+
+    // Hàm tính toán rowSpan
+    // Trả về số dòng cần span nếu là dòng đầu tiên của nhóm, trả về 0 nếu là dòng tiếp theo (để ẩn)
+    const getRowSpan = (index: number, field: string) => {
+        const current = groupedList[index];
+        const prev = groupedList[index - 1];
+        
+        // Chỉ gộp khi có SO_HD. Nếu không có SO_HD, không gộp.
+        if (!current.data.SO_HD) return 1;
+
+        if (prev && prev.data.SO_HD === current.data.SO_HD) {
+            return 0; // Đã được gộp vào dòng trên
+        }
+
+        // Đếm xem có bao nhiêu dòng tiếp theo cùng SO_HD
+        let count = 1;
+        for (let i = index + 1; i < groupedList.length; i++) {
+            if (groupedList[i].data.SO_HD === current.data.SO_HD) {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return count;
+    };
+    
+    // Tính STT nhóm (Group Index) thay vì Row Index
+    const getGroupSTT = (index: number) => {
+        const current = groupedList[index];
+        if (!current.data.SO_HD) return index + 1; // Fallback
+
+        // Tìm index của dòng đầu tiên trong nhóm này
+        let firstIdx = index;
+        while(firstIdx > 0 && groupedList[firstIdx - 1].data.SO_HD === current.data.SO_HD) {
+            firstIdx--;
+        }
+        
+        // Đếm số nhóm ĐỘC LẬP đứng trước firstIdx
+        let groupCount = 0;
+        let i = 0;
+        while (i < firstIdx) {
+            groupCount++;
+            const hd = groupedList[i].data.SO_HD;
+            if (hd) {
+                // Skip qua các dòng cùng nhóm
+                while (i < firstIdx && groupedList[i].data.SO_HD === hd) i++;
+            } else {
+                i++;
+            }
+        }
+        return groupCount + 1;
+    }
+
+    // --- EXCEL EXPORT (MERGED) ---
     const handleExportExcel = () => {
-        if (savedList.length === 0) { notify("Danh sách trống.", 'error'); return; }
+        if (groupedList.length === 0) { notify("Danh sách trống.", 'error'); return; }
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
-        // Header Structure
         const header1 = ["STT", "Xã, Thị trấn", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
         const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", ""];
 
-        // Data Rows
-        const dataRows = savedList.map((item, index) => {
-            const d = item.data;
-            return [
-                index + 1,
-                d.XA,
-                d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
-                d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
-                d.TONG_DT,
-                d.CAN_CU_PHAP_LY,
-                d.SO_HD,
-                d.GHI_CHU
-            ];
-        });
-
-        // Add content
+        // Add Header
         XLSX.utils.sheet_add_aoa(ws, [
             ["DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC"],
             [""],
             header1,
-            header2,
-            ...dataRows
+            header2
         ], { origin: "A1" });
 
-        // Merges
-        if (!ws['!merges']) ws['!merges'] = [];
-        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }); // Title
+        // Build Data Rows & Merges
+        const dataRows: any[] = [];
+        const merges: any[] = [];
         
-        // Header merges
-        ws['!merges'].push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // STT
-        ws['!merges'].push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Xã
-        ws['!merges'].push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ
-        ws['!merges'].push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
-        ws['!merges'].push({ s: { r: 2, c: 11 }, e: { r: 3, c: 11 } }); // Tổng DT
-        ws['!merges'].push({ s: { r: 2, c: 12 }, e: { r: 3, c: 12 } }); // Căn cứ
-        ws['!merges'].push({ s: { r: 2, c: 13 }, e: { r: 3, c: 13 } }); // Số HĐ
-        ws['!merges'].push({ s: { r: 2, c: 14 }, e: { r: 3, c: 14 } }); // Ghi chú
+        // Base merges for Header
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }); // Title
+        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // STT
+        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Xã
+        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ
+        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
+        merges.push({ s: { r: 2, c: 11 }, e: { r: 3, c: 11 } }); // Tổng DT
+        merges.push({ s: { r: 2, c: 12 }, e: { r: 3, c: 12 } }); // Căn cứ
+        merges.push({ s: { r: 2, c: 13 }, e: { r: 3, c: 13 } }); // Số HĐ
+        merges.push({ s: { r: 2, c: 14 }, e: { r: 3, c: 14 } }); // Ghi chú
 
-        // Style
+        let currentRow = 4; // Data starts at row index 4 (A5)
+
+        // Loop through groupedList to build rows and merges
+        for (let i = 0; i < groupedList.length; i++) {
+            const item = groupedList[i];
+            const d = item.data;
+            const span = getRowSpan(i, 'SO_HD');
+            
+            dataRows.push([
+                span > 0 ? getGroupSTT(i) : '', // STT chỉ hiện ở dòng đầu
+                span > 0 ? d.XA : '',           // Xã
+                d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
+                d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
+                d.TONG_DT,
+                span > 0 ? d.CAN_CU_PHAP_LY : '', // Căn cứ
+                span > 0 ? d.SO_HD : '',          // Số HĐ
+                span > 0 ? d.GHI_CHU : ''         // Ghi chú
+            ]);
+
+            // Add merges for Common Columns if span > 1
+            if (span > 1) {
+                // Cột STT (0), Xã (1), Tổng DT (11) - nếu muốn gộp, Căn cứ (12), Số HĐ (13), Ghi chú (14)
+                [0, 1, 12, 13, 14].forEach(colIdx => {
+                    merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
+                });
+            }
+            currentRow++;
+        }
+
+        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A5" });
+        ws['!merges'] = merges;
+
+        // Styling
         const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
         const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
-        
-        for (let c = 0; c <= 14; c++) {
-            const h1Ref = XLSX.utils.encode_cell({ r: 2, c });
-            const h2Ref = XLSX.utils.encode_cell({ r: 3, c });
-            if (!ws[h1Ref]) ws[h1Ref] = { v: "", t: "s" };
-            if (!ws[h2Ref]) ws[h2Ref] = { v: "", t: "s" };
-            ws[h1Ref].s = headerStyle;
-            ws[h2Ref].s = headerStyle;
+        const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
 
-            for (let r = 4; r < 4 + dataRows.length; r++) {
-                const cellRef = XLSX.utils.encode_cell({ r, c });
-                if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-                ws[cellRef].s = cellStyle;
+        // Apply Header Styles
+        for (let r = 2; r <= 3; r++) {
+            for (let c = 0; c <= 14; c++) {
+                const ref = XLSX.utils.encode_cell({ r, c });
+                if (!ws[ref]) ws[ref] = { v: "", t: "s" };
+                ws[ref].s = headerStyle;
+            }
+        }
+
+        // Apply Data Styles
+        for (let r = 4; r < 4 + dataRows.length; r++) {
+            for (let c = 0; c <= 14; c++) {
+                const ref = XLSX.utils.encode_cell({ r, c });
+                if (!ws[ref]) ws[ref] = { v: "", t: "s" };
+                // Center align specific columns: STT, Tờ, Thửa
+                if ([0, 2, 3, 6, 7, 8, 13].includes(c)) ws[ref].s = centerStyle;
+                else ws[ref].s = cellStyle;
             }
         }
 
         ws['!cols'] = [
             { wch: 5 }, { wch: 15 }, 
-            { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, 
-            { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, 
-            { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 20 }
+            { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
+            { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
+            { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 20 }
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_ChinhLy");
         XLSX.writeFile(wb, `DS_ChinhLy_BienDong_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    const filteredList = savedList.filter(item => {
-        if (!searchTerm) return true;
-        const lower = searchTerm.toLowerCase();
-        return (
-            (item.customer_name || '').toLowerCase().includes(lower) ||
-            (item.data.XA || '').toLowerCase().includes(lower) ||
-            (item.data.SO_HD || '').toLowerCase().includes(lower)
-        );
-    });
-
-    const commonInputClass = "w-full h-full border-none outline-none bg-transparent px-2 py-1 text-sm focus:ring-2 focus:ring-inset focus:ring-blue-500 focus:bg-white";
+    const commonInputClass = "w-full border border-gray-300 rounded px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+    const detailInputClass = "w-full border-none bg-transparent px-1 py-2 text-sm text-center focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none h-full";
 
     return (
         <div className="flex flex-col h-full bg-[#f1f5f9]">
-            {/* TOOLBAR */}
+            {/* SUB-HEADER TABS */}
             <div className="flex items-center gap-2 px-4 pt-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-20">
                 <button onClick={() => { setMode('create'); handleReset(); }} className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'create' ? 'border-orange-600 text-orange-600 bg-orange-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     <Plus size={16} /> Nhập liệu
@@ -280,107 +424,124 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
 
             <div className="flex-1 overflow-hidden p-4">
                 {mode === 'create' ? (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
-                        {/* INPUT TOOLBAR */}
-                        <div className="p-3 border-b border-gray-200 flex flex-wrap gap-4 items-center bg-gray-50">
-                            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                                {editingId ? <Edit size={16} className="text-orange-500"/> : <FileSpreadsheet size={16} className="text-green-600"/>}
-                                {editingId ? 'Cập nhật dòng' : 'Nhập liệu dạng bảng'}
-                            </h3>
-                            
-                            {!editingId && (
-                                <div className="flex items-center gap-2 bg-white px-2 py-1 border border-blue-200 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 ml-auto">
-                                    <Search size={14} className="text-gray-400" />
-                                    <input 
-                                        className="text-xs outline-none w-48" 
-                                        placeholder="Nhập mã HS để điền nhanh..."
-                                        value={searchQuery}
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleSearchAndFill()}
-                                    />
-                                    <button onClick={handleSearchAndFill} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200 font-bold">Điền</button>
-                                </div>
-                            )}
-
-                            <div className="flex gap-2 ml-auto">
-                                {!editingId && (
-                                    <button onClick={handleAddRow} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50">
-                                        <PlusCircle size={14}/> Thêm dòng
-                                    </button>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden max-w-[1600px] mx-auto">
+                        
+                        {/* 1. HEADER: COMMON INFO */}
+                        <div className="p-4 bg-gray-50 border-b border-gray-200">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <Layers size={18} className="text-blue-600"/> 
+                                    {editingGroupId ? `Đang chỉnh sửa hồ sơ: ${editingGroupId}` : 'Thông tin chung (Nhóm)'}
+                                </h3>
+                                
+                                {/* Quick Search & Fill */}
+                                {!editingGroupId && (
+                                    <div className="flex gap-2">
+                                        <div className="relative">
+                                            <input 
+                                                className="pl-8 pr-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" 
+                                                placeholder="Mã HS..."
+                                                value={searchQuery}
+                                                onChange={e => setSearchQuery(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleSearchAndFill()}
+                                            />
+                                            <Search size={14} className="absolute left-2.5 top-2.5 text-blue-400" />
+                                        </div>
+                                        <button onClick={handleSearchAndFill} className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-200">Điền</button>
+                                    </div>
                                 )}
-                                <button onClick={handleSaveAll} disabled={isSaving} className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm disabled:opacity-50">
-                                    {isSaving ? 'Đang lưu...' : <><Save size={14}/> {editingId ? 'Cập nhật' : 'Lưu tất cả'}</>}
-                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="md:col-span-1">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Xã / Thị trấn *</label>
+                                    <input className={commonInputClass} value={commonData.XA} onChange={e => setCommonData({...commonData, XA: e.target.value})} placeholder="VD: Tân Phú" />
+                                </div>
+                                {/* ĐÃ BỎ Ô TÊN CHỦ */}
+                                <div className="md:col-span-1">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số Hợp đồng / Mã HS *</label>
+                                    <input className={`${commonInputClass} font-mono font-bold text-blue-700`} value={commonData.SO_HD} onChange={e => setCommonData({...commonData, SO_HD: e.target.value})} placeholder="0902/HĐ..." />
+                                </div>
+                                <div className="md:col-span-1">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Căn cứ pháp lý</label>
+                                    <input className={commonInputClass} value={commonData.CAN_CU_PHAP_LY} onChange={e => setCommonData({...commonData, CAN_CU_PHAP_LY: e.target.value})} />
+                                </div>
+                                <div className="md:col-span-1">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ghi chú</label>
+                                    <input className={commonInputClass} value={commonData.GHI_CHU} onChange={e => setCommonData({...commonData, GHI_CHU: e.target.value})} />
+                                </div>
                             </div>
                         </div>
 
-                        {/* SPREADSHEET TABLE */}
-                        <div className="flex-1 overflow-auto">
-                            <table className="w-full text-left border-collapse min-w-[1500px]">
-                                <thead className="bg-gray-100 text-gray-700 text-xs font-bold uppercase sticky top-0 z-10 shadow-sm">
+                        {/* 2. BODY: DETAIL LIST TABLE */}
+                        <div className="flex-1 overflow-auto bg-white relative">
+                            <table className="w-full border-collapse min-w-[1000px]">
+                                <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 z-10 shadow-sm">
                                     <tr>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 w-10 text-center bg-gray-200">#</th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 w-10 text-center bg-gray-200"><Trash2 size={14}/></th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 min-w-[120px]">Xã / TT</th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 min-w-[150px]">Chủ Sử Dụng (Tên)</th>
-                                        <th colSpan={4} className="p-2 border border-gray-300 text-center bg-blue-50 text-blue-800">Thông tin Trước BĐ</th>
-                                        <th colSpan={5} className="p-2 border border-gray-300 text-center bg-green-50 text-green-800">Thông tin Sau BĐ</th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 w-20">Tổng DT</th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 min-w-[100px]">Số HĐ</th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 min-w-[150px]">Căn cứ pháp lý</th>
-                                        <th rowSpan={2} className="p-2 border border-gray-300 min-w-[150px]">Ghi chú</th>
+                                        <th className="p-2 border w-10 bg-gray-200">#</th>
+                                        <th colSpan={4} className="p-2 border text-center bg-blue-50 text-blue-800">Thông tin Trước Biến Động</th>
+                                        <th colSpan={5} className="p-2 border text-center bg-green-50 text-green-800">Thông tin Sau Biến Động</th>
+                                        <th className="p-2 border w-24 bg-gray-200">Tổng DT</th>
+                                        <th className="p-2 border w-10 bg-gray-200">Xóa</th>
                                     </tr>
                                     <tr>
-                                        <th className="p-2 border border-gray-300 w-16 text-center bg-blue-50">Tờ</th>
-                                        <th className="p-2 border border-gray-300 w-16 text-center bg-blue-50">Thửa</th>
-                                        <th className="p-2 border border-gray-300 w-20 text-center bg-blue-50">DT</th>
-                                        <th className="p-2 border border-gray-300 w-20 text-center bg-blue-50">Loại</th>
+                                        <th className="bg-gray-200 border"></th>
+                                        <th className="p-2 border w-16 text-center bg-blue-50">Tờ</th>
+                                        <th className="p-2 border w-16 text-center bg-blue-50">Thửa</th>
+                                        <th className="p-2 border w-20 text-center bg-blue-50">DT (m2)</th>
+                                        <th className="p-2 border w-20 text-center bg-blue-50">Loại đất</th>
                                         
-                                        <th className="p-2 border border-gray-300 w-16 text-center bg-green-50">Tờ</th>
-                                        <th className="p-2 border border-gray-300 w-16 text-center bg-green-50">Tạm</th>
-                                        <th className="p-2 border border-gray-300 w-16 text-center bg-green-50 text-green-700">CT</th>
-                                        <th className="p-2 border border-gray-300 w-20 text-center bg-green-50">DT</th>
-                                        <th className="p-2 border border-gray-300 w-20 text-center bg-green-50">Loại</th>
+                                        <th className="p-2 border w-16 text-center bg-green-50">Tờ</th>
+                                        <th className="p-2 border w-16 text-center bg-green-50">Thửa Tạm</th>
+                                        <th className="p-2 border w-20 text-center bg-green-50 text-green-700">Thửa CT</th>
+                                        <th className="p-2 border w-20 text-center bg-green-50">DT (m2)</th>
+                                        <th className="p-2 border w-20 text-center bg-green-50">Loại đất</th>
+                                        <th className="bg-gray-200 border"></th>
+                                        <th className="bg-gray-200 border"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {inputRows.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-blue-50/30 group">
-                                            <td className="border border-gray-300 text-center text-xs text-gray-500 bg-gray-50">{idx + 1}</td>
-                                            <td className="border border-gray-300 text-center">
-                                                <button tabIndex={-1} onClick={() => handleRemoveRow(idx)} className="text-gray-300 hover:text-red-500 p-1"><X size={14}/></button>
-                                            </td>
-                                            <td className="border border-gray-300 p-0"><input className={commonInputClass} value={row.XA} onChange={e => handleRowChange(idx, 'XA', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} font-bold`} value={row.TEN_CSD} onChange={e => handleRowChange(idx, 'TEN_CSD', e.target.value)} /></td>
+                                <tbody>
+                                    {detailRows.map((row, idx) => (
+                                        <tr key={idx} className="border-b border-gray-200 hover:bg-blue-50/20">
+                                            <td className="border text-center text-gray-400 text-xs bg-gray-50">{idx + 1}</td>
                                             
-                                            {/* TRƯỚC BĐ */}
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.TO_CU} onChange={e => handleRowChange(idx, 'TO_CU', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.THUA_CU} onChange={e => handleRowChange(idx, 'THUA_CU', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.DT_CU} onChange={e => handleRowChange(idx, 'DT_CU', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.LOAI_DAT_CU} onChange={e => handleRowChange(idx, 'LOAI_DAT_CU', e.target.value)} /></td>
+                                            {/* TRƯỚC */}
+                                            <td className="border p-0"><input className={detailInputClass} value={row.TO_CU} onChange={e => handleDetailChange(idx, 'TO_CU', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={detailInputClass} value={row.THUA_CU} onChange={e => handleDetailChange(idx, 'THUA_CU', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={detailInputClass} value={row.DT_CU} onChange={e => handleDetailChange(idx, 'DT_CU', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={detailInputClass} value={row.LOAI_DAT_CU} onChange={e => handleDetailChange(idx, 'LOAI_DAT_CU', e.target.value)} /></td>
 
-                                            {/* SAU BĐ */}
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.TO_MOI} onChange={e => handleRowChange(idx, 'TO_MOI', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.THUA_TAM} onChange={e => handleRowChange(idx, 'THUA_TAM', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center font-bold text-green-700 bg-green-50/30`} value={row.THUA_CHINH_THUC} onChange={e => handleRowChange(idx, 'THUA_CHINH_THUC', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.DT_MOI} onChange={e => handleRowChange(idx, 'DT_MOI', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.LOAI_DAT_MOI} onChange={e => handleRowChange(idx, 'LOAI_DAT_MOI', e.target.value)} /></td>
+                                            {/* SAU */}
+                                            <td className="border p-0"><input className={detailInputClass} value={row.TO_MOI} onChange={e => handleDetailChange(idx, 'TO_MOI', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={detailInputClass} value={row.THUA_TAM} onChange={e => handleDetailChange(idx, 'THUA_TAM', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={`${detailInputClass} font-bold text-green-700 bg-green-50/30`} value={row.THUA_CHINH_THUC} onChange={e => handleDetailChange(idx, 'THUA_CHINH_THUC', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={detailInputClass} value={row.DT_MOI} onChange={e => handleDetailChange(idx, 'DT_MOI', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={detailInputClass} value={row.LOAI_DAT_MOI} onChange={e => handleDetailChange(idx, 'LOAI_DAT_MOI', e.target.value)} /></td>
 
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center font-bold`} value={row.TONG_DT} onChange={e => handleRowChange(idx, 'TONG_DT', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={`${commonInputClass} text-center`} value={row.SO_HD} onChange={e => handleRowChange(idx, 'SO_HD', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={commonInputClass} value={row.CAN_CU_PHAP_LY} onChange={e => handleRowChange(idx, 'CAN_CU_PHAP_LY', e.target.value)} /></td>
-                                            <td className="border border-gray-300 p-0"><input className={commonInputClass} value={row.GHI_CHU} onChange={e => handleRowChange(idx, 'GHI_CHU', e.target.value)} /></td>
+                                            <td className="border p-0"><input className={`${detailInputClass} font-bold`} value={row.TONG_DT} onChange={e => handleDetailChange(idx, 'TONG_DT', e.target.value)} /></td>
+                                            
+                                            <td className="border text-center">
+                                                <button onClick={() => handleRemoveDetailRow(idx)} className="text-gray-300 hover:text-red-500 p-1"><X size={16}/></button>
+                                            </td>
                                         </tr>
                                     ))}
                                     <tr>
-                                        <td colSpan={17} className="p-2 bg-gray-50 border-t border-gray-200">
-                                            <button onClick={handleAddRow} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mx-auto">
-                                                <Plus size={14}/> Thêm dòng mới
+                                        <td colSpan={12} className="p-2 border-t bg-gray-50">
+                                            <button onClick={handleAddDetailRow} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mx-auto px-3 py-1 bg-white border border-blue-200 rounded-full shadow-sm hover:shadow">
+                                                <Plus size={14}/> Thêm dòng thửa đất
                                             </button>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* 3. FOOTER: ACTIONS */}
+                        <div className="p-4 border-t border-gray-200 bg-white flex justify-between items-center shrink-0">
+                            <button onClick={() => { setMode('list'); handleReset(); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium text-sm">Hủy bỏ</button>
+                            <button onClick={handleSaveGroup} disabled={isSaving} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center gap-2">
+                                <Save size={18}/> {editingGroupId ? 'Cập nhật Nhóm' : 'Lưu Danh Sách'}
+                            </button>
                         </div>
                     </div>
                 ) : (
@@ -405,40 +566,89 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                             <table className="w-full text-left border-collapse text-sm">
                                 <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0 shadow-sm z-10 text-xs uppercase">
                                     <tr>
-                                        <th className="p-3 border-b text-center w-10">STT</th>
-                                        <th className="p-3 border-b">Xã/Thị trấn</th>
-                                        <th className="p-3 border-b">Tên Chủ / HĐ</th>
-                                        <th className="p-3 border-b">Thông tin trước BĐ</th>
-                                        <th className="p-3 border-b">Thông tin sau BĐ</th>
-                                        <th className="p-3 border-b w-20 text-center">Thao tác</th>
+                                        <th className="p-3 border-b text-center w-12 border-r bg-gray-200">STT</th>
+                                        <th className="p-3 border-b border-r w-[150px] bg-white">Xã / Thị trấn</th>
+                                        <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Trước BĐ</th>
+                                        <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Sau BĐ</th>
+                                        <th className="p-3 border-b border-r w-[80px] bg-white">Tổng DT</th>
+                                        <th className="p-3 border-b border-r w-[150px] bg-white">Căn cứ pháp lý</th>
+                                        <th className="p-3 border-b border-r w-[100px] bg-white">Số HĐ</th>
+                                        <th className="p-3 border-b border-r w-[150px] bg-white">Ghi chú</th>
+                                        <th className="p-3 border-b w-[80px] text-center bg-gray-200 sticky right-0">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {filteredList.length > 0 ? filteredList.map((item, idx) => (
-                                        <tr key={item.id} className="hover:bg-blue-50/50">
-                                            <td className="p-3 text-center text-gray-500">{idx + 1}</td>
-                                            <td className="p-3 font-medium text-blue-700">{item.data.XA}</td>
-                                            <td className="p-3">
-                                                <div className="font-bold text-gray-800">{item.data.TEN_CSD}</div>
-                                                <div className="text-xs text-gray-500 font-mono">{item.data.SO_HD}</div>
-                                            </td>
-                                            <td className="p-3 text-xs">
-                                                <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
-                                                <div>DT: {item.data.DT_CU} m2</div>
-                                            </td>
-                                            <td className="p-3 text-xs">
-                                                <div>Tờ: <b>{item.data.TO_MOI}</b> - Thửa CT: <b className="text-green-700">{item.data.THUA_CHINH_THUC}</b></div>
-                                                <div>DT: {item.data.DT_MOI} m2</div>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <div className="flex justify-center gap-2">
-                                                    <button onClick={() => handleEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded"><Edit size={16}/></button>
-                                                    <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded"><Trash2 size={16}/></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>
+                                    {groupedList.length > 0 ? groupedList.map((item, idx) => {
+                                        // Logic Merge Rows
+                                        const rowSpan = getRowSpan(idx, 'SO_HD');
+                                        const shouldRenderCommon = rowSpan > 0;
+                                        const isFirstInGroup = shouldRenderCommon; // Dòng đầu của nhóm
+                                        
+                                        // Chỉ hiện border-top đậm cho dòng đầu nhóm
+                                        const rowClass = isFirstInGroup ? "border-t-2 border-gray-300" : "hover:bg-blue-50/30";
+
+                                        return (
+                                            <tr key={item.id} className={rowClass}>
+                                                {/* COMMON COLUMNS (Render with RowSpan) */}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-center text-gray-500 border-r align-middle bg-white" rowSpan={rowSpan}>
+                                                        {getGroupSTT(idx)}
+                                                    </td>
+                                                )}
+                                                
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 font-bold text-gray-800 border-r align-middle bg-white" rowSpan={rowSpan}>
+                                                        {item.data.XA}
+                                                    </td>
+                                                )}
+
+                                                {/* DETAIL COLUMNS (Always render) */}
+                                                <td className="p-2 border-r text-xs">
+                                                    {/* ĐÃ BỎ HIỂN THỊ TÊN CHỦ */}
+                                                    <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
+                                                    <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
+                                                </td>
+                                                <td className="p-2 border-r text-xs">
+                                                    <div>Tờ: <b>{item.data.TO_MOI}</b></div>
+                                                    <div>Tạm: {item.data.THUA_TAM} <span className="text-gray-300">|</span> CT: <b className="text-green-700">{item.data.THUA_CHINH_THUC}</b></div>
+                                                    <div>DT: {item.data.DT_MOI} ({item.data.LOAI_DAT_MOI})</div>
+                                                </td>
+
+                                                {/* COMMON COLUMNS (Right side) */}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-center border-r align-middle font-bold bg-white" rowSpan={rowSpan}>
+                                                        {item.data.TONG_DT}
+                                                    </td>
+                                                )}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-xs text-gray-500 border-r align-middle bg-white" rowSpan={rowSpan}>
+                                                        {item.data.CAN_CU_PHAP_LY}
+                                                    </td>
+                                                )}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-center font-mono text-xs font-bold text-blue-600 border-r align-middle bg-white" rowSpan={rowSpan}>
+                                                        {item.data.SO_HD}
+                                                    </td>
+                                                )}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-xs text-gray-500 border-r align-middle italic bg-white" rowSpan={rowSpan}>
+                                                        {item.data.GHI_CHU}
+                                                    </td>
+                                                )}
+
+                                                {/* ACTION COLUMN */}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-3 text-center align-middle bg-white sticky right-0 shadow-l" rowSpan={rowSpan}>
+                                                        <div className="flex flex-col gap-2 items-center">
+                                                            <button onClick={() => handleEditGroup(item.data.SO_HD)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 bg-blue-50" title="Sửa nhóm"><Edit size={14}/></button>
+                                                            <button onClick={() => handleDeleteGroup(item.data.SO_HD)} className="p-1.5 text-red-500 hover:bg-red-100 rounded border border-red-200 bg-red-50" title="Xóa nhóm"><Trash2 size={14}/></button>
+                                                        </div>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    }) : (
+                                        <tr><td colSpan={9} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>
                                     )}
                                 </tbody>
                             </table>

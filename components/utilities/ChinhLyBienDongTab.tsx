@@ -13,6 +13,19 @@ interface ChinhLyBienDongTabProps {
     notify: NotifyFunction;
 }
 
+// Danh sách Xã/Phường Chơn Thành
+const CHON_THANH_WARDS = [
+    "phường Hưng Long",
+    "phường Thành Tâm",
+    "phường Minh Hưng",
+    "phường Minh Long",
+    "phường Minh Thành",
+    "xã Minh Lập",
+    "xã Minh Thắng",
+    "xã Nha Bích",
+    "xã Quang Minh"
+];
+
 // Dữ liệu dùng chung cho cả nhóm (Header)
 interface CommonData {
     XA: string;
@@ -100,7 +113,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             setCommonData(prev => ({
                 ...prev,
                 // TEN_CSD: found.customerName, // Bỏ điền tên
-                XA: found.ward ? found.ward.replace(/^(xã|phường|thị trấn)\s+/i, '') : '',
+                XA: found.ward ? found.ward : '', // Giữ nguyên tên xã/phường đầy đủ
                 SO_HD: found.code
             }));
 
@@ -135,7 +148,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
     };
 
     const handleSaveGroup = async () => {
-        if (!commonData.XA) { notify("Vui lòng nhập Xã/Thị trấn.", 'error'); return; }
+        if (!commonData.XA) { notify("Vui lòng chọn Xã/Phường.", 'error'); return; }
         
         setIsSaving(true);
         
@@ -313,7 +326,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
-        const header1 = ["STT", "Xã, Thị trấn", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
+        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
         const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", ""];
 
         // Add Header
@@ -454,8 +467,17 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
 
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div className="md:col-span-1">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Xã / Thị trấn *</label>
-                                    <input className={commonInputClass} value={commonData.XA} onChange={e => setCommonData({...commonData, XA: e.target.value})} placeholder="VD: Tân Phú" />
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Xã / Phường *</label>
+                                    <select 
+                                        className={commonInputClass}
+                                        value={commonData.XA}
+                                        onChange={e => setCommonData({...commonData, XA: e.target.value})}
+                                    >
+                                        <option value="">-- Chọn Xã/Phường --</option>
+                                        {CHON_THANH_WARDS.map(w => (
+                                            <option key={w} value={w}>{w}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 {/* ĐÃ BỎ Ô TÊN CHỦ */}
                                 <div className="md:col-span-1">
@@ -567,7 +589,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                 <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0 shadow-sm z-10 text-xs uppercase">
                                     <tr>
                                         <th className="p-3 border-b text-center w-12 border-r bg-gray-200">STT</th>
-                                        <th className="p-3 border-b border-r w-[150px] bg-white">Xã / Thị trấn</th>
+                                        <th className="p-3 border-b border-r w-[150px] bg-white">Xã / Phường</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Trước BĐ</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Sau BĐ</th>
                                         <th className="p-3 border-b border-r w-[80px] bg-white">Tổng DT</th>

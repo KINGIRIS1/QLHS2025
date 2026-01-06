@@ -13,17 +13,11 @@ interface ChinhLyBienDongTabProps {
     notify: NotifyFunction;
 }
 
-// Danh sách Xã/Phường Chơn Thành
+// Danh sách Xã/Phường giới hạn theo yêu cầu
 const CHON_THANH_WARDS = [
-    "phường Hưng Long",
-    "phường Thành Tâm",
+    "phường Chơn Thành",
     "phường Minh Hưng",
-    "phường Minh Long",
-    "phường Minh Thành",
-    "xã Minh Lập",
-    "xã Minh Thắng",
-    "xã Nha Bích",
-    "xã Quang Minh"
+    "xã Nha Bích"
 ];
 
 // Dữ liệu dùng chung cho cả nhóm (Header)

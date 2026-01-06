@@ -313,15 +313,13 @@ function App() {
       if (!returnRecord) return;
       
       const today = new Date().toISOString().split('T')[0];
-      const newNotes = returnRecord.notes 
-          ? `${returnRecord.notes}. Người nhận: ${receiverName}`
-          : `Người nhận: ${receiverName}`;
-
+      
       const updates = { 
           resultReturnedDate: today, 
           status: RecordStatus.RETURNED,
           receiptNumber: receiptNumber,
-          notes: newNotes
+          receiverName: receiverName, // CẬP NHẬT: Lưu vào cột receiverName riêng
+          // Không cần nối vào notes nữa
       }; 
 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));

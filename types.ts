@@ -81,6 +81,7 @@ export interface RecordFile {
 
   // Tính năng trả kết quả
   receiptNumber?: string;     // Số biên lai
+  receiverName?: string;      // Người nhận kết quả (Mới)
   resultReturnedDate?: string; // Ngày trả kết quả cho dân
 }
 

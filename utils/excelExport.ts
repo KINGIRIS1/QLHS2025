@@ -215,7 +215,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     };
 
     const tableHeader = [
-        "STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Số Biên Lai", "Ngày Hẹn", "Ngày Trả Kết Quả", "Người Nhận / Ghi Chú"
+        "STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Số Biên Lai", "Ngày Hẹn", "Ngày Trả Kết Quả", "Người Nhận", "Ghi Chú"
     ];
 
     const dataRows = records.map((r, i) => [
@@ -227,6 +227,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
         r.receiptNumber || '',
         formatDate(r.deadline),
         formatDate(r.resultReturnedDate),
+        r.receiverName || '', // Cột Người Nhận mới
         r.notes || ''
     ]);
 
@@ -286,7 +287,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A8" });
 
     // Merges
-    const lastColIdx = 8;
+    const lastColIdx = 9; // Tăng lên 1 vì thêm cột Người Nhận
     if(!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push(
         { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
@@ -297,7 +298,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
 
     // Column Widths
     ws['!cols'] = [
-        { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 25 }
+        { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
     ];
 
     // Apply Styles
@@ -330,15 +331,15 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     // Footer
     const footerStart = dataStart + dataRows.length + 2;
     XLSX.utils.sheet_add_aoa(ws, [
-        ["NGƯỜI LẬP BIỂU", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "(Ký, họ tên)", "", "", ""]
+        ["NGƯỜI LẬP BIỂU", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
+        ["(Ký, họ tên)", "", "", "", "", "(Ký, họ tên)", "", "", "", ""]
     ], { origin: { r: footerStart, c: 0 } });
 
     ws['!merges'].push(
         { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 2 } },
         { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 2 } },
-        { s: { r: footerStart, c: 5 }, e: { r: footerStart, c: 8 } },
-        { s: { r: footerStart + 1, c: 5 }, e: { r: footerStart + 1, c: 8 } }
+        { s: { r: footerStart, c: 5 }, e: { r: footerStart, c: 9 } },
+        { s: { r: footerStart + 1, c: 5 }, e: { r: footerStart + 1, c: 9 } }
     );
 
     const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };

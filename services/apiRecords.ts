@@ -12,7 +12,7 @@ const RECORD_DB_COLUMNS = [
     'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt',
-    'receiptNumber', 'resultReturnedDate'
+    'receiptNumber', 'resultReturnedDate', 'receiverName'
 ];
 
 export const fetchRecords = async (): Promise<RecordFile[]> => {

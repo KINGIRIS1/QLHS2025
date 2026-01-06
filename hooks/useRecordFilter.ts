@@ -77,9 +77,15 @@ export const useRecordFilter = (
                 // Tab Đã trả kết quả: Status = RETURNED
                 result = result.filter(r => r.status === RecordStatus.RETURNED);
                 
-                // Lọc theo ngày trả kết quả (nếu có chọn ngày)
-                if (filterDate) {
-                    result = result.filter(r => r.resultReturnedDate === filterDate);
+                // CẬP NHẬT: Lọc theo khoảng thời gian (Từ ngày - Đến ngày) thay vì 1 ngày
+                if (filterFromDate || filterToDate) {
+                    result = result.filter(r => {
+                        if (!r.resultReturnedDate) return false;
+                        const returnDate = r.resultReturnedDate;
+                        if (filterFromDate && returnDate < filterFromDate) return false;
+                        if (filterToDate && returnDate > filterToDate) return false;
+                        return true;
+                    });
                 }
             } else {
                 // Tab Lịch sử giao: Bao gồm Đã giao HOẶC (Đã rút VÀ đã có đợt xuất)
@@ -87,6 +93,7 @@ export const useRecordFilter = (
                     r.status === RecordStatus.HANDOVER || 
                     (r.status === RecordStatus.WITHDRAWN && r.exportBatch)
                 );
+                // Giữ nguyên logic lọc ngày đơn cho Lịch sử giao (theo đợt)
                 if (filterDate) {
                     result = result.filter(r => {
                         const dateToCheck = r.exportDate || r.completedDate;

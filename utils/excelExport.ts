@@ -200,8 +200,8 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
     XLSX.writeFile(wb, fileName);
 };
 
-// --- Export Returned List (FIXED: Correct Header Row Index) ---
-export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: string, wardName?: string) => {
+// --- Export Returned List (UPDATED: Hỗ trợ khoảng thời gian) ---
+export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -214,8 +214,20 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
+    // UPDATE HEADER
     const tableHeader = [
-        "STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ", "Loại Hồ Sơ", "Số Biên Lai", "Ngày Hẹn", "Ngày Trả Kết Quả", "Người Nhận", "Ghi Chú"
+        "STT", 
+        "Mã Hồ Sơ", 
+        "Chủ Sử Dụng", 
+        "Địa Chỉ", 
+        "Tờ", 
+        "Thửa", 
+        "Loại Hồ Sơ", 
+        "Số Biên Lai", 
+        "Ngày Hẹn", 
+        "Ngày Trả Kết Quả", 
+        "Người Nhận", 
+        "Ghi Chú"
     ];
 
     const dataRows = records.map((r, i) => [
@@ -223,17 +235,25 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
         r.code,
         r.customerName,
         getNormalizedWard(r.ward),
+        r.mapSheet || '', 
+        r.landPlot || '', 
         getShortRecordType(r.recordType),
         r.receiptNumber || '',
         formatDate(r.deadline),
         formatDate(r.resultReturnedDate),
-        r.receiverName || '', // Cột Người Nhận mới
+        r.receiverName || '',
         r.notes || ''
     ]);
 
-    const displayDate = dateStr 
-        ? `Ngày ${dateStr.split('-')[2]} tháng ${dateStr.split('-')[1]} năm ${dateStr.split('-')[0]}` 
-        : `Tính đến ngày ${new Date().toLocaleDateString('vi-VN')}`;
+    // Xử lý tiêu đề ngày tháng
+    let displayDate = "";
+    if (fromDateStr && toDateStr && fromDateStr !== toDateStr) {
+        displayDate = `TỪ NGÀY ${formatDate(fromDateStr)} ĐẾN NGÀY ${formatDate(toDateStr)}`;
+    } else if (fromDateStr) {
+        displayDate = `NGÀY ${formatDate(fromDateStr)}`;
+    } else {
+        displayDate = `TÍNH ĐẾN NGÀY ${new Date().toLocaleDateString('vi-VN')}`;
+    }
 
     // --- LOGIC TIÊU ĐỀ ĐỘNG ---
     let title = "DANH SÁCH HỒ SƠ ĐÃ TRẢ KẾT QUẢ";
@@ -287,7 +307,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A8" });
 
     // Merges
-    const lastColIdx = 9; // Tăng lên 1 vì thêm cột Người Nhận
+    const lastColIdx = 11; // Index 11 (Cột 12)
     if(!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push(
         { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
@@ -298,7 +318,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
 
     // Column Widths
     ws['!cols'] = [
-        { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
+        { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 7 }, { wch: 7 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
     ];
 
     // Apply Styles
@@ -322,8 +342,8 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Căn giữa các cột: STT(0), Số BL(5), Ngày Hẹn(6), Ngày Trả(7)
-            if ([0, 5, 6, 7].includes(c)) ws[cellRef].s = centerStyle;
+            // Căn giữa các cột: STT(0), Tờ(4), Thửa(5), Số BL(7), Ngày Hẹn(8), Ngày Trả(9)
+            if ([0, 4, 5, 7, 8, 9].includes(c)) ws[cellRef].s = centerStyle;
             else ws[cellRef].s = cellStyle;
         }
     }
@@ -338,22 +358,22 @@ export const exportReturnedListToExcel = (records: RecordFile[], dateStr?: strin
     ws['!merges'].push(
         { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 2 } },
         { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 2 } },
-        { s: { r: footerStart, c: 5 }, e: { r: footerStart, c: 9 } },
-        { s: { r: footerStart + 1, c: 5 }, e: { r: footerStart + 1, c: 9 } }
+        { s: { r: footerStart, c: 7 }, e: { r: footerStart, c: 11 } },
+        { s: { r: footerStart + 1, c: 7 }, e: { r: footerStart + 1, c: 11 } }
     );
 
     const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
     const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
-    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 5});
+    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 7});
     if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
 
     XLSX.utils.book_append_sheet(wb, ws, "DS_Tra_KQ");
     
     // Tên file
-    let safeName = dateStr || 'Tat_Ca';
+    let safeName = 'Tat_Ca';
     if (wardName && wardName !== 'all') {
-        safeName += `_${wardName.replace(/\s+/g, '_')}`;
+        safeName = wardName.replace(/\s+/g, '_');
     }
     const fileName = `DS_Tra_KQ_${safeName}.xlsx`;
     

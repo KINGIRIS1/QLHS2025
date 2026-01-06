@@ -386,9 +386,8 @@ function App() {
 
   const handleExportReturnedList = () => {
       if (!canPerformAction) return;
-      // Xuất các record đang được lọc (có thể là tất cả hoặc theo ngày)
-      // CẬP NHẬT: TRUYỀN filterWard để hiển thị tên xã trong tiêu đề
-      exportReturnedListToExcel(filteredRecords, filterSpecificDate || filterDate, filterWard);
+      // CẬP NHẬT: Truyền khoảng thời gian (Từ ngày - Đến ngày)
+      exportReturnedListToExcel(filteredRecords, filterFromDate, filterToDate, filterWard);
   };
 
   // --- LIQUIDATION HANDLER ---
@@ -442,13 +441,24 @@ function App() {
                      {currentView !== 'handover_list' && !showAdvancedDateFilter && ( <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm"><Calendar size={16} className="text-gray-500" /><input type="date" value={filterSpecificDate} onChange={(e) => setFilterSpecificDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700" title="Lọc theo ngày tiếp nhận" />{filterSpecificDate && (<button onClick={() => setFilterSpecificDate('')} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}</div>)}
                      
                      {/* Logic lọc ngày riêng cho History và Returned */}
-                     {currentView === 'handover_list' && (handoverTab === 'history' || handoverTab === 'returned') && (
+                     {currentView === 'handover_list' && handoverTab === 'history' && (
                          <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                              <Calendar size={16} className="text-gray-500" />
-                             <span className="text-xs text-gray-500 font-bold uppercase">{handoverTab === 'returned' ? 'Ngày trả:' : 'Ngày giao:'}</span>
+                             <span className="text-xs text-gray-500 font-bold uppercase">Ngày giao:</span>
                              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700" />
                              {filterDate && (<button onClick={() => setFilterDate('')} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}
                          </div>
+                     )}
+
+                     {/* CẬP NHẬT: Logic lọc ngày cho 'returned' dùng khoảng thời gian (giống Advanced Date Filter) */}
+                     {currentView === 'handover_list' && handoverTab === 'returned' && (
+                        <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
+                            <span className="text-xs text-gray-500 font-bold uppercase">Ngày trả:</span>
+                            <input type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700 border border-gray-300 rounded px-1" title="Từ ngày" />
+                            <span className="text-gray-400">-</span>
+                            <input type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700 border border-gray-300 rounded px-1" title="Đến ngày" />
+                            {(filterFromDate || filterToDate) && (<button onClick={() => { setFilterFromDate(''); setFilterToDate(''); }} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}
+                        </div>
                      )}
 
                      {currentView !== 'handover_list' && <button onClick={() => setShowAdvancedDateFilter(!showAdvancedDateFilter)} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${showAdvancedDateFilter ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}><CalendarRange size={16} /></button>}

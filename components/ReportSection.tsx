@@ -1,20 +1,21 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save } from 'lucide-react';
-import { RecordFile, RecordStatus } from '../types';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin } from 'lucide-react';
+import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
-import { isRecordOverdue } from '../utils/appHelpers';
+import { isRecordOverdue, removeVietnameseTones } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 
 interface ReportSectionProps {
     reportContent: string;
     isGenerating: boolean;
     onGenerate: (fromDate: string, toDate: string) => void;
-    onExportExcel: (fromDate: string, toDate: string) => void;
-    records: RecordFile[]; // Thêm prop records để tính toán client-side
+    onExportExcel: (fromDate: string, toDate: string, ward: string) => void;
+    records: RecordFile[];
+    wards: string[]; 
+    employees: Employee[];
 }
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records }) => {
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees }) => {
     const [fromDate, setFromDate] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -22,11 +23,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [toDate, setToDate] = useState(() => {
         return new Date().toISOString().split('T')[0];
     });
+    
+    // State chọn xã phường
+    const [selectedWard, setSelectedWard] = useState<string>('all');
 
     const [activeTab, setActiveTab] = useState<'list' | 'ai'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
-    // States cho Modal nhập Key
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
     const [apiKey, setApiKey] = useState('');
 
@@ -42,7 +45,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         alert("Đã lưu API Key thành công!");
     };
 
-    // --- LOGIC TÍNH TOÁN DỮ LIỆU ---
+    // --- LOGIC TÍNH TOÁN DỮ LIỆU (Cập nhật để lọc theo Xã/Phường) ---
     const filteredData = useMemo(() => {
         const start = new Date(fromDate); start.setHours(0,0,0,0);
         const end = new Date(toDate); end.setHours(23,59,59,999);
@@ -50,9 +53,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return records.filter(r => {
             if (!r.receivedDate) return false;
             const rDate = new Date(r.receivedDate);
-            return rDate >= start && rDate <= end;
+            const matchDate = rDate >= start && rDate <= end;
+            
+            let matchWard = true;
+            if (selectedWard !== 'all') {
+                const rWard = removeVietnameseTones(r.ward || '');
+                const sWard = removeVietnameseTones(selectedWard);
+                matchWard = rWard.includes(sWard);
+            }
+
+            return matchDate && matchWard;
         });
-    }, [records, fromDate, toDate]);
+    }, [records, fromDate, toDate, selectedWard]);
 
     const stats = useMemo(() => {
         const total = filteredData.length;
@@ -78,13 +90,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const toStr = new Date().toISOString().split('T')[0];
         setFromDate(fromStr);
         setToDate(toStr);
-        setActiveTab('list'); // Chuyển về tab list để xem kết quả ngay
+        setActiveTab('list');
     };
 
     const handleGenerateClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         
-        // Kiểm tra Key trước khi chạy
         const currentKey = getGeminiKey();
         if (!currentKey && !process.env.API_KEY) {
             setIsKeyModalOpen(true);
@@ -97,7 +108,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
-        onExportExcel(fromDate, toDate);
+        // Truyền thêm selectedWard vào hàm export
+        onExportExcel(fromDate, toDate, selectedWard);
     };
 
     const handlePrint = () => {
@@ -165,6 +177,21 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
+                        {/* SELECT WARD */}
+                        <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-300 rounded-lg shadow-sm">
+                            <MapPin size={16} className="text-gray-500" />
+                            <select 
+                                value={selectedWard} 
+                                onChange={(e) => setSelectedWard(e.target.value)} 
+                                className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[150px]"
+                            >
+                                <option value="all">Toàn bộ địa bàn</option>
+                                {wards.map(w => (
+                                    <option key={w} value={w}>{w}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-sm">
                             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="text-sm outline-none text-gray-700 font-medium" />
                             <span className="text-gray-400">➜</span>
@@ -229,12 +256,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                         <th className="p-3 w-24">Ngày nhận</th>
                                         <th className="p-3 w-24">Hẹn trả</th>
                                         <th className="p-3 w-24">Hoàn thành</th>
+                                        <th className="p-3 w-32">NV Xử lý</th>
                                         <th className="p-3 w-32 text-center">Trạng thái</th>
                                         <th className="p-3">Ghi chú</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {filteredData.length > 0 ? filteredData.map((r, i) => (
+                                    {filteredData.length > 0 ? filteredData.map((r, i) => {
+                                        const emp = employees.find(e => e.id === r.assignedTo);
+                                        return (
                                         <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
                                             <td className="p-3 text-center text-gray-400">{i + 1}</td>
                                             <td className="p-3 font-medium text-blue-600">{r.code}</td>
@@ -243,6 +273,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                             <td className="p-3 text-gray-600">{formatDate(r.receivedDate)}</td>
                                             <td className="p-3 text-gray-600">{formatDate(r.deadline)}</td>
                                             <td className="p-3 text-green-700 font-medium">{formatDate(r.completedDate)}</td>
+                                            <td className="p-3 text-gray-600 text-xs truncate" title={emp?.name}>{emp ? emp.name : '-'}</td>
                                             <td className="p-3 text-center">
                                                 <span className={`px-2 py-1 rounded text-xs border ${
                                                     r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
@@ -255,8 +286,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                             </td>
                                             <td className="p-3 text-gray-500 italic truncate max-w-xs">{r.notes || r.content}</td>
                                         </tr>
-                                    )) : (
-                                        <tr><td colSpan={9} className="p-8 text-center text-gray-400">Không có dữ liệu trong khoảng thời gian này.</td></tr>
+                                    )}) : (
+                                        <tr><td colSpan={10} className="p-8 text-center text-gray-400">Không có dữ liệu trong khoảng thời gian này.</td></tr>
                                     )}
                                 </tbody>
                             </table>

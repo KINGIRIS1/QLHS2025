@@ -179,9 +179,10 @@ function App() {
 
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
 
-  const handleExportReportExcel = async (fromDateStr: string, toDateStr: string) => {
+  const handleExportReportExcel = async (fromDateStr: string, toDateStr: string, ward: string) => {
       if (!currentUser) return;
-      await exportReportToExcel(records, fromDateStr, toDateStr);
+      // CẬP NHẬT: Truyền thêm ward và employees vào hàm export
+      await exportReportToExcel(records, fromDateStr, toDateStr, ward, employees);
   };
 
   const handleUpdateCurrentAccount = async (data: { name: string; password?: string; department?: string }) => {
@@ -777,7 +778,9 @@ function App() {
                     isGenerating={isGeneratingReport} 
                     onGenerate={handleGlobalGenerateReport} 
                     onExportExcel={handleExportReportExcel}
-                    records={records} // Truyền data
+                    records={records} 
+                    employees={employees} // TRUYỀN DANH SÁCH NHÂN VIÊN
+                    wards={wards} // TRUYỀN DANH SÁCH XÃ
                 />
             )}
 

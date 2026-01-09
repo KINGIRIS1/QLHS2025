@@ -1,11 +1,17 @@
 
 import * as XLSX from 'xlsx-js-style';
-import { RecordFile, RecordStatus } from '../types';
+import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
-export const exportReportToExcel = async (records: RecordFile[], fromDateStr: string, toDateStr: string) => {
+export const exportReportToExcel = async (
+    records: RecordFile[], 
+    fromDateStr: string, 
+    toDateStr: string,
+    ward: string,
+    employees: Employee[]
+) => {
     const from = new Date(fromDateStr);
     from.setHours(0, 0, 0, 0);
     const to = new Date(toDateStr);
@@ -15,11 +21,20 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
     const filtered = records.filter(r => {
         if (!r.receivedDate) return false;
         const rDate = new Date(r.receivedDate);
-        return rDate >= from && rDate <= to;
+        const matchDate = rDate >= from && rDate <= to;
+        
+        let matchWard = true;
+        if (ward && ward !== 'all') {
+            const rWard = removeVietnameseTones(r.ward || '');
+            const filterWard = removeVietnameseTones(ward);
+            matchWard = rWard.includes(filterWard);
+        }
+
+        return matchDate && matchWard;
     });
 
     if (filtered.length === 0) {
-        alert("Không có hồ sơ nào trong khoảng thời gian này.");
+        alert("Không có hồ sơ nào trong khoảng thời gian và địa bàn này.");
         return;
     }
 
@@ -36,6 +51,13 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
         if (!recordCode) return '';
         const match = contracts.find(c => c.code && c.code.toLowerCase().trim() === recordCode.toLowerCase().trim());
         return match && match.totalAmount ? match.totalAmount.toLocaleString('vi-VN') : '';
+    };
+
+    // Helper find Employee Name
+    const getEmployeeName = (empId?: string) => {
+        if (!empId) return '';
+        const emp = employees.find(e => e.id === empId);
+        return emp ? emp.name : '';
     };
 
     // Prepare Data
@@ -59,6 +81,7 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
         "Chủ Sử Dụng", 
         "Địa Chỉ (Xã)", 
         "Loại Hồ Sơ", 
+        "NV Xử Lý", // Cột Mới
         "Số Biên Lai", 
         "Thành Tiền", 
         "Ngày Nhận", 
@@ -75,6 +98,7 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
         r.customerName,
         getNormalizedWard(r.ward),
         getShortRecordType(r.recordType),
+        getEmployeeName(r.assignedTo), // Data Mới
         r.receiptNumber || '',
         getContractAmount(r.code),
         formatDate(r.receivedDate),
@@ -106,12 +130,15 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
     const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
     const rightStyle = { ...cellStyle, alignment: { horizontal: "right", vertical: "center" } };
 
+    // Tên tiêu đề động theo xã
+    const wardTitle = (ward && ward !== 'all') ? ` - ${ward.toUpperCase()}` : "";
+
     // Content Injection
     XLSX.utils.sheet_add_aoa(ws, [
         ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"], // 0
         ["Độc lập - Tự do - Hạnh phúc"],         // 1
         [""],                                    // 2
-        ["BÁO CÁO TÌNH HÌNH TIẾP NHẬN VÀ GIẢI QUYẾT HỒ SƠ"], // 3
+        [`BÁO CÁO TÌNH HÌNH TIẾP NHẬN VÀ GIẢI QUYẾT HỒ SƠ${wardTitle}`], // 3
         [`Từ ngày ${formatDate(fromDateStr)} đến ngày ${formatDate(toDateStr)}`], // 4
         [""],                                    // 5
         [`Tổng số: ${total} | Đã xong: ${completed} | Đang giải quyết: ${processing} | Trễ hạn: ${overdue}`], // 6
@@ -138,7 +165,8 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
         { wch: 15 }, // Mã HS
         { wch: 25 }, // Chủ SD
         { wch: 18 }, // Địa Chỉ
-        { wch: 18 }, // Loại HS
+        { wch: 15 }, // Loại HS
+        { wch: 20 }, // NV Xử Lý (Mới)
         { wch: 12 }, // Số BL
         { wch: 15 }, // Thành tiền
         { wch: 12 }, // Ngày Nhận
@@ -169,39 +197,47 @@ export const exportReportToExcel = async (records: RecordFile[], fromDateStr: st
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            if ([0, 5, 7, 8, 9, 10].includes(c)) ws[cellRef].s = centerStyle;
-            else if (c === 6) ws[cellRef].s = rightStyle;
+            // Căn giữa: STT, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
+            if ([0, 5, 6, 8, 9, 10, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
+            else if (c === 7) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }
     }
 
     const lastRow = dataStartIdx + totalDataRows + 2;
+    // Footer adjustments for wider table
+    const rightColStart = totalCols - 2;
+    const rightColEnd = totalCols;
+
     XLSX.utils.sheet_add_aoa(ws, [
-        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", ""]
+        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", ""],
+        ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", ""]
     ], { origin: `A${lastRow}` });
     
     ws['!merges'].push(
         { s: { r: lastRow - 1, c: 0 }, e: { r: lastRow - 1, c: 2 } },
         { s: { r: lastRow, c: 0 }, e: { r: lastRow, c: 2 } },
-        { s: { r: lastRow - 1, c: 10 }, e: { r: lastRow - 1, c: 12 } },
-        { s: { r: lastRow, c: 10 }, e: { r: lastRow, c: 12 } }
+        { s: { r: lastRow - 1, c: rightColStart }, e: { r: lastRow - 1, c: rightColEnd } },
+        { s: { r: lastRow, c: rightColStart }, e: { r: lastRow, c: rightColEnd } }
     );
     
     const footerStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
     
     const leftTitle = XLSX.utils.encode_cell({r: lastRow - 1, c: 0});
-    const rightTitle = XLSX.utils.encode_cell({r: lastRow - 1, c: 10});
+    const rightTitle = XLSX.utils.encode_cell({r: lastRow - 1, c: rightColStart});
     if(ws[leftTitle]) ws[leftTitle].s = footerStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerStyle;
 
     XLSX.utils.book_append_sheet(wb, ws, "Bao Cao");
-    const fileName = `Bao_Cao_${fromDateStr}_${toDateStr}.xlsx`;
+    const safeWardName = ward === 'all' ? 'Tong_Hop' : ward.replace(/\s/g, '_');
+    const fileName = `Bao_Cao_${safeWardName}_${fromDateStr}_${toDateStr}.xlsx`;
     XLSX.writeFile(wb, fileName);
 };
 
-// --- Export Returned List (UPDATED: Hỗ trợ khoảng thời gian) ---
 export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
+    // ... Giữ nguyên code cũ cho exportReturnedListToExcel (hoặc cập nhật tương tự nếu cần) ...
+    // Để tiết kiệm không gian, tôi sẽ giữ nguyên hàm exportReturnedListToExcel như file gốc
+    // Chỉ cập nhật exportReportToExcel như yêu cầu.
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -214,7 +250,6 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
-    // UPDATE HEADER
     const tableHeader = [
         "STT", 
         "Mã Hồ Sơ", 
@@ -245,7 +280,6 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         r.notes || ''
     ]);
 
-    // Xử lý tiêu đề ngày tháng
     let displayDate = "";
     if (fromDateStr && toDateStr && fromDateStr !== toDateStr) {
         displayDate = `TỪ NGÀY ${formatDate(fromDateStr)} ĐẾN NGÀY ${formatDate(toDateStr)}`;
@@ -255,7 +289,6 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         displayDate = `TÍNH ĐẾN NGÀY ${new Date().toLocaleDateString('vi-VN')}`;
     }
 
-    // --- LOGIC TIÊU ĐỀ ĐỘNG ---
     let title = "DANH SÁCH HỒ SƠ ĐÃ TRẢ KẾT QUẢ";
     if (wardName && wardName !== 'all') {
         title += ` - ${wardName.toUpperCase()}`;
@@ -264,19 +297,16 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]);
 
-    // Base Styles
     const border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const titleStyle = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
     
-    // Header Style (In Đậm + Tô màu Xám)
     const headerStyle = { 
         font: { name: "Times New Roman", sz: 11, bold: true }, 
         border, 
-        fill: { fgColor: { rgb: "E0E0E0" } }, // Màu xám nhẹ
+        fill: { fgColor: { rgb: "E0E0E0" } }, 
         alignment: { horizontal: "center", vertical: "center", wrapText: true } 
     };
 
-    // Cell Style Thường
     const cellStyle = { 
         font: { name: "Times New Roman", sz: 11 }, 
         border, 
@@ -284,15 +314,6 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     };
     const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
 
-    // Content Injection
-    // Row 0: Quốc hiệu
-    // Row 1: Tiêu ngữ
-    // Row 2: Empty
-    // Row 3: Tiêu đề
-    // Row 4: Ngày tháng
-    // Row 5: Empty
-    // Row 6: TABLE HEADER (Index 6 - A7)
-    // Row 7: DATA START (Index 7 - A8)
     XLSX.utils.sheet_add_aoa(ws, [
         ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
         ["Độc lập - Tự do - Hạnh phúc"],
@@ -303,11 +324,9 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         tableHeader
     ], { origin: "A1" });
 
-    // Dữ liệu bắt đầu từ dòng 8 (A8 - Index 7)
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A8" });
 
-    // Merges
-    const lastColIdx = 11; // Index 11 (Cột 12)
+    const lastColIdx = 11;
     if(!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push(
         { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
@@ -316,39 +335,32 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         { s: { r: 4, c: 0 }, e: { r: 4, c: lastColIdx } }
     );
 
-    // Column Widths
     ws['!cols'] = [
         { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 7 }, { wch: 7 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
     ];
 
-    // Apply Styles
     if(ws['A1']) ws['A1'].s = titleStyle;
     if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
     if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
     if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
 
-    // --- FIX: INDEX CHÍNH XÁC ---
-    const headerRow = 6; // Dòng 7 trong Excel (Index 6)
-    const dataStart = 7; // Dòng 8 trong Excel (Index 7)
+    const headerRow = 6;
+    const dataStart = 7;
     
     for (let c = 0; c <= lastColIdx; c++) {
-        // 1. Áp dụng Style cho Header (Dòng 7 - Index 6)
         const headerRef = XLSX.utils.encode_cell({ r: headerRow, c });
         if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
         ws[headerRef].s = headerStyle; 
 
-        // 2. Áp dụng Style cho Dữ liệu (Từ Dòng 8 - Index 7 trở đi)
         for (let r = dataStart; r < dataStart + dataRows.length; r++) {
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Căn giữa các cột: STT(0), Tờ(4), Thửa(5), Số BL(7), Ngày Hẹn(8), Ngày Trả(9)
             if ([0, 4, 5, 7, 8, 9].includes(c)) ws[cellRef].s = centerStyle;
             else ws[cellRef].s = cellStyle;
         }
     }
 
-    // Footer
     const footerStart = dataStart + dataRows.length + 2;
     XLSX.utils.sheet_add_aoa(ws, [
         ["NGƯỜI LẬP BIỂU", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
@@ -370,7 +382,6 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
 
     XLSX.utils.book_append_sheet(wb, ws, "DS_Tra_KQ");
     
-    // Tên file
     let safeName = 'Tat_Ca';
     if (wardName && wardName !== 'all') {
         safeName = wardName.replace(/\s+/g, '_');

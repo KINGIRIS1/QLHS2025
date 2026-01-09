@@ -38,6 +38,7 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
 
 // --- ĐỊNH NGHĨA CÁC CỘT HIỂN THỊ ---
 // Updated: Căn giữa tiêu đề và điều chỉnh độ rộng theo yêu cầu
+// Updated: Gộp cột Đợt vào cột Hoàn thành
 export const COLUMN_DEFS = [
   { key: 'code', label: 'Mã Hồ Sơ', sortKey: 'code', className: 'w-44 text-center' },
   { key: 'customer', label: 'Thông tin chủ sử dụng', sortKey: 'customerName', className: 'w-64 text-center' }, 
@@ -46,10 +47,9 @@ export const COLUMN_DEFS = [
   { key: 'mapSheet', label: 'Tờ', sortKey: 'mapSheet', className: 'w-16 text-center' }, 
   { key: 'landPlot', label: 'Thửa', sortKey: 'landPlot', className: 'w-16 text-center' }, 
   { key: 'assigned', label: 'Giao nhân viên', sortKey: 'assignedDate', className: 'w-48 text-center' },
-  { key: 'completed', label: 'Giao 1 cửa', sortKey: 'completedDate', className: 'w-28 text-center' },
+  { key: 'completed', label: 'Hoàn thành / Đợt', sortKey: 'completedDate', className: 'w-32 text-center' },
   { key: 'type', label: 'Loại Hồ Sơ', sortKey: 'recordType', className: 'w-[5.5rem] text-center' },
   { key: 'tech', label: 'TĐ / TL', sortKey: 'measurementNumber', className: 'w-20 text-center' },
-  { key: 'batch', label: 'Đợt giao', sortKey: 'exportBatch', className: 'w-24 text-center' },
   { key: 'receipt', label: 'Biên Lai', sortKey: 'receiptNumber', className: 'w-20 text-center' },
   { key: 'status', label: 'Trạng Thái', sortKey: 'status', className: 'w-32 text-center' },
 ];
@@ -62,10 +62,9 @@ export const DEFAULT_VISIBLE_COLUMNS = {
     mapSheet: true, 
     landPlot: true, 
     assigned: true, 
-    completed: false,
+    completed: true, // Mặc định hiện cột gộp này
     type: true, 
     tech: false, 
-    batch: false, 
     receipt: true, 
     status: true
 };

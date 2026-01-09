@@ -149,13 +149,21 @@ const RecordRow: React.FC<RecordRowProps> = ({
       
       {visibleColumns.completed && (
         <td className={`${cellClass} text-center text-gray-600`}>
-          {record.status === RecordStatus.WITHDRAWN ? (
-            <div className="flex flex-col items-center">
-              <span className="text-sm font-bold text-slate-600">{formatDate(record.completedDate)}</span>
-              <span className="text-xs text-slate-400 italic">(Ngày rút)</span>
-            </div>
+          {record.exportBatch ? (
+             // Trường hợp 1: Có đợt giao
+             <span className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-bold border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                <span>Đợt {record.exportBatch}</span>
+                <span className="text-[10px] font-normal whitespace-nowrap">{formatDate(record.exportDate || record.completedDate)}</span>
+             </span>
+          ) : record.status === RecordStatus.WITHDRAWN ? (
+             // Trường hợp 2: Rút hồ sơ (nhưng chưa có đợt)
+             <div className="flex flex-col items-center">
+                <span className="text-xs font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded mb-1">Rút HS</span>
+                <span className="text-sm font-bold text-slate-600">{formatDate(record.completedDate)}</span>
+             </div>
           ) : (
-            <span className="text-sm font-bold text-green-700">{formatDate(record.completedDate) || '--'}</span>
+             // Trường hợp 3: Hoàn thành bình thường (Giao 1 cửa lẻ hoặc đã ký xong)
+             <span className="text-sm font-bold text-green-700">{formatDate(record.completedDate) || '--'}</span>
           )}
         </td>
       )}
@@ -187,22 +195,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
         </td>
       )}
 
-      {visibleColumns.batch && (
-        <td className={`${cellClass} text-center`}>
-          {record.status === RecordStatus.WITHDRAWN && !record.exportBatch ? (
-            <span className="inline-flex flex-col items-center px-1 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300">
-              <span className="font-bold">Rút HS</span>
-            </span>
-          ) : (
-            record.exportBatch ? (
-              <span className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-bold border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                <span>Đợt {record.exportBatch}</span>
-                <span className="text-[10px] font-normal whitespace-nowrap">{formatDate(record.exportDate)}</span>
-              </span>
-            ) : '-'
-          )}
-        </td>
-      )}
+      {/* Cột Batch đã bị gộp vào cột completed ở trên */}
 
       {visibleColumns.receipt && (
         <td className={`${cellClass} text-center`}>

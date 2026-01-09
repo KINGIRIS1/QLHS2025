@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Employee, RecordFile } from '../types';
 import { X, Check, MapPin, User, Users, Search } from 'lucide-react';
+import { removeVietnameseTones } from '../utils/appHelpers';
 
 interface AssignModalProps {
   isOpen: boolean;
@@ -15,8 +16,25 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Lấy tên xã/phường nếu chỉ chọn 1 hồ sơ (để gợi ý)
-  const targetWardName = selectedRecords.length === 1 ? selectedRecords[0].ward : null;
+  // CẬP NHẬT LOGIC: Tự động xác định địa bàn mục tiêu
+  // Nếu chọn 1 hồ sơ -> Lấy xã của hồ sơ đó.
+  // Nếu chọn nhiều hồ sơ -> Kiểm tra xem tất cả có cùng xã không. Nếu cùng thì lấy, khác thì null.
+  const targetWardName = useMemo(() => {
+      if (selectedRecords.length === 0) return null;
+      
+      const firstWard = selectedRecords[0].ward;
+      if (!firstWard) return null;
+
+      // Chuẩn hóa tên xã đầu tiên để so sánh
+      const normFirst = removeVietnameseTones(firstWard);
+
+      // Kiểm tra tính đồng nhất
+      const isUniform = selectedRecords.every(r => 
+          r.ward && removeVietnameseTones(r.ward) === normFirst
+      );
+
+      return isUniform ? firstWard : null;
+  }, [selectedRecords]);
 
   // Logic chia nhóm nhân viên
   const { recommended, others } = useMemo(() => {
@@ -26,7 +44,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         e.department.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Nếu không có địa bàn cụ thể, tất cả vào nhóm others
+    // Nếu không có địa bàn cụ thể (do chọn nhiều xã khác nhau), tất cả vào nhóm others
     if (!targetWardName) {
         return { recommended: [], others: filteredEmployees };
     }
@@ -36,7 +54,10 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
 
     filteredEmployees.forEach(emp => {
         // Kiểm tra xem nhân viên có quản lý địa bàn này không
-        const isManaged = emp.managedWards && emp.managedWards.some(w => w === targetWardName);
+        // So sánh tương đối bằng cách xóa dấu và chữ hoa thường
+        const targetNorm = removeVietnameseTones(targetWardName);
+        const isManaged = emp.managedWards && emp.managedWards.some(w => removeVietnameseTones(w) === targetNorm);
+        
         if (isManaged) {
             rec.push(emp);
         } else {
@@ -149,9 +170,13 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                         <MapPin size={16} />
                         Đúng Tuyến ({recommended.length})
                      </div>
-                     {targetWardName && (
+                     {targetWardName ? (
                         <div className="text-xs text-blue-600 mt-1 font-medium bg-white px-2 py-1 rounded border border-blue-200 inline-block">
                             Địa bàn: {targetWardName}
+                        </div>
+                     ) : (
+                        <div className="text-xs text-gray-500 mt-1 italic">
+                            (Nhiều địa bàn khác nhau)
                         </div>
                      )}
                  </div>
@@ -166,7 +191,12 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                      ) : (
                          <div className="h-full flex flex-col items-center justify-center text-center p-4 text-gray-400 border-2 border-dashed border-blue-200 rounded-xl m-2">
                             <MapPin size={32} className="mb-2 opacity-50" />
-                            <p className="text-sm">Không có nhân viên nào phụ trách chính địa bàn này.</p>
+                            <p className="text-sm">
+                                {targetWardName 
+                                    ? "Không có nhân viên nào phụ trách chính địa bàn này." 
+                                    : "Vui lòng chọn các hồ sơ cùng 1 địa bàn để nhận đề xuất."
+                                }
+                            </p>
                          </div>
                      )}
                  </div>

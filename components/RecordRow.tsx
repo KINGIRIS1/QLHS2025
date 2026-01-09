@@ -151,9 +151,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
         <td className={`${cellClass} text-center text-gray-600`}>
           {record.exportBatch ? (
              // Trường hợp 1: Có đợt giao
-             <span className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-bold border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                <span>Đợt {record.exportBatch}</span>
-                <span className="text-[10px] font-normal whitespace-nowrap">{formatDate(record.exportDate || record.completedDate)}</span>
+             <span className={`inline-flex flex-col items-center px-2 py-1 rounded border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                <span className="text-[11px] font-bold">Đợt {record.exportBatch}</span>
+                <span className="text-[11px] font-medium whitespace-nowrap">{formatDate(record.exportDate || record.completedDate)}</span>
              </span>
           ) : record.status === RecordStatus.WITHDRAWN ? (
              // Trường hợp 2: Rút hồ sơ (nhưng chưa có đợt)

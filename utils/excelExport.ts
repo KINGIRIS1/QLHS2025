@@ -72,7 +72,31 @@ export const exportReportToExcel = async (
     let total = filtered.length;
     let completed = filtered.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED).length;
     let processing = total - completed;
-    let overdue = filtered.filter(r => isRecordOverdue(r)).length;
+    
+    // Tính trễ hạn tách biệt
+    let overduePending = 0;
+    let overdueCompleted = 0;
+
+    filtered.forEach(r => {
+        if (r.deadline) {
+            const deadline = new Date(r.deadline);
+            deadline.setHours(0,0,0,0);
+            
+            const isCompleted = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED;
+            
+            if (isCompleted) {
+                if (r.completedDate) {
+                    const completedDate = new Date(r.completedDate);
+                    completedDate.setHours(0,0,0,0);
+                    if (completedDate > deadline) overdueCompleted++;
+                }
+            } else if (r.status !== RecordStatus.WITHDRAWN) {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                if (today > deadline) overduePending++;
+            }
+        }
+    });
 
     // Table Header
     const tableHeader = [
@@ -141,7 +165,7 @@ export const exportReportToExcel = async (
         [`BÁO CÁO TÌNH HÌNH TIẾP NHẬN VÀ GIẢI QUYẾT HỒ SƠ${wardTitle}`], // 3
         [`Từ ngày ${formatDate(fromDateStr)} đến ngày ${formatDate(toDateStr)}`], // 4
         [""],                                    // 5
-        [`Tổng số: ${total} | Đã xong: ${completed} | Đang giải quyết: ${processing} | Trễ hạn: ${overdue}`], // 6
+        [`Tổng số: ${total} | Đã xong: ${completed} | Đang giải quyết: ${processing} | Trễ hạn (Chưa xong): ${overduePending} | Trễ hạn (Đã xong): ${overdueCompleted}`], // 6
         [""],                                    // 7
         tableHeader                              // 8 (A9) -> Header Row Index = 8
     ], { origin: "A1" });
@@ -235,9 +259,7 @@ export const exportReportToExcel = async (
 };
 
 export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
-    // ... Giữ nguyên code cũ cho exportReturnedListToExcel (hoặc cập nhật tương tự nếu cần) ...
-    // Để tiết kiệm không gian, tôi sẽ giữ nguyên hàm exportReturnedListToExcel như file gốc
-    // Chỉ cập nhật exportReportToExcel như yêu cầu.
+    // ... Giữ nguyên code cũ cho exportReturnedListToExcel ...
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;

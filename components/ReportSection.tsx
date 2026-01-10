@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
@@ -45,7 +46,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         alert("Đã lưu API Key thành công!");
     };
 
-    // --- LOGIC TÍNH TOÁN DỮ LIỆU (Cập nhật để lọc theo Xã/Phường) ---
+    // --- LOGIC TÍNH TOÁN DỮ LIỆU ---
     const filteredData = useMemo(() => {
         const start = new Date(fromDate); start.setHours(0,0,0,0);
         const end = new Date(toDate); end.setHours(23,59,59,999);
@@ -70,9 +71,22 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const total = filteredData.length;
         const completed = filteredData.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED).length;
         const withdrawn = filteredData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
-        const overdue = filteredData.filter(r => isRecordOverdue(r)).length;
+        
+        // Trễ hạn chưa xong (isRecordOverdue chỉ check những hồ sơ chưa xong)
+        const overduePending = filteredData.filter(r => isRecordOverdue(r)).length;
+        
+        // Trễ hạn đã xong (Check ngày hoàn thành > deadline)
+        const overdueCompleted = filteredData.filter(r => {
+            if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED) return false;
+            if (!r.deadline || !r.completedDate) return false;
+            const d = new Date(r.deadline); d.setHours(0,0,0,0);
+            const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+            return c > d;
+        }).length;
+
         const processing = total - completed - withdrawn;
-        return { total, completed, withdrawn, overdue, processing };
+        
+        return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
     }, [filteredData]);
 
     const handleQuickReport = (type: 'week' | 'month') => {
@@ -218,9 +232,22 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
                         <div><div className="text-2xl font-bold text-orange-800">{stats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
                     </div>
+                    {/* Updated Red Card for Split Overdue */}
                     <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
                         <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
-                        <div><div className="text-2xl font-bold text-red-800">{stats.overdue}</div><div className="text-xs text-red-600 uppercase font-bold">Trễ hạn</div></div>
+                        <div className="flex-1">
+                            <div className="flex justify-between items-center text-red-800">
+                                <span className="text-xs font-semibold">Chưa xong:</span>
+                                <span className="text-xl font-bold">{stats.overduePending}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-red-600/70">
+                                <span className="text-xs font-semibold">Đã xong:</span>
+                                <span className="text-sm font-bold">{stats.overdueCompleted}</span>
+                            </div>
+                            <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
+                                Tổng trễ hạn
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -264,6 +291,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredData.length > 0 ? filteredData.map((r, i) => {
                                         const emp = employees.find(e => e.id === r.assignedTo);
+                                        const isOverdue = isRecordOverdue(r);
+                                        
+                                        // Logic xác định trễ đã xong để highlight
+                                        let isCompletedLate = false;
+                                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
+                                            if (r.deadline && r.completedDate) {
+                                                const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                                                const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                                                if (c > d) isCompletedLate = true;
+                                            }
+                                        }
+
                                         return (
                                         <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
                                             <td className="p-3 text-center text-gray-400">{i + 1}</td>
@@ -271,20 +310,25 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                             <td className="p-3 font-medium">{r.customerName}</td>
                                             <td className="p-3 text-gray-600">{getNormalizedWard(r.ward)}</td>
                                             <td className="p-3 text-gray-600">{formatDate(r.receivedDate)}</td>
-                                            <td className="p-3 text-gray-600">{formatDate(r.deadline)}</td>
-                                            <td className="p-3 text-green-700 font-medium">{formatDate(r.completedDate)}</td>
+                                            <td className={`p-3 font-medium ${isOverdue ? 'text-red-600' : 'text-gray-600'}`}>{formatDate(r.deadline)}</td>
+                                            <td className={`p-3 font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>
+                                                {formatDate(r.completedDate)}
+                                            </td>
                                             <td className="p-3 text-gray-600 text-xs truncate" title={emp?.name}>{emp ? emp.name : '-'}</td>
                                             <td className="p-3 text-center">
                                                 <span className={`px-2 py-1 rounded text-xs border ${
                                                     r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
                                                     r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
-                                                    isRecordOverdue(r) ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
+                                                    isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
                                                     'bg-blue-50 text-blue-700 border-blue-100'
                                                 }`}>
                                                     {STATUS_LABELS[r.status]}
                                                 </span>
                                             </td>
-                                            <td className="p-3 text-gray-500 italic truncate max-w-xs">{r.notes || r.content}</td>
+                                            <td className="p-3 text-gray-500 italic truncate max-w-xs">
+                                                {isCompletedLate && <span className="text-[10px] text-orange-600 font-bold mr-1">[Trễ xong]</span>}
+                                                {r.notes || r.content}
+                                            </td>
                                         </tr>
                                     )}) : (
                                         <tr><td colSpan={10} className="p-8 text-center text-gray-400">Không có dữ liệu trong khoảng thời gian này.</td></tr>

@@ -58,7 +58,11 @@ export const generateReport = async (
     const total = records.length;
     let completedCount = 0;
     let processingCount = 0;
-    let overdueCount = 0;
+    
+    // Tách biến trễ hạn
+    let overduePendingCount = 0;   // Trễ hạn chưa xong
+    let overdueCompletedCount = 0; // Trễ hạn đã xong (làm xong trễ ngày hẹn)
+    
     let pendingSignCount = 0;
     let withdrawnCount = 0;
     
@@ -68,14 +72,33 @@ export const generateReport = async (
     today.setHours(0,0,0,0);
 
     records.forEach(r => {
-        // Cập nhật: Tính cả RETURNED vào completedCount
-        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) completedCount++;
+        const isCompleted = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED;
+        
+        if (isCompleted) completedCount++;
         else if (r.status === RecordStatus.PENDING_SIGN) pendingSignCount++;
         else if (r.status === RecordStatus.WITHDRAWN) withdrawnCount++;
         else processingCount++;
         
-        if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.WITHDRAWN && r.deadline) {
-            if (new Date(r.deadline) < today) overdueCount++;
+        // Logic tính trễ hạn mới
+        if (r.deadline) {
+            const deadlineDate = new Date(r.deadline);
+            deadlineDate.setHours(0,0,0,0);
+
+            if (isCompleted) {
+                // Nếu đã xong, so sánh ngày hoàn thành với ngày hẹn
+                if (r.completedDate) {
+                    const finishedDate = new Date(r.completedDate);
+                    finishedDate.setHours(0,0,0,0);
+                    if (finishedDate > deadlineDate) {
+                        overdueCompletedCount++;
+                    }
+                }
+            } else if (r.status !== RecordStatus.WITHDRAWN) {
+                // Nếu chưa xong và chưa rút, so sánh hôm nay với ngày hẹn
+                if (today > deadlineDate) {
+                    overduePendingCount++;
+                }
+            }
         }
 
         const typeName = getShortRecordType(r.recordType) || 'Khác';
@@ -83,17 +106,25 @@ export const generateReport = async (
 
         const wardName = getNormalizedWard(r.ward) || 'Khác';
         if (!wardStats[wardName]) {
-            wardStats[wardName] = { total: 0, done: 0, pending: 0, overdue: 0 };
+            wardStats[wardName] = { total: 0, done: 0, pending: 0 };
         }
         wardStats[wardName].total++;
-        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) wardStats[wardName].done++;
+        if (isCompleted) wardStats[wardName].done++;
         else wardStats[wardName].pending++;
     });
 
     const reportData = {
         time: timeLabel,
         author: userName,
-        summary: { total, done: completedCount, processing: processingCount, pendingSign: pendingSignCount, overdue: overdueCount, withdrawn: withdrawnCount },
+        summary: { 
+            total, 
+            done: completedCount, 
+            processing: processingCount, 
+            pendingSign: pendingSignCount, 
+            overduePending: overduePendingCount,     // Trễ chưa xong
+            overdueCompleted: overdueCompletedCount, // Trễ đã xong
+            withdrawn: withdrawnCount 
+        },
         types: typeStats,
         wards: wardStats
     };
@@ -106,9 +137,14 @@ export const generateReport = async (
       YÊU CẦU TRÌNH BÀY (HTML thuần, CSS Tailwind):
       1. TIÊU ĐỀ: "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" (In đậm, trung tâm).
       2. THỜI GIAN: ${timeLabel}.
-      3. BẢNG TỔNG HỢP: Tạo 1 bảng nhỏ 2 cột hiển thị các chỉ số Tổng HS, Đã xong, Đang xử lý, Trễ hạn.
+      3. BẢNG TỔNG HỢP: Tạo 1 bảng nhỏ hiển thị các chỉ số:
+         - Tổng HS
+         - Đã xong
+         - Đang xử lý
+         - Trễ hạn (Chưa xong): ${overduePendingCount}
+         - Trễ hạn (Đã xong): ${overdueCompletedCount}
       4. THỐNG KÊ CHI TIẾT ĐỊA BÀN: Tạo 1 bảng HTML (Border đen mỏng 1px) các cột: STT, Địa bàn, Tổng số, Đã xong, Tỷ lệ %.
-      5. NHẬN XÉT (Tối đa 3 câu): Nhận xét ngắn gọn về tiến độ. Nếu có trễ hạn thì yêu cầu đôn đốc.
+      5. NHẬN XÉT (Tối đa 3 câu): Nhận xét ngắn gọn về tiến độ. Đặc biệt lưu ý tách biệt việc tồn đọng hồ sơ trễ hạn (chưa xong) và việc hoàn thành nhưng bị trễ (đã xong).
       6. CHỮ KÝ: Căn phải "Người lập biểu", để trống khoảng trắng để ký.
 
       LƯU Ý QUAN TRỌNG: 

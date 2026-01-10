@@ -3,7 +3,6 @@ import React from 'react';
 import { RecordFile, Employee, User, RecordStatus } from '../types';
 import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
-// SettingsModal is now EmployeeManagement (a View), removed here
 import SystemSettingsModal from './SystemSettingsModal';
 import AssignModal from './AssignModal';
 import DetailModal from './DetailModal';
@@ -27,13 +26,13 @@ interface AppModalsProps {
     isAddToBatchModalOpen: boolean;
     isExcelPreviewOpen: boolean;
     isBulkUpdateModalOpen: boolean;
-    isReturnModalOpen: boolean; // New Prop
+    isReturnModalOpen: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
     viewingRecord: RecordFile | null;
     deletingRecord: RecordFile | null;
-    returnRecord: RecordFile | null; // New Prop
+    returnRecord: RecordFile | null;
     assignTargetRecords: RecordFile[];
     exportModalType: 'handover' | 'check_list';
     
@@ -52,12 +51,12 @@ interface AppModalsProps {
     setIsAddToBatchModalOpen: (v: boolean) => void;
     setIsExcelPreviewOpen: (v: boolean) => void;
     setIsBulkUpdateModalOpen: (v: boolean) => void;
-    setIsReturnModalOpen: (v: boolean) => void; // New Prop
+    setIsReturnModalOpen: (v: boolean) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
     setDeletingRecord: (r: RecordFile | null) => void;
-    setReturnRecord: (r: RecordFile | null) => void; // New Prop
+    setReturnRecord: (r: RecordFile | null) => void;
 
     // Handlers
     handleAddOrUpdate: (data: any) => Promise<boolean>;
@@ -72,7 +71,7 @@ interface AppModalsProps {
     executeBatchExport: (batch: number, date: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>;
-    confirmReturnResult: (receiptNumber: string, receiverName: string) => void; // New Handler
+    confirmReturnResult: (receiptNumber: string, receiverName: string) => void;
 
     // Shared Data
     employees: Employee[];
@@ -86,6 +85,9 @@ interface AppModalsProps {
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
+    // Xác định danh sách hồ sơ cần chốt để truyền vào modal (cho tính năng cảnh báo)
+    const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
+
     return (
         <>
             <RecordModal 
@@ -152,6 +154,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onConfirm={props.executeBatchExport}
                 records={props.records}
                 selectedCount={props.selectedCount}
+                targetRecords={targetRecordsForBatch} 
             />
 
             <ExcelPreviewModal 

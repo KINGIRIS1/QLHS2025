@@ -12,7 +12,8 @@ const RECORD_DB_COLUMNS = [
     'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt',
-    'receiptNumber', 'resultReturnedDate', 'receiverName'
+    'receiptNumber', 'resultReturnedDate', 'receiverName',
+    'needsMapCorrection' // Cột mới
 ];
 
 export const fetchRecords = async (): Promise<RecordFile[]> => {
@@ -125,13 +126,11 @@ export const createRecordsBatchApi = async (records: RecordFile[]): Promise<bool
     }
 };
 
-// Hàm này dùng cho chế độ Update từ Excel
 export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise<{ success: boolean, count: number }> => {
     if (!isConfigured) return { success: true, count: 0 };
     
     const isSupabase = API_BASE_URL.includes('supabase.co');
     if (!isSupabase) {
-        // Fallback cho Local Server (Giữ nguyên logic cũ hoặc đơn giản hóa)
         return { success: true, count: 0 };
     }
 
@@ -139,7 +138,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
         const rawCodes = records.map(r => r.code).filter(c => c);
         if (rawCodes.length === 0) return { success: true, count: 0 };
 
-        // 1. TẢI TOÀN BỘ DỮ LIỆU TỪ DB ĐỂ SO SÁNH (QUAN TRỌNG: Phải dùng loop để vượt giới hạn 1000 dòng)
         let allDbRecords: any[] = [];
         let from = 0;
         const step = 1000;
@@ -162,7 +160,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
             }
         }
 
-        // Tạo Map để tìm kiếm nhanh: Normalized Code -> Record
         const dbMap = new Map<string, any>();
         allDbRecords.forEach((r: any) => {
             if (r.code) {
@@ -178,21 +175,14 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
             const dbRecord = dbMap.get(normCode);
             
             if (dbRecord) {
-                // LOGIC MERGE QUAN TRỌNG:
-                // Bắt đầu với dữ liệu cũ (dbRecord)
                 const merged = { ...dbRecord };
                 let hasChange = false;
 
-                // Duyệt qua các key của dữ liệu mới (excelRecord)
                 Object.keys(excelRecord).forEach(key => {
                     const newVal = (excelRecord as any)[key];
-                    
-                    // CHỈ cập nhật nếu newVal có giá trị thực sự (không null, không undefined, không rỗng)
-                    // Lưu ý: số 0 là giá trị hợp lệ, nên check type
                     const isValidValue = newVal !== null && newVal !== undefined && newVal !== '';
                     
                     if (isValidValue && key !== 'id') {
-                        // So sánh lỏng (==) để tránh lỗi khác kiểu (ví dụ "1" vs 1)
                         if (String(merged[key]) !== String(newVal)) {
                             merged[key] = newVal;
                             hasChange = true;
@@ -201,7 +191,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
                 });
 
                 if (hasChange) {
-                    // Sanitize lần cuối để đảm bảo đúng định dạng DB
                     updatesToPush.push(sanitizeData(merged, RECORD_DB_COLUMNS));
                     updateCount++;
                 }
@@ -209,7 +198,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
         });
 
         if (updatesToPush.length > 0) {
-            // Upsert (Insert on conflict update)
             const { error: upsertError } = await supabase.from('records').upsert(updatesToPush);
             if (upsertError) throw upsertError;
         }

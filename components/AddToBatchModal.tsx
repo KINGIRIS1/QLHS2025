@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
-import { X, Calendar, Plus, History, CheckCircle2 } from 'lucide-react';
+import { X, Calendar, Plus, History, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface AddToBatchModalProps {
   isOpen: boolean;
@@ -9,16 +9,26 @@ interface AddToBatchModalProps {
   onConfirm: (batch: number, date: string) => void;
   records: RecordFile[];
   selectedCount: number;
+  targetRecords?: RecordFile[]; // Prop này quan trọng để kiểm tra warning
 }
 
-const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onConfirm, records, selectedCount }) => {
+const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  records, 
+  selectedCount,
+  targetRecords = [] // Giá trị mặc định
+}) => {
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
   
+  // State xác nhận danh sách chỉnh lý
+  const [needsCorrectionConfirm, setNeedsCorrectionConfirm] = useState(false);
+
   // Ngày hiện tại cho đợt mới
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // 1. Tính toán Đợt tiếp theo cho ngày hôm nay
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
       records.forEach(r => {
@@ -32,12 +42,10 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
       };
   }, [records, todayStr]);
 
-  // 2. Tổng hợp danh sách các đợt cũ (Bao gồm HANDOVER và WITHDRAWN đã xuất)
   const historyBatches = useMemo(() => {
       const batches: Record<string, { date: string, batch: number, count: number, fullDate: string }> = {};
       
       records.forEach(r => {
-          // Chỉ lấy những hồ sơ đã chốt (có exportBatch và exportDate)
           if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN) && r.exportBatch && r.exportDate) {
               const datePart = r.exportDate.split('T')[0];
               const key = `${datePart}_${r.exportBatch}`;
@@ -54,17 +62,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
           }
       });
 
-      // Chuyển về mảng và sắp xếp (Mới nhất lên đầu)
       return Object.values(batches).sort((a, b) => {
-          // So sánh ngày trước
           const dateDiff = b.date.localeCompare(a.date);
           if (dateDiff !== 0) return dateDiff;
-          // Nếu cùng ngày, so sánh số đợt (lớn lên đầu)
           return b.batch - a.batch;
       });
   }, [records]);
 
-  // Tự động chọn đợt cũ đầu tiên nếu có
   useEffect(() => {
       if (mode === 'existing' && historyBatches.length > 0 && !selectedExistingBatch) {
           const first = historyBatches[0];
@@ -72,9 +76,19 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
       }
   }, [mode, historyBatches]);
 
+  // Danh sách cảnh báo (lấy từ targetRecords được truyền vào)
+  const warningList = useMemo(() => {
+      return targetRecords.filter(r => r.needsMapCorrection);
+  }, [targetRecords]);
+
   if (!isOpen) return null;
 
   const handleConfirm = () => {
+      if (warningList.length > 0 && !needsCorrectionConfirm) {
+          alert("Vui lòng xác nhận bạn đã lập danh sách chỉnh lý.");
+          return;
+      }
+
       if (mode === 'new') {
           onConfirm(nextBatchInfo.batch, nextBatchInfo.date);
       } else {
@@ -82,16 +96,15 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
               alert('Vui lòng chọn một đợt cũ.');
               return;
           }
-          // Tìm lại thông tin đợt đã chọn
           const [datePart, batchNumStr] = selectedExistingBatch.split('_');
           const batchNum = parseInt(batchNumStr);
           const found = historyBatches.find(h => h.date === datePart && h.batch === batchNum);
           
           if (found) {
-              // Sử dụng lại đúng ngày giờ cũ của đợt đó để đồng bộ
               onConfirm(found.batch, found.fullDate);
           }
       }
+      setNeedsCorrectionConfirm(false); // Reset
       onClose();
   };
 
@@ -112,6 +125,32 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
             <p className="text-sm text-gray-600 mb-2">
                 Bạn đang thực hiện chốt <strong>{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao".
             </p>
+
+            {/* CẢNH BÁO CHỈNH LÝ BẢN ĐỒ */}
+            {warningList.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 animate-pulse">
+                    <div className="flex items-center gap-2 text-orange-700 font-bold text-sm mb-2">
+                        <AlertTriangle size={18} /> CẢNH BÁO ĐẶC BIỆT
+                    </div>
+                    <p className="text-xs text-orange-800 mb-2">
+                        Có <strong>{warningList.length}</strong> hồ sơ cần chỉnh lý bản đồ địa chính:
+                    </p>
+                    <ul className="list-disc list-inside text-xs text-orange-800 font-mono mb-3 max-h-20 overflow-y-auto">
+                        {warningList.map(r => (
+                            <li key={r.id}>{r.code} - {r.customerName}</li>
+                        ))}
+                    </ul>
+                    <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-orange-200 hover:border-orange-400 transition-colors">
+                        <input 
+                            type="checkbox" 
+                            className="w-4 h-4 text-orange-600 focus:ring-orange-500 rounded"
+                            checked={needsCorrectionConfirm}
+                            onChange={(e) => setNeedsCorrectionConfirm(e.target.checked)}
+                        />
+                        <span className="text-xs font-bold text-gray-700">Tôi xác nhận đã lập danh sách chỉnh lý riêng.</span>
+                    </label>
+                </div>
+            )}
 
             {/* Option 1: New Batch */}
             <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${mode === 'new' ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
@@ -174,7 +213,11 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ isOpen, onClose, onCo
             <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium text-sm">
                 Hủy bỏ
             </button>
-            <button onClick={handleConfirm} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm transition-transform active:scale-95">
+            <button 
+                onClick={handleConfirm} 
+                disabled={warningList.length > 0 && !needsCorrectionConfirm}
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
                 <CheckCircle2 size={16} /> Xác nhận chốt
             </button>
         </div>

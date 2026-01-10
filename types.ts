@@ -83,6 +83,9 @@ export interface RecordFile {
   receiptNumber?: string;     // Số biên lai
   receiverName?: string;      // Người nhận kết quả (Mới)
   resultReturnedDate?: string; // Ngày trả kết quả cho dân
+
+  // Tính năng Chỉnh lý bản đồ (Mới)
+  needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý
 }
 
 // Interface cho Item tách thửa

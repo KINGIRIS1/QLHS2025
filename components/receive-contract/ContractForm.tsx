@@ -545,8 +545,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         </thead>
                                         <tbody>
                                             {tachThuaItems.map((item, idx) => {
-                                                const currentPrice = getDynamicPrice(item.serviceName);
-                                                const lineTotal = currentPrice * item.quantity;
+                                                const currentPrice = getDynamicPrice(item.serviceName) || 0;
+                                                const lineTotal = currentPrice * (item.quantity || 0);
                                                 return (
                                                     <tr key={idx} className="border-t border-purple-50 hover:bg-purple-50/30">
                                                         <td className="p-2">

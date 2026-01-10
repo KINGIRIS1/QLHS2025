@@ -56,7 +56,8 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
               const match = contracts.find(c => c.code && record.code && c.code.trim().toLowerCase() === record.code.trim().toLowerCase());
               
               if (match) {
-                  setContractPrice(match.totalAmount);
+                  // FIX: Đảm bảo undefined chuyển thành null để tránh lỗi render
+                  setContractPrice(match.totalAmount ?? null);
                   setContractSplitItems(match.splitItems || null);
               } else {
                   // LOGIC MỚI: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
@@ -480,8 +481,9 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                                     <DollarSign size={16} className="text-green-600" />
                                     <div>
                                         <span className="text-xs text-gray-500 block">Phí đo đạc (HĐ)</span>
+                                        {/* FIX: Check !== null && !== undefined explicitly */}
                                         <span className="font-mono font-bold text-green-700">
-                                            {contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'}
+                                            {contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'}
                                         </span>
                                     </div>
                                 </div>
@@ -500,7 +502,8 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                                                     {item.serviceName ? <span className="text-gray-500 ml-1 italic">- {item.serviceName}</span> : ''}
                                                 </span>
                                                 <span className="font-mono font-bold text-green-700">
-                                                    Thành tiền: {(item.price * item.quantity).toLocaleString('vi-VN')} đ
+                                                    {/* FIX: Thêm fallback 0 cho phép nhân */}
+                                                    Thành tiền: {((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')} đ
                                                 </span>
                                             </div>
                                         ))}

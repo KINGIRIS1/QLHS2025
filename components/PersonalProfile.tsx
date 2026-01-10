@@ -1,26 +1,31 @@
-
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map as MapIcon, CheckCircle } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
-import { updateRecordApi } from '../services/api';
 
 interface PersonalProfileProps {
   user: User;
   records: RecordFile[];
   onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
   onViewRecord: (record: RecordFile) => void;
-  onCreateLiquidation?: (record: RecordFile) => void;
+  onCreateLiquidation?: (record: RecordFile) => void; // New Prop
 }
 
 function removeVietnameseTones(str: string): string {
     if (!str) return '';
     str = str.toLowerCase();
-    str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+    str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
     str = str.replace(/đ/g, "d");
-    str = str.replace(/\s+/g, " ");
+    str = str.replace(/\u0300|\u0301|\u0303|\u0309|\u0323/g, "");
+    str = str.replace(/\u02C6|\u0306|\u031B/g, "");
+    str = str.replace(/ + /g, " ");
     str = str.trim();
     return str;
 }
@@ -40,6 +45,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     return records.filter(r => user.employeeId && r.assignedTo === user.employeeId);
   }, [records, user.employeeId]);
   
+  // 1. Hồ sơ Đang thực hiện
   const pendingRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
 
@@ -50,6 +56,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
              const nameNorm = removeVietnameseTones(r.customerName || '');
              const codeRaw = (r.code || '').toLowerCase();
              const wardNorm = removeVietnameseTones(r.ward || '');
+             
              return nameNorm.includes(lowerSearch) || codeRaw.includes(rawSearch) || wardNorm.includes(lowerSearch);
           });
       }
@@ -57,14 +64,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       return list.sort((a, b) => {
           const aValue = a[sortConfig.key];
           const bValue = b[sortConfig.key];
+
           if (!aValue) return 1;
           if (!bValue) return -1;
+
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
           return 0;
       });
   }, [myRecords, searchTerm, sortConfig]);
 
+  // 2. Hồ sơ Có hẹn nhắc việc
   const reminderRecords = useMemo(() => {
       let list = myRecords.filter(r => 
           r.reminderDate && 
@@ -82,6 +92,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
           });
       }
 
+      // Mặc định sắp xếp theo thời gian nhắc (gần nhất lên đầu)
       return list.sort((a, b) => {
           const timeA = new Date(a.reminderDate!).getTime();
           const timeB = new Date(b.reminderDate!).getTime();
@@ -92,7 +103,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   const reviewRecords = myRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
   const completedRecords = myRecords.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER);
 
+  // Xác định danh sách hiển thị dựa trên Tab đang chọn
   const displayRecords = activeTab === 'pending' ? pendingRecords : reminderRecords;
+
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
   
   const paginatedDisplayRecords = useMemo(() => {
@@ -109,22 +122,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   };
 
   const handleForwardToSign = async (record: RecordFile) => {
-    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?`)) {
+    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?\nHãy chắc chắn bạn đã hoàn thành công việc.`)) {
       onUpdateStatus(record, RecordStatus.PENDING_SIGN);
     }
-  };
-
-  const handleToggleMapCorrection = async (record: RecordFile) => {
-      const newValue = !record.needsMapCorrection;
-      const confirmMsg = newValue 
-          ? `Đánh dấu hồ sơ ${record.code} cần CHỈNH LÝ BẢN ĐỒ?`
-          : `Hủy đánh dấu chỉnh lý bản đồ cho hồ sơ ${record.code}?`;
-      
-      if (await confirmAction(confirmMsg)) {
-          const updatedRecord = { ...record, needsMapCorrection: newValue };
-          await updateRecordApi(updatedRecord);
-          window.location.reload(); 
-      }
   };
 
   const formatDate = (dateStr?: string) => {
@@ -184,13 +184,20 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             <h2 className="text-xl font-bold text-gray-800 mb-2">Tài khoản chưa liên kết nhân sự</h2>
             <p className="text-gray-600 max-w-md mb-6">
                 Tài khoản <strong>{user.username}</strong> hiện là quản trị viên hệ thống nhưng chưa được liên kết với hồ sơ nhân viên cụ thể.
+                <br/><br/>
+                Để xem danh sách công việc cá nhân, vui lòng vào menu <strong>Quản lý tài khoản</strong> và cập nhật thông tin "Liên kết hồ sơ nhân viên".
             </p>
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
+                <AlertTriangle size={16} />
+                <span>Gợi ý: Nếu bạn muốn xem tất cả hồ sơ, hãy dùng menu <strong>"Tất cả hồ sơ"</strong>.</span>
+            </div>
         </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full space-y-4 animate-fade-in-up overflow-hidden">
+      {/* Header thống kê - FIXED (SHRINK-0) */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -215,18 +222,29 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         </div>
       </div>
 
+      {/* DANH SÁCH CÔNG VIỆC CHÍNH (SCROLLABLE CONTENT) */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
+        
+        {/* TAB NAVIGATION & SEARCH */}
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
             <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
                 <button 
                     onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                        activeTab === 'pending' 
+                        ? 'bg-blue-600 text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                 >
                     <Clock size={16} /> Đang thực hiện ({pendingRecords.length})
                 </button>
                 <button 
                     onClick={() => { setActiveTab('reminder'); setCurrentPage(1); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'reminder' ? 'bg-pink-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                        activeTab === 'reminder' 
+                        ? 'bg-pink-600 text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                 >
                     <Bell size={16} /> Có hẹn nhắc việc ({reminderRecords.length})
                 </button>
@@ -253,27 +271,33 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                             <th className="p-3 w-[120px]">{renderSortHeader('Mã HS', 'code')}</th>
                             <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
                             <th className="p-3 w-[130px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
+                            
+                            {/* Cột thời gian thay đổi tùy theo Tab */}
                             <th className="p-3 w-[150px]">
-                                {activeTab === 'pending' ? renderSortHeader('Hẹn trả', 'deadline') : <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>}
+                                {activeTab === 'pending' 
+                                    ? renderSortHeader('Hẹn trả', 'deadline') 
+                                    : <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>
+                                }
                             </th>
+                            
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
-                            <th className="p-3 text-center w-[220px]">Thao tác chính</th>
+                            <th className="p-3 text-center w-[160px]">Thao tác chính</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {paginatedDisplayRecords.map((r, index) => {
                             const deadlineStatus = getDeadlineStatus(r.deadline);
+                            // Highlight màu hồng nhạt nếu là tab reminder
                             const rowClass = activeTab === 'reminder' ? 'hover:bg-pink-50/50 bg-pink-50/10' : 'hover:bg-blue-50/50';
                             
                             return (
                                 <tr key={r.id} className={`${rowClass} transition-colors`}>
                                     <td className="p-3 text-center text-gray-400 text-xs align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                                    <td className="p-3 font-medium text-blue-600 align-middle">
-                                        <div className="truncate" title={r.code}>{r.code}</div>
-                                        {r.needsMapCorrection && <span className="block text-[9px] font-bold text-orange-600 bg-orange-100 px-1 rounded w-fit mt-1 border border-orange-200">Cần chỉnh lý</span>}
-                                    </td>
+                                    <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code}>{r.code}</div></td>
                                     <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName}>{r.customerName}</div></td>
                                     <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType}>{getShortRecordType(r.recordType)}</div></td>
+                                    
+                                    {/* Hiển thị thời gian */}
                                     <td className="p-3 align-middle">
                                         {activeTab === 'pending' ? (
                                             <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
@@ -288,15 +312,35 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                             </div>
                                         )}
                                     </td>
+
                                     <td className="p-3 text-center align-middle"><StatusBadge status={r.status} /></td>
                                     <td className="p-3 align-middle">
-                                        <div className="flex flex-wrap justify-center gap-1">
-                                            <button onClick={() => onViewRecord(r)} className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm">Chi tiết</button>
+                                        <div className="flex justify-center gap-2">
+                                            <button 
+                                                onClick={() => onViewRecord(r)}
+                                                className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm"
+                                            >
+                                                Chi tiết
+                                            </button>
+                                            
+                                            {/* Nút Thanh lý */}
                                             {onCreateLiquidation && (
-                                                <button onClick={() => onCreateLiquidation(r)} className="px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" title="Thanh lý hợp đồng"><FileCheck size={14} /> TL</button>
+                                                <button 
+                                                    onClick={() => onCreateLiquidation(r)}
+                                                    className="px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                                                    title="Thanh lý hợp đồng"
+                                                >
+                                                    <FileCheck size={14} /> Thanh lý
+                                                </button>
                                             )}
-                                            <button onClick={() => handleToggleMapCorrection(r)} className={`px-2 py-1.5 border rounded-md text-xs font-bold flex items-center gap-1 shadow-sm transition-all ${r.needsMapCorrection ? 'bg-orange-600 text-white border-orange-700 hover:bg-orange-700' : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'}`} title={r.needsMapCorrection ? "Hủy đăng ký chỉnh lý" : "Đăng ký chỉnh lý bản đồ"}><MapIcon size={14} /> {r.needsMapCorrection ? 'Đã ĐK' : 'Chỉnh lý'}</button>
-                                            <button onClick={() => handleForwardToSign(r)} title="Chuyển sang bước Ký kiểm tra" className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">Trình ký <Send size={14} /></button>
+
+                                            <button 
+                                                onClick={() => handleForwardToSign(r)}
+                                                title="Chuyển sang bước Ký kiểm tra"
+                                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+                                            >
+                                                Trình ký <Send size={14} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -312,22 +356,46 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             )}
         </div>
 
+        {/* PAGINATION FOOTER */}
         {displayRecords.length > 0 && (
             <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-between items-center shrink-0">
                 <span className="text-xs text-gray-500">
                     Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, displayRecords.length)}</strong> trên tổng <strong>{displayRecords.length}</strong>
                 </span>
                 <div className="flex items-center gap-1">
-                    <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={18} /></button>
+                    <button 
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
                     {Array.from({ length: totalPages }).map((_, idx) => (
-                         <button key={idx} onClick={() => setCurrentPage(idx + 1)} className={`w-7 h-7 flex items-center justify-center rounded text-xs font-medium transition-all ${currentPage === idx + 1 ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-200 text-gray-600'}`}>{idx + 1}</button>
+                         <button
+                            key={idx}
+                            onClick={() => setCurrentPage(idx + 1)}
+                            className={`w-7 h-7 flex items-center justify-center rounded text-xs font-medium transition-all ${
+                                currentPage === idx + 1 
+                                ? 'bg-blue-600 text-white shadow-sm' 
+                                : 'hover:bg-gray-200 text-gray-600'
+                            }`}
+                        >
+                            {idx + 1}
+                        </button>
                     ))}
-                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={18} /></button>
+                    <button 
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ChevronRight size={18} />
+                    </button>
                 </div>
             </div>
         )}
       </div>
 
+       {/* DANH SÁCH CHỜ KÝ (Scrollable within limits) */}
        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-90 shrink-0 max-h-64 flex flex-col">
         <div className="p-4 border-b border-gray-100 bg-purple-50 flex items-center gap-2 shrink-0">
             <CheckCircle size={18} className="text-purple-600" />
@@ -353,7 +421,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                 <td className="p-3 text-gray-500">{formatDate(r.receivedDate)}</td>
                                 <td className="p-3 text-center"><StatusBadge status={r.status} /></td>
                                 <td className="p-3 text-right">
-                                    <button onClick={() => onViewRecord(r)} className="text-blue-600 hover:underline text-xs">Xem</button>
+                                    <button 
+                                        onClick={() => onViewRecord(r)}
+                                        className="text-blue-600 hover:underline text-xs"
+                                    >
+                                        Xem
+                                    </button>
                                 </td>
                             </tr>
                         ))}

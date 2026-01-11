@@ -351,7 +351,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                                 title={r.needsMapCorrection ? "Hủy báo cáo chỉnh lý" : "Báo cáo cần chỉnh lý bản đồ"}
                                             >
                                                 <Map size={14} />
-                                                {r.needsMapCorrection && <span className="hidden sm:inline">Cần CL</span>}
+                                                {r.needsMapCorrection && <span className="hidden sm:inline">Chỉnh lý</span>}
                                             </button>
 
                                             {/* Nút Thanh lý */}

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
-import { X, Calendar, Plus, History, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X, Calendar, Plus, History, CheckCircle2, AlertTriangle, Map } from 'lucide-react';
 
 interface AddToBatchModalProps {
   isOpen: boolean;
@@ -130,14 +130,16 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             {warningList.length > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 animate-pulse">
                     <div className="flex items-center gap-2 text-orange-700 font-bold text-sm mb-2">
-                        <AlertTriangle size={18} /> CẢNH BÁO ĐẶC BIỆT
+                        <AlertTriangle size={18} /> CẢNH BÁO: CÓ HỒ SƠ CẦN CHỈNH LÝ
                     </div>
                     <p className="text-xs text-orange-800 mb-2">
                         Có <strong>{warningList.length}</strong> hồ sơ cần chỉnh lý bản đồ địa chính:
                     </p>
-                    <ul className="list-disc list-inside text-xs text-orange-800 font-mono mb-3 max-h-20 overflow-y-auto">
+                    <ul className="list-disc list-inside text-xs text-orange-800 font-mono mb-3 max-h-20 overflow-y-auto bg-orange-100/50 p-2 rounded">
                         {warningList.map(r => (
-                            <li key={r.id}>{r.code} - {r.customerName}</li>
+                            <li key={r.id} className="flex items-center gap-2">
+                                <Map size={10} /> {r.code} - {r.customerName}
+                            </li>
                         ))}
                     </ul>
                     <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-orange-200 hover:border-orange-400 transition-colors">

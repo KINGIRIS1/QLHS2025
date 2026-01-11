@@ -1,9 +1,11 @@
+
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
+import { updateRecordApi } from '../services/api';
 
 interface PersonalProfileProps {
   user: User;
@@ -125,6 +127,20 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?\nHãy chắc chắn bạn đã hoàn thành công việc.`)) {
       onUpdateStatus(record, RecordStatus.PENDING_SIGN);
     }
+  };
+
+  // Hàm xử lý khi tick chọn Cần chỉnh lý bản đồ
+  const handleToggleMapCorrection = async (record: RecordFile) => {
+      const newValue = !record.needsMapCorrection;
+      // Cập nhật Optimistic UI (nếu App.tsx có state chung, nó sẽ tự update sau khi API gọi xong)
+      // Ở đây ta gọi API trực tiếp
+      try {
+          await updateRecordApi({ ...record, needsMapCorrection: newValue });
+          // Note: App sẽ tự động refresh data qua cơ chế polling hoặc props callback nếu có
+      } catch (error) {
+          console.error("Lỗi cập nhật trạng thái chỉnh lý:", error);
+          alert("Có lỗi xảy ra khi cập nhật.");
+      }
   };
 
   const formatDate = (dateStr?: string) => {
@@ -281,6 +297,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                             </th>
                             
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
+                            
+                            {/* Cột Chỉnh lý BĐ - MỚI */}
+                            <th className="p-3 text-center w-[80px]">Chỉnh lý</th>
+
                             <th className="p-3 text-center w-[160px]">Thao tác chính</th>
                         </tr>
                     </thead>
@@ -314,6 +334,21 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                     </td>
 
                                     <td className="p-3 text-center align-middle"><StatusBadge status={r.status} /></td>
+                                    
+                                    {/* Checkbox Chỉnh lý bản đồ */}
+                                    <td className="p-3 text-center align-middle">
+                                        <label className="cursor-pointer flex justify-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-4 h-4 text-orange-600 focus:ring-orange-500 rounded border-gray-300 cursor-pointer"
+                                                checked={!!r.needsMapCorrection}
+                                                onChange={() => handleToggleMapCorrection(r)}
+                                                title="Tích nếu hồ sơ này cần chỉnh lý bản đồ"
+                                            />
+                                        </label>
+                                        {r.needsMapCorrection && <span className="text-[9px] text-orange-600 font-bold block mt-0.5">Cần chỉnh lý</span>}
+                                    </td>
+
                                     <td className="p-3 align-middle">
                                         <div className="flex justify-center gap-2">
                                             <button 

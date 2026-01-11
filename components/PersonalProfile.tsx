@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
@@ -13,6 +12,7 @@ interface PersonalProfileProps {
   onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
   onViewRecord: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void; // New Prop
+  onQuickUpdate: (id: string, field: keyof RecordFile, value: any) => void; // New Prop for Optimistic Update
 }
 
 function removeVietnameseTones(str: string): string {
@@ -32,7 +32,7 @@ function removeVietnameseTones(str: string): string {
     return str;
 }
 
-const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation }) => {
+const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onQuickUpdate }) => {
   const [activeTab, setActiveTab] = useState<'pending' | 'reminder'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -130,15 +130,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   };
 
   // Hàm xử lý khi tick chọn Cần chỉnh lý bản đồ
-  const handleToggleMapCorrection = async (record: RecordFile) => {
+  const handleToggleMapCorrection = (record: RecordFile) => {
       const newValue = !record.needsMapCorrection;
-      try {
-          await updateRecordApi({ ...record, needsMapCorrection: newValue });
-          // Note: App sẽ tự động refresh data qua cơ chế polling hoặc props callback nếu có
-      } catch (error) {
-          console.error("Lỗi cập nhật trạng thái chỉnh lý:", error);
-          alert("Có lỗi xảy ra khi cập nhật.");
-      }
+      // Sử dụng onQuickUpdate để cập nhật UI ngay lập tức (Optimistic Update)
+      // Hàm này sẽ gọi setRecords ngay lập tức trong App.tsx, sau đó mới gọi API ngầm
+      onQuickUpdate(record.id, 'needsMapCorrection', newValue);
   };
 
   const formatDate = (dateStr?: string) => {

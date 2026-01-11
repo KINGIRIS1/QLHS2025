@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message } from './types';
 import { STATUS_LABELS, DEFAULT_WARDS as STATIC_WARDS } from './constants';
@@ -288,16 +287,21 @@ function App() {
       setSelectedRecordIds(new Set()); // Clear selection
   };
 
-  const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
+  const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: any) => {
+      // Optimistic Update: Cập nhật state ngay lập tức
       setRecords(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+      
+      // Sau đó gọi API ngầm
       const record = records.find(r => r.id === id); 
       if (record) {
           try {
               await updateRecordApi({ ...record, [field]: value });
           } catch (e) {
               console.error("Quick update failed", e);
+              // Có thể revert state nếu cần, nhưng ở đây ta chấp nhận rủi ro nhỏ để UI mượt
           }
       } else {
+          // Trường hợp hiếm khi record không có trong list hiện tại
           const tempRecord = { id } as RecordFile; 
           await updateRecordApi({ ...tempRecord, [field]: value });
       }
@@ -703,6 +707,7 @@ function App() {
                     onUpdateStatus={() => {}} 
                     onViewRecord={handleViewRecord} 
                     onCreateLiquidation={handleRequestLiquidation}
+                    onQuickUpdate={handleQuickUpdate} // NEW PROP
                 />
             )}
             

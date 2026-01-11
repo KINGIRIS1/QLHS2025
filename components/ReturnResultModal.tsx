@@ -19,9 +19,8 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   useEffect(() => {
     if (isOpen && record) {
         setReceiptNumber(record.receiptNumber || '');
-        // Nếu trong notes đã có thông tin người nhận (VD: "Người nhận: Nguyễn Văn A"), có thể parse ra (tùy chọn)
-        // Ở đây để trống để người dùng nhập mới
-        setReceiverName(record.customerName || ''); // Mặc định gợi ý tên chủ hồ sơ
+        // Gợi ý tên chủ hồ sơ, nhưng cho phép sửa
+        setReceiverName(record.receiverName || record.customerName || ''); 
     }
   }, [isOpen, record]);
 
@@ -29,6 +28,10 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+      if (!receiverName.trim()) {
+          alert("Vui lòng nhập tên người nhận kết quả.");
+          return;
+      }
       onConfirm(receiptNumber, receiverName);
       onClose();
   };

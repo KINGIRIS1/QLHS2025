@@ -71,8 +71,16 @@ export const DEFAULT_VISIBLE_COLUMNS = {
 
 // --- CÁC HÀM CHECK LOGIC ---
 export const isRecordOverdue = (record: RecordFile): boolean => {
-  // Hồ sơ đã xong (Handover) hoặc đã rút (Withdrawn) thì không tính trễ
-  if (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN) return false;
+  // Danh sách các trạng thái coi như "Đã hoàn thành" hoặc "Dừng theo dõi"
+  // Bổ sung: RETURNED (Đã trả), SIGNED (Đã ký - coi như xong việc chuyên môn)
+  const completedStatuses = [
+      RecordStatus.HANDOVER,
+      RecordStatus.RETURNED,
+      RecordStatus.WITHDRAWN,
+      RecordStatus.SIGNED
+  ];
+
+  if (completedStatuses.includes(record.status)) return false;
   
   if (!record.deadline) return false;
   const today = new Date();
@@ -83,8 +91,16 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
 };
 
 export const isRecordApproaching = (record: RecordFile): boolean => {
-  if (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN) return false;
+  const completedStatuses = [
+      RecordStatus.HANDOVER,
+      RecordStatus.RETURNED,
+      RecordStatus.WITHDRAWN,
+      RecordStatus.SIGNED
+  ];
+
+  if (completedStatuses.includes(record.status)) return false;
   if (isRecordOverdue(record)) return false;
+  
   if (!record.deadline) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);

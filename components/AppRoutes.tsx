@@ -197,8 +197,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                          {currentUser?.role !== UserRole.ONEDOOR && currentView === 'all_records' && (
                             <div className="flex gap-2">
-                                <button onClick={() => props.setWarningFilter(prev => prev === 'overdue' ? 'none' : 'overdue')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${props.warningFilter === 'overdue' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}><AlertTriangle size={16} /> {props.warningCount.overdue}</button>
-                                <button onClick={() => props.setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${props.warningFilter === 'approaching' ? 'bg-orange-500 text-white' : 'bg-white text-orange-600'}`}><Clock size={16} /> {props.warningCount.approaching}</button>
+                                <button onClick={() => props.setWarningFilter((prev: any) => prev === 'overdue' ? 'none' : 'overdue')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${props.warningFilter === 'overdue' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}><AlertTriangle size={16} /> {props.warningCount.overdue}</button>
+                                <button onClick={() => props.setWarningFilter((prev: any) => prev === 'approaching' ? 'none' : 'approaching')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${props.warningFilter === 'approaching' ? 'bg-orange-500 text-white' : 'bg-white text-orange-600'}`}><Clock size={16} /> {props.warningCount.approaching}</button>
                             </div>
                          )}
 

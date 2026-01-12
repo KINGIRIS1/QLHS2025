@@ -68,6 +68,10 @@ export const generateReport = async (
     
     const wardStats: Record<string, any> = {};
     const typeStats: Record<string, number> = {};
+    
+    // MỚI: Thống kê chi tiết loại hồ sơ theo từng xã
+    const wardTypeStats: Record<string, Record<string, number>> = {};
+
     const today = new Date();
     today.setHours(0,0,0,0);
 
@@ -105,12 +109,20 @@ export const generateReport = async (
         typeStats[typeName] = (typeStats[typeName] || 0) + 1;
 
         const wardName = getNormalizedWard(r.ward) || 'Khác';
+        
+        // Thống kê tổng quan xã
         if (!wardStats[wardName]) {
             wardStats[wardName] = { total: 0, done: 0, pending: 0 };
         }
         wardStats[wardName].total++;
         if (isCompleted) wardStats[wardName].done++;
         else wardStats[wardName].pending++;
+
+        // MỚI: Thống kê chi tiết loại hồ sơ theo xã
+        if (!wardTypeStats[wardName]) {
+            wardTypeStats[wardName] = {};
+        }
+        wardTypeStats[wardName][typeName] = (wardTypeStats[wardName][typeName] || 0) + 1;
     });
 
     const reportData = {
@@ -126,7 +138,8 @@ export const generateReport = async (
             withdrawn: withdrawnCount 
         },
         types: typeStats,
-        wards: wardStats
+        wards: wardStats,
+        wardTypeDetails: wardTypeStats // Truyền dữ liệu mới vào prompt
     };
 
     const prompt = `
@@ -134,8 +147,8 @@ export const generateReport = async (
       
       DỮ LIỆU JSON: ${JSON.stringify(reportData)}
 
-      YÊU CẦU TRÌNH BÀY (HTML thuần, CSS Tailwind):
-      1. TIÊU ĐỀ: "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" (In đậm, trung tâm).
+      YÊU CẦU TRÌNH BÀY (HTML thuần, CSS Tailwind, Font Serif):
+      1. TIÊU ĐỀ: "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" (In đậm, trung tâm, size lớn).
       2. THỜI GIAN: ${timeLabel}.
       3. BẢNG TỔNG HỢP: Tạo 1 bảng nhỏ hiển thị các chỉ số:
          - Tổng HS
@@ -143,15 +156,24 @@ export const generateReport = async (
          - Đang xử lý
          - Trễ hạn (Chưa xong): ${overduePendingCount}
          - Trễ hạn (Đã xong): ${overdueCompletedCount}
-      4. THỐNG KÊ CHI TIẾT ĐỊA BÀN: Tạo 1 bảng HTML (Border đen mỏng 1px) các cột: STT, Địa bàn, Tổng số, Đã xong, Tỷ lệ %.
-      5. NHẬN XÉT (Tối đa 3 câu): Nhận xét ngắn gọn về tiến độ. Đặc biệt lưu ý tách biệt việc tồn đọng hồ sơ trễ hạn (chưa xong) và việc hoàn thành nhưng bị trễ (đã xong).
-      6. CHỮ KÝ: Căn phải "Người lập biểu", để trống khoảng trắng để ký.
+      
+      4. THỐNG KÊ THEO ĐỊA BÀN (Tóm tắt): Tạo 1 bảng HTML (Border đen mỏng 1px) các cột: STT, Địa bàn, Tổng số, Đã xong, Tỷ lệ %.
+
+      5. CHI TIẾT LOẠI HỒ SƠ CỦA TỪNG XÃ/PHƯỜNG (Quan trọng): 
+         - Tạo một bảng HTML riêng biệt.
+         - Cột 1: Địa bàn (Xã/Phường).
+         - Cột 2: Chi tiết số lượng từng loại (Ví dụ: Trích lục: 5, Đo đạc: 2, Cắm mốc: 1...). Hãy liệt kê rõ ràng trong ô.
+         - Dữ liệu lấy từ 'wardTypeDetails'.
+
+      6. NHẬN XÉT (Tối đa 3 câu): Nhận xét ngắn gọn về tiến độ. Đặc biệt lưu ý tách biệt việc tồn đọng hồ sơ trễ hạn (chưa xong) và việc hoàn thành nhưng bị trễ (đã xong).
+      7. CHỮ KÝ: Căn phải "Người lập biểu", để trống khoảng trắng để ký.
 
       LƯU Ý QUAN TRỌNG: 
       - Không sử dụng các thẻ <html> <body>. 
-      - Sử dụng font-serif (giả lập Times New Roman).
+      - Sử dụng font-family: "Times New Roman", Serif.
       - Đảm bảo toàn bộ nội dung không quá dài để tránh bị nhảy sang trang 2.
-      - Sử dụng bảng (table) thay vì thẻ div cho các danh sách để trông giống văn bản hành chính.
+      - Sử dụng bảng (table) thay vì thẻ div cho các danh sách để trông giống văn bản hành chính chuyên nghiệp.
+      - Các bảng nên có width="100%" và border-collapse: collapse.
     `;
 
     const response = await ai.models.generateContent({

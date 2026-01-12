@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Employee, RecordFile } from '../types';
 import { X, Check, MapPin, User, Users, Search } from 'lucide-react';
@@ -11,6 +10,65 @@ interface AssignModalProps {
   employees: Employee[];
   selectedRecords: RecordFile[];
 }
+
+interface EmployeeItemProps {
+    emp: Employee;
+    isRecommended?: boolean;
+    isSelected: boolean;
+    onSelect: (id: string) => void;
+}
+
+// Component hiển thị một dòng nhân viên (Compact style cho grid)
+const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isRecommended, isSelected, onSelect }) => (
+    <div 
+        onClick={() => onSelect(emp.id)}
+        className={`relative flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all group h-full ${
+            isSelected 
+                ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-200' 
+                : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-md'
+        }`}
+    >
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isRecommended ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+            {emp.name.charAt(0).toUpperCase()}
+        </div>
+        
+        <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1 mb-0.5">
+                <span className={`font-bold text-sm truncate ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>
+                    {emp.name}
+                </span>
+                {isSelected && <Check size={14} className="text-blue-600 shrink-0" />}
+            </div>
+            
+            <div className="text-xs text-gray-500 truncate mb-1">
+                {emp.department}
+            </div>
+
+            {/* Hiển thị tags địa bàn nếu có (chỉ hiện tối đa 2 cái) */}
+            {emp.managedWards && emp.managedWards.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                    {emp.managedWards.slice(0, 2).map((w, idx) => (
+                        <span key={idx} className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 truncate max-w-[80px]">
+                            {w}
+                        </span>
+                    ))}
+                    {emp.managedWards.length > 2 && (
+                        <span className="text-[9px] text-gray-400">+{emp.managedWards.length - 2}</span>
+                    )}
+                </div>
+            )}
+        </div>
+
+        {isRecommended && (
+            <div className="absolute top-2 right-2">
+                <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+            </div>
+        )}
+    </div>
+);
 
 const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords }) => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
@@ -69,58 +127,6 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   }, [employees, targetWardName, searchTerm]);
 
   if (!isOpen) return null;
-
-  // Component hiển thị một dòng nhân viên (Compact style cho grid)
-  const EmployeeItem = ({ emp, isRecommended }: { emp: Employee, isRecommended?: boolean }) => (
-    <div 
-        onClick={() => setSelectedEmpId(emp.id)}
-        className={`relative flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all group h-full ${
-            selectedEmpId === emp.id 
-                ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-200' 
-                : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-md'
-        }`}
-    >
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isRecommended ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-            {emp.name.charAt(0).toUpperCase()}
-        </div>
-        
-        <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1 mb-0.5">
-                <span className={`font-bold text-sm truncate ${selectedEmpId === emp.id ? 'text-blue-700' : 'text-gray-800'}`}>
-                    {emp.name}
-                </span>
-                {selectedEmpId === emp.id && <Check size={14} className="text-blue-600 shrink-0" />}
-            </div>
-            
-            <div className="text-xs text-gray-500 truncate mb-1">
-                {emp.department}
-            </div>
-
-            {/* Hiển thị tags địa bàn nếu có (chỉ hiện tối đa 2 cái) */}
-            {emp.managedWards && emp.managedWards.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                    {emp.managedWards.slice(0, 2).map((w, idx) => (
-                        <span key={idx} className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 truncate max-w-[80px]">
-                            {w}
-                        </span>
-                    ))}
-                    {emp.managedWards.length > 2 && (
-                        <span className="text-[9px] text-gray-400">+{emp.managedWards.length - 2}</span>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {isRecommended && (
-            <div className="absolute top-2 right-2">
-                <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-            </div>
-        )}
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -185,7 +191,13 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                      {recommended.length > 0 ? (
                          <div className="flex flex-col gap-2">
                             {recommended.map(emp => (
-                                <EmployeeItem key={emp.id} emp={emp} isRecommended={true} />
+                                <EmployeeItem 
+                                    key={emp.id} 
+                                    emp={emp} 
+                                    isRecommended={true} 
+                                    isSelected={selectedEmpId === emp.id}
+                                    onSelect={setSelectedEmpId}
+                                />
                             ))}
                          </div>
                      ) : (
@@ -215,7 +227,12 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                      {others.length > 0 ? (
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                             {others.map(emp => (
-                                <EmployeeItem key={emp.id} emp={emp} />
+                                <EmployeeItem 
+                                    key={emp.id} 
+                                    emp={emp}
+                                    isSelected={selectedEmpId === emp.id}
+                                    onSelect={setSelectedEmpId}
+                                />
                             ))}
                          </div>
                      ) : (

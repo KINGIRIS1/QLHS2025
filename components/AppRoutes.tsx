@@ -74,8 +74,8 @@ interface AppRoutesProps {
     filterWard: string; setFilterWard: (s: string) => void;
     filterStatus: string; setFilterStatus: (s: string) => void;
     filterEmployee: string; setFilterEmployee: (s: string) => void;
-    warningFilter: string; setWarningFilter: (s: any) => void;
-    handoverTab: string; setHandoverTab: (s: any) => void;
+    warningFilter: string; setWarningFilter: React.Dispatch<React.SetStateAction<any>>;
+    handoverTab: string; setHandoverTab: React.Dispatch<React.SetStateAction<any>>;
     
     sortConfig: any; setSortConfig: (c: any) => void;
     currentPage: number; setCurrentPage: React.Dispatch<React.SetStateAction<number>>;

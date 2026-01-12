@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2 } from 'lucide-react';
-import { User as UserType } from '../types';
+import { User as UserType, RecordFile } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
 import VPHCTab from './utilities/VPHCTab';
@@ -10,17 +10,25 @@ import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
+    initialRecordForCorrection?: RecordFile | null; // New prop for auto-navigation
 }
 
 export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
 
-const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser }) => {
+const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
   const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
   const [notification, setNotification] = useState<{ type: NotifyType, message: string } | null>(null);
+
+  // Auto-switch to correction tab if initial record is provided
+  useEffect(() => {
+      if (initialRecordForCorrection) {
+          setActiveTab('chinhly');
+      }
+  }, [initialRecordForCorrection]);
 
   // Load default path on mount and tab change
   useEffect(() => {
@@ -147,7 +155,11 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser }) => {
 
           {/* TAB 4: CHỈNH LÝ BIẾN ĐỘNG */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'chinhly' ? 'block' : 'hidden'}`}>
-              <ChinhLyBienDongTab currentUser={currentUser} notify={notify} />
+              <ChinhLyBienDongTab 
+                  currentUser={currentUser} 
+                  notify={notify}
+                  initialRecord={initialRecordForCorrection} // Pass down the record
+              />
           </div>
 
           {/* TAB 5: TÍNH SAI SỐ */}

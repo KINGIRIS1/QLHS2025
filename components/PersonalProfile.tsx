@@ -12,7 +12,8 @@ interface PersonalProfileProps {
   records: RecordFile[];
   onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
   onViewRecord: (record: RecordFile) => void;
-  onCreateLiquidation?: (record: RecordFile) => void; // New Prop
+  onCreateLiquidation?: (record: RecordFile) => void; 
+  onMapCorrection?: (record: RecordFile) => void; // New Handler Prop
 }
 
 function removeVietnameseTones(str: string): string {
@@ -32,7 +33,7 @@ function removeVietnameseTones(str: string): string {
     return str;
 }
 
-const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation }) => {
+const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   const [activeTab, setActiveTab] = useState<'pending' | 'reminder'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -127,20 +128,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?\nHãy chắc chắn bạn đã hoàn thành công việc.`)) {
       onUpdateStatus(record, RecordStatus.PENDING_SIGN);
     }
-  };
-
-  // Hàm xử lý khi tick chọn Cần chỉnh lý bản đồ
-  const handleToggleMapCorrection = async (record: RecordFile) => {
-      const newValue = !record.needsMapCorrection;
-      // Cập nhật Optimistic UI (nếu App.tsx có state chung, nó sẽ tự update sau khi API gọi xong)
-      // Ở đây ta gọi API trực tiếp
-      try {
-          await updateRecordApi({ ...record, needsMapCorrection: newValue });
-          // Note: App sẽ tự động refresh data qua cơ chế polling hoặc props callback nếu có
-      } catch (error) {
-          console.error("Lỗi cập nhật trạng thái chỉnh lý:", error);
-          alert("Có lỗi xảy ra khi cập nhật.");
-      }
   };
 
   const formatDate = (dateStr?: string) => {
@@ -298,8 +285,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                             
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
                             
-                            {/* Cột Chỉnh lý BĐ - MỚI */}
-                            <th className="p-3 text-center w-[80px]">Chỉnh lý</th>
+                            {/* Cột Chỉnh lý BĐ - CẬP NHẬT: Thay checkbox bằng button */}
+                            <th className="p-3 text-center w-[100px]">Chỉnh lý</th>
 
                             <th className="p-3 text-center w-[160px]">Thao tác chính</th>
                         </tr>
@@ -335,18 +322,22 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
 
                                     <td className="p-3 text-center align-middle"><StatusBadge status={r.status} /></td>
                                     
-                                    {/* Checkbox Chỉnh lý bản đồ */}
+                                    {/* BUTTON CHỈNH LÝ (Thay thế checkbox) */}
                                     <td className="p-3 text-center align-middle">
-                                        <label className="cursor-pointer flex justify-center">
-                                            <input 
-                                                type="checkbox" 
-                                                className="w-4 h-4 text-orange-600 focus:ring-orange-500 rounded border-gray-300 cursor-pointer"
-                                                checked={!!r.needsMapCorrection}
-                                                onChange={() => handleToggleMapCorrection(r)}
-                                                title="Tích nếu hồ sơ này cần chỉnh lý bản đồ"
-                                            />
-                                        </label>
-                                        {r.needsMapCorrection && <span className="text-[9px] text-orange-600 font-bold block mt-0.5">Cần chỉnh lý</span>}
+                                        {onMapCorrection && (
+                                            <button 
+                                                onClick={() => onMapCorrection(r)}
+                                                className={`flex items-center justify-center gap-1 px-2 py-1 rounded border transition-all text-[10px] font-bold shadow-sm mx-auto ${
+                                                    r.needsMapCorrection 
+                                                    ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100 w-full' 
+                                                    : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:bg-gray-50'
+                                                }`}
+                                                title={r.needsMapCorrection ? "Đang yêu cầu chỉnh lý" : "Yêu cầu chỉnh lý bản đồ"}
+                                            >
+                                                <Map size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
+                                                {r.needsMapCorrection && <span>CHỈNH LÝ</span>}
+                                            </button>
+                                        )}
                                     </td>
 
                                     <td className="p-3 align-middle">

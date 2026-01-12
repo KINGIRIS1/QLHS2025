@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx-js-style';
 interface ChinhLyBienDongTabProps {
     currentUser: UserType;
     notify: NotifyFunction;
+    initialRecord?: RecordFile | null; // Prop mới
 }
 
 // Danh sách Xã/Phường giới hạn theo yêu cầu
@@ -51,7 +52,7 @@ const DEFAULT_DETAIL: DetailData = {
     TONG_DT: ''
 };
 
-const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, notify }) => {
+const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, notify, initialRecord }) => {
     const [mode, setMode] = useState<'create' | 'list'>('list');
     
     // Tab con trong màn hình danh sách
@@ -76,6 +77,30 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
     useEffect(() => {
         loadData();
     }, []);
+
+    // --- HANDLE INITIAL RECORD (AUTO FILL) ---
+    useEffect(() => {
+        if (initialRecord) {
+            setMode('create');
+            setCommonData({
+                ...DEFAULT_COMMON,
+                XA: initialRecord.ward || '',
+                SO_HD: initialRecord.code || ''
+            });
+            
+            const newDetail: DetailData = {
+                ...DEFAULT_DETAIL,
+                TO_CU: initialRecord.mapSheet || '',
+                THUA_CU: initialRecord.landPlot || '',
+                DT_CU: initialRecord.area ? initialRecord.area.toString() : '',
+                DT_MOI: initialRecord.area ? initialRecord.area.toString() : '',
+                TONG_DT: initialRecord.area ? initialRecord.area.toString() : '',
+                TO_MOI: initialRecord.mapSheet || '',
+            };
+            setDetailRows([newDetail]);
+            notify(`Đã nạp dữ liệu chỉnh lý từ hồ sơ: ${initialRecord.code}`, 'success');
+        }
+    }, [initialRecord]);
 
     // Reset selection khi đổi tab danh sách
     useEffect(() => {

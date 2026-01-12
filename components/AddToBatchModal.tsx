@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
 import { X, Calendar, Plus, History, CheckCircle2, AlertTriangle, Map } from 'lucide-react';
+import { fetchChinhLyRecords } from '../services/apiUtilities';
 
 interface AddToBatchModalProps {
   isOpen: boolean;
@@ -25,9 +26,51 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   
   // State xác nhận danh sách chỉnh lý
   const [needsCorrectionConfirm, setNeedsCorrectionConfirm] = useState(false);
+  
+  // State danh sách cảnh báo thực tế (đã lọc qua logic kiểm tra bảng chỉnh lý)
+  const [filteredWarningList, setFilteredWarningList] = useState<RecordFile[]>([]);
 
   // Ngày hiện tại cho đợt mới
   const todayStr = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+      // Logic kiểm tra xem hồ sơ nào cần chỉnh lý NHƯNG chưa có trong danh sách đã chuyển ('sent')
+      const checkWarnings = async () => {
+          if (!isOpen || targetRecords.length === 0) {
+              setFilteredWarningList([]);
+              return;
+          }
+
+          // Lấy tất cả hồ sơ có cờ needsMapCorrection = true
+          const potentialWarnings = targetRecords.filter(r => r.needsMapCorrection);
+          
+          if (potentialWarnings.length === 0) {
+              setFilteredWarningList([]);
+              return;
+          }
+
+          // Fetch danh sách chỉnh lý từ DB
+          const chinhLyRecords = await fetchChinhLyRecords();
+          
+          // Lọc ra danh sách thực sự cần cảnh báo
+          // Điều kiện: Có cờ 'needsMapCorrection' VÀ (không tìm thấy trong bảng chỉnh lý HOẶC tìm thấy nhưng status != 'sent')
+          const realWarnings = potentialWarnings.filter(r => {
+              // Tìm record tương ứng trong bảng chỉnh lý (dựa vào SO_HD == r.code)
+              const correctionEntry = chinhLyRecords.find(c => c.data.SO_HD === r.code);
+              
+              // Nếu đã chuyển ('sent') thì KHÔNG cần cảnh báo -> return false
+              if (correctionEntry && correctionEntry.data.STATUS === 'sent') {
+                  return false;
+              }
+              // Ngược lại (chưa có hoặc đang 'pending') -> Cần cảnh báo -> return true
+              return true;
+          });
+
+          setFilteredWarningList(realWarnings);
+      };
+
+      checkWarnings();
+  }, [isOpen, targetRecords]);
 
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
@@ -76,16 +119,12 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       }
   }, [mode, historyBatches]);
 
-  // Danh sách cảnh báo (lấy từ targetRecords được truyền vào)
-  const warningList = useMemo(() => {
-      return targetRecords.filter(r => r.needsMapCorrection);
-  }, [targetRecords]);
-
   if (!isOpen) return null;
 
   const handleConfirm = () => {
-      if (warningList.length > 0 && !needsCorrectionConfirm) {
-          alert("Vui lòng xác nhận bạn đã lập danh sách chỉnh lý.");
+      // Logic chặn nếu có cảnh báo chưa xác nhận
+      if (filteredWarningList.length > 0 && !needsCorrectionConfirm) {
+          alert("Vui lòng xác nhận bạn đã lập danh sách chỉnh lý cho các hồ sơ được cảnh báo.");
           return;
       }
 
@@ -126,17 +165,17 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 Bạn đang thực hiện chốt <strong>{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao".
             </p>
 
-            {/* CẢNH BÁO CHỈNH LÝ BẢN ĐỒ */}
-            {warningList.length > 0 && (
+            {/* CẢNH BÁO CHỈNH LÝ BẢN ĐỒ (CHỈ HIỆN KHI CÓ HỒ SƠ CHƯA CHUYỂN LIST) */}
+            {filteredWarningList.length > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 animate-pulse">
                     <div className="flex items-center gap-2 text-orange-700 font-bold text-sm mb-2">
                         <AlertTriangle size={18} /> CẢNH BÁO: CÓ HỒ SƠ CẦN CHỈNH LÝ
                     </div>
                     <p className="text-xs text-orange-800 mb-2">
-                        Có <strong>{warningList.length}</strong> hồ sơ cần chỉnh lý bản đồ địa chính:
+                        Có <strong>{filteredWarningList.length}</strong> hồ sơ cần chỉnh lý bản đồ nhưng chưa có trong danh sách "Đã chuyển":
                     </p>
                     <ul className="list-disc list-inside text-xs text-orange-800 font-mono mb-3 max-h-20 overflow-y-auto bg-orange-100/50 p-2 rounded">
-                        {warningList.map(r => (
+                        {filteredWarningList.map(r => (
                             <li key={r.id} className="flex items-center gap-2">
                                 <Map size={10} /> {r.code} - {r.customerName}
                             </li>
@@ -149,7 +188,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                             checked={needsCorrectionConfirm}
                             onChange={(e) => setNeedsCorrectionConfirm(e.target.checked)}
                         />
-                        <span className="text-xs font-bold text-gray-700">Tôi xác nhận đã lập danh sách chỉnh lý riêng.</span>
+                        <span className="text-xs font-bold text-gray-700">Tôi xác nhận đã kiểm tra / lập danh sách.</span>
                     </label>
                 </div>
             )}
@@ -217,7 +256,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
-                disabled={warningList.length > 0 && !needsCorrectionConfirm}
+                disabled={filteredWarningList.length > 0 && !needsCorrectionConfirm}
                 className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <CheckCircle2 size={16} /> Xác nhận chốt

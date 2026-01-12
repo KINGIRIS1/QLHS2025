@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
-import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone } from 'lucide-react';
+import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
@@ -19,6 +19,7 @@ interface RecordRowProps {
   onAdvanceStatus: (record: RecordFile) => void;
   onQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
   onReturnResult?: (record: RecordFile) => void;
+  onMapCorrection?: (record: RecordFile) => void; // New Handler
 }
 
 const formatDate = (dateStr?: string) => {
@@ -39,7 +40,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
   onDelete,
   onAdvanceStatus,
   onQuickUpdate,
-  onReturnResult
+  onReturnResult,
+  onMapCorrection
 }) => {
   const employee = employees.find(e => e.id === record.assignedTo);
   const isOverdue = isRecordOverdue(record);
@@ -83,11 +85,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
       {visibleColumns.customer && (
           <td className={cellClass}>
               <div className="flex flex-col gap-1 items-center text-center">
-                  {/* Tên chủ sử dụng: text-sm */}
                   <div className="break-words leading-normal text-sm font-medium text-gray-900" title={record.customerName}>
                       {toTitleCase(record.customerName)}
                   </div>
-                  {/* Số điện thoại: text-sm (trước là text-xs) */}
                   {record.phoneNumber && (
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                           <Phone size={14} className="shrink-0" />
@@ -101,13 +101,11 @@ const RecordRow: React.FC<RecordRowProps> = ({
       {visibleColumns.deadline && (
         <td className={cellClass}>
           <div className="flex flex-col w-full bg-white/50 rounded border border-gray-100 overflow-hidden shadow-sm">
-             {/* Ngày nhận - Thêm mr-3 để tách biệt */}
              <div className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50/80 border-b border-gray-100" title="Ngày tiếp nhận">
                 <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight mr-3">Nhận</span>
                 <span className="text-sm font-semibold text-slate-600 font-mono whitespace-nowrap">{formatDate(record.receivedDate)}</span>
              </div>
              
-             {/* Hẹn trả - Thêm mr-3 để tách biệt */}
              <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
                 <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
                 <div className="flex items-center gap-1.5">
@@ -124,7 +122,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
       
       {visibleColumns.ward && (
           <td className={`${cellClass} text-center text-gray-700`}>
-              {/* Xã phường: text-sm - CĂN GIỮA */}
               <div className="break-words leading-normal text-sm" title={getNormalizedWard(record.ward)}> 
                   {getNormalizedWard(record.ward) || '--'}
               </div>
@@ -138,9 +135,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
           <td className={`${cellClass} text-center`}>
               {record.assignedDate ? (
                   <div className="flex flex-col items-center gap-1">
-                      {/* Ngày giao: text-sm */}
                       <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
-                      {/* Tên NV: text-xs */}
                       {employee && <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>}
                   </div>
               ) : '--'}
@@ -150,19 +145,16 @@ const RecordRow: React.FC<RecordRowProps> = ({
       {visibleColumns.completed && (
         <td className={`${cellClass} text-center text-gray-600`}>
           {record.exportBatch ? (
-             // Trường hợp 1: Có đợt giao
              <span className={`inline-flex flex-col items-center px-2 py-1 rounded border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-green-50 text-green-700 border-green-200'}`}>
                 <span className="text-[11px] font-bold">Đợt {record.exportBatch}</span>
                 <span className="text-[11px] font-medium whitespace-nowrap">{formatDate(record.exportDate || record.completedDate)}</span>
              </span>
           ) : record.status === RecordStatus.WITHDRAWN ? (
-             // Trường hợp 2: Rút hồ sơ (nhưng chưa có đợt)
              <div className="flex flex-col items-center">
                 <span className="text-xs font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded mb-1">Rút HS</span>
                 <span className="text-sm font-bold text-slate-600">{formatDate(record.completedDate)}</span>
              </div>
           ) : (
-             // Trường hợp 3: Hoàn thành bình thường (Giao 1 cửa lẻ hoặc đã ký xong)
              <span className="text-sm font-bold text-green-700">{formatDate(record.completedDate) || '--'}</span>
           )}
         </td>
@@ -170,7 +162,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
       {visibleColumns.type && (
           <td className={`${cellClass} text-center text-gray-700`}>
-              {/* Loại hồ sơ: text-sm - CĂN GIỮA */}
               <div className="break-words leading-normal text-sm" title={record.recordType}> 
                   {getShortRecordType(record.recordType)}
               </div>
@@ -194,8 +185,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
           </div>
         </td>
       )}
-
-      {/* Cột Batch đã bị gộp vào cột completed ở trên */}
 
       {visibleColumns.receipt && (
         <td className={`${cellClass} text-center`}>
@@ -223,6 +212,24 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 </span>
             ) : (
                 <div className="transform origin-top pt-1"><StatusBadge status={record.status} /></div> 
+            )}
+            
+            {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}
+            {onMapCorrection && (
+                <div className="mt-2 flex justify-center">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onMapCorrection(record); }}
+                        className={`flex items-center gap-1 px-2 py-1 rounded border transition-all text-[10px] font-bold shadow-sm ${
+                            record.needsMapCorrection 
+                            ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100' 
+                            : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:bg-gray-50'
+                        }`}
+                        title={record.needsMapCorrection ? "Hồ sơ đang cần chỉnh lý bản đồ" : "Bấm để chuyển sang chỉnh lý bản đồ"}
+                    >
+                        <Map size={14} className={record.needsMapCorrection ? "fill-orange-100" : ""} />
+                        {record.needsMapCorrection && <span>CHỈNH LÝ</span>}
+                    </button>
+                </div>
             )}
         </td>
       )}

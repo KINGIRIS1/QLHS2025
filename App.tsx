@@ -50,6 +50,9 @@ function App() {
 
   // Contract Liquidation Request State
   const [recordToLiquidate, setRecordToLiquidate] = useState<RecordFile | null>(null);
+  
+  // Map Correction Request State
+  const [recordForMapCorrection, setRecordForMapCorrection] = useState<RecordFile | null>(null);
 
   useEffect(() => {
       if (toast) {
@@ -181,7 +184,6 @@ function App() {
 
   const handleExportReportExcel = async (fromDateStr: string, toDateStr: string, ward: string) => {
       if (!currentUser) return;
-      // CẬP NHẬT: Truyền thêm ward và employees vào hàm export
       await exportReportToExcel(records, fromDateStr, toDateStr, ward, employees);
   };
 
@@ -263,7 +265,6 @@ function App() {
       const selectedIds = Array.from(selectedRecordIds);
       const updates: any = { [field]: value };
       
-      // Tự động set ngày kèm theo nếu đổi trạng thái
       const todayStr = new Date().toISOString().split('T')[0];
       if (field === 'status') {
           if (value === RecordStatus.ASSIGNED) updates.assignedDate = todayStr;
@@ -274,18 +275,16 @@ function App() {
       }
       if (field === 'assignedTo') {
           updates.assignedDate = todayStr;
-          updates.status = RecordStatus.ASSIGNED; // Tự động chuyển status nếu giao việc
+          updates.status = RecordStatus.ASSIGNED; 
       }
 
-      // Optimistic Update UI
       setRecords(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, ...updates } : r));
 
-      // Call API Loop
       const targets = records.filter(r => selectedIds.includes(r.id));
       await Promise.all(targets.map(r => updateRecordApi({ ...r, ...updates })));
 
       setToast({ type: 'success', message: `Đã cập nhật ${selectedIds.length} hồ sơ thành công!` });
-      setSelectedRecordIds(new Set()); // Clear selection
+      setSelectedRecordIds(new Set()); 
   };
 
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
@@ -303,13 +302,11 @@ function App() {
       }
   }, [records]);
 
-  // Xử lý nút mở Modal trả kết quả (Thay vì confirm trực tiếp)
   const handleOpenReturnModal = useCallback((record: RecordFile) => {
       setReturnRecord(record);
       setIsReturnModalOpen(true);
   }, []);
 
-  // Xử lý xác nhận trả kết quả từ Modal
   const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string) => {
       if (!returnRecord) return;
       
@@ -319,8 +316,7 @@ function App() {
           resultReturnedDate: today, 
           status: RecordStatus.RETURNED,
           receiptNumber: receiptNumber,
-          receiverName: receiverName, // CẬP NHẬT: Lưu vào cột receiverName riêng
-          // Không cần nối vào notes nữa
+          receiverName: receiverName,
       }; 
 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
@@ -329,6 +325,20 @@ function App() {
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
   }, [returnRecord]);
+
+  // --- HÀM XỬ LÝ YÊU CẦU CHỈNH LÝ BẢN ĐỒ ---
+  const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
+      // 1. Cập nhật trạng thái record trong DB
+      const updatedRecord = { ...record, needsMapCorrection: true };
+      setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+      await updateRecordApi(updatedRecord);
+
+      // 2. Chuyển sang tiện ích Chỉnh lý
+      setRecordForMapCorrection(updatedRecord);
+      setCurrentView('utilities');
+      
+      setToast({ type: 'success', message: `Đã chuyển hồ sơ ${record.code} sang tiện ích chỉnh lý bản đồ.` });
+  }, []);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
       if (record.status === RecordStatus.RECEIVED) { 
@@ -387,11 +397,9 @@ function App() {
 
   const handleExportReturnedList = () => {
       if (!canPerformAction) return;
-      // CẬP NHẬT: Truyền khoảng thời gian (Từ ngày - Đến ngày)
       exportReturnedListToExcel(filteredRecords, filterFromDate, filterToDate, filterWard);
   };
 
-  // --- LIQUIDATION HANDLER ---
   const handleRequestLiquidation = useCallback((record: RecordFile) => {
       setRecordToLiquidate(record);
       setCurrentView('receive_contract');
@@ -407,9 +415,7 @@ function App() {
       setIsExcelPreviewOpen(true);
   };
 
-  // Render Record List Table
   const renderRecordList = () => {
-    // UPDATE: Thêm 'all_records' vào danh sách isListView để hiển thị thanh công cụ phía dưới
     const isListView = currentView === 'check_list' || currentView === 'handover_list' || currentView === 'assign_tasks' || currentView === 'all_records';
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
@@ -428,20 +434,16 @@ function App() {
                 <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
                      {currentView === 'handover_list' && (
                          <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
-                             {/* CHỈ HIỂN THỊ NÚT 'CHỜ GIAO' NẾU KHÔNG PHẢI LÀ 1 CỬA */}
                              {currentUser?.role !== UserRole.ONEDOOR && (
                                 <button onClick={() => setHandoverTab('today')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'today' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><ListChecks size={16} /> Chờ giao</button>
                              )}
                              <button onClick={() => setHandoverTab('history')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'history' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><History size={16} /> Lịch sử</button>
-                             {/* TAB MỚI: ĐÃ TRẢ KẾT QUẢ */}
                              <button onClick={() => setHandoverTab('returned')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${handoverTab === 'returned' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}><FileCheck size={16} /> Đã trả KQ</button>
                          </div>
                      )}
                      
-                     {/* Ẩn bộ lọc ngày chung nếu đang ở tab handover_list history/returned vì nó có logic lọc riêng */}
                      {currentView !== 'handover_list' && !showAdvancedDateFilter && ( <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm"><Calendar size={16} className="text-gray-500" /><input type="date" value={filterSpecificDate} onChange={(e) => setFilterSpecificDate(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700" title="Lọc theo ngày tiếp nhận" />{filterSpecificDate && (<button onClick={() => setFilterSpecificDate('')} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}</div>)}
                      
-                     {/* Logic lọc ngày riêng cho History và Returned */}
                      {currentView === 'handover_list' && handoverTab === 'history' && (
                          <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                              <Calendar size={16} className="text-gray-500" />
@@ -451,7 +453,6 @@ function App() {
                          </div>
                      )}
 
-                     {/* CẬP NHẬT: Logic lọc ngày cho 'returned' dùng khoảng thời gian (giống Advanced Date Filter) */}
                      {currentView === 'handover_list' && handoverTab === 'returned' && (
                         <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                             <span className="text-xs text-gray-500 font-bold uppercase">Ngày trả:</span>
@@ -542,7 +543,6 @@ function App() {
                     </div>
                 )}
                 
-                {/* Check List / Handover Actions */}
                 {isListView && (
                     <div className="flex justify-end gap-3 mt-2">
                         {canPerformAction && currentView === 'handover_list' && handoverTab === 'today' && selectedRecordIds.size > 0 && (
@@ -560,7 +560,6 @@ function App() {
                                 <FileSignature size={18} /> Ký Duyệt Tất Cả ({filteredRecords.length})
                             </button>
                         )}
-                        {/* BUTTON GIAO VIỆC HÀNG LOẠT (Updated condition) */}
                         {canPerformAction && (currentView === 'assign_tasks' || currentView === 'all_records') && selectedRecordIds.size > 0 && (
                             <button 
                                 onClick={() => {
@@ -573,7 +572,6 @@ function App() {
                                 <UserPlus size={18} /> Giao Nhân Viên ({selectedRecordIds.size})
                             </button>
                         )}
-                        {/* UPDATE: Ẩn nút Xuất Danh Sách cho all_records vì đã có nút Excel ở trên */}
                         {(currentView !== 'handover_list' || handoverTab !== 'returned') && currentView !== 'assign_tasks' && currentView !== 'all_records' && (
                             <button onClick={() => { setExportModalType(currentView === 'check_list' ? 'check_list' : 'handover'); setIsExportModalOpen(true); }} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium shadow-sm">
                                 <FileOutput size={18} /> Xuất Danh Sách
@@ -617,6 +615,8 @@ function App() {
                                 onAdvanceStatus={advanceStatus}
                                 onQuickUpdate={handleQuickUpdate}
                                 onReturnResult={handleOpenReturnModal}
+                                // Pass the map correction handler
+                                onMapCorrection={handleMapCorrectionRequest}
                             />
                         )) : (
                             <tr><td colSpan={Object.values(visibleColumns).filter(v => v).length + 2} className="p-8 text-center text-gray-400 italic">Không có dữ liệu hiển thị.</td></tr>
@@ -703,6 +703,8 @@ function App() {
                     onUpdateStatus={() => {}} 
                     onViewRecord={handleViewRecord} 
                     onCreateLiquidation={handleRequestLiquidation}
+                    // Pass the map correction handler
+                    onMapCorrection={handleMapCorrectionRequest}
                 />
             )}
             
@@ -760,7 +762,13 @@ function App() {
                 />
             )}
 
-            {currentView === 'utilities' && <UtilitiesView currentUser={currentUser} />}
+            {/* Cập nhật UtilitiesView để nhận recordForCorrection */}
+            {currentView === 'utilities' && (
+                <UtilitiesView 
+                    currentUser={currentUser} 
+                    initialRecordForCorrection={recordForMapCorrection}
+                />
+            )}
 
             {currentView === 'account_settings' && (
                 <AccountSettingsView 

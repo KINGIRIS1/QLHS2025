@@ -328,16 +328,24 @@ function App() {
 
   // --- HÀM XỬ LÝ YÊU CẦU CHỈNH LÝ BẢN ĐỒ ---
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
-      // 1. Cập nhật trạng thái record trong DB
-      const updatedRecord = { ...record, needsMapCorrection: true };
+      // 1. Toggle trạng thái (Nếu đang true -> false, false -> true)
+      const newValue = !record.needsMapCorrection;
+      
+      const updatedRecord = { ...record, needsMapCorrection: newValue };
+      
+      // Optimistic Update
       setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
       await updateRecordApi(updatedRecord);
 
-      // 2. Chuyển sang tiện ích Chỉnh lý
-      setRecordForMapCorrection(updatedRecord);
-      setCurrentView('utilities');
-      
-      setToast({ type: 'success', message: `Đã chuyển hồ sơ ${record.code} sang tiện ích chỉnh lý bản đồ.` });
+      if (newValue) {
+          // Nếu bật -> Chuyển sang view tiện ích
+          setRecordForMapCorrection(updatedRecord);
+          setCurrentView('utilities');
+          setToast({ type: 'success', message: `Đã chuyển hồ sơ ${record.code} sang tiện ích chỉnh lý bản đồ.` });
+      } else {
+          // Nếu tắt -> Chỉ thông báo
+          setToast({ type: 'success', message: `Đã HỦY yêu cầu chỉnh lý cho hồ sơ ${record.code}.` });
+      }
   }, []);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {

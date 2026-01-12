@@ -332,7 +332,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                                     ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100 w-full' 
                                                     : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:bg-gray-50'
                                                 }`}
-                                                title={r.needsMapCorrection ? "Đang yêu cầu chỉnh lý" : "Yêu cầu chỉnh lý bản đồ"}
+                                                title={r.needsMapCorrection ? "Đang có yêu cầu. Bấm để HỦY." : "Yêu cầu chỉnh lý bản đồ"}
                                             >
                                                 <Map size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
                                                 {r.needsMapCorrection && <span>CHỈNH LÝ</span>}

@@ -3,7 +3,7 @@ import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './
 
 // CẤU HÌNH KẾT NỐI
 // QUAN TRỌNG: Để dùng Cloud (Supabase), hãy dán URL dự án vào đây.
-// Nếu dùng Mạng LAN (Local), đổi lại thành 'http://localhost:3000'
+// Nếu dùng Mạng LAN (Local), đổi lại thành 'http://localhost:3005'
 export const API_BASE_URL = 'https://dajjhubrhybodggbqapt.supabase.co'; 
 
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG

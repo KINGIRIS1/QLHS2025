@@ -224,7 +224,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                             ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100' 
                             : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:bg-gray-50'
                         }`}
-                        title={record.needsMapCorrection ? "Hồ sơ đang cần chỉnh lý bản đồ" : "Bấm để chuyển sang chỉnh lý bản đồ"}
+                        title={record.needsMapCorrection ? "Hồ sơ đang cần chỉnh lý. Bấm để HỦY." : "Bấm để chuyển sang chỉnh lý bản đồ"}
                     >
                         <Map size={14} className={record.needsMapCorrection ? "fill-orange-100" : ""} />
                         {record.needsMapCorrection && <span>CHỈNH LÝ</span>}

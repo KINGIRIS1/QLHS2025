@@ -165,7 +165,8 @@ server.post('/custom/counters', (req, res) => {
 
 server.use(router);
 
-const PORT = 3000;
+// ĐỔI PORT TỪ 3000 -> 3005 ĐỂ TRÁNH XUNG ĐỘT
+const PORT = 3005;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Update feed available at: http://localhost:${PORT}/updates`);

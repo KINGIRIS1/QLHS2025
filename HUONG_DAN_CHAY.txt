@@ -21,7 +21,7 @@ B. Nếu triển khai Mạng LAN (1 Máy chủ, nhiều máy con):
 
 2. Tại MÁY NHÂN VIÊN (Máy con):
    - Chạy file "2_Chay_Ung_Dung.bat".
-   - Bấm nút "Cấu hình kết nối" -> Nhập IP máy chủ (VD: 192.168.1.15:3000).
+   - Bấm nút "Cấu hình kết nối" -> Nhập IP máy chủ (VD: 192.168.1.15:3005).
 
 === HƯỚNG DẪN SAO LƯU & CẬP NHẬT ===
 

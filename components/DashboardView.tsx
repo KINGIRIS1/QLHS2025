@@ -48,8 +48,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
 
     // 3. Tính toán thống kê cho năm đã chọn
     const total = recordsInYear.length;
-    
-    // CẬP NHẬT: Nhóm Đã hoàn thành bao gồm HANDOVER (Giao nội bộ) và RETURNED (Đã trả dân)
     const completed = recordsInYear.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED).length;
     const withdrawn = recordsInYear.filter(r => r.status === RecordStatus.WITHDRAWN).length;
     const processing = total - completed - withdrawn;

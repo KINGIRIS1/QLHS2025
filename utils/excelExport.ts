@@ -105,14 +105,13 @@ export const exportReportToExcel = async (
         "Chủ Sử Dụng", 
         "Địa Chỉ (Xã)", 
         "Loại Hồ Sơ", 
-        "NV Xử Lý",
+        "NV Xử Lý", // Cột Mới
         "Số Biên Lai", 
         "Thành Tiền", 
         "Ngày Nhận", 
         "Hẹn Trả", 
         "Ngày hoàn thành",
-        "Ngày trả KQ",
-        "Người Nhận KQ",
+        "Ngày trả kết quả",
         "Trạng Thái", 
         "Ghi Chú"
     ];
@@ -123,14 +122,13 @@ export const exportReportToExcel = async (
         r.customerName,
         getNormalizedWard(r.ward),
         getShortRecordType(r.recordType),
-        getEmployeeName(r.assignedTo),
+        getEmployeeName(r.assignedTo), // Data Mới
         r.receiptNumber || '',
         getContractAmount(r.code),
         formatDate(r.receivedDate),
         formatDate(r.deadline),
         formatDate(r.completedDate),      
         formatDate(r.resultReturnedDate),
-        r.receiverName || '',
         STATUS_LABELS[r.status],
         r.notes || ''
     ]);
@@ -169,10 +167,10 @@ export const exportReportToExcel = async (
         [""],                                    // 5
         [`Tổng số: ${total} | Đã xong: ${completed} | Đang giải quyết: ${processing} | Trễ hạn (Chưa xong): ${overduePending} | Trễ hạn (Đã xong): ${overdueCompleted}`], // 6
         [""],                                    // 7
-        tableHeader                              // 8 (A9)
+        tableHeader                              // 8 (A9) -> Header Row Index = 8
     ], { origin: "A1" });
 
-    // Dữ liệu bắt đầu từ dòng 9 (A10)
+    // Dữ liệu bắt đầu từ dòng 9 (A10) -> Data Start Index = 9
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A10" });
 
     // Formatting Merges
@@ -190,16 +188,15 @@ export const exportReportToExcel = async (
         { wch: 5 },  // STT
         { wch: 15 }, // Mã HS
         { wch: 25 }, // Chủ SD
-        { wch: 15 }, // Địa Chỉ
+        { wch: 18 }, // Địa Chỉ
         { wch: 15 }, // Loại HS
-        { wch: 18 }, // NV Xử Lý
+        { wch: 20 }, // NV Xử Lý (Mới)
         { wch: 12 }, // Số BL
         { wch: 15 }, // Thành tiền
         { wch: 12 }, // Ngày Nhận
         { wch: 12 }, // Hẹn Trả
         { wch: 14 }, // Ngày hoàn thành
-        { wch: 14 }, // Ngày trả KQ
-        { wch: 20 }, // Người nhận KQ
+        { wch: 14 }, // Ngày trả kết quả
         { wch: 15 }, // Trạng thái
         { wch: 20 }  // Ghi chú
     ];
@@ -225,13 +222,14 @@ export const exportReportToExcel = async (
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
             // Căn giữa: STT, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
-            if ([0, 5, 6, 8, 9, 10, 11, 13].includes(c)) ws[cellRef].s = centerStyle;
+            if ([0, 5, 6, 8, 9, 10, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
             else if (c === 7) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }
     }
 
     const lastRow = dataStartIdx + totalDataRows + 2;
+    // Footer adjustments for wider table
     const rightColStart = totalCols - 2;
     const rightColEnd = totalCols;
 
@@ -261,6 +259,7 @@ export const exportReportToExcel = async (
 };
 
 export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
+    // ... Giữ nguyên code cũ cho exportReturnedListToExcel ...
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -283,7 +282,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         "Loại Hồ Sơ", 
         "Số Biên Lai", 
         "Ngày Hẹn", 
-        "Ngày Trả KQ", 
+        "Ngày Trả Kết Quả", 
         "Người Nhận", 
         "Ghi Chú"
     ];

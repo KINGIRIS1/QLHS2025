@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Employee, RecordFile } from '../types';
 import { X, Check, MapPin, User, Users, Search } from 'lucide-react';
@@ -70,7 +71,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   if (!isOpen) return null;
 
   // Component hiển thị một dòng nhân viên (Compact style cho grid)
-  const EmployeeItem: React.FC<{ emp: Employee, isRecommended?: boolean }> = ({ emp, isRecommended }) => (
+  const EmployeeItem = ({ emp, isRecommended }: { emp: Employee, isRecommended?: boolean }) => (
     <div 
         onClick={() => setSelectedEmpId(emp.id)}
         className={`relative flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all group h-full ${

@@ -46,6 +46,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     THANG_LAP: '',
     NAM_LAP: '',
     HO: 'Ông', TEN_CHU: '', DIA_CHI_CHU: '',
+    OWNERS: [], // Mảng chứa danh sách chủ (New)
     SO_THUA_MOI: '', SO_TO_106: '', SO_TO_MOI: '', DIA_CHI_THUA: '', PHUONG: 'phường Chơn Thành',
     SO_GCN: '', SO_VAO_SO: '', DV_CAP_GCN: 'Sở Tài nguyên và Môi trường', NGAY_CAP: '',
     SO_THUA_CU: '', SO_TO_CU: '', 
@@ -81,7 +82,14 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
               const savedBoundary = localStorage.getItem('SOAN_BIEN_BAN_BOUNDARY');
               const savedBoundaryBDDC = localStorage.getItem('SOAN_BIEN_BAN_BOUNDARY_BDDC');
 
-              if (savedForm) setFormData(JSON.parse(savedForm));
+              if (savedForm) {
+                  const parsedForm = JSON.parse(savedForm);
+                  // Migration: Nếu form cũ chưa có mảng OWNERS, ta khởi tạo nó từ trường lẻ
+                  if (!parsedForm.OWNERS) {
+                      parsedForm.OWNERS = []; // Form component sẽ tự handle việc tạo default nếu rỗng
+                  }
+                  setFormData(parsedForm);
+              }
               if (savedBoundary) setBoundaryChanges(JSON.parse(savedBoundary));
               if (savedBoundaryBDDC) setBoundaryChangesBDDC(JSON.parse(savedBoundaryBDDC));
           } catch (e) {
@@ -104,6 +112,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
       setFormData({
         GIO_LAP: '', PHUT_LAP: '', NGAY_LAP: '', THANG_LAP: '', NAM_LAP: '',
         HO: 'Ông', TEN_CHU: '', DIA_CHI_CHU: '',
+        OWNERS: [],
         SO_THUA_MOI: '', SO_TO_106: '', SO_TO_MOI: '', DIA_CHI_THUA: '', PHUONG: 'phường Chơn Thành',
         SO_GCN: '', SO_VAO_SO: '', DV_CAP_GCN: 'Sở Tài nguyên và Môi trường', NGAY_CAP: '',
         SO_THUA_CU: '', SO_TO_CU: '', 
@@ -149,7 +158,12 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
   const handleEditFromList = (item: BienBanRecord) => {
       setEditingId(item.id);
-      setFormData(item.data.formData);
+      
+      const loadedData = item.data.formData;
+      // Migration khi load từ DB cũ
+      if (!loadedData.OWNERS) loadedData.OWNERS = [];
+      
+      setFormData(loadedData);
       setBoundaryChanges(item.data.boundaryChanges || []);
       setBoundaryChangesBDDC(item.data.boundaryChangesBDDC || []);
       setMode('create');
@@ -245,6 +259,22 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
+    // --- GENERATE OWNERS HTML (LOGIC MỚI) ---
+    // Sử dụng mảng OWNERS nếu có, nếu không fallback về HO + TEN_CHU cũ
+    let ownersHtml = "";
+    if (formData.OWNERS && formData.OWNERS.length > 0) {
+        ownersHtml = formData.OWNERS.map((o: any) => {
+            let line = `${o.title}: <b>${o.name.toUpperCase()}</b>`;
+            if (o.hasSpouse) {
+                line += ` và ${o.spouseTitle}: <b>${o.spouseName.toUpperCase()}</b>`;
+            }
+            return `<p style="margin-bottom: 5px;">${line}</p>`;
+        }).join('');
+    } else {
+        // Fallback
+        ownersHtml = `<p style="margin-bottom: 5px;">${formData.HO}: <b>${toTitleCase(formData.TEN_CHU)}</b></p>`;
+    }
+
     const dtCu = parseFloat(formData.DT_CU) || 0;
     const dtMoi = parseFloat(formData.DT_MOI) || 0;
     const dtBddc = parseFloat(formData.DT_BDDC_2024) || 0;
@@ -301,6 +331,9 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
     const bddcCauseText = formData.NGUYEN_NHAN_BDDC || DEFAULT_BDDC_CAUSE;
     
+    // Tự động điều chỉnh đại từ nhân xưng trong đoạn kiến nghị
+    const daiTuNhanXung = (formData.OWNERS && formData.OWNERS.length > 1) ? "các ông/bà" : `${formData.HO.toLowerCase()} ${toTitleCase(formData.TEN_CHU)}`;
+
     const bddcSection = formData.HIEN_THI_BIEN_DONG_BDDC 
         ? `
         <p style="${indentStyle} margin-bottom: 5px; font-weight: bold;">Biến động so với BĐĐC 2024. Như sau:</p>
@@ -311,7 +344,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         <p style="${indentStyle} margin-bottom: 5px;"><b>Nguyên nhân:</b></p>
         <p style="${indentStyle} margin-bottom: 5px;">${bddcCauseText}.</p>
         <p style="${indentStyle} margin-bottom: 5px;">Nay chủ sử dụng đất và các chủ sử dụng đất giáp ranh tiến hành cắm mốc xác định lại ranh giới theo hiện trạng, cam kết không tranh chấp.</p>
-        <p style="${indentStyle} margin-bottom: 12px;">Do đó, Kiến nghị Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành cấp đổi GCNQSDĐ cho ${formData.HO.toLowerCase()} ${toTitleCase(formData.TEN_CHU)}, đồng thời chỉnh lý bản đồ địa chính năm 2024 theo hiện trạng sử dụng đất thực tế.</p>
+        <p style="${indentStyle} margin-bottom: 12px;">Do đó, Kiến nghị Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành cấp đổi GCNQSDĐ cho ${daiTuNhanXung}, đồng thời chỉnh lý bản đồ địa chính năm 2024 theo hiện trạng sử dụng đất thực tế.</p>
         `
         : "";
 
@@ -327,6 +360,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
       ? `<p style="${indentStyle} margin-top: 8px;"><b>Cam kết thực hiện đầy đủ nghĩa vụ tài chính theo quy định.</b></p>` 
       : "";
     
+    // Câu chênh lệch diện tích: Sử dụng đại từ nhân xưng phù hợp
     const diffClause = dtCu !== dtMoi 
       ? `<p style="${indentStyle} margin-top: 10px;">“Đối với phần diện tích ${dtMoi > dtCu ? 'tăng' : 'giảm'} ${absDiff} m² không phải do chuyển nhượng, tặng cho.”</p>` 
       : "";
@@ -335,7 +369,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
       ? `
         <p style="${indentStyle} margin-bottom: 5px; margin-top: 12px;"><b>Ý kiến của các chủ sử dụng đất liên ranh:</b></p>
         <p style="${indentStyle} margin-bottom: 5px;">Ranh giới, mốc giới được xác định theo hiện trạng ${formData.LOAI_COC}. Cam kết không tranh chấp, khiếu nại.</p>
-        ${dtCu !== dtMoi ? `<p style="${indentStyle} margin-bottom: 5px;">Đối với phần diện tích ${dtMoi > dtCu ? 'tăng' : 'giảm'} ${absDiff} m² thửa đất của ${formData.HO} ${toTitleCase(formData.TEN_CHU)} không phải do chuyển nhượng, tặng cho.</p>` : ""}
+        ${dtCu !== dtMoi ? `<p style="${indentStyle} margin-bottom: 5px;">Đối với phần diện tích ${dtMoi > dtCu ? 'tăng' : 'giảm'} ${absDiff} m² thửa đất của ${daiTuNhanXung} không phải do chuyển nhượng, tặng cho.</p>` : ""}
       ` : "";
 
     let titleSectionII = "II. Đại Diện Phòng Kinh Tế - Hạ Tầng Và Đô Thị:";
@@ -474,7 +508,9 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         </div>
 
         <p style="margin-bottom: 8px;">Hôm nay, vào lúc ${gioLap} giờ ${phutLap} phút, ngày ${ngayLap} tháng ${thangLap} năm ${namLap},</p>
-        <p style="margin-bottom: 8px;">Tại khu đất của ${formData.HO}: <b>${toTitleCase(formData.TEN_CHU)}</b></p>
+        <p style="margin-bottom: 8px;">Tại khu đất của:</p>
+        ${ownersHtml}
+        
         <p style="margin-bottom: 15px;">Địa chỉ: ${formData.DIA_CHI_CHU}</p>
 
         <p style="margin-bottom: 5px;"><b>A. THÀNH PHẦN GỒM:</b></p>
@@ -485,7 +521,8 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         ${phongKTSection}
 
         <p style="margin-bottom: 5px;"><b>${formData.HIEN_THI_PHONG_KT ? 'III' : 'II'}. Đại diện chủ sử dụng đất:</b></p>
-        <p style="margin-bottom: 5px;">${formData.HO}: <b>${toTitleCase(formData.TEN_CHU)}</b></p>
+        ${ownersHtml}
+        
         <p style="margin-bottom: 5px;">Và các hộ sử dụng đất liền kề:</p>
         <p style="margin-bottom: 15px;">${formData.HO_GIAP_RANH}</p>
 

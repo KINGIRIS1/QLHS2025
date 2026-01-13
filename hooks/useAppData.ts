@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { RecordFile, Employee, User, RecordStatus } from '../types';
+import { RecordFile, Employee, User, RecordStatus, Holiday } from '../types';
 import { 
-    fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo,
+    fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi
 } from '../services/api';
@@ -12,6 +12,7 @@ export const useAppData = (currentUser: User | null) => {
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const [holidays, setHolidays] = useState<Holiday[]>([]); // State mới cho ngày nghỉ
     const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline'>('connected');
     
     // Wards State
@@ -36,15 +37,17 @@ export const useAppData = (currentUser: User | null) => {
                 fetchRecords(),
                 fetchEmployees(),
                 fetchUsers(),
-                fetchUpdateInfo()
+                fetchUpdateInfo(),
+                fetchHolidays() // Tải thêm danh sách ngày nghỉ
             ]);
 
             // Race giữa fetch data và timeout
-            const [recData, empData, userData, updateInfo] = await Promise.race([dataPromise, timeoutPromise]) as any;
+            const [recData, empData, userData, updateInfo, holidayData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
             setRecords(recData);
             setEmployees(empData);
             setUsers(userData);
+            setHolidays(holidayData); // Cập nhật state holidays
             setConnectionStatus('connected');
 
             if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
@@ -62,6 +65,7 @@ export const useAppData = (currentUser: User | null) => {
             setRecords((prev) => prev.length > 0 ? prev : []);
             setEmployees((prev) => prev.length > 0 ? prev : []);
             setUsers((prev) => prev.length > 0 ? prev : []);
+            // Holidays sẽ tự lấy từ cache trong apiSystem nếu lỗi
         }
     }, []);
 
@@ -158,7 +162,7 @@ export const useAppData = (currentUser: User | null) => {
     };
 
     return {
-        records, employees, users, wards, connectionStatus,
+        records, employees, users, wards, holidays, connectionStatus,
         isUpdateAvailable, latestVersion, updateUrl,
         setWards, setEmployees, setUsers, setRecords,
         loadData,

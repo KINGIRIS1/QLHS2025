@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { RecordFile, Employee, User, UserRole } from '../types';
+import { RecordFile, Employee, User, UserRole, Holiday } from '../types';
 import { STATUS_LABELS } from '../constants';
 import { COLUMN_DEFS } from '../utils/appHelpers';
 
@@ -28,6 +28,7 @@ interface AppRoutesProps {
     employees: Employee[];
     users: User[];
     wards: string[];
+    holidays: Holiday[]; // New prop
     
     // States & Setters passed from App
     setUnreadMessages: (n: number) => void;
@@ -107,7 +108,7 @@ interface AppRoutesProps {
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     const { 
-        currentView, currentUser, records, employees, users, wards,
+        currentView, currentUser, records, employees, users, wards, holidays,
         canPerformAction, isAdmin, isSubadmin
     } = {
         ...props,
@@ -381,6 +382,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     employees={employees}
                     currentUser={currentUser}
                     records={records}
+                    holidays={holidays} // Truyền holidays
                 />
             );
         case 'receive_contract':

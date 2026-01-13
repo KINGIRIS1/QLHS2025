@@ -13,6 +13,25 @@ interface ImportModalProps {
   employees: Employee[];
 }
 
+// Helper: Solar date from Lunar (Giống ReceiveRecord)
+const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year: number): Date | null => {
+    const lunarMapping: Record<number, Record<string, string>> = {
+        2024: { "1/1": "2024-02-10", "2/1": "2024-02-11", "3/1": "2024-02-12", "10/3": "2024-04-18" },
+        2025: { "1/1": "2025-01-29", "2/1": "2025-01-30", "3/1": "2025-01-31", "10/3": "2025-04-07" },
+        2026: { "1/1": "2026-02-17", "2/1": "2026-02-18", "3/1": "2026-02-19", "10/3": "2026-04-26" }
+    };
+    const key = `${lunarDay}/${lunarMonth}`;
+    return lunarMapping[year] && lunarMapping[year][key] ? new Date(lunarMapping[year][key]) : null;
+};
+
+// Helper: Format YYYY-MM-DD
+const formatDateKey = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, employees }) => {
   const [previewData, setPreviewData] = useState<RecordFile[]>([]);
   const [fileName, setFileName] = useState('');
@@ -38,10 +57,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           const excelEpoch = new Date(1899, 11, 30);
           const totalMilliseconds = Math.round(num * 86400 * 1000); 
           const date = new Date(excelEpoch.getTime() + totalMilliseconds);
-          const y = date.getFullYear();
-          const m = String(date.getMonth() + 1).padStart(2, '0');
-          const d = String(date.getDate()).padStart(2, '0');
-          return `${y}-${m}-${d}`;
+          return formatDateKey(date);
       }
 
       if (typeof input === 'string') {
@@ -68,12 +84,35 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       const startDate = new Date(receivedDateStr);
       let count = 0;
       let currentDate = new Date(startDate);
-      // Logic tính ngày lễ (giữ nguyên code cũ, rút gọn để tập trung logic chính)
+      
+      // Build Holiday Set
+      const holidaySet = new Set<string>();
+      const currentYear = startDate.getFullYear();
+      [currentYear, currentYear + 1].forEach(year => {
+          holidays.forEach(h => {
+              if (h.isLunar) {
+                  const solar = getSolarDateFromLunar(h.day, h.month, year);
+                  if (solar) holidaySet.add(formatDateKey(solar));
+              } else {
+                  const solar = new Date(year, h.month - 1, h.day);
+                  holidaySet.add(formatDateKey(solar));
+              }
+          });
+      });
+
       while (count < daysToAdd) {
           currentDate.setDate(currentDate.getDate() + 1);
-          if (currentDate.getDay() !== 0) count++; // Simple logic fallback
+          const dateStr = formatDateKey(currentDate);
+          const day = currentDate.getDay();
+          
+          const isWeekend = day === 0 || day === 6; // Sat + Sun
+          const isHoliday = holidaySet.has(dateStr);
+
+          if (!isWeekend && !isHoliday) {
+              count++;
+          }
       }
-      return currentDate.toISOString().split('T')[0];
+      return formatDateKey(currentDate);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -10,12 +10,14 @@ interface SystemSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDeleteAllData: () => void;
+  onHolidaysChanged?: () => void; // Prop mới
 }
 
 const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ 
   isOpen, 
   onClose, 
-  onDeleteAllData 
+  onDeleteAllData,
+  onHolidaysChanged
 }) => {
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -136,7 +138,11 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({
       setSavingHolidays(true);
       const success = await saveHolidays(holidays);
       setSavingHolidays(false);
-      if (success) alert('Đã lưu danh sách ngày lễ thành công!');
+      if (success) {
+          alert('Đã lưu danh sách ngày lễ thành công!');
+          // Trigger refresh data ở App cha
+          if (onHolidaysChanged) onHolidaysChanged();
+      }
       else alert('Lỗi khi lưu ngày lễ.');
   };
 

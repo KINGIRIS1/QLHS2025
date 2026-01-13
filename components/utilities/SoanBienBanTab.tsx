@@ -261,6 +261,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
     // --- GENERATE OWNERS HTML (LOGIC MỚI) ---
     // Sử dụng mảng OWNERS nếu có, nếu không fallback về HO + TEN_CHU cũ
+    // Hiển thị Địa chỉ riêng cho từng chủ
     let ownersHtml = "";
     if (formData.OWNERS && formData.OWNERS.length > 0) {
         ownersHtml = formData.OWNERS.map((o: any) => {
@@ -268,11 +269,18 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
             if (o.hasSpouse) {
                 line += ` và ${o.spouseTitle}: <b>${o.spouseName.toUpperCase()}</b>`;
             }
-            return `<p style="margin-bottom: 5px;">${line}</p>`;
+            // Thêm dòng địa chỉ ngay dưới tên chủ (nếu có)
+            let addressLine = o.address ? `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>` : '';
+            
+            return `<p style="margin-bottom: 5px;">${line}</p>${addressLine}`;
         }).join('');
     } else {
         // Fallback
         ownersHtml = `<p style="margin-bottom: 5px;">${formData.HO}: <b>${toTitleCase(formData.TEN_CHU)}</b></p>`;
+        // Fallback địa chỉ chung nếu không có danh sách owners chi tiết
+        if (formData.DIA_CHI_CHU) {
+            ownersHtml += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${formData.DIA_CHI_CHU}</p>`;
+        }
     }
 
     const dtCu = parseFloat(formData.DT_CU) || 0;
@@ -511,8 +519,6 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         <p style="margin-bottom: 8px;">Tại khu đất của:</p>
         ${ownersHtml}
         
-        <p style="margin-bottom: 15px;">Địa chỉ: ${formData.DIA_CHI_CHU}</p>
-
         <p style="margin-bottom: 5px;"><b>A. THÀNH PHẦN GỒM:</b></p>
         <p style="margin-bottom: 5px;"><b>I. Đại diện Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành:</b></p>
         <p style="margin-bottom: 5px;">1. ........................................................... - Chức vụ: ...........................................</p>

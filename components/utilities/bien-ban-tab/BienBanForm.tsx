@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Settings2, CheckSquare, Square, Plus, Trash2, MoveHorizontal, Quote, LandPlot, ClipboardList, User as UserIcon, AlertTriangle, Users, Heart } from 'lucide-react';
+import { User, Settings2, CheckSquare, Square, Plus, Trash2, MoveHorizontal, Quote, LandPlot, ClipboardList, User as UserIcon, AlertTriangle, Users, Heart, MapPin } from 'lucide-react';
 
 interface BoundaryChange {
   id: string;
@@ -18,6 +18,7 @@ interface OwnerData {
     id: string;
     title: string;
     name: string;
+    address: string; // Thêm trường địa chỉ riêng
     hasSpouse: boolean;
     spouseTitle: string;
     spouseName: string;
@@ -66,10 +67,12 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
             setOwners(formData.OWNERS);
         } else if (formData.TEN_CHU) {
             // Fallback: Nếu không có OWNERS nhưng có TEN_CHU cũ -> Tạo 1 owner mặc định
+            // Lấy địa chỉ chung cũ gán cho chủ đầu tiên
             setOwners([{
                 id: 'default_1',
                 title: formData.HO || 'Ông',
                 name: formData.TEN_CHU,
+                address: formData.DIA_CHI_CHU || '', 
                 hasSpouse: false,
                 spouseTitle: 'Bà',
                 spouseName: ''
@@ -80,29 +83,23 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                 id: Math.random().toString(36).substr(2, 9),
                 title: 'Ông',
                 name: '',
+                address: '',
                 hasSpouse: false,
                 spouseTitle: 'Bà',
                 spouseName: ''
             }]);
         }
-    }, []); // Chỉ chạy 1 lần khi mount để tránh loop, sau đó owners sẽ lái formData
+    }, []); // Chỉ chạy 1 lần khi mount để tránh loop
 
     // Sync owners back to formData
     useEffect(() => {
         if (owners.length > 0) {
-            // Tạo chuỗi hiển thị tóm tắt cho TEN_CHU (để hiện trong danh sách)
-            const summaryName = owners.map(o => {
-                let txt = `${o.title} ${o.name}`;
-                if (o.hasSpouse) txt += ` và ${o.spouseTitle} ${o.spouseName}`;
-                return txt;
-            }).join(', ');
-
             setFormData((prev: any) => ({
                 ...prev,
                 OWNERS: owners,
-                TEN_CHU: owners[0].name, // Giữ tên người đầu tiên cho các logic cũ nếu cần
-                HO: owners[0].title,     // Giữ danh xưng người đầu tiên
-                // Field ảo để hiển thị trong list nếu cần, nhưng logic chính sẽ dùng OWNERS
+                TEN_CHU: owners[0].name, // Giữ tên người đầu tiên cho tương thích ngược
+                HO: owners[0].title,
+                DIA_CHI_CHU: owners[0].address // Giữ địa chỉ người đầu tiên cho tương thích ngược
             }));
             onResetFile();
         }
@@ -115,10 +112,14 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
 
     // --- OWNER ACTIONS ---
     const addOwner = () => {
+        // Lấy địa chỉ của người trước đó để gợi ý (thường cùng địa chỉ)
+        const lastAddress = owners.length > 0 ? owners[owners.length - 1].address : '';
+        
         setOwners(prev => [...prev, {
             id: Math.random().toString(36).substr(2, 9),
             title: 'Ông',
             name: '',
+            address: lastAddress, 
             hasSpouse: false,
             spouseTitle: 'Bà',
             spouseName: ''
@@ -132,6 +133,7 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
             // Nếu chỉ còn 1 dòng thì reset data thay vì xóa
             const newOwners = [...owners];
             newOwners[0].name = '';
+            newOwners[0].address = '';
             newOwners[0].hasSpouse = false;
             newOwners[0].spouseName = '';
             setOwners(newOwners);
@@ -147,7 +149,6 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
     const toggleSpouse = (index: number) => {
         const newOwners = [...owners];
         newOwners[index].hasSpouse = !newOwners[index].hasSpouse;
-        // Tự động set danh xưng vợ/chồng ngược lại
         if (newOwners[index].hasSpouse) {
             newOwners[index].spouseTitle = newOwners[index].title === 'Ông' ? 'Bà' : 'Ông';
         }
@@ -248,7 +249,7 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                     <Settings2 size={18} className="text-blue-500" /> 
                     Cấu hình biểu mẫu
                 </h3>
-                {/* ... (Giữ nguyên phần cấu hình) ... */}
+                
                 <div className="grid grid-cols-1 gap-3">
                     <div className={`rounded-2xl border-2 transition-all duration-200 group ${formData.HIEN_THI_PHONG_KT ? 'bg-purple-50 border-purple-500 shadow-purple-100 shadow-lg' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
                         <button 
@@ -363,7 +364,7 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
 
                             {/* Form vợ/chồng */}
                             {owner.hasSpouse && (
-                                <div className="grid grid-cols-12 gap-2 bg-pink-50/50 p-2 rounded-lg border border-pink-100 animate-fade-in">
+                                <div className="grid grid-cols-12 gap-2 bg-pink-50/50 p-2 rounded-lg border border-pink-100 animate-fade-in mb-2">
                                     <div className="col-span-4">
                                         <label className="text-[10px] font-bold text-pink-400 uppercase block mb-1">Xưng hô</label>
                                         <select 
@@ -386,13 +387,21 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                                     </div>
                                 </div>
                             )}
+
+                            {/* ĐỊA CHỈ THƯỜNG TRÚ CỦA CHỦ NÀY */}
+                            <div className="mt-2 pt-2 border-t border-slate-200/50">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 flex items-center gap-1">
+                                    <MapPin size={12} /> Địa chỉ thường trú
+                                </label>
+                                <input 
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] bg-white outline-none" 
+                                    value={owner.address} 
+                                    onChange={e => updateOwner(idx, 'address', e.target.value)} 
+                                    placeholder={`Nhập địa chỉ của ${owner.title} ${owner.name}...`}
+                                />
+                            </div>
                         </div>
                     ))}
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100">
-                    <label className="text-[12px] font-bold text-slate-400 block mb-1 uppercase">Địa chỉ thường trú (Chung)</label>
-                    <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] bg-white outline-none" value={formData.DIA_CHI_CHU} onChange={e => handleChange('DIA_CHI_CHU', e.target.value)} />
                 </div>
             </section>
 

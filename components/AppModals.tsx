@@ -64,6 +64,7 @@ interface AppModalsProps {
     handleSaveEmployee: (emp: Employee) => void;
     handleDeleteEmployee: (id: string) => void;
     handleDeleteAllData: () => void;
+    onRefreshData?: () => void; // New callback
     confirmAssign: (empId: string) => void;
     handleDeleteRecord: () => void;
     confirmDelete: (r: RecordFile) => void;
@@ -111,6 +112,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 isOpen={props.isSystemSettingsOpen} 
                 onClose={() => props.setIsSystemSettingsOpen(false)} 
                 onDeleteAllData={props.handleDeleteAllData}
+                onHolidaysChanged={props.onRefreshData} // Wiring callback
             />
 
             <AssignModal 

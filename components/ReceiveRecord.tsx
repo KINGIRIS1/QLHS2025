@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, Holiday } from '../types';
 import { getNormalizedWard } from '../constants';
-import { fetchHolidays } from '../services/api';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
@@ -23,6 +22,7 @@ interface ReceiveRecordProps {
   employees: Employee[];
   currentUser: User;
   records?: RecordFile[];
+  holidays: Holiday[]; // New prop
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -49,9 +49,17 @@ const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year: numbe
     return null;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [] }) => {
+// Hàm định dạng ngày chuẩn YYYY-MM-DD theo giờ địa phương (tránh lệch múi giờ)
+const formatDateKey = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays }) => {
   const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk'>('create');
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  // Removed local holidays state and useEffect
   
   // State chỉnh sửa
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
@@ -68,23 +76,15 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [previewExcelName, setPreviewExcelName] = useState('');
 
-  useEffect(() => {
-      const load = async () => { const data = await fetchHolidays(); setHolidays(data); };
-      load();
-  }, []);
-
   // --- LOGIC TẠO MÃ HỒ SƠ (CẬP NHẬT CHÍNH XÁC THEO ĐỊA BÀN) ---
   const getShortCode = (ward: string) => {
-      // Chuẩn hóa chuỗi nhập vào: chữ thường, bỏ khoảng trắng thừa
       const normalized = ward.toLowerCase().trim();
-      
-      // Loại bỏ các tiền tố hành chính để so sánh chính xác hơn
       const cleanName = normalized
-          .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '') // Xóa tiền tố đầu câu
-          .replace(/\s+(xã|phường|thị trấn)\s+/g, ' '); // Xóa tiền tố giữa câu (nếu có)
+          .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
+          .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
 
       if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
-      if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT'; // Hưng Long thuộc Chơn Thành cũ
+      if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
       if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
       if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
       if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
@@ -92,7 +92,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
       if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
       
-      return 'CT'; // Mặc định về Chơn Thành nếu không khớp
+      return 'CT';
   };
 
   const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = []) => {
@@ -104,18 +104,15 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
     
-    // QUAN TRỌNG: Mã hậu tố (suffix) phụ thuộc hoàn toàn vào wardName được truyền vào (Địa bàn quản lý của NV)
     const suffix = getShortCode(wardName);
     
     let maxSeq = 0;
     
-    // 1. Kiểm tra trong DB (các hồ sơ đã lưu)
     records.forEach(r => {
         if (!r.code) return;
         const parts = r.code.split('-');
         if (parts.length === 3) {
             const [rPrefix, rSeq, rSuffix] = parts;
-            // So sánh cả Prefix ngày và Suffix địa bàn
             if (rPrefix === datePrefix && rSuffix === suffix) {
                 const seqNum = parseInt(rSeq, 10);
                 if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
@@ -123,7 +120,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         }
     });
 
-    // 2. Kiểm tra trong existingCodes (các hồ sơ đang chờ nhập Excel)
     existingCodes.forEach(code => {
         if (!code) return;
         const parts = code.split('-');
@@ -140,7 +136,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     return `${datePrefix}-${nextSeq}-${suffix}`;
   };
 
-  // --- LOGIC TÍNH HẠN TRẢ ---
+  // --- LOGIC TÍNH HẠN TRẢ (CẬP NHẬT FIX LỖI TIMEZONE VÀ NGÀY NGHỈ) ---
   const calculateDeadline = (type: string, receivedDateStr: string) => {
       let daysToAdd = 30; 
       const lowerType = type.toLowerCase();
@@ -153,42 +149,46 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       let count = 0;
       let currentDate = new Date(startDate);
       
+      // Tạo Set chứa chuỗi ngày nghỉ (YYYY-MM-DD) để tra cứu nhanh và chính xác
+      const holidaySet = new Set<string>();
       const currentYear = startDate.getFullYear();
-      const solarHolidayStrings: string[] = [];
+      // Check cả năm hiện tại và năm sau (trường hợp cuối năm)
+      const yearsToCheck = [currentYear, currentYear + 1];
 
-      const addBlockedDate = (d: Date) => {
-          solarHolidayStrings.push(d.toISOString().split('T')[0]);
-      };
-
-      [currentYear, currentYear + 1].forEach(year => {
-          holidays.forEach(h => {
+      holidays.forEach(h => {
+          yearsToCheck.forEach(year => {
               if (h.isLunar) {
                   const solarDate = getSolarDateFromLunar(h.day, h.month, year);
-                  if (solarDate) addBlockedDate(solarDate);
+                  if (solarDate) holidaySet.add(formatDateKey(solarDate));
               } else {
+                  // Lưu ý: Date constructor tháng bắt đầu từ 0
                   const solarDate = new Date(year, h.month - 1, h.day);
-                  addBlockedDate(solarDate);
+                  holidaySet.add(formatDateKey(solarDate));
               }
           });
       });
 
       while (count < daysToAdd) {
+          // Tăng 1 ngày
           currentDate.setDate(currentDate.getDate() + 1);
           
-          const dayOfWeek = currentDate.getDay(); // 0 là Chủ Nhật
-          const dateString = currentDate.toISOString().split('T')[0];
+          const dayOfWeek = currentDate.getDay(); // 0 là Chủ Nhật, 6 là Thứ 7
+          const dateString = formatDateKey(currentDate);
           
-          const isSunday = dayOfWeek === 0;
-          const isHoliday = solarHolidayStrings.includes(dateString);
+          // Trừ Thứ 7 và Chủ Nhật
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const isHoliday = holidaySet.has(dateString);
 
-          if (!isSunday && !isHoliday) {
+          // Nếu không phải cuối tuần VÀ không phải ngày lễ thì mới tính là 1 ngày làm việc
+          if (!isWeekend && !isHoliday) {
               count++;
           }
       }
-      return currentDate.toISOString().split('T')[0];
+      
+      return formatDateKey(currentDate);
   };
 
-  // --- LOGIC IN BIÊN NHẬN (.DOCX) ---
+  // ... (Phần logic in ấn và render giữ nguyên)
   const handlePreviewDocx = async (dataToUse: Partial<RecordFile>) => {
     if (!dataToUse.code || !dataToUse.customerName) { 
         alert("Vui lòng nhập ít nhất Mã hồ sơ và Tên khách hàng để in."); 
@@ -388,8 +388,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 generateCode={calculateNextCode} 
                 onPrint={handlePreviewDocx}
                 onCancelEdit={() => setEditingRecord(null)}
-                currentUser={currentUser} // Pass currentUser down
-                employees={employees} // Pass employees down
+                currentUser={currentUser}
+                employees={employees}
             />
         )}
 

@@ -96,7 +96,7 @@ function App() {
 
   // --- CUSTOM HOOKS ---
   const { 
-      records, employees, users, wards, connectionStatus,
+      records, employees, users, wards, holidays, connectionStatus, // Lấy thêm holidays
       isUpdateAvailable, latestVersion, updateUrl,
       setEmployees, setUsers, setRecords, setWards,
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
@@ -352,6 +352,7 @@ function App() {
             employees={employees}
             users={users}
             wards={wards}
+            holidays={holidays} // Truyền holidays xuống
             
             setUnreadMessages={setUnreadMessages}
             notificationEnabled={notificationEnabled}
@@ -435,6 +436,7 @@ function App() {
             handleSaveEmployee={handleSaveEmployee}
             handleDeleteEmployee={handleDeleteEmployee}
             handleDeleteAllData={handleDeleteAllData}
+            onRefreshData={loadData} // Kết nối hàm loadData vào AppModals để truyền cho SystemSettings
             confirmAssign={confirmAssign}
             handleDeleteRecord={() => { if(deletingRecord) handleDeleteRecord(deletingRecord.id); }}
             confirmDelete={(r) => handleDeleteRecord(r.id)}

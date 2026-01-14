@@ -254,14 +254,14 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
                                     <td className="p-4 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
                                         {getNormalizedWard(r.ward)}
                                     </td>
-                                    <td className="p-4 text-gray-600 truncate align-middle" title={r.address}>
+                                    <td className="p-4 text-gray-600 truncate align-middle" title={r.address || ''}>
                                         {r.address || '-'}
                                     </td> 
                                     <td className="p-4 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
                                     <td className="p-4 text-center font-mono align-middle">{r.landPlot || '-'}</td>
-                                    <td className="p-4 text-gray-600 truncate align-middle" title={r.recordType}>{getShortRecordType(r.recordType)}</td> 
+                                    <td className="p-4 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
                                     <td className="p-4 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
-                                    <td className="p-4 text-gray-500 italic truncate align-middle" title={r.content}>{r.content}</td>
+                                    <td className="p-4 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
                                     <td className="p-3 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
                                         <div className="flex items-center justify-center gap-2">
                                             <button onClick={() => onEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa">

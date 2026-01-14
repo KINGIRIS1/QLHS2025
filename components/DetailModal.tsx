@@ -85,7 +85,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
   // Điều kiện để In biên nhận: Chỉ Admin hoặc Một cửa mới được thấy nút này
   const canPrintReceipt = isAdmin || isOneDoor;
 
-  const formatDate = (dateStr?: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '---';
     const date = new Date(dateStr);
     const d = String(date.getDate()).padStart(2, '0');
@@ -94,7 +94,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
     return `${d}/${m}/${y}`;
   };
 
-  const getEmployeeName = (id?: string) => {
+  const getEmployeeName = (id?: string | null) => {
     if (!id) return 'Chưa giao';
     const emp = employees.find(e => e.id === id);
     return emp ? `${emp.name} (${emp.department})` : 'Không xác định';
@@ -268,9 +268,9 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
         NGAY_HEN_FULL: deadlineFullString,
         
         // --- NHÓM CÁN BỘ ---
-        NGUOI_NHAN: val(currentUser.name), 
-        CAN_BO: val(currentUser.name),
-        USER: val(currentUser.name),
+        NGUOI_NHAN: val(currentUser?.name), 
+        CAN_BO: val(currentUser?.name),
+        USER: val(currentUser?.name),
         
         // --- NHÓM NỘI DUNG ---
         NOI_DUNG: val(record.content),

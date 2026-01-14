@@ -59,7 +59,7 @@ export const EXTENDED_RECORD_TYPES = [
 ];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
-export const getNormalizedWard = (ward: string | undefined): string => {
+export const getNormalizedWard = (ward: string | null | undefined): string => {
   if (!ward) return '';
   let w = ward.trim();
   
@@ -78,7 +78,7 @@ export const getNormalizedWard = (ward: string | undefined): string => {
 };
 
 // Hàm rút gọn tên loại hồ sơ để hiển thị trong Danh sách (Table)
-export const getShortRecordType = (type: string | undefined): string => {
+export const getShortRecordType = (type: string | null | undefined): string => {
   if (!type) return '---';
   const t = type.toLowerCase();
   

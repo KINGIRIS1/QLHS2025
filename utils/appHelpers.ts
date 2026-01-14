@@ -20,7 +20,7 @@ export function removeVietnameseTones(str: string): string {
 }
 
 // Hàm chuyển đổi Title Case (Nguyễn Văn A)
-export function toTitleCase(str: string | undefined): string {
+export function toTitleCase(str: string | null | undefined): string {
     if (!str) return '';
     return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

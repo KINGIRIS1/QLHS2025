@@ -38,21 +38,21 @@ export interface RecordFile {
   id: string;
   code: string;           
   customerName: string;   
-  phoneNumber?: string;   
-  cccd?: string;          
+  phoneNumber?: string | null;   
+  cccd?: string | null;          
   
-  ward?: string;          
-  landPlot?: string;      
-  mapSheet?: string;      
-  area?: number;          
-  address?: string;       
-  group?: string;         
+  ward?: string | null;          
+  landPlot?: string | null;      
+  mapSheet?: string | null;      
+  area?: number | null;          
+  address?: string | null;       
+  group?: string | null;         
 
-  content: string;        
-  recordType?: string;    
+  content?: string | null;        
+  recordType?: string | null;    
   
-  receivedDate: string;   
-  deadline: string;       
+  receivedDate?: string | null;   
+  deadline?: string | null;       
   assignedDate?: string | null;  
   
   submissionDate?: string | null; // Ngày trình ký
@@ -60,28 +60,28 @@ export interface RecordFile {
   completedDate?: string | null; 
   
   status: RecordStatus;   
-  assignedTo?: string;    
-  notes?: string;         
-  privateNotes?: string;  
-  personalNotes?: string; // Ghi chú cá nhân của nhân viên
+  assignedTo?: string | null;    
+  notes?: string | null;         
+  privateNotes?: string | null;  
+  personalNotes?: string | null; // Ghi chú cá nhân của nhân viên
   
-  authorizedBy?: string;  
-  authDocType?: string;   
-  otherDocs?: string;     
+  authorizedBy?: string | null;  
+  authDocType?: string | null;   
+  otherDocs?: string | null;     
 
   exportBatch?: number | null;   
   exportDate?: string | null;    
   
-  measurementNumber?: string; 
-  excerptNumber?: string;
+  measurementNumber?: string | null; 
+  excerptNumber?: string | null;
   
   // Tính năng nhắc nhở
-  reminderDate?: string;      // Thời gian đặt lịch nhắc
-  lastRemindedAt?: string;    // Thời gian đã thông báo lần cuối
+  reminderDate?: string | null;      // Thời gian đặt lịch nhắc
+  lastRemindedAt?: string | null;    // Thời gian đã thông báo lần cuối
 
   // Tính năng trả kết quả
-  receiptNumber?: string;     // Số biên lai
-  receiverName?: string;      // Người nhận kết quả (Mới)
+  receiptNumber?: string | null;     // Số biên lai
+  receiverName?: string | null;      // Người nhận kết quả (Mới)
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
 
   // Tính năng Chỉnh lý bản đồ (Mới)
@@ -101,12 +101,12 @@ export interface Contract {
   id: string;
   code: string;           
   customerName: string;
-  phoneNumber?: string;
-  ward?: string;
-  address?: string;
-  landPlot?: string;
-  mapSheet?: string;
-  area?: number;
+  phoneNumber?: string | null;
+  ward?: string | null;
+  address?: string | null;
+  landPlot?: string | null;
+  mapSheet?: string | null;
+  area?: number | null;
   
   // Phân loại logic
   contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc'; // Tab đang chọn
@@ -114,8 +114,8 @@ export interface Contract {
   areaType: string;       // Khu vực (Đất đô thị / Nông thôn)
 
   // Số lượng đặc thù
-  plotCount?: number;     // Số thửa (cho Đo đạc)
-  markerCount?: number;   // Số mốc (cho Cắm mốc)
+  plotCount?: number | null;     // Số thửa (cho Đo đạc)
+  markerCount?: number | null;   // Số mốc (cho Cắm mốc)
   splitItems?: SplitItem[]; // Danh sách tách thửa (lưu JSON)
 
   // Tài chính
@@ -125,13 +125,13 @@ export interface Contract {
   vatAmount: number;      // Tiền thuế
   totalAmount: number;    
   deposit: number;        
-  content?: string;       
+  content?: string | null;       
   
   createdDate: string;    
   status: 'PENDING' | 'COMPLETED';
 
   // Thanh lý
-  liquidationArea?: number; // Diện tích thanh lý thực tế
+  liquidationArea?: number | null; // Diện tích thanh lý thực tế
 }
 
 // Interface cho Bảng giá (Cập nhật theo hình ảnh)

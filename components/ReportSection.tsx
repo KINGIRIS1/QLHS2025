@@ -164,7 +164,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     };
 
-    const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+    const formatDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
 
     return (
         <div className="flex flex-col h-full overflow-hidden relative bg-slate-50">

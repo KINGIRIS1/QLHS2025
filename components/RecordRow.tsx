@@ -22,7 +22,7 @@ interface RecordRowProps {
   onMapCorrection?: (record: RecordFile) => void; // New Handler
 }
 
-const formatDate = (dateStr?: string) => {
+const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
@@ -162,7 +162,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
       {visibleColumns.type && (
           <td className={`${cellClass} text-center text-gray-700`}>
-              <div className="break-words leading-normal text-sm" title={record.recordType}> 
+              <div className="break-words leading-normal text-sm" title={record.recordType || ''}> 
                   {getShortRecordType(record.recordType)}
               </div>
           </td>

@@ -201,28 +201,101 @@ function App() {
   const confirmAssign = async (employeeId: string) => {
       const today = new Date().toISOString().split('T')[0];
       const updatedIds = assignTargetRecords.map(r => r.id);
-      setRecords(prev => prev.map(r => updatedIds.includes(r.id) ? { ...r, assignedTo: employeeId, status: RecordStatus.ASSIGNED, assignedDate: today } : r));
-      await Promise.all(assignTargetRecords.map(r => updateRecordApi({ ...r, assignedTo: employeeId, status: RecordStatus.ASSIGNED, assignedDate: today })));
+      
+      // Xóa các ngày tháng sau bước "Đã giao" để đảm bảo tính nhất quán (nếu hồ sơ bị quay lui)
+      const updates = {
+          assignedTo: employeeId,
+          status: RecordStatus.ASSIGNED,
+          assignedDate: today,
+          submissionDate: null,
+          approvalDate: null,
+          completedDate: null,
+          resultReturnedDate: null,
+          exportBatch: null,
+          exportDate: null
+      };
+
+      setRecords(prev => prev.map(r => updatedIds.includes(r.id) ? { ...r, ...updates } : r));
+      await Promise.all(assignTargetRecords.map(r => updateRecordApi({ ...r, ...updates } as any)));
       setIsAssignModalOpen(false); 
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
   };
 
+  // Helper xử lý logic xóa ngày tháng khi đổi trạng thái (Dùng cho cả BulkUpdate và QuickUpdate)
+  const getUpdatesForStatusChange = (newStatus: RecordStatus) => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const updates: any = { status: newStatus };
+
+      switch (newStatus) {
+          case RecordStatus.RECEIVED:
+              updates.assignedDate = null;
+              updates.submissionDate = null;
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              updates.exportBatch = null;
+              updates.exportDate = null;
+              break;
+          case RecordStatus.ASSIGNED:
+          case RecordStatus.IN_PROGRESS:
+              if (!updates.assignedDate) updates.assignedDate = todayStr;
+              // Xóa các mốc sau
+              updates.submissionDate = null;
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              updates.exportBatch = null;
+              updates.exportDate = null;
+              break;
+          case RecordStatus.PENDING_SIGN:
+              updates.submissionDate = todayStr; // Tự động ghi ngày trình ký
+              // Xóa các mốc sau
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              break;
+          case RecordStatus.SIGNED:
+              updates.approvalDate = todayStr; // Tự động ghi ngày ký
+              // Xóa các mốc sau
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              break;
+          case RecordStatus.HANDOVER:
+              updates.completedDate = todayStr; // Tự động ghi ngày hoàn thành
+              updates.resultReturnedDate = null;
+              break;
+          case RecordStatus.RETURNED:
+              updates.resultReturnedDate = todayStr;
+              // Nếu chưa có ngày hoàn thành, set luôn (logic bổ sung)
+              if (!updates.completedDate) updates.completedDate = todayStr;
+              break;
+      }
+      return updates;
+  };
+
   const handleBulkUpdate = async (field: keyof RecordFile, value: any) => {
       const selectedIds = Array.from(selectedRecordIds);
-      const updates: any = { [field]: value };
+      let updates: any = { [field]: value };
       const todayStr = new Date().toISOString().split('T')[0];
+
       if (field === 'status') {
-          if (value === RecordStatus.ASSIGNED) updates.assignedDate = todayStr;
-          if (value === RecordStatus.PENDING_SIGN) updates.submissionDate = todayStr;
-          if (value === RecordStatus.SIGNED) updates.approvalDate = todayStr;
-          if (value === RecordStatus.HANDOVER) updates.completedDate = todayStr;
-          if (value === RecordStatus.RETURNED) updates.resultReturnedDate = todayStr;
+          // Áp dụng logic reset ngày tháng
+          updates = getUpdatesForStatusChange(value as RecordStatus);
       }
+      
       if (field === 'assignedTo') {
           updates.assignedDate = todayStr;
-          updates.status = RecordStatus.ASSIGNED; 
+          updates.status = RecordStatus.ASSIGNED;
+          // Reset các mốc sau khi giao việc lại
+          updates.submissionDate = null;
+          updates.approvalDate = null;
+          updates.completedDate = null;
+          updates.resultReturnedDate = null;
+          updates.exportBatch = null;
+          updates.exportDate = null;
       }
+
       setRecords(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, ...updates } : r));
       const targets = records.filter(r => selectedIds.includes(r.id));
       await Promise.all(targets.map(r => updateRecordApi({ ...r, ...updates })));
@@ -231,13 +304,22 @@ function App() {
   };
 
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
-      setRecords(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+      let updates: any = { [field]: value };
+      
+      if (field === 'status') {
+          // Áp dụng logic reset ngày tháng cho Quick Update (Button & Dropdown)
+          updates = getUpdatesForStatusChange(value as RecordStatus);
+      }
+
+      setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+      
       const record = records.find(r => r.id === id); 
       if (record) {
-          try { await updateRecordApi({ ...record, [field]: value }); } catch (e) { console.error("Quick update failed", e); }
+          try { await updateRecordApi({ ...record, ...updates }); } catch (e) { console.error("Quick update failed", e); }
       } else {
+          // Fallback nếu không tìm thấy trong state (ít xảy ra)
           const tempRecord = { id } as RecordFile; 
-          await updateRecordApi({ ...tempRecord, [field]: value });
+          await updateRecordApi({ ...tempRecord, ...updates });
       }
   }, [records]);
 
@@ -280,11 +362,9 @@ function App() {
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];
-          const updates: any = { status: nextStatus };
-          const todayStr = new Date().toISOString().split('T')[0];
-          if (nextStatus === RecordStatus.HANDOVER) updates.completedDate = todayStr;
-          if (nextStatus === RecordStatus.PENDING_SIGN) updates.submissionDate = todayStr;
-          if (nextStatus === RecordStatus.SIGNED) updates.approvalDate = todayStr;
+          // Sử dụng hàm getUpdatesForStatusChange để đảm bảo logic ngày tháng nhất quán
+          const updates = getUpdatesForStatusChange(nextStatus);
+          
           setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
           await updateRecordApi({ ...record, ...updates });
       }
@@ -314,8 +394,11 @@ function App() {
       if (pendingSign.length === 0) { alert("Không có hồ sơ nào đang chờ ký."); return; }
       if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ sang "Đã ký"?`)) {
           const todayStr = new Date().toISOString().split('T')[0];
-          setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, status: RecordStatus.SIGNED, approvalDate: todayStr } : r));
-          await Promise.all(pendingSign.map(r => updateRecordApi({ ...r, status: RecordStatus.SIGNED, approvalDate: todayStr })));
+          // Dùng updates chuẩn để đảm bảo logic
+          const updates = { status: RecordStatus.SIGNED, approvalDate: todayStr, completedDate: null };
+          
+          setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, ...updates } : r));
+          await Promise.all(pendingSign.map(r => updateRecordApi({ ...r, ...updates })));
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
       }
   };

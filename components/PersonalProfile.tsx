@@ -288,7 +288,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                             {/* Cột Chỉnh lý BĐ - CẬP NHẬT: Thay checkbox bằng button */}
                             <th className="p-3 text-center w-[100px]">Chỉnh lý</th>
 
-                            <th className="p-3 text-center w-[160px]">Thao tác chính</th>
+                            <th className="p-3 text-center w-[180px]">Thao tác chính</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
@@ -365,7 +365,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                                 title="Chuyển sang bước Ký kiểm tra"
                                                 className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
                                             >
-                                                Trình ký <Send size={14} />
+                                                Trình kiểm tra <Send size={14} />
                                             </button>
                                         </div>
                                     </td>

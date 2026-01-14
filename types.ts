@@ -53,11 +53,11 @@ export interface RecordFile {
   
   receivedDate: string;   
   deadline: string;       
-  assignedDate?: string;  
+  assignedDate?: string | null;  
   
-  submissionDate?: string; // Ngày trình ký
-  approvalDate?: string;   // Ngày ký duyệt
-  completedDate?: string; 
+  submissionDate?: string | null; // Ngày trình ký
+  approvalDate?: string | null;   // Ngày ký duyệt
+  completedDate?: string | null; 
   
   status: RecordStatus;   
   assignedTo?: string;    
@@ -69,8 +69,8 @@ export interface RecordFile {
   authDocType?: string;   
   otherDocs?: string;     
 
-  exportBatch?: number;   
-  exportDate?: string;    
+  exportBatch?: number | null;   
+  exportDate?: string | null;    
   
   measurementNumber?: string; 
   excerptNumber?: string;
@@ -82,7 +82,7 @@ export interface RecordFile {
   // Tính năng trả kết quả
   receiptNumber?: string;     // Số biên lai
   receiverName?: string;      // Người nhận kết quả (Mới)
-  resultReturnedDate?: string; // Ngày trả kết quả cho dân
+  resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
 
   // Tính năng Chỉnh lý bản đồ (Mới)
   needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý

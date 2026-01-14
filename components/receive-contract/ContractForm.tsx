@@ -404,7 +404,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <input 
                                     type="number" 
                                     className={`${inputClass} font-bold text-green-700 border-green-300 focus:border-green-500`} 
-                                    value={formData.liquidationArea !== undefined ? formData.liquidationArea : (formData.area ?? 0)} 
+                                    value={formData.liquidationArea ?? formData.area ?? 0}
                                     onChange={e => handleChange('liquidationArea', parseFloat(e.target.value))} 
                                 />
                                 <span className="text-xs font-bold text-green-600">m²</span>

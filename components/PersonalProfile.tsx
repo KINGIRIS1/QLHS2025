@@ -293,29 +293,29 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {paginatedDisplayRecords.map((r, index) => {
-                            const deadlineStatus = getDeadlineStatus(r.deadline);
+                            const deadlineStatus = getDeadlineStatus(r.deadline || undefined);
                             // Highlight màu hồng nhạt nếu là tab reminder
                             const rowClass = activeTab === 'reminder' ? 'hover:bg-pink-50/50 bg-pink-50/10' : 'hover:bg-blue-50/50';
                             
                             return (
                                 <tr key={r.id} className={`${rowClass} transition-colors`}>
                                     <td className="p-3 text-center text-gray-400 text-xs align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                                    <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code}>{r.code}</div></td>
-                                    <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName}>{r.customerName}</div></td>
-                                    <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType}>{getShortRecordType(r.recordType || undefined)}</div></td>
+                                    <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code || ''}>{r.code}</div></td>
+                                    <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName || ''}>{r.customerName}</div></td>
+                                    <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType || ''}>{getShortRecordType(r.recordType || undefined)}</div></td>
                                     
                                     {/* Hiển thị thời gian */}
                                     <td className="p-3 align-middle">
                                         {activeTab === 'pending' ? (
                                             <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
                                                 {deadlineStatus.icon}
-                                                <span>{formatDate(r.deadline)}</span>
+                                                <span>{formatDate(r.deadline || undefined)}</span>
                                                 <span className="text-[10px] uppercase ml-1">{deadlineStatus.text}</span>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-1.5 text-pink-700 font-bold bg-pink-100 px-2 py-1 rounded w-fit text-xs">
                                                 <Bell size={12} className="fill-pink-700"/>
-                                                {formatDateTime(r.reminderDate)}
+                                                {formatDateTime(r.reminderDate || undefined)}
                                             </div>
                                         )}
                                     </td>
@@ -442,9 +442,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {reviewRecords.map(r => (
                             <tr key={r.id} className="hover:bg-gray-50">
-                                <td className="p-3 font-medium text-gray-700 truncate" title={r.code}>{r.code}</td>
-                                <td className="p-3 truncate" title={r.customerName}>{r.customerName}</td>
-                                <td className="p-3 text-gray-500">{formatDate(r.receivedDate)}</td>
+                                <td className="p-3 font-medium text-gray-700 truncate" title={r.code || ''}>{r.code}</td>
+                                <td className="p-3 truncate" title={r.customerName || ''}>{r.customerName}</td>
+                                <td className="p-3 text-gray-500">{formatDate(r.receivedDate || undefined)}</td>
                                 <td className="p-3 text-center"><StatusBadge status={r.status} /></td>
                                 <td className="p-3 text-right">
                                     <button 

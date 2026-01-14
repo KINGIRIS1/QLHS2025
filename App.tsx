@@ -347,6 +347,7 @@ function App() {
     >
         <AppRoutes 
             currentView={currentView}
+            setCurrentView={setCurrentView}
             currentUser={currentUser}
             records={records}
             employees={employees}

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { RecordFile, Employee, User, UserRole, Holiday } from '../types';
 import { STATUS_LABELS } from '../constants';
@@ -23,12 +22,13 @@ import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, Map
 
 interface AppRoutesProps {
     currentView: string;
+    setCurrentView: (view: string) => void; // Added setCurrentView
     currentUser: User;
     records: RecordFile[];
     employees: Employee[];
     users: User[];
     wards: string[];
-    holidays: Holiday[]; // New prop
+    holidays: Holiday[]; 
     
     // States & Setters passed from App
     setUnreadMessages: (n: number) => void;
@@ -107,15 +107,14 @@ interface AppRoutesProps {
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
+    // Simplify destructuring to avoid TS errors with complex objects
     const { 
-        currentView, currentUser, records, employees, users, wards, holidays,
-        canPerformAction, isAdmin, isSubadmin
-    } = {
-        ...props,
-        isAdmin: props.currentUser.role === UserRole.ADMIN,
-        isSubadmin: props.currentUser.role === UserRole.SUBADMIN,
-        canPerformAction: props.currentUser.role === UserRole.ADMIN || props.currentUser.role === UserRole.SUBADMIN || props.currentUser.role === UserRole.TEAM_LEADER || props.currentUser.role === UserRole.ONEDOOR
-    };
+        currentView, currentUser, records, employees, users, wards, holidays
+    } = props;
+
+    const isAdmin = currentUser.role === UserRole.ADMIN;
+    const isSubadmin = currentUser.role === UserRole.SUBADMIN;
+    const canPerformAction = isAdmin || isSubadmin || currentUser.role === UserRole.TEAM_LEADER || currentUser.role === UserRole.ONEDOOR;
 
     const [showColumnSelector, setShowColumnSelector] = React.useState(false);
 
@@ -367,9 +366,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 <PersonalProfile
                     user={currentUser}
                     records={records}
-                    onUpdateStatus={() => {}}
+                    onUpdateStatus={(r, status) => props.handleQuickUpdate(r.id, 'status', status)}
                     onViewRecord={props.handleViewRecord}
-                    onCreateLiquidation={(r) => { props.setRecordToLiquidate(r); }}
+                    onCreateLiquidation={(r) => { 
+                        props.setRecordToLiquidate(r); 
+                        props.setCurrentView('receive_contract'); 
+                    }}
                     onMapCorrection={props.handleMapCorrectionRequest}
                 />
             );

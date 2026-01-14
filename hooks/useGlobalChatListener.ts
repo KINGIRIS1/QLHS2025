@@ -1,5 +1,4 @@
-
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { User, Message } from '../types';
 

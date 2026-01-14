@@ -29,8 +29,9 @@ export const useAppData = (currentUser: User | null) => {
     const loadData = useCallback(async () => {
         try {
             // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
+            // Tăng timeout lên 30s để xử lý trường hợp mạng chậm hoặc DB bị sleep
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout")), 8000)
+                setTimeout(() => reject(new Error("Timeout")), 30000)
             );
 
             const dataPromise = Promise.all([

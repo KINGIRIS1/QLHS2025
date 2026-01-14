@@ -381,20 +381,20 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 </div>
 
                 <div className="space-y-4">
-                    <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName} onChange={e => handleChange('customerName', e.target.value)} /></div>
+                    <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
                     <div>
                         <label className={labelClass}>Xã phường</label>
-                        <select className={inputClass} value={formData.ward || ''} onChange={e => handleChange('ward', e.target.value)}>
+                        <select className={inputClass} value={formData.ward ?? ''} onChange={e => handleChange('ward', e.target.value)}>
                             <option value="">-- Chọn Xã/Phường --</option>
                             {wards.map(w => <option key={w} value={w}>{w}</option>)}
                         </select>
                     </div>
-                    <div><label className={labelClass}>Địa chỉ đất</label><input className={inputClass} value={formData.address} onChange={e => handleChange('address', e.target.value)} /></div>
+                    <div><label className={labelClass}>Địa chỉ đất</label><input className={inputClass} value={formData.address ?? ''} onChange={e => handleChange('address', e.target.value)} /></div>
                     <div className="grid grid-cols-2 gap-3">
-                        <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
-                        <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot} onChange={e => handleChange('landPlot', e.target.value)} /></div>
+                        <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet ?? ''} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
+                        <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot ?? ''} onChange={e => handleChange('landPlot', e.target.value)} /></div>
                     </div>
-                    <div><label className={labelClass}>Diện tích Hợp Đồng (m2)</label><input type="number" className={`${inputClass} font-bold text-blue-600`} value={formData.area} onChange={e => handleChange('area', parseFloat(e.target.value))} /></div>
+                    <div><label className={labelClass}>Diện tích Hợp Đồng (m2)</label><input type="number" className={`${inputClass} font-bold text-blue-600`} value={formData.area ?? 0} onChange={e => handleChange('area', parseFloat(e.target.value))} /></div>
                     
                     {/* LIQUIDATION AREA FIELD - ONLY IN LIQUIDATION MODE */}
                     {mode === 'liquidation' && (
@@ -404,7 +404,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <input 
                                     type="number" 
                                     className={`${inputClass} font-bold text-green-700 border-green-300 focus:border-green-500`} 
-                                    value={formData.liquidationArea !== undefined ? formData.liquidationArea : formData.area} 
+                                    value={formData.liquidationArea !== undefined ? formData.liquidationArea : (formData.area ?? 0)} 
                                     onChange={e => handleChange('liquidationArea', parseFloat(e.target.value))} 
                                 />
                                 <span className="text-xs font-bold text-green-600">m²</span>
@@ -435,14 +435,14 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             <label className={labelClass}>Mã Hợp Đồng</label>
                             <div className="relative">
                                 <FileText size={16} className="absolute left-3 top-3 text-slate-400" />
-                                <input type="text" readOnly className={`${inputClass} bg-white pl-9 font-mono font-bold text-purple-700`} value={formData.code} />
+                                <input type="text" readOnly className={`${inputClass} bg-white pl-9 font-mono font-bold text-purple-700`} value={formData.code ?? ''} />
                             </div>
                         </div>
                         <div>
                             <label className={labelClass}>Ngày lập</label>
                             <div className="relative">
                                 <Calendar size={16} className="absolute left-3 top-3 text-slate-400" />
-                                <input type="date" className={`${inputClass} pl-9`} value={formData.createdDate} onChange={e => handleChange('createdDate', e.target.value)} />
+                                <input type="date" className={`${inputClass} pl-9`} value={formData.createdDate ?? ''} onChange={e => handleChange('createdDate', e.target.value)} />
                             </div>
                         </div>
                     </div>
@@ -458,7 +458,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Khu vực</label>
-                                    <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.areaType} onChange={(e) => handleChange('areaType', e.target.value)}>
+                                    <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.areaType ?? ''} onChange={(e) => handleChange('areaType', e.target.value)}>
                                         <option value="">-- Tự động theo xã --</option>
                                         <option value="Đất nông thôn">Đất nông thôn (Xã)</option>
                                         <option value="Đất đô thị">Đất đô thị (Phường/TT)</option>
@@ -466,17 +466,17 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Loại dịch vụ</label>
-                                    <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.serviceType} onChange={(e) => handleChange('serviceType', e.target.value)}>
+                                    <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.serviceType ?? ''} onChange={(e) => handleChange('serviceType', e.target.value)}>
                                         <option value="">-- Chọn dịch vụ --</option>{availableServices.map(name => <option key={name} value={name}>{name}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">{activeTab === 'dd' ? 'Số thửa' : 'Số mốc'}</label>
-                                    <input type="number" className={`${inputClass} border-purple-200 bg-white/80`} value={activeTab === 'dd' ? formData.plotCount : formData.markerCount} onChange={e => handleChange(activeTab === 'dd' ? 'plotCount' : 'markerCount', parseInt(e.target.value))} />
+                                    <input type="number" className={`${inputClass} border-purple-200 bg-white/80`} value={activeTab === 'dd' ? (formData.plotCount ?? 1) : (formData.markerCount ?? 1)} onChange={e => handleChange(activeTab === 'dd' ? 'plotCount' : 'markerCount', parseInt(e.target.value))} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Đơn giá</label>
-                                    <input type="number" readOnly className={`${inputClass} border-purple-200 bg-purple-100/50 text-right font-mono text-purple-700`} value={formData.unitPrice} />
+                                    <input type="number" readOnly className={`${inputClass} border-purple-200 bg-purple-100/50 text-right font-mono text-purple-700`} value={formData.unitPrice ?? 0} />
                                 </div>
                             </div>
                         )}
@@ -486,7 +486,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Khu vực</label>
-                                        <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.areaType} onChange={(e) => handleChange('areaType', e.target.value)}>
+                                        <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.areaType ?? ''} onChange={(e) => handleChange('areaType', e.target.value)}>
                                             <option value="">-- Tự động theo xã --</option>
                                             <option value="Đất nông thôn">Đất nông thôn (Xã)</option>
                                             <option value="Đất đô thị">Đất đô thị (Phường/TT)</option>
@@ -615,18 +615,18 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         <div className="flex flex-col md:flex-row justify-end gap-6 pt-4 border-t border-purple-200 mt-2">
                             <div className="text-right">
                                 <span className="text-xs text-purple-600 uppercase font-bold block mb-1">Thuế VAT ({formData.vatRate}%)</span>
-                                <span className="font-medium text-slate-700 bg-white/50 px-2 py-1 rounded border border-purple-100">{formData.vatAmount?.toLocaleString('vi-VN')}</span>
+                                <span className="font-medium text-slate-700 bg-white/50 px-2 py-1 rounded border border-purple-100">{(formData.vatAmount ?? 0).toLocaleString('vi-VN')}</span>
                             </div>
                             <div className="text-right">
                                 <span className="text-xs text-purple-600 uppercase font-bold block mb-1">TỔNG TIỀN</span>
-                                <span className="text-2xl font-black text-purple-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-purple-100">{formData.totalAmount?.toLocaleString('vi-VN')} <span className="text-sm font-medium text-slate-500">VNĐ</span></span>
+                                <span className="text-2xl font-black text-purple-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-purple-100">{(formData.totalAmount ?? 0).toLocaleString('vi-VN')} <span className="text-sm font-medium text-slate-500">VNĐ</span></span>
                             </div>
                         </div>
                     </div>
                     
                     <div>
                         <label className={labelClass}>Ghi chú hợp đồng</label>
-                        <textarea rows={3} className={`${inputClass} resize-none`} value={formData.content} onChange={e => handleChange('content', e.target.value)} placeholder="Nội dung chi tiết..." />
+                        <textarea rows={3} className={`${inputClass} resize-none`} value={formData.content ?? ''} onChange={e => handleChange('content', e.target.value)} placeholder="Nội dung chi tiết..." />
                     </div>
 
                     {/* ACTION BUTTONS */}

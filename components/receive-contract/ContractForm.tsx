@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
-import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -19,7 +19,7 @@ function _nd(s: string | undefined | null): string {
 }
 
 const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode }) => {
-  const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm'>('dd');
+  const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm' | 'tl'>('dd');
   const [tachThuaItems, setTachThuaItems] = useState<SplitItem[]>([]);
   const [searchCode, setSearchCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           // Update Active Tab based on Contract Type
           if (initialData.contractType === 'Tách thửa') setActiveTab('tt');
           else if (initialData.contractType === 'Cắm mốc') setActiveTab('cm');
+          else if (initialData.contractType === 'Trích lục') setActiveTab('tl');
           else setActiveTab('dd');
           
           setNotification(null);
@@ -79,7 +80,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   // Tab change logic
   useEffect(() => {
-      const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc' };
+      const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
       setFormData(prev => ({ ...prev, contractType: typeMap[activeTab] }));
       if (activeTab === 'tt' && tachThuaItems.length === 0) setTachThuaItems([{ serviceName: '', quantity: 1, price: 0, area: 0 }]);
   }, [activeTab]);
@@ -102,8 +103,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       // Ưu tiên giá từ CSDL nếu có
       if (matchedRow && matchedRow.price > 0) return matchedRow.price;
 
-      // Logic mặc định cho Trích lục (nếu CSDL chưa cấu hình)
-      if (_nd(serviceName).includes('trich luc')) return 53163;
+      // Logic mặc định cho Trích lục (nếu CSDL chưa cấu hình) - GIÁ CŨ (đã thay bằng logic 'tl' riêng)
+      if (_nd(serviceName).includes('trich luc')) return 49225;
 
       return 0;
   };
@@ -171,8 +172,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   };
 
   // Price Calculation Logic
-  // IMPORTANT: Chỉ tính lại tự động nếu KHÔNG phải đang load initialData
-  // Tuy nhiên, để đơn giản, ta cho phép tính lại nhưng phải đảm bảo initialData được set trước.
   useEffect(() => {
       // 1. Tự động xác định Khu vực (Đất đô thị / Nông thôn) dựa trên Xã/Phường
       let currentAreaType = formData.areaType;
@@ -185,7 +184,27 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           }
       }
 
-      // 2. Logic Tách thửa
+      // 2. Logic Trích Lục (MỚI)
+      if (activeTab === 'tl') {
+          const price = 49225;
+          const vatRate = 8;
+          const qty = formData.quantity || 1;
+          const baseAmount = price * qty;
+          const vatAmount = Math.round(baseAmount * (vatRate / 100));
+          
+          setFormData(prev => ({
+              ...prev,
+              serviceType: 'Trích lục bản đồ địa chính',
+              unitPrice: price,
+              vatRate: vatRate,
+              vatAmount: vatAmount,
+              totalAmount: baseAmount + vatAmount,
+              areaType: currentAreaType
+          }));
+          return;
+      }
+
+      // 3. Logic Tách thửa
       if (activeTab === 'tt') {
           let totalBase = 0;
           // Cập nhật lại giá cho từng item dựa trên AreaType mới (nếu có thay đổi)
@@ -204,7 +223,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           return;
       }
 
-      // 3. Logic Đo đạc & Cắm mốc
+      // 4. Logic Đo đạc & Cắm mốc
       if (!formData.serviceType) return;
       const price = getDynamicPrice(formData.serviceType);
       
@@ -233,7 +252,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           areaType: currentAreaType 
       }));
       
-  }, [formData.area, formData.serviceType, formData.ward, formData.areaType, formData.plotCount, formData.markerCount, tachThuaItems, activeTab, priceList]);
+  }, [formData.area, formData.serviceType, formData.ward, formData.areaType, formData.plotCount, formData.markerCount, formData.quantity, tachThuaItems, activeTab, priceList]);
 
   const handleSearchRecord = () => {
       const found = records.find(r => r.code.toLowerCase() === searchCode.toLowerCase());
@@ -241,8 +260,17 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           // Tự động detect dịch vụ nếu là trích lục
           let suggestedService = '';
           const recType = (found.recordType || '').toLowerCase();
+          
+          // Logic chọn tab tự động
           if (recType.includes('trích lục')) {
+              setActiveTab('tl');
               suggestedService = 'Trích lục bản đồ địa chính';
+          } else if (recType.includes('cắm mốc')) {
+              setActiveTab('cm');
+          } else if (recType.includes('tách thửa')) {
+              setActiveTab('tt');
+          } else {
+              setActiveTab('dd');
           }
 
           setFormData(prev => ({ 
@@ -306,7 +334,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   const handleReset = (keepNotification = false) => {
       setFormData({
         code: generateCode(), customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
-        contractType: activeTab === 'tt' ? 'Tách thửa' : activeTab === 'cm' ? 'Cắm mốc' : 'Đo đạc', 
+        contractType: activeTab === 'tt' ? 'Tách thửa' : activeTab === 'cm' ? 'Cắm mốc' : activeTab === 'tl' ? 'Trích lục' : 'Đo đạc', 
         serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
         unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
         createdDate: new Date().toISOString().split('T')[0], status: 'PENDING',
@@ -332,13 +360,13 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   const handleChange = (k: keyof Contract, v: any) => setFormData(p => ({ ...p, [k]: v }));
   
   // Logic lấy danh sách dịch vụ
-  // ĐÃ SỬA: Không tự động thêm "Trích lục" vào danh sách nữa
   const availableServices = (() => {
       const services = priceList.map(p => p.serviceName).filter((v, i, a) => a.indexOf(v) === i);
       let filtered = services.filter(n => {
           if (activeTab === 'tt') return _nd(n).includes('tach thua');
           if (activeTab === 'cm') return _nd(n).includes('cam moc');
-          return !_nd(n).includes('tach thua') && !_nd(n).includes('cam moc');
+          if (activeTab === 'tl') return _nd(n).includes('trich luc');
+          return !_nd(n).includes('tach thua') && !_nd(n).includes('cam moc') && !_nd(n).includes('trich luc');
       });
       return filtered;
   })();
@@ -420,10 +448,13 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
         <div className="lg:col-span-8 space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 {/* TABS HEADER */}
-                <div className="flex border-b border-slate-200 bg-slate-50/50 p-1.5 gap-1.5">
-                    {['dd', 'tt', 'cm'].map(t => (
-                        <button key={t} type="button" onClick={() => setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold text-center rounded-xl transition-all flex items-center justify-center gap-2 ${activeTab === t ? 'bg-white text-purple-700 shadow-md ring-1 ring-purple-100' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}>
-                            {t === 'dd' ? <><Ruler size={16} /> Đo đạc</> : t === 'tt' ? <><Grid size={16} /> Tách thửa</> : <><MapPin size={16} /> Cắm mốc</>}
+                <div className="flex border-b border-slate-200 bg-slate-50/50 p-1.5 gap-1.5 overflow-x-auto">
+                    {['dd', 'tt', 'cm', 'tl'].map(t => (
+                        <button key={t} type="button" onClick={() => setActiveTab(t as any)} className={`flex-1 py-3 px-4 text-sm font-bold text-center rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === t ? 'bg-white text-purple-700 shadow-md ring-1 ring-purple-100' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}>
+                            {t === 'dd' ? <><Ruler size={16} /> Đo đạc</> : 
+                             t === 'tt' ? <><Grid size={16} /> Tách thửa</> : 
+                             t === 'cm' ? <><MapPin size={16} /> Cắm mốc</> :
+                             <><Copy size={16} /> Trích lục</>}
                         </button>
                     ))}
                 </div>
@@ -454,25 +485,46 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             Tính chi phí dịch vụ
                         </h4>
                         
-                        {(activeTab === 'dd' || activeTab === 'cm') && (
+                        {(activeTab === 'dd' || activeTab === 'cm' || activeTab === 'tl') && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Khu vực</label>
-                                    <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.areaType ?? ''} onChange={(e) => handleChange('areaType', e.target.value)}>
-                                        <option value="">-- Tự động theo xã --</option>
-                                        <option value="Đất nông thôn">Đất nông thôn (Xã)</option>
-                                        <option value="Đất đô thị">Đất đô thị (Phường/TT)</option>
-                                    </select>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Loại dịch vụ</label>
-                                    <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.serviceType ?? ''} onChange={(e) => handleChange('serviceType', e.target.value)}>
-                                        <option value="">-- Chọn dịch vụ --</option>{availableServices.map(name => <option key={name} value={name}>{name}</option>)}
-                                    </select>
-                                </div>
+                                {activeTab !== 'tl' && (
+                                    <>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Khu vực</label>
+                                            <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.areaType ?? ''} onChange={(e) => handleChange('areaType', e.target.value)}>
+                                                <option value="">-- Tự động theo xã --</option>
+                                                <option value="Đất nông thôn">Đất nông thôn (Xã)</option>
+                                                <option value="Đất đô thị">Đất đô thị (Phường/TT)</option>
+                                            </select>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Loại dịch vụ</label>
+                                            <select className={`${inputClass} border-purple-200 bg-white/80`} value={formData.serviceType ?? ''} onChange={(e) => handleChange('serviceType', e.target.value)}>
+                                                <option value="">-- Chọn dịch vụ --</option>{availableServices.map(name => <option key={name} value={name}>{name}</option>)}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+                                
+                                {activeTab === 'tl' && (
+                                    <div className="md:col-span-2">
+                                        <div className="bg-white/80 p-3 rounded-lg border border-purple-200 text-sm text-purple-800 flex items-center gap-2">
+                                            <AlertCircle size={16} />
+                                            <span>Loại hình: <strong>Trích lục bản đồ địa chính</strong> (Đơn giá cố định: 49.225đ)</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div>
-                                    <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">{activeTab === 'dd' ? 'Số thửa' : 'Số mốc'}</label>
-                                    <input type="number" className={`${inputClass} border-purple-200 bg-white/80`} value={activeTab === 'dd' ? (formData.plotCount ?? 1) : (formData.markerCount ?? 1)} onChange={e => handleChange(activeTab === 'dd' ? 'plotCount' : 'markerCount', parseInt(e.target.value))} />
+                                    <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">
+                                        {activeTab === 'dd' ? 'Số thửa' : activeTab === 'cm' ? 'Số mốc' : 'Số lượng'}
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        className={`${inputClass} border-purple-200 bg-white/80`} 
+                                        value={activeTab === 'cm' ? (formData.markerCount ?? 1) : activeTab === 'tl' ? (formData.quantity ?? 1) : (formData.plotCount ?? 1)} 
+                                        onChange={e => handleChange(activeTab === 'cm' ? 'markerCount' : activeTab === 'tl' ? 'quantity' : 'plotCount', parseInt(e.target.value))} 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">Đơn giá</label>

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ArrowUpCircle, RefreshCw, CheckCircle, Info, Download, ShieldCheck, Bell, Power, ExternalLink, DownloadCloud, PenTool, PlayCircle } from 'lucide-react';
+import React from 'react';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { APP_VERSION } from '../constants';
 
@@ -14,9 +14,6 @@ interface SidebarProps {
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
   isGeneratingReport?: boolean;
-  isUpdateAvailable?: boolean;
-  latestVersion?: string;
-  updateUrl?: string | null; 
   onOpenAccountSettings: () => void;
   unreadMessagesCount: number;
   warningRecordsCount: number;
@@ -33,52 +30,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen,
   setMobileOpen,
   isGeneratingReport = false,
-  isUpdateAvailable = false,
-  latestVersion = '',
-  updateUrl,
   onOpenAccountSettings,
   unreadMessagesCount,
   warningRecordsCount,
   reminderCount
 }) => {
-  const [isBannerVisible, setIsBannerVisible] = useState(true);
-  const [downloadStatus, setDownloadStatus] = useState<'idle' | 'checking' | 'downloading' | 'ready' | 'error'>('idle');
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadSpeed, setDownloadSpeed] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  
-  useEffect(() => {
-      if (isUpdateAvailable) setIsBannerVisible(true);
-  }, [isUpdateAvailable]);
-
-  const getFriendlyErrorMessage = (msg: string) => {
-      if (!msg) return 'Lỗi không xác định';
-      if (msg.includes('404') && msg.includes('github')) return 'File cài đặt không tồn tại trên GitHub.';
-      if (msg.includes('404') || msg.includes('latest.yml')) return 'Không tìm thấy thông tin cập nhật.';
-      if (msg.includes('NetworkError')) return 'Lỗi kết nối mạng.';
-      return msg;
-  };
-
-  useEffect(() => {
-      if (window.electronAPI && window.electronAPI.onUpdateStatus) {
-          window.electronAPI.onUpdateStatus((data: any) => {
-              if (data.status === 'downloading') {
-                  setDownloadStatus('downloading');
-                  setDownloadProgress(Math.round(data.progress));
-                  const speed = (data.bytesPerSecond / 1024 / 1024).toFixed(2);
-                  setDownloadSpeed(`${speed} MB/s`);
-              } else if (data.status === 'downloaded') {
-                  setDownloadStatus('ready');
-                  setDownloadProgress(100);
-              } else if (data.status === 'error') {
-                  setDownloadStatus('error');
-                  setErrorMessage(getFriendlyErrorMessage(data.message));
-              }
-          });
-          return () => { if (window.electronAPI?.removeUpdateListener) window.electronAPI.removeUpdateListener(); };
-      }
-  }, []);
-
   const isAdmin = currentUser.role === UserRole.ADMIN;
   const isSubadmin = currentUser.role === UserRole.SUBADMIN;
   const isTeamLeader = currentUser.role === UserRole.TEAM_LEADER;
@@ -109,25 +65,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     setCurrentView(viewId);
     setMobileOpen(false); // Luôn đóng sidebar khi click trên mobile
   };
-
-  // ... (Giữ nguyên logic Update Handlers) ...
-  const handleDownloadInApp = async () => {
-      if (window.electronAPI && window.electronAPI.downloadUpdate) {
-          try {
-              setDownloadStatus('checking');
-              const checkResult = await window.electronAPI.checkForUpdate(updateUrl || '');
-              if (checkResult?.status === 'available') {
-                  setDownloadStatus('downloading');
-                  await window.electronAPI.downloadUpdate();
-              } else {
-                  setDownloadStatus('error');
-                  setErrorMessage(checkResult?.message || 'Lỗi');
-              }
-          } catch (e: any) { setDownloadStatus('error'); setErrorMessage(e.message); }
-      } else { handleDownloadExternal(); }
-  };
-  const handleQuitAndInstall = async () => { if (window.electronAPI?.quitAndInstall) await window.electronAPI.quitAndInstall(); };
-  const handleDownloadExternal = () => { if (updateUrl) window.open(updateUrl, '_blank'); };
 
   return (
     <>
@@ -160,26 +97,6 @@ const Sidebar: React.FC<SidebarProps> = ({
              <button onClick={() => setMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white"><X size={20} /></button>
           </div>
         </div>
-
-        {/* UPDATE NOTIFICATION */}
-        {isUpdateAvailable && isBannerVisible && (
-            <div className="bg-gradient-to-b from-amber-600/90 to-amber-700/90 backdrop-blur-sm text-white text-xs px-4 py-3 border-b border-amber-800 flex flex-col gap-2 shadow-inner relative animate-fade-in shrink-0">
-                <button onClick={() => setIsBannerVisible(false)} className="absolute top-1 right-1 text-amber-200 hover:text-white p-1 rounded-full"><X size={14} /></button>
-                <div className="flex items-center gap-2 font-bold animate-pulse text-amber-100"><DownloadCloud size={16} /><span>CÓ BẢN CẬP NHẬT MỚI</span></div>
-                <div className="bg-black/20 p-2 rounded text-[10px] border border-white/10 mt-1">
-                    {downloadStatus === 'idle' && (
-                        <button onClick={handleDownloadInApp} className="bg-emerald-600 hover:bg-emerald-500 w-full py-1.5 rounded flex items-center justify-center gap-1 font-bold text-white mb-1 transition-colors shadow-sm"><Download size={12} /> Tải & Cài đặt ngay</button>
-                    )}
-                    {downloadStatus === 'downloading' && (
-                        <div className="space-y-1"><div className="flex justify-between items-center text-[9px]"><span>Đang tải...</span><span>{downloadProgress}%</span></div><div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden"><div className="bg-emerald-400 h-full" style={{ width: `${downloadProgress}%` }}></div></div></div>
-                    )}
-                    {downloadStatus === 'ready' && (
-                        <button onClick={handleQuitAndInstall} className="bg-blue-600 hover:bg-blue-500 w-full py-2 rounded flex items-center justify-center gap-1 font-bold text-white animate-pulse"><PlayCircle size={14} /> Khởi động lại</button>
-                    )}
-                    {downloadStatus === 'error' && <button onClick={handleDownloadExternal} className="bg-gray-200 text-gray-800 w-full py-1.5 rounded flex items-center justify-center gap-1 font-bold">Tải thủ công</button>}
-                </div>
-            </div>
-        )}
 
         {/* USER INFO */}
         <div className="px-4 py-4 border-b border-slate-800 bg-[#1e293b]/50 shrink-0">
@@ -259,7 +176,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
           <div className="mt-3 text-[10px] text-slate-600 text-center flex flex-col items-center gap-1 font-mono">
               <span>v{APP_VERSION}</span>
-              {!isUpdateAvailable && <span className="text-emerald-500 flex items-center gap-1 font-bold">● Latest</span>}
           </div>
         </div>
       </div>

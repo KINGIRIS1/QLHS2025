@@ -36,7 +36,7 @@ function App() {
   const [recordToLiquidate, setRecordToLiquidate] = useState<RecordFile | null>(null);
   const [recordForMapCorrection, setRecordForMapCorrection] = useState<RecordFile | null>(null);
 
-  // Modal & UI States (Moved from old App.tsx)
+  // Modal & UI States
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
       try { return JSON.parse(localStorage.getItem('visible_columns') || '') || DEFAULT_VISIBLE_COLUMNS; } catch { return DEFAULT_VISIBLE_COLUMNS; }
@@ -65,6 +65,12 @@ function App() {
   const [globalReportContent, setGlobalReportContent] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // --- UPDATE LOGIC STATES ---
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateSpeed, setUpdateSpeed] = useState(0); // Bytes per second
+  const [updateDeferred, setUpdateDeferred] = useState(false); // Đã chọn cập nhật sau 10p chưa
 
   // Toast effect
   useEffect(() => {
@@ -96,7 +102,7 @@ function App() {
 
   // --- CUSTOM HOOKS ---
   const { 
-      records, employees, users, wards, holidays, connectionStatus, // Lấy thêm holidays
+      records, employees, users, wards, holidays, connectionStatus, 
       isUpdateAvailable, latestVersion, updateUrl,
       setEmployees, setUsers, setRecords, setWards,
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
@@ -121,6 +127,55 @@ function App() {
   const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
   const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
 
+  // --- UPDATE HANDLERS ---
+  
+  // Lắng nghe sự kiện update từ Electron
+  useEffect(() => {
+      if (window.electronAPI && window.electronAPI.onUpdateStatus) {
+          window.electronAPI.onUpdateStatus((data: any) => {
+              if (data.status === 'downloading') {
+                  setUpdateStatus('downloading');
+                  setUpdateProgress(data.progress);
+                  if (data.bytesPerSecond) setUpdateSpeed(data.bytesPerSecond);
+              } else if (data.status === 'downloaded') {
+                  setUpdateStatus('ready');
+                  setUpdateProgress(100);
+                  // Tự động cài đặt khi tải xong
+                  window.electronAPI?.quitAndInstall();
+              } else if (data.status === 'error') {
+                  setUpdateStatus('error');
+                  console.error("Update error:", data.message);
+              }
+          });
+          return () => { if (window.electronAPI?.removeUpdateListener) window.electronAPI.removeUpdateListener(); };
+      }
+  }, []);
+
+  const handleUpdateNow = async () => {
+      if (window.electronAPI?.downloadUpdate) {
+          try {
+              setUpdateStatus('downloading'); // Chuyển trạng thái ngay để hiện progress bar
+              await window.electronAPI.downloadUpdate();
+          } catch (e: any) {
+              console.error("Download update failed:", e);
+              setUpdateStatus('error');
+              alert("Lỗi khi tải bản cập nhật: " + (e.message || "Không xác định"));
+          }
+      } else {
+          // Fallback cho web
+          if (updateUrl) window.open(updateUrl, '_blank');
+      }
+  };
+
+  const handleUpdateLater = () => {
+      setUpdateDeferred(true);
+      // Đặt hẹn giờ 10 phút (600,000 ms)
+      setTimeout(() => {
+          setToast({ type: 'success', message: 'Bắt đầu tự động cập nhật hệ thống...' });
+          handleUpdateNow();
+      }, 600000);
+  };
+
   // --- LOGIC TỰ ĐỘNG CHUYỂN TAB CHO 1 CỬA ---
   useEffect(() => {
       if (currentView === 'handover_list' && currentUser?.role === UserRole.ONEDOOR && recordFilterProps.handoverTab === 'today') {
@@ -128,7 +183,7 @@ function App() {
       }
   }, [currentView, currentUser, recordFilterProps.handoverTab]);
 
-  // --- HANDLERS ---
+  // --- HANDLERS (Business Logic) ---
 
   const handleExportReportExcel = async (fromDateStr: string, toDateStr: string, ward: string) => {
       if (!currentUser) return;
@@ -202,7 +257,6 @@ function App() {
       const today = new Date().toISOString().split('T')[0];
       const updatedIds = assignTargetRecords.map(r => r.id);
       
-      // Xóa các ngày tháng sau bước "Đã giao" để đảm bảo tính nhất quán (nếu hồ sơ bị quay lui)
       const updates = {
           assignedTo: employeeId,
           status: RecordStatus.ASSIGNED,
@@ -222,7 +276,6 @@ function App() {
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
   };
 
-  // Helper xử lý logic xóa ngày tháng khi đổi trạng thái (Dùng cho cả BulkUpdate và QuickUpdate)
   const getUpdatesForStatusChange = (newStatus: RecordStatus) => {
       const todayStr = new Date().toISOString().split('T')[0];
       const updates: any = { status: newStatus };
@@ -240,7 +293,6 @@ function App() {
           case RecordStatus.ASSIGNED:
           case RecordStatus.IN_PROGRESS:
               if (!updates.assignedDate) updates.assignedDate = todayStr;
-              // Xóa các mốc sau
               updates.submissionDate = null;
               updates.approvalDate = null;
               updates.completedDate = null;
@@ -249,25 +301,22 @@ function App() {
               updates.exportDate = null;
               break;
           case RecordStatus.PENDING_SIGN:
-              updates.submissionDate = todayStr; // Tự động ghi ngày trình ký
-              // Xóa các mốc sau
+              updates.submissionDate = todayStr; 
               updates.approvalDate = null;
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               break;
           case RecordStatus.SIGNED:
-              updates.approvalDate = todayStr; // Tự động ghi ngày ký
-              // Xóa các mốc sau
+              updates.approvalDate = todayStr; 
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               break;
           case RecordStatus.HANDOVER:
-              updates.completedDate = todayStr; // Tự động ghi ngày hoàn thành
+              updates.completedDate = todayStr; 
               updates.resultReturnedDate = null;
               break;
           case RecordStatus.RETURNED:
               updates.resultReturnedDate = todayStr;
-              // Nếu chưa có ngày hoàn thành, set luôn (logic bổ sung)
               if (!updates.completedDate) updates.completedDate = todayStr;
               break;
       }
@@ -280,14 +329,12 @@ function App() {
       const todayStr = new Date().toISOString().split('T')[0];
 
       if (field === 'status') {
-          // Áp dụng logic reset ngày tháng
           updates = getUpdatesForStatusChange(value as RecordStatus);
       }
       
       if (field === 'assignedTo') {
           updates.assignedDate = todayStr;
           updates.status = RecordStatus.ASSIGNED;
-          // Reset các mốc sau khi giao việc lại
           updates.submissionDate = null;
           updates.approvalDate = null;
           updates.completedDate = null;
@@ -305,19 +352,14 @@ function App() {
 
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
       let updates: any = { [field]: value };
-      
       if (field === 'status') {
-          // Áp dụng logic reset ngày tháng cho Quick Update (Button & Dropdown)
           updates = getUpdatesForStatusChange(value as RecordStatus);
       }
-
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-      
       const record = records.find(r => r.id === id); 
       if (record) {
           try { await updateRecordApi({ ...record, ...updates }); } catch (e) { console.error("Quick update failed", e); }
       } else {
-          // Fallback nếu không tìm thấy trong state (ít xảy ra)
           const tempRecord = { id } as RecordFile; 
           await updateRecordApi({ ...tempRecord, ...updates });
       }
@@ -362,9 +404,7 @@ function App() {
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];
-          // Sử dụng hàm getUpdatesForStatusChange để đảm bảo logic ngày tháng nhất quán
           const updates = getUpdatesForStatusChange(nextStatus);
-          
           setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
           await updateRecordApi({ ...record, ...updates });
       }
@@ -394,9 +434,7 @@ function App() {
       if (pendingSign.length === 0) { alert("Không có hồ sơ nào đang chờ ký."); return; }
       if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ sang "Đã ký"?`)) {
           const todayStr = new Date().toISOString().split('T')[0];
-          // Dùng updates chuẩn để đảm bảo logic
           const updates = { status: RecordStatus.SIGNED, approvalDate: todayStr, completedDate: null };
-          
           setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, ...updates } : r));
           await Promise.all(pendingSign.map(r => updateRecordApi({ ...r, ...updates })));
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
@@ -420,13 +458,22 @@ function App() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         setIsSystemSettingsOpen={setIsSystemSettingsOpen}
         isGeneratingReport={isGeneratingReport}
-        isUpdateAvailable={isUpdateAvailable}
+        // Removed isUpdateAvailable passing to Sidebar as it is handled by Modal now
+        isUpdateAvailable={false} 
         latestVersion={latestVersion}
         updateUrl={updateUrl}
         unreadMessages={unreadMessages}
         warningCount={recordFilterProps.warningCount}
         activeRemindersCount={activeRemindersCount}
         connectionStatus={connectionStatus}
+        // New Props for Update Modal
+        showUpdateModal={isUpdateAvailable && !updateDeferred}
+        updateVersion={latestVersion}
+        updateDownloadStatus={updateStatus}
+        updateProgress={updateProgress}
+        updateSpeed={updateSpeed} // Pass new prop
+        onUpdateNow={handleUpdateNow}
+        onUpdateLater={handleUpdateLater}
     >
         <AppRoutes 
             currentView={currentView}
@@ -436,7 +483,7 @@ function App() {
             employees={employees}
             users={users}
             wards={wards}
-            holidays={holidays} // Truyền holidays xuống
+            holidays={holidays}
             
             setUnreadMessages={setUnreadMessages}
             notificationEnabled={notificationEnabled}
@@ -445,7 +492,6 @@ function App() {
             setRecordToLiquidate={setRecordToLiquidate}
             recordForMapCorrection={recordForMapCorrection}
             
-            // Handlers
             handleViewRecord={(r) => setViewingRecord(r)}
             handleMapCorrectionRequest={handleMapCorrectionRequest}
             handleAddOrUpdateRecord={handleAddOrUpdateRecord}
@@ -459,23 +505,19 @@ function App() {
             handleQuickUpdate={handleQuickUpdate}
             handleUpdateCurrentAccount={handleUpdateCurrentAccount}
             
-            // Reports
             globalReportContent={globalReportContent}
             isGeneratingReport={isGeneratingReport}
             handleGlobalGenerateReport={handleGlobalGenerateReport}
             handleExportReportExcel={handleExportReportExcel}
 
-            // List Filter Props
             {...recordFilterProps}
             
-            // Selection & UI Logic
             selectedRecordIds={selectedRecordIds}
             toggleSelectAll={toggleSelectAll}
             toggleSelectRecord={toggleSelectRecord}
             visibleColumns={visibleColumns}
             setVisibleColumns={setVisibleColumns}
             
-            // Modal Triggers
             setIsModalOpen={setIsModalOpen}
             setEditingRecord={setEditingRecord}
             setIsImportModalOpen={setIsImportModalOpen}
@@ -520,7 +562,7 @@ function App() {
             handleSaveEmployee={handleSaveEmployee}
             handleDeleteEmployee={handleDeleteEmployee}
             handleDeleteAllData={handleDeleteAllData}
-            onRefreshData={loadData} // Kết nối hàm loadData vào AppModals để truyền cho SystemSettings
+            onRefreshData={loadData}
             confirmAssign={confirmAssign}
             handleDeleteRecord={() => { if(deletingRecord) handleDeleteRecord(deletingRecord.id); }}
             confirmDelete={(r) => handleDeleteRecord(r.id)}

@@ -118,10 +118,17 @@ ipcMain.handle('check-for-update', async (event, serverUrl) => {
   if (!app.isPackaged) return { status: 'dev-mode', message: 'Đang chạy chế độ Dev (Không update)' };
   
   try {
-    if (serverUrl) {
+    // LOGIC THÔNG MINH:
+    // 1. Nếu serverUrl chứa "github.com" hoặc rỗng -> Sử dụng cấu hình mặc định trong package.json (GitHub Releases)
+    // 2. Nếu serverUrl là IP hoặc tên miền riêng (LAN) -> Sử dụng chế độ Custom Server
+    
+    if (serverUrl && !serverUrl.includes('github.com') && serverUrl.trim() !== '') {
         const feedUrl = `${serverUrl}/updates`;
-        log.info(`Checking updates from: ${feedUrl}`);
+        log.info(`Checking updates from Custom Server: ${feedUrl}`);
         autoUpdater.setFeedURL(feedUrl);
+    } else {
+        log.info('Checking updates from GitHub Releases (using package.json config)');
+        // Không gọi setFeedURL, để electron-updater tự dùng "publish" trong package.json
     }
 
     const result = await autoUpdater.checkForUpdates();
@@ -136,9 +143,34 @@ ipcMain.handle('check-for-update', async (event, serverUrl) => {
   }
 });
 
+// FIX LỖI: "Please check update first"
 ipcMain.handle('download-update', async () => {
   log.info("User requested download update...");
-  autoUpdater.downloadUpdate();
+  try {
+    // Cố gắng tải ngay lập tức
+    return await autoUpdater.downloadUpdate();
+  } catch (e) {
+    log.warn("Direct download failed, attempting to re-check update first...", e.message);
+    
+    // Nếu lỗi do chưa có state update, ta thực hiện check lại rồi mới download
+    if (e.message.includes('check update first')) {
+        try {
+            // Check lại (sử dụng feedURL đã set trước đó hoặc mặc định)
+            const checkResult = await autoUpdater.checkForUpdates();
+            if (checkResult && checkResult.updateInfo) {
+                // Sau khi check xong, gọi download lại
+                return await autoUpdater.downloadUpdate();
+            } else {
+                throw new Error("Không tìm thấy bản cập nhật khi thử lại.");
+            }
+        } catch (retryError) {
+            log.error("Retry download failed:", retryError);
+            throw retryError;
+        }
+    }
+    
+    throw e;
+  }
 });
 
 ipcMain.handle('quit-and-install', () => {

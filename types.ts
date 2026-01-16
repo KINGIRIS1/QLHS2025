@@ -109,7 +109,7 @@ export interface Contract {
   area?: number | null;
   
   // Phân loại logic
-  contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc'; // Tab đang chọn
+  contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục'; // Đã bổ sung Trích lục
   serviceType: string;    // Tên dịch vụ chi tiết (VD: Đo đạc tòa án)
   areaType: string;       // Khu vực (Đất đô thị / Nông thôn)
 

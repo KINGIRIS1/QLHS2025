@@ -10,6 +10,22 @@ const dbFile = process.env.DB_PATH || path.join(__dirname, 'db.json');
 
 console.log(`Dang su dung Database tai: ${dbFile}`);
 
+const server = jsonServer.create();
+const router = jsonServer.router(dbFile);
+const middlewares = jsonServer.defaults();
+
+// --- TỐI ƯU HÓA TỐC ĐỘ CẬP NHẬT ---
+// Đưa cấu hình Static File lên TRƯỚC các middleware mặc định.
+// Điều này giúp việc tải file bỏ qua Logger và BodyParser, tăng tốc độ đáng kể.
+let releaseDir = path.join(__dirname, '../release');
+if (!fs.existsSync(releaseDir)) {
+    // Thử tìm ở thư mục gốc project (khi chạy dev)
+    releaseDir = path.join(__dirname, '../../release');
+}
+console.log(`Update Server path: ${releaseDir}`);
+server.use('/updates', express.static(releaseDir));
+// ------------------------------------
+
 // --- TỰ ĐỘNG SAO LƯU (AUTO BACKUP) ---
 try {
     if (fs.existsSync(dbFile)) {
@@ -57,27 +73,10 @@ if (!fs.existsSync(dbFile)) {
     fs.writeFileSync(dbFile, JSON.stringify(DEFAULT_DATA, null, 2));
 }
 
-const server = jsonServer.create();
-const router = jsonServer.router(dbFile);
-const middlewares = jsonServer.defaults();
-
 server.use(middlewares);
 server.use(jsonServer.bodyParser);
 
-// --- CẤU HÌNH HOST FILE CẬP NHẬT ---
-// Trỏ tới thư mục 'release' nằm ngang hàng với thư mục 'server' hoặc thư mục gốc
-// Khi chạy trong Electron (Packaged), ta cần tìm đường dẫn tương đối phù hợp
-let releaseDir = path.join(__dirname, '../release');
-if (!fs.existsSync(releaseDir)) {
-    // Thử tìm ở thư mục gốc project (khi chạy dev)
-    releaseDir = path.join(__dirname, '../../release');
-}
-
-console.log(`Update Server path: ${releaseDir}`);
-// Serve thư mục release tại đường dẫn /updates
-server.use('/updates', express.static(releaseDir));
-
-// Middleware hiển thị log
+// Middleware hiển thị log (Chỉ log các request API, không log file tĩnh nữa do đã khai báo static ở trên)
 server.use((req, res, next) => {
     if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
         console.log(`${new Date().toLocaleTimeString()} - ${req.method} request received`);
@@ -104,7 +103,6 @@ server.post('/custom/bulk', (req, res) => {
 });
 
 server.post('/custom/update-missing', (req, res) => {
-    // ... Giữ nguyên code cũ
     const db = router.db;
     const incomingData = req.body;
     if (Array.isArray(incomingData)) {

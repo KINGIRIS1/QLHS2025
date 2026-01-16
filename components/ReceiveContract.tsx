@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Contract, PriceItem, User } from '../types';
+import { RecordFile, Contract, PriceItem, SplitItem, User } from '../types';
 import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts } from '../services/api';
 import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
@@ -118,9 +118,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
               // 2. Detect Contract & Service Type (Loại dịch vụ)
               const recType = (recordToLiquidate.recordType || '').toLowerCase();
               let serviceType = '';
-              let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' = 'Đo đạc';
+              let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
 
               if (recType.includes('trích lục')) {
+                  contractType = 'Trích lục';
                   // Cố gắng map chính xác tên dịch vụ trong bảng giá
                   const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
                   serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
@@ -218,14 +219,23 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       
       let templateKey = '', typeName = '';
       const isCamMoc = dataToPrint.contractType === 'Cắm mốc';
-      const isTachThua = dataToPrint.contractType === 'Tách thửa'; 
+      const isTrichLuc = dataToPrint.contractType === 'Trích lục';
       
       if (printType === 'liquidation') {
-          templateKey = isCamMoc ? STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC : STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC;
-          typeName = isCamMoc ? "Thanh lý Hợp đồng Cắm mốc" : "Thanh lý Hợp đồng Đo đạc";
+          if (isTrichLuc) {
+              templateKey = STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_TRICHLUC;
+              typeName = "Thanh lý Hợp đồng Trích lục";
+          } else {
+              templateKey = isCamMoc ? STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC : STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC;
+              typeName = isCamMoc ? "Thanh lý Hợp đồng Cắm mốc" : "Thanh lý Hợp đồng Đo đạc";
+          }
       } else {
+          // Hợp đồng
           templateKey = isCamMoc ? STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC : STORAGE_KEYS.CONTRACT_TEMPLATE_DODAC;
           typeName = isCamMoc ? "Hợp đồng Cắm mốc" : "Hợp đồng Đo đạc";
+          
+          // Trích lục thường không có hợp đồng, nhưng nếu cần có thể dùng chung mẫu Đo đạc
+          if (isTrichLuc) typeName = "Hợp đồng Trích lục (Dùng mẫu đo đạc)";
       }
       
       if (!hasTemplate(templateKey)) { 
@@ -235,12 +245,42 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       
       setIsProcessing(true);
       
-      const cDate = dataToPrint.createdDate ? new Date(dataToPrint.createdDate) : new Date();
+      // XỬ LÝ NGÀY THÁNG (Tách biệt ngày Hợp đồng và ngày Thanh lý)
+      
+      // 1. Ngày hiện tại trên Form (Dùng cho loại văn bản đang in)
+      const currentFormDate = dataToPrint.createdDate ? new Date(dataToPrint.createdDate) : new Date();
+      
+      // 2. Ngày Hợp Đồng Gốc (Cố gắng tìm lại từ Database nếu đang ở chế độ Thanh lý)
+      let originalContractDate = currentFormDate; // Mặc định fallback
+      
+      if (printType === 'liquidation') {
+          // Nếu đang in thanh lý, ngày trên form thường là ngày thanh lý.
+          // Cần tìm ngày hợp đồng gốc.
+          const originalContract = contracts.find(c => c.code === dataToPrint.code);
+          if (originalContract && originalContract.createdDate) {
+              originalContractDate = new Date(originalContract.createdDate);
+          }
+      } else {
+          // Nếu đang in hợp đồng, ngày trên form chính là ngày hợp đồng
+          originalContractDate = currentFormDate;
+      }
+
+      // 3. Helper Format Date
+      const fmt = (d: Date) => ({
+          day: d.getDate().toString().padStart(2, '0'),
+          month: (d.getMonth() + 1).toString().padStart(2, '0'),
+          year: d.getFullYear(),
+          full: d.toLocaleDateString('vi-VN')
+      });
+
+      const dateHD = fmt(originalContractDate);
+      const dateTL = fmt(currentFormDate); // Ngày trên form lúc này là ngày thanh lý (hoặc ngày in HĐ)
+
+      // --- MAPPING DATA ---
       const moneyText = docTienBangChu(dataToPrint.totalAmount || 0);
       const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
       const money = (v: any) => (v === undefined || v === null) ? "0" : Number(v).toLocaleString('vi-VN');
       
-      // ... (Logic map dữ liệu giữ nguyên như cũ) ...
       const rawWard = val(dataToPrint.ward);
       const normWard = _nd(rawWard);
       
@@ -313,10 +353,25 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           DIA_CHI_CHI_TIET: val(dataToPrint.address),
           MA_HS: val(dataToPrint.code),
           SO_HD: val(dataToPrint.code),
-          NGAY: cDate.getDate().toString().padStart(2, '0'),
-          THANG: (cDate.getMonth()+1).toString().padStart(2, '0'),
-          NAM: cDate.getFullYear(),
-          NGAY_KY: cDate.toLocaleDateString('vi-VN'),
+          
+          // --- NGÀY THÁNG CHUNG (Theo ngày trên form hiện tại) ---
+          NGAY: dateTL.day,
+          THANG: dateTL.month,
+          NAM: dateTL.year,
+          NGAY_KY: dateTL.full,
+
+          // --- NGÀY HỢP ĐỒNG (Cố định theo dữ liệu gốc) ---
+          NGAY_HD: dateHD.day,
+          THANG_HD: dateHD.month,
+          NAM_HD: dateHD.year,
+          NGAY_KY_HD: dateHD.full,
+
+          // --- NGÀY THANH LÝ (Ngày trên form) ---
+          NGAY_TL: dateTL.day,
+          THANG_TL: dateTL.month,
+          NAM_TL: dateTL.year,
+          NGAY_KY_TL: dateTL.full,
+
           NGUOI_LAP: val(currentUser.name),
           BEN_A: val(dataToPrint.customerName).toUpperCase(),
           TEN: val(dataToPrint.customerName).toUpperCase(),
@@ -335,8 +390,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           SO_THUA: val(dataToPrint.landPlot),
           TO: val(dataToPrint.mapSheet),
           SO_TO: val(dataToPrint.mapSheet),
-          DT: isTachThua ? "" : val(dataToPrint.area),
-          DIEN_TICH: isTachThua ? "" : val(dataToPrint.area),
+          DT: val(dataToPrint.area),
+          DIEN_TICH: val(dataToPrint.area),
           DIEN_TICH_TL: val(dataToPrint.liquidationArea || dataToPrint.area),
           DT_TL: val(dataToPrint.liquidationArea || dataToPrint.area),
           DIACHIDAT: fullLandAddress,

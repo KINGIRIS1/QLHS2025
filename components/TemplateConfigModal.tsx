@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, FileSpreadsheet, MapPin, Ruler, Link as LinkIcon, Cloud, Loader2, FileCheck, Gavel } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, FileSpreadsheet, MapPin, Ruler, Link as LinkIcon, Cloud, Loader2, FileCheck, Gavel, Copy } from 'lucide-react';
 import { saveTemplate, hasTemplate, removeTemplate, saveTemplateUrl, getTemplateSourceType, STORAGE_KEYS } from '../services/docxService';
 import { saveExcelTemplate, hasExcelTemplate, removeExcelTemplate, EXCEL_STORAGE_KEYS } from '../services/excelTemplateService';
 import * as XLSX from 'xlsx-js-style';
@@ -20,8 +21,8 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
   const [startRow, setStartRow] = useState<number>(8);
   const [isSaving, setIsSaving] = useState(false);
   
-  // State mới để chọn loại hợp đồng con (4 loại)
-  const [contractSubType, setContractSubType] = useState<'dodac' | 'cammoc' | 'liq_dodac' | 'liq_cammoc'>('dodac');
+  // State chọn loại hợp đồng con
+  const [contractSubType, setContractSubType] = useState<'dodac' | 'cammoc' | 'liq_dodac' | 'liq_cammoc' | 'liq_trichluc'>('dodac');
   // State mới cho loại VPHC
   const [vphcSubType, setVphcSubType] = useState<'mau01' | 'mau02'>('mau01');
 
@@ -47,6 +48,9 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
           } else if (contractSubType === 'liq_dodac') {
               storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC;
               title = 'Mẫu Thanh Lý HĐ Đo Đạc';
+          } else if (contractSubType === 'liq_trichluc') {
+              storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_TRICHLUC;
+              title = 'Mẫu Thanh Lý HĐ Trích Lục';
           } else {
               storageKey = STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC;
               title = 'Mẫu Thanh Lý HĐ Cắm Mốc';
@@ -203,6 +207,12 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
                             className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all ${contractSubType === 'liq_cammoc' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                         >
                             <FileCheck size={14} /> TL Cắm Mốc
+                        </button>
+                        <button 
+                            onClick={() => setContractSubType('liq_trichluc')}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold border transition-all col-span-2 ${contractSubType === 'liq_trichluc' ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <Copy size={14} /> TL Trích Lục (Mới)
                         </button>
                     </div>
                 </div>

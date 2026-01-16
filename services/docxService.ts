@@ -1,3 +1,4 @@
+
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import saveAs from 'file-saver';
@@ -9,9 +10,10 @@ export const STORAGE_KEYS = {
     RECEIPT_TEMPLATE: 'docx_template_receipt',
     CONTRACT_TEMPLATE_DODAC: 'docx_template_contract_dodac', 
     CONTRACT_TEMPLATE_CAMMOC: 'docx_template_contract_cammoc', 
-    // Tách riêng 2 loại thanh lý
+    // Tách riêng các loại thanh lý
     CONTRACT_TEMPLATE_LIQ_DODAC: 'docx_template_liquidation_dodac', 
     CONTRACT_TEMPLATE_LIQ_CAMMOC: 'docx_template_liquidation_cammoc',
+    CONTRACT_TEMPLATE_LIQ_TRICHLUC: 'docx_template_liquidation_trichluc', // MỚI: Mẫu thanh lý trích lục
     CONTRACT_TEMPLATE: 'docx_template_contract',
     
     // MỚI: Template cho VPHC
@@ -111,6 +113,7 @@ export const syncTemplatesFromCloud = async () => {
             STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC,
             STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_DODAC,
             STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_CAMMOC,
+            STORAGE_KEYS.CONTRACT_TEMPLATE_LIQ_TRICHLUC, // Thêm vào danh sách đồng bộ
             STORAGE_KEYS.VPHC_TEMPLATE_01,
             STORAGE_KEYS.VPHC_TEMPLATE_02
         ];

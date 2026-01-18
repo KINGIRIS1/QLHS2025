@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, Contract, SplitItem } from '../types';
 import { STATUS_LABELS, getNormalizedWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell, Receipt, DollarSign, CheckCircle2, Circle, Clock, ArrowDown, Send, FileSignature, CheckSquare, CalendarClock, FileCheck } from 'lucide-react';
+import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell, Receipt, DollarSign, CheckCircle2, Circle, Clock, ArrowDown, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
@@ -36,6 +36,9 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
   // State cho giá hợp đồng
   const [contractPrice, setContractPrice] = useState<number | null>(null);
   const [contractSplitItems, setContractSplitItems] = useState<SplitItem[] | null>(null);
+  
+  // State cho Thanh lý
+  const [liquidationInfo, setLiquidationInfo] = useState<{ amount: number, content: string } | null>(null);
 
   useEffect(() => {
       if (record) {
@@ -59,6 +62,25 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                   // FIX: Đảm bảo undefined chuyển thành null để tránh lỗi render
                   setContractPrice(match.totalAmount ?? null);
                   setContractSplitItems(match.splitItems || null);
+
+                  // Kiểm tra và set thông tin thanh lý
+                  // Nếu có diện tích thanh lý (đã nhập form thanh lý) hoặc trạng thái completed
+                  if (match.liquidationArea || (match.status === 'COMPLETED' && match.totalAmount)) {
+                      let typeLabel = match.contractType || 'Hồ sơ';
+                      // Chuẩn hóa tên loại thanh lý
+                      if (typeLabel === 'Đo đạc') typeLabel = 'Đo đạc';
+                      else if (typeLabel === 'Cắm mốc') typeLabel = 'Cắm mốc';
+                      else if (typeLabel === 'Tách thửa') typeLabel = 'Tách thửa';
+                      else if (typeLabel === 'Trích lục') typeLabel = 'Trích lục';
+
+                      setLiquidationInfo({
+                          amount: match.totalAmount, // Lấy giá trị tổng (thường là giá sau khi thanh lý)
+                          content: `Thanh lý ${typeLabel}`
+                      });
+                  } else {
+                      setLiquidationInfo(null);
+                  }
+
               } else {
                   // LOGIC MỚI: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
                   const type = (record.recordType || '').toLowerCase();
@@ -68,6 +90,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                       setContractPrice(null);
                   }
                   setContractSplitItems(null);
+                  setLiquidationInfo(null);
               }
           };
           fetchPrice();
@@ -480,7 +503,8 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                                 <div className="flex items-center gap-2">
                                     <DollarSign size={16} className="text-green-600" />
                                     <div>
-                                        <span className="text-xs text-gray-500 block">Phí đo đạc (HĐ)</span>
+                                        {/* SỬA NHÃN THEO YÊU CẦU */}
+                                        <span className="text-xs text-gray-500 block">Giá trị hợp đồng</span>
                                         {/* FIX: Check !== null && !== undefined explicitly */}
                                         <span className="font-mono font-bold text-green-700">
                                             {contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'}
@@ -488,6 +512,24 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                                     </div>
                                 </div>
                             </div>
+
+                            {/* MỚI: PHẦN HIỂN THỊ GIÁ TRỊ THANH LÝ */}
+                            {liquidationInfo && (
+                                <div className="mt-3 pt-3 border-t border-dashed border-gray-200 bg-orange-50/50 p-2 rounded-lg border border-orange-100">
+                                    <div className="flex items-center gap-2">
+                                        <Calculator size={16} className="text-orange-600" />
+                                        <div>
+                                            <span className="text-xs text-orange-600 font-bold uppercase block">Giá trị thanh lý</span>
+                                            <span className="font-mono font-bold text-orange-800 text-lg">
+                                                {liquidationInfo.amount.toLocaleString('vi-VN')} đ
+                                            </span>
+                                            <span className="text-[10px] text-orange-500 block italic font-medium mt-0.5">
+                                                ({liquidationInfo.content})
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Chi tiết tách thửa nếu có */}
                             {contractSplitItems && contractSplitItems.length > 0 && (

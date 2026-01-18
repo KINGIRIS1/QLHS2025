@@ -66,17 +66,25 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                   // Kiểm tra và set thông tin thanh lý
                   // Nếu có diện tích thanh lý (đã nhập form thanh lý) hoặc trạng thái completed
                   if (match.liquidationArea || (match.status === 'COMPLETED' && match.totalAmount)) {
-                      // LOGIC MỚI: Ưu tiên hiển thị tên dịch vụ cụ thể (serviceType) 
-                      // Vì khi thanh lý, người dùng có thể đổi từ Trích lục -> Trích đo (serviceType thay đổi)
-                      // Nếu không có serviceType thì mới fallback về contractType
-                      let contentLabel = match.serviceType || match.contractType || 'Hồ sơ';
                       
-                      // Làm đẹp text hiển thị
-                      if (contentLabel === 'Đo đạc tách thửa') contentLabel = 'Tách thửa';
+                      // LOGIC MỚI: Xác định tên loại thanh lý cụ thể
+                      let liquidationLabel = 'Thanh lý hợp đồng';
+                      const cType = (match.contractType || '').toLowerCase();
+                      const sType = (match.serviceType || '').toLowerCase();
+
+                      if (cType.includes('trích lục') || sType.includes('trích lục')) {
+                          liquidationLabel = 'Thanh lý trích lục';
+                      } else if (cType.includes('cắm mốc') || sType.includes('cắm mốc')) {
+                          liquidationLabel = 'Thanh lý cắm mốc';
+                      } else if (cType.includes('tách thửa') || sType.includes('tách thửa')) {
+                          liquidationLabel = 'Thanh lý tách thửa';
+                      } else if (cType.includes('đo đạc') || sType.includes('đo đạc')) {
+                          liquidationLabel = 'Thanh lý đo đạc';
+                      }
 
                       setLiquidationInfo({
                           amount: match.totalAmount, // Lấy giá trị tổng (thường là giá sau khi thanh lý)
-                          content: `Thanh lý: ${contentLabel}`
+                          content: liquidationLabel
                       });
                   } else {
                       setLiquidationInfo(null);
@@ -520,12 +528,9 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                                     <div className="flex items-center gap-2">
                                         <Calculator size={16} className="text-orange-600" />
                                         <div>
-                                            <span className="text-xs text-orange-600 font-bold uppercase block">Giá trị thanh lý</span>
+                                            <span className="text-xs text-orange-600 font-bold uppercase block">{liquidationInfo.content}</span>
                                             <span className="font-mono font-bold text-orange-800 text-lg">
                                                 {liquidationInfo.amount.toLocaleString('vi-VN')} đ
-                                            </span>
-                                            <span className="text-[10px] text-orange-500 block italic font-medium mt-0.5">
-                                                ({liquidationInfo.content})
                                             </span>
                                         </div>
                                     </div>

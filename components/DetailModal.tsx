@@ -16,7 +16,7 @@ interface DetailModalProps {
   currentUser: User | null;
   onEdit?: (record: RecordFile) => void;
   onDelete?: (record: RecordFile) => void;
-  onCreateLiquidation?: (record: RecordFile) => void; // New Prop
+  onCreateLiquidation?: (record: RecordFile) => void; 
 }
 
 const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, currentUser, onEdit, onDelete, onCreateLiquidation }) => {
@@ -66,16 +66,17 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                   // Kiểm tra và set thông tin thanh lý
                   // Nếu có diện tích thanh lý (đã nhập form thanh lý) hoặc trạng thái completed
                   if (match.liquidationArea || (match.status === 'COMPLETED' && match.totalAmount)) {
-                      let typeLabel = match.contractType || 'Hồ sơ';
-                      // Chuẩn hóa tên loại thanh lý
-                      if (typeLabel === 'Đo đạc') typeLabel = 'Đo đạc';
-                      else if (typeLabel === 'Cắm mốc') typeLabel = 'Cắm mốc';
-                      else if (typeLabel === 'Tách thửa') typeLabel = 'Tách thửa';
-                      else if (typeLabel === 'Trích lục') typeLabel = 'Trích lục';
+                      // LOGIC MỚI: Ưu tiên hiển thị tên dịch vụ cụ thể (serviceType) 
+                      // Vì khi thanh lý, người dùng có thể đổi từ Trích lục -> Trích đo (serviceType thay đổi)
+                      // Nếu không có serviceType thì mới fallback về contractType
+                      let contentLabel = match.serviceType || match.contractType || 'Hồ sơ';
+                      
+                      // Làm đẹp text hiển thị
+                      if (contentLabel === 'Đo đạc tách thửa') contentLabel = 'Tách thửa';
 
                       setLiquidationInfo({
                           amount: match.totalAmount, // Lấy giá trị tổng (thường là giá sau khi thanh lý)
-                          content: `Thanh lý ${typeLabel}`
+                          content: `Thanh lý: ${contentLabel}`
                       });
                   } else {
                       setLiquidationInfo(null);

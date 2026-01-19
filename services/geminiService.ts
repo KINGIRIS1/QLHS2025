@@ -49,7 +49,8 @@ export const generateReport = async (
   records: RecordFile[], 
   timeLabel: string, 
   scope: 'general' | 'personal' = 'general', 
-  userName?: string
+  userName?: string,
+  customTitle?: string
 ): Promise<string> => {
   try {
     const ai = getAiClient();
@@ -142,13 +143,15 @@ export const generateReport = async (
         wardTypeDetails: wardTypeStats // Truyền dữ liệu mới vào prompt
     };
 
+    const title = customTitle || "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC";
+
     const prompt = `
       Bạn là thư ký chuyên nghiệp. Hãy tạo một BÁO CÁO CÔNG VIỆC CÔ ĐỌNG nằm gọn trong 01 TRANG A4 (khổ đứng).
       
       DỮ LIỆU JSON: ${JSON.stringify(reportData)}
 
       YÊU CẦU TRÌNH BÀY (HTML thuần, CSS Tailwind, Font Serif):
-      1. TIÊU ĐỀ: "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" (In đậm, trung tâm, size lớn).
+      1. TIÊU ĐỀ: "${title}" (In đậm, trung tâm, size lớn).
       2. THỜI GIAN: ${timeLabel}.
       3. BẢNG TỔNG HỢP: Tạo 1 bảng nhỏ hiển thị các chỉ số:
          - Tổng HS

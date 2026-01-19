@@ -9,7 +9,7 @@ import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 interface ReportSectionProps {
     reportContent: string;
     isGenerating: boolean;
-    onGenerate: (fromDate: string, toDate: string) => void;
+    onGenerate: (fromDate: string, toDate: string, title?: string) => void;
     onExportExcel: (fromDate: string, toDate: string, ward: string) => void;
     records: RecordFile[];
     wards: string[]; 
@@ -27,6 +27,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     
     // State chọn xã phường
     const [selectedWard, setSelectedWard] = useState<string>('all');
+    
+    // Report Type State
+    const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
     const [activeTab, setActiveTab] = useState<'list' | 'ai'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
@@ -104,6 +107,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const toStr = new Date().toISOString().split('T')[0];
         setFromDate(fromStr);
         setToDate(toStr);
+        setReportType(type);
         setActiveTab('list');
     };
 
@@ -117,7 +121,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
 
         setActiveTab('ai');
-        onGenerate(fromDate, toDate);
+        
+        let title = "BÁO CÁO TÌNH HÌNH TIẾP NHẬN VÀ GIẢI QUYẾT HỒ SƠ";
+        if (reportType === 'week') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC TUẦN";
+        if (reportType === 'month') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC THÁNG";
+
+        onGenerate(fromDate, toDate, title);
     };
 
     const handleExportExcelClick = () => {
@@ -182,10 +191,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                     
                     <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                        <button onClick={() => handleQuickReport('week')} className="px-3 py-1.5 rounded-md text-xs font-bold hover:bg-white hover:shadow-sm transition-all text-slate-600 flex items-center gap-1">
+                        <button onClick={() => handleQuickReport('week')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
                             <CalendarDays size={14} /> Tuần này
                         </button>
-                        <button onClick={() => handleQuickReport('month')} className="px-3 py-1.5 rounded-md text-xs font-bold hover:bg-white hover:shadow-sm transition-all text-slate-600 flex items-center gap-1">
+                        <button onClick={() => handleQuickReport('month')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
                             <Layout size={14} /> Tháng này
                         </button>
                     </div>
@@ -207,9 +216,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         </div>
 
                         <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-sm">
-                            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="text-sm outline-none text-gray-700 font-medium" />
+                            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setReportType('custom'); }} className="text-sm outline-none text-gray-700 font-medium" />
                             <span className="text-gray-400">➜</span>
-                            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="text-sm outline-none text-gray-700 font-medium" />
+                            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} className="text-sm outline-none text-gray-700 font-medium" />
                         </div>
                         
                         <button onClick={handleExportExcelClick} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">
@@ -346,6 +355,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <div className="flex items-center gap-2">
                                 <div className="text-sm text-gray-600">
                                     Sử dụng <strong>Gemini AI</strong> để viết báo cáo nhận xét tiến độ.
+                                    {reportType !== 'custom' && <span className="ml-2 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">Chế độ: {reportType === 'week' ? 'Báo cáo Tuần' : 'Báo cáo Tháng'}</span>}
                                 </div>
                             </div>
                             <div className="flex gap-2">

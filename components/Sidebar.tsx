@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays } from 'lucide-react';
-import { User, UserRole } from '@/types';
-import { APP_VERSION } from '@/constants';
+import { User, UserRole } from '../types';
+import { APP_VERSION } from '../constants';
 
 interface SidebarProps {
   currentView: string;

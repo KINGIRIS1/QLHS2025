@@ -50,9 +50,14 @@ export const saveWorkSchedule = async (schedule: Partial<WorkSchedule>): Promise
                 .eq('id', schedule.id);
             if (error) throw error;
         } else {
+            // FIX: Tự động sinh ID trước khi insert để tránh lỗi null value
+            const newSchedule = {
+                ...schedule,
+                id: Math.random().toString(36).substr(2, 9)
+            };
             const { error } = await supabase
                 .from('work_schedules')
-                .insert([schedule]);
+                .insert([newSchedule]);
             if (error) throw error;
         }
         return true;

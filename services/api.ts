@@ -7,3 +7,4 @@ export * from './apiPeople';
 export * from './apiContracts';
 export * from './apiExcerpts';
 export * from './apiChat';
+export * from './apiWorkSchedule';

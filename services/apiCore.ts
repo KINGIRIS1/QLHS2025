@@ -94,7 +94,8 @@ export const logError = (context: string, error: any) => {
          alert(`LỖI DỮ LIỆU: Có trường dữ liệu không đúng định dạng (Ví dụ: Diện tích phải là số).\nHệ thống đã cố gắng tự sửa nhưng vẫn thất bại.`);
     } else if (code === 'PGRST204') {
          console.error(`❌ Lỗi tại ${context}: Cột không tồn tại (Lỗi PGRST204).`);
-         alert(`LỖI CẤU TRÚC: Hệ thống đang cố gửi dữ liệu vào cột không tồn tại trên Server.\nVui lòng báo cho quản trị viên cập nhật lại Bảng Contracts.`);
+         // Cập nhật thông báo lỗi hướng dẫn cụ thể SQL
+         alert(`LỖI CẤU TRÚC DATABASE (Thiếu cột):\nDatabase trên Cloud đang thiếu các cột mới (Thanh lý hợp đồng).\n\nVui lòng vào SQL Editor trên Supabase và chạy lệnh sau:\n\nALTER TABLE contracts ADD COLUMN liquidation_area numeric;\nALTER TABLE contracts ADD COLUMN liquidation_amount numeric;`);
     } else if (code === '406') {
          console.warn(`⚠️ [Info] ${context}: Không tìm thấy dữ liệu (406).`);
     } else if (code === '22007' || code === '22008') {
@@ -130,7 +131,8 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const numberFields = [
         'area', 'exportBatch', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
         'deposit', 'quantity', 'excerptNumber', 'plotCount', 'markerCount', 
-        'minArea', 'maxArea', 'price'
+        'minArea', 'maxArea', 'price',
+        'liquidationArea', 'liquidationAmount' // MỚI
     ];
     numberFields.forEach(field => {
         if (clean[field] === '' || clean[field] === undefined || (typeof clean[field] === 'number' && isNaN(clean[field]))) {
@@ -187,7 +189,9 @@ export const mapContractToDb = (c: Contract) => ({
     deposit: c.deposit,
     content: c.content,
     created_date: c.createdDate,
-    status: c.status
+    status: c.status,
+    liquidation_area: c.liquidationArea,
+    liquidation_amount: c.liquidationAmount // Map trường mới
 });
 
 export const mapContractFromDb = (c: any): Contract => ({
@@ -214,7 +218,9 @@ export const mapContractFromDb = (c: any): Contract => ({
     deposit: c.deposit,
     content: c.content,
     createdDate: c.created_date || c.createdDate,
-    status: c.status
+    status: c.status,
+    liquidationArea: c.liquidation_area || c.liquidationArea,
+    liquidationAmount: c.liquidation_amount || c.liquidationAmount // Map trường mới
 });
 
 export const mapPriceFromDb = (item: any): PriceItem => ({

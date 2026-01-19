@@ -59,15 +59,13 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
               const match = contracts.find(c => c.code && record.code && c.code.trim().toLowerCase() === record.code.trim().toLowerCase());
               
               if (match) {
-                  // FIX: Đảm bảo undefined chuyển thành null để tránh lỗi render
+                  // GIÁ TRỊ HỢP ĐỒNG (Lấy từ totalAmount - giá trị lúc lập hợp đồng)
                   setContractPrice(match.totalAmount ?? null);
                   setContractSplitItems(match.splitItems || null);
 
-                  // Kiểm tra và set thông tin thanh lý
-                  // Nếu có diện tích thanh lý (đã nhập form thanh lý) hoặc trạng thái completed
-                  if (match.liquidationArea || (match.status === 'COMPLETED' && match.totalAmount)) {
+                  // GIÁ TRỊ THANH LÝ (Lấy từ liquidationAmount - nếu đã nhập)
+                  if (match.liquidationAmount !== null && match.liquidationAmount !== undefined) {
                       
-                      // LOGIC MỚI: Xác định tên loại thanh lý cụ thể
                       let liquidationLabel = 'Thanh lý hợp đồng';
                       const cType = (match.contractType || '').toLowerCase();
                       const sType = (match.serviceType || '').toLowerCase();
@@ -83,7 +81,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                       }
 
                       setLiquidationInfo({
-                          amount: match.totalAmount, // Lấy giá trị tổng (thường là giá sau khi thanh lý)
+                          amount: match.liquidationAmount, 
                           content: liquidationLabel
                       });
                   } else {
@@ -91,7 +89,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
                   }
 
               } else {
-                  // LOGIC MỚI: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
+                  // Fallback: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
                   const type = (record.recordType || '').toLowerCase();
                   if (type.includes('trích lục')) {
                       setContractPrice(53163);

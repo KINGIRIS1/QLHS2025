@@ -132,6 +132,7 @@ export interface Contract {
 
   // Thanh lý
   liquidationArea?: number | null; // Diện tích thanh lý thực tế
+  liquidationAmount?: number | null; // MỚI: Giá trị thanh lý thực tế (tiền)
 }
 
 // Interface cho Bảng giá (Cập nhật theo hình ảnh)
@@ -192,4 +193,15 @@ export interface Holiday {
   day: number;        // Ngày
   month: number;      // Tháng
   isLunar: boolean;   // true = Âm lịch, false = Dương lịch
+}
+
+// Interface cho Lịch công tác
+export interface WorkSchedule {
+  id: string;
+  date: string;       // Ngày công tác (YYYY-MM-DD)
+  executors: string;  // Người thực hiện (Lưu dạng chuỗi text: "Nguyễn Văn A, Trần B")
+  content: string;    // Văn bản / Nội dung công tác
+  partner: string;    // Cơ quan phối hợp
+  created_at: string; // Ngày tạo
+  created_by: string; // Người tạo
 }

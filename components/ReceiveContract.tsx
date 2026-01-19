@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Contract, PriceItem, SplitItem, User } from '../types';
 import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts } from '../services/api';
-import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText } from 'lucide-react';
+import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
+import saveAs from 'file-saver'; // Import saveAs
 
 // Child Components
 import ContractForm from './receive-contract/ContractForm';
@@ -58,17 +59,20 @@ function _nd(s: string): string {
 }
 
 const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, records, recordToLiquidate, onClearRecordToLiquidate }) => {
-  // Thay đổi: activeModule giờ bao gồm cả 'list'
-  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list'>('list'); 
+  // Thay đổi: activeModule giờ bao gồm cả 'list' và 'liquidation_list'
+  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list'>('list'); 
   const [priceList, setPriceList] = useState<PriceItem[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]); // Move contracts state up to handle logic
   
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  
+  // Không dùng Modal Preview nữa, nhưng vẫn giữ state để tránh lỗi biên dịch nếu cần
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
+  
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined);
@@ -84,7 +88,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
   // --- LOGIC XỬ LÝ KHI CÓ YÊU CẦU THANH LÝ TỪ BÊN NGOÀI ---
   useEffect(() => {
       // Quan trọng: Chỉ chạy logic khi recordToLiquidate có giá trị VÀ danh sách contracts ĐÃ ĐƯỢC TẢI
-      // Điều này ngăn chặn việc tìm kiếm thất bại khi contracts chưa load xong (mảng rỗng)
       if (recordToLiquidate && contracts.length > 0) {
           
           const normalize = (s: string) => String(s || '').trim().toLowerCase();
@@ -213,7 +216,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       return success;
   };
 
-  // --- LOGIC IN ẤN HỢP ĐỒNG ---
+  // --- LOGIC IN ẤN (TẢI VỀ & MỞ) ---
   const handlePreviewDocx = async (dataToPrint: Partial<Contract> | undefined, printType: 'contract' | 'liquidation') => {
       if (!dataToPrint || !dataToPrint.customerName) { alert("Vui lòng nhập Tên khách hàng để in."); return; }
       
@@ -234,8 +237,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           templateKey = isCamMoc ? STORAGE_KEYS.CONTRACT_TEMPLATE_CAMMOC : STORAGE_KEYS.CONTRACT_TEMPLATE_DODAC;
           typeName = isCamMoc ? "Hợp đồng Cắm mốc" : "Hợp đồng Đo đạc";
           
-          // Trích lục thường không có hợp đồng, nhưng nếu cần có thể dùng chung mẫu Đo đạc
-          if (isTrichLuc) typeName = "Hợp đồng Trích lục (Dùng mẫu đo đạc)";
+          if (isTrichLuc) typeName = "Hợp đồng Trích lục";
       }
       
       if (!hasTemplate(templateKey)) { 
@@ -245,27 +247,18 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       
       setIsProcessing(true);
       
-      // XỬ LÝ NGÀY THÁNG (Tách biệt ngày Hợp đồng và ngày Thanh lý)
-      
-      // 1. Ngày hiện tại trên Form (Dùng cho loại văn bản đang in)
+      // XỬ LÝ NGÀY THÁNG
       const currentFormDate = dataToPrint.createdDate ? new Date(dataToPrint.createdDate) : new Date();
-      
-      // 2. Ngày Hợp Đồng Gốc (Cố gắng tìm lại từ Database nếu đang ở chế độ Thanh lý)
-      let originalContractDate = currentFormDate; // Mặc định fallback
+      let originalContractDate = currentFormDate; 
       
       if (printType === 'liquidation') {
-          // Nếu đang in thanh lý, ngày trên form thường là ngày thanh lý.
-          // Cần tìm ngày hợp đồng gốc.
+          // Nếu đang in thanh lý, tìm ngày hợp đồng gốc
           const originalContract = contracts.find(c => c.code === dataToPrint.code);
           if (originalContract && originalContract.createdDate) {
               originalContractDate = new Date(originalContract.createdDate);
           }
-      } else {
-          // Nếu đang in hợp đồng, ngày trên form chính là ngày hợp đồng
-          originalContractDate = currentFormDate;
       }
 
-      // 3. Helper Format Date
       const fmt = (d: Date) => ({
           day: d.getDate().toString().padStart(2, '0'),
           month: (d.getMonth() + 1).toString().padStart(2, '0'),
@@ -274,10 +267,12 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       });
 
       const dateHD = fmt(originalContractDate);
-      const dateTL = fmt(currentFormDate); // Ngày trên form lúc này là ngày thanh lý (hoặc ngày in HĐ)
+      const dateTL = fmt(currentFormDate); 
 
       // --- MAPPING DATA ---
-      const moneyText = docTienBangChu(dataToPrint.totalAmount || 0);
+      const amountToPrint = printType === 'liquidation' ? (dataToPrint.liquidationAmount || 0) : (dataToPrint.totalAmount || 0);
+      
+      const moneyText = docTienBangChu(amountToPrint);
       const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
       const money = (v: any) => (v === undefined || v === null) ? "0" : Number(v).toLocaleString('vi-VN');
       
@@ -311,9 +306,17 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       const detailAddress = val(dataToPrint.address);
       const fullLandAddress = detailAddress ? `${detailAddress}, ${unitPrefix} ${rawWard}` : `${unitPrefix} ${rawWard}`;
       const qty = dataToPrint.contractType === 'Cắm mốc' ? (dataToPrint.markerCount || 0) : (dataToPrint.plotCount || 0);
-      const preTaxAmount = (dataToPrint.unitPrice || 0) * qty;
-
+      
+      let preTaxAmount = 0;
       const vatRate = dataToPrint.vatRate || 0;
+      
+      if (printType === 'liquidation') {
+          preTaxAmount = Math.round(amountToPrint / (1 + vatRate/100));
+      } else {
+          preTaxAmount = (dataToPrint.unitPrice || 0) * qty;
+      }
+
+      const vatAmount = amountToPrint - preTaxAmount;
       const thueLabel = vatRate > 0 ? `Thuế GTGT (${vatRate}%)` : 'Thuế GTGT';
 
       const dsArray = (dataToPrint.splitItems || []).map((item, index) => ({
@@ -330,6 +333,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           AREA: item.area ? val(item.area) : ""
       }));
 
+      // FIX LOGIC: Nếu không có dòng chi tiết (Đo đạc thường), thì tạo 1 dòng mặc định
+      // Ở đây map DT_THUA và AREA bằng diện tích tổng của hợp đồng
       const finalDS = dsArray.length > 0 ? dsArray : [{
           STT: 1,
           TEN: val(dataToPrint.serviceType || dataToPrint.contractType),
@@ -340,8 +345,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           QTY: qty,
           PRICE: money(dataToPrint.unitPrice),
           TOTAL: money(preTaxAmount),
-          DT_THUA: "",
-          AREA: ""
+          DT_THUA: val(dataToPrint.area), // Lấy tổng diện tích
+          AREA: val(dataToPrint.area)     // Lấy tổng diện tích
       }];
 
       const printData = {
@@ -354,19 +359,16 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           MA_HS: val(dataToPrint.code),
           SO_HD: val(dataToPrint.code),
           
-          // --- NGÀY THÁNG CHUNG (Theo ngày trên form hiện tại) ---
           NGAY: dateTL.day,
           THANG: dateTL.month,
           NAM: dateTL.year,
           NGAY_KY: dateTL.full,
 
-          // --- NGÀY HỢP ĐỒNG (Cố định theo dữ liệu gốc) ---
           NGAY_HD: dateHD.day,
           THANG_HD: dateHD.month,
           NAM_HD: dateHD.year,
           NGAY_KY_HD: dateHD.full,
 
-          // --- NGÀY THANH LÝ (Ngày trên form) ---
           NGAY_TL: dateTL.day,
           THANG_TL: dateTL.month,
           NAM_TL: dateTL.year,
@@ -418,12 +420,12 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
           THANHTIEN_TEXT: money(preTaxAmount),
           VAT: val(dataToPrint.vatRate),
           THUE_VAT: val(dataToPrint.vatRate),
-          TIEN_THUE: money(dataToPrint.vatAmount),
-          VAT_AMOUNT: money(dataToPrint.vatAmount),
+          TIEN_THUE: money(vatAmount),
+          VAT_AMOUNT: money(vatAmount),
           THUE_LABEL: thueLabel,
-          TONGTIEN: money(dataToPrint.totalAmount),
-          TONG_TIEN: money(dataToPrint.totalAmount),
-          TONGTIEN_TEXT: money(dataToPrint.totalAmount),
+          TONGTIEN: money(amountToPrint),
+          TONG_TIEN: money(amountToPrint),
+          TONGTIEN_TEXT: money(amountToPrint),
           BANG_CHU: moneyText,
           TONGTIEN_CHU: moneyText,
           SO_TIEN_BANG_CHU: moneyText,
@@ -432,8 +434,32 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       };
 
       const blob = await generateDocxBlobAsync(templateKey, printData);
+      
+      if (blob) { 
+          const fileName = `${typeName.replace(/\s/g, '_')}_${dataToPrint.code}.docx`;
+          
+          if (window.electronAPI && window.electronAPI.saveAndOpenFile) {
+              const reader = new FileReader();
+              reader.readAsDataURL(blob);
+              reader.onloadend = async () => {
+                  if (!window.electronAPI?.saveAndOpenFile) return;
+                  const base64Data = (reader.result as string).split(',')[1];
+                  const result = await window.electronAPI.saveAndOpenFile({
+                      fileName: fileName,
+                      base64Data: base64Data
+                  });
+                  
+                  if (!result.success) {
+                      alert(`Lỗi khi lưu file: ${result.message}`);
+                  }
+              };
+          } else {
+              // Web Fallback
+              saveAs(blob, fileName);
+          }
+      }
+      
       setIsProcessing(false);
-      if (blob) { setPreviewBlob(blob); setPreviewFileName(`${typeName.replace(/\s/g, '_')}_${dataToPrint.code}`); setIsPreviewOpen(true); }
   };
 
   return (
@@ -455,25 +481,30 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
         </div>
 
         {/* MAIN TABS */}
-        <div className="flex px-4 gap-2">
+        <div className="flex px-4 gap-2 overflow-x-auto">
             <button 
                 onClick={() => { setActiveModule('contract'); setEditingContract(undefined); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
                 <FileText size={16} className="inline mr-2" /> Lập Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation'); setEditingContract(undefined); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
                 <FileCheck size={16} className="inline mr-2" /> Thanh Lý Hợp Đồng
             </button>
-            {/* Tab Danh sách riêng biệt */}
             <button 
                 onClick={() => { setActiveModule('list'); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
                 <LayoutList size={16} className="inline mr-2" /> Danh sách Hợp đồng
+            </button>
+            <button 
+                onClick={() => { setActiveModule('liquidation_list'); }}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation_list' ? 'bg-white text-orange-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+            >
+                <ClipboardList size={16} className="inline mr-2" /> Danh sách Thanh lý
             </button>
         </div>
       </div>
@@ -512,6 +543,17 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
                     onDelete={handleDelete}
                     onPrint={handlePreviewDocx} 
                     onCreateLiquidation={handleCreateLiquidation} // Nút tạo thanh lý từ danh sách
+                    viewMode='contract'
+                />
+            )}
+
+            {activeModule === 'liquidation_list' && (
+                <ContractList 
+                    onEdit={handleCreateLiquidation} // Edit thanh lý thì mở form thanh lý
+                    onDelete={handleDelete}
+                    onPrint={handlePreviewDocx} 
+                    onCreateLiquidation={handleCreateLiquidation}
+                    viewMode='liquidation'
                 />
             )}
         </div>

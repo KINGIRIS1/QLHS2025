@@ -38,7 +38,7 @@ export const exportReportToExcel = async (
         return;
     }
 
-    // Lấy dữ liệu hợp đồng để map giá tiền
+    // Lấy dữ liệu hợp đồng để map giá tiền và loại hợp đồng
     let contracts: any[] = [];
     try {
         contracts = await fetchContracts();
@@ -46,11 +46,17 @@ export const exportReportToExcel = async (
         console.warn("Không tải được dữ liệu hợp đồng cho báo cáo.");
     }
 
-    // Helper find price
-    const getContractAmount = (recordCode: string) => {
-        if (!recordCode) return '';
+    // Helper find Contract Info
+    const getContractInfo = (recordCode: string) => {
+        if (!recordCode) return { amount: '', liquidation: '', type: '' };
         const match = contracts.find(c => c.code && c.code.toLowerCase().trim() === recordCode.toLowerCase().trim());
-        return match && match.totalAmount ? match.totalAmount.toLocaleString('vi-VN') : '';
+        if (!match) return { amount: '', liquidation: '', type: '' };
+
+        return {
+            amount: match.totalAmount ? match.totalAmount.toLocaleString('vi-VN') : '',
+            liquidation: match.liquidationAmount ? match.liquidationAmount.toLocaleString('vi-VN') : '',
+            type: match.contractType || '' // Loại hợp đồng (Trích lục, Đo đạc...)
+        };
     };
 
     // Helper find Employee Name
@@ -98,16 +104,18 @@ export const exportReportToExcel = async (
         }
     });
 
-    // Table Header
+    // Table Header (Cập nhật cột theo yêu cầu)
     const tableHeader = [
         "STT", 
         "Mã Hồ Sơ", 
         "Chủ Sử Dụng", 
         "Địa Chỉ (Xã)", 
         "Loại Hồ Sơ", 
-        "NV Xử Lý", // Cột Mới
+        "Loại HĐ/TL", // Yêu cầu 2: Loại hồ sơ thanh lý (Trích lục, đo đạc...)
+        "NV Xử Lý",
         "Số Biên Lai", 
-        "Thành Tiền", 
+        "Giá trị HĐ", // Yêu cầu 3: Đổi từ Thành Tiền -> Giá trị HĐ
+        "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
         "Ngày Nhận", 
         "Hẹn Trả", 
         "Ngày hoàn thành",
@@ -116,22 +124,27 @@ export const exportReportToExcel = async (
         "Ghi Chú"
     ];
     
-    const dataRows = filtered.map((r, i) => [
-        i + 1,
-        r.code,
-        r.customerName,
-        getNormalizedWard(r.ward || undefined),
-        getShortRecordType(r.recordType || undefined),
-        getEmployeeName(r.assignedTo || undefined), // Data Mới
-        r.receiptNumber || '',
-        getContractAmount(r.code),
-        formatDate(r.receivedDate),
-        formatDate(r.deadline),
-        formatDate(r.completedDate),      
-        formatDate(r.resultReturnedDate),
-        STATUS_LABELS[r.status],
-        r.notes || ''
-    ]);
+    const dataRows = filtered.map((r, i) => {
+        const contractInfo = getContractInfo(r.code);
+        return [
+            i + 1,
+            r.code,
+            r.customerName,
+            getNormalizedWard(r.ward || undefined),
+            getShortRecordType(r.recordType || undefined),
+            contractInfo.type, // Loại HĐ/TL
+            getEmployeeName(r.assignedTo || undefined),
+            r.receiptNumber || '',
+            contractInfo.amount,      // Giá trị HĐ
+            contractInfo.liquidation, // Giá trị TL
+            formatDate(r.receivedDate),
+            formatDate(r.deadline),
+            formatDate(r.completedDate),      
+            formatDate(r.resultReturnedDate),
+            STATUS_LABELS[r.status],
+            r.notes || ''
+        ];
+    });
 
     // Generate Workbook
     const wb = XLSX.utils.book_new();
@@ -183,16 +196,18 @@ export const exportReportToExcel = async (
         { s: { r: 6, c: 0 }, e: { r: 6, c: totalCols } }
     ];
     
-    // Column Widths
+    // Column Widths (Adjusted for new columns)
     ws['!cols'] = [
         { wch: 5 },  // STT
         { wch: 15 }, // Mã HS
         { wch: 25 }, // Chủ SD
         { wch: 18 }, // Địa Chỉ
         { wch: 15 }, // Loại HS
-        { wch: 20 }, // NV Xử Lý (Mới)
+        { wch: 15 }, // Loại HĐ/TL (New)
+        { wch: 20 }, // NV Xử Lý
         { wch: 12 }, // Số BL
-        { wch: 15 }, // Thành tiền
+        { wch: 15 }, // Giá trị HĐ
+        { wch: 15 }, // Giá trị TL (New)
         { wch: 12 }, // Ngày Nhận
         { wch: 12 }, // Hẹn Trả
         { wch: 14 }, // Ngày hoàn thành
@@ -222,8 +237,9 @@ export const exportReportToExcel = async (
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
             // Căn giữa: STT, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
-            if ([0, 5, 6, 8, 9, 10, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
-            else if (c === 7) ws[cellRef].s = rightStyle;
+            // Index: 0(STT), 6(NV), 7(BL), 8(HĐ), 9(TL), 10(NgayNhan), 11(Hen), 12(Xong), 13(TraKQ), 14(Status)
+            if ([0, 6, 7, 10, 11, 12, 13, 14].includes(c)) ws[cellRef].s = centerStyle;
+            else if (c === 8 || c === 9) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }
     }
@@ -234,8 +250,8 @@ export const exportReportToExcel = async (
     const rightColEnd = totalCols;
 
     XLSX.utils.sheet_add_aoa(ws, [
-        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", ""]
+        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", ""],
+        ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", ""]
     ], { origin: `A${lastRow}` });
     
     ws['!merges'].push(

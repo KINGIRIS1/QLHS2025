@@ -1,4 +1,3 @@
-
 {
   "records": [
     {
@@ -46,5 +45,8 @@
     "X. Nha Bích": 100,
     "P. Minh Hưng": 205
   },
-  "excerpt_history": []
+  "excerpt_history": [],
+  "work_schedules": [],
+  "employees": [],
+  "users": [{ "username": "admin", "password": "123", "name": "Administrator", "role": "ADMIN" }]
 }

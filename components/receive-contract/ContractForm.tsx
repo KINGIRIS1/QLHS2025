@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
-import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink } from 'lucide-react';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -35,7 +35,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
     contractType: 'Đo đạc', serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
     unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
     createdDate: new Date().toISOString().split('T')[0], status: 'PENDING',
-    liquidationArea: 0 // Init
+    liquidationArea: 0, liquidationAmount: 0 // Init
   });
 
   useEffect(() => {
@@ -43,8 +43,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           // Update Form Data
           setFormData(prev => ({
               ...initialData,
-              // Quan trọng: Nếu vào chế độ Thanh lý và chưa có diện tích thanh lý, lấy diện tích hợp đồng
-              liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea
+              // Logic fallback: Nếu vào chế độ Thanh lý và chưa có dữ liệu thanh lý, lấy dữ liệu hợp đồng
+              liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
+              liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount
           }));
           
           // Update Split Items (Chi tiết tính phí/Tách thửa)
@@ -82,15 +83,19 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   useEffect(() => {
       const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
       setFormData(prev => ({ ...prev, contractType: typeMap[activeTab] }));
-      if (activeTab === 'tt' && tachThuaItems.length === 0) setTachThuaItems([{ serviceName: '', quantity: 1, price: 0, area: 0 }]);
+      if (activeTab === 'tt' && tachThuaItems.length === 0) setTachThuaItems([{ serviceName: '', quantity: 1, price: 0, area: undefined }]); // Initialize area as undefined
   }, [activeTab]);
 
-  // Init Liquidation Area if missing (Fallback logic)
+  // Init Liquidation Data if missing (Fallback logic)
   useEffect(() => {
-      if (mode === 'liquidation' && !formData.liquidationArea && formData.area) {
-          setFormData(prev => ({ ...prev, liquidationArea: prev.area }));
+      if (mode === 'liquidation') {
+          // Khi vào mode liquidation, nếu chưa có diện tích thanh lý thì lấy diện tích hợp đồng
+          setFormData(prev => ({ 
+              ...prev, 
+              liquidationArea: prev.liquidationArea || prev.area
+          }));
       }
-  }, [mode, formData.area]);
+  }, [mode]);
 
   // Helper tìm giá động theo AreaType hiện tại
   const getDynamicPrice = (serviceName: string) => {
@@ -100,10 +105,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           (!row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType))
       );
       
-      // Ưu tiên giá từ CSDL nếu có
       if (matchedRow && matchedRow.price > 0) return matchedRow.price;
-
-      // Logic mặc định cho Trích lục (nếu CSDL chưa cấu hình) - GIÁ CŨ (đã thay bằng logic 'tl' riêng)
       if (_nd(serviceName).includes('trich luc')) return 49225;
 
       return 0;
@@ -115,10 +117,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       const lines = splitImportText.split(/\n|;/).filter(line => line.trim() !== '');
       const newItems: SplitItem[] = [];
-      const currentAreaType = formData.areaType; // Đất đô thị/nông thôn
+      const currentAreaType = formData.areaType;
 
-      // Lấy danh sách các dịch vụ liên quan đến tách thửa trong bảng giá
-      // Lọc theo Khu vực hiện tại
       const validPriceItems = priceList.filter(p => {
           const isTachThua = _nd(p.serviceGroup).includes('tach thua') || _nd(p.serviceName).includes('tach thua');
           const isMatchArea = !p.areaType || !currentAreaType || _nd(p.areaType) === _nd(currentAreaType);
@@ -126,29 +126,16 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       });
 
       lines.forEach(line => {
-          // Regex tìm diện tích: "diện tích: 279,8" hoặc "dt: 50.5"
-          // Hỗ trợ dấu phẩy hoặc chấm thập phân
           const areaMatch = line.match(/(?:diện tích|dt)[:\s]*([\d,.]+)/i);
-          
           if (areaMatch) {
-              // Chuẩn hóa số liệu: Xóa dấu chấm (ngàn) nếu có nhiều hơn 1, thay phẩy bằng chấm
               let areaStr = areaMatch[1];
-              // Trường hợp 1.234,56 -> 1234.56
-              if (areaStr.includes('.') && areaStr.includes(',')) {
-                  areaStr = areaStr.replace(/\./g, '').replace(',', '.');
-              } else if (areaStr.includes(',')) {
-                  // Trường hợp 123,45 -> 123.45
-                  areaStr = areaStr.replace(',', '.');
-              }
-              // Trường hợp 1.234 (nếu ko có phẩy, giả sử là chấm thập phân nếu nhỏ, hoặc chấm ngàn nếu lớn - logic đơn giản là parse float trực tiếp)
+              if (areaStr.includes('.') && areaStr.includes(',')) areaStr = areaStr.replace(/\./g, '').replace(',', '.');
+              else if (areaStr.includes(',')) areaStr = areaStr.replace(',', '.');
               
               const area = parseFloat(areaStr);
 
               if (!isNaN(area)) {
-                  // Tự động chọn loại sản phẩm dựa trên diện tích (minArea <= area < maxArea)
                   let bestService = validPriceItems.find(p => area >= p.minArea && area < p.maxArea);
-                  
-                  // Nếu không tìm thấy range phù hợp, lấy item đầu tiên hoặc mặc định
                   let serviceName = bestService ? bestService.serviceName : (availableServices[0] || '');
                   let price = bestService ? bestService.price : getDynamicPrice(serviceName);
 
@@ -165,7 +152,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       if (newItems.length > 0) {
           setTachThuaItems(newItems);
           setNotification({ type: 'success', message: `Đã nhập tự động ${newItems.length} thửa đất.` });
-          setIsImportExpanded(false); // Thu gọn sau khi nhập xong
+          setIsImportExpanded(false); 
       } else {
           setNotification({ type: 'error', message: 'Không tìm thấy thông tin diện tích hợp lệ trong văn bản.' });
       }
@@ -173,7 +160,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   // Price Calculation Logic
   useEffect(() => {
-      // 1. Tự động xác định Khu vực (Đất đô thị / Nông thôn) dựa trên Xã/Phường
+      // 1. Tự động xác định Khu vực
       let currentAreaType = formData.areaType;
       if (!currentAreaType && formData.ward) {
           const wardName = (formData.ward || '').toLowerCase();
@@ -184,84 +171,109 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           }
       }
 
-      // 2. Logic Trích Lục (MỚI)
+      let calculatedTotal = 0;
+      let calculatedUnitPrice = 0;
+      let calculatedVatAmount = 0;
+      const vatRate = 8; // Mặc định
+
+      // 2. Logic Trích Lục
       if (activeTab === 'tl') {
-          const price = 49225;
-          const vatRate = 8;
+          calculatedUnitPrice = 49225;
           const qty = formData.quantity || 1;
-          const baseAmount = price * qty;
-          const vatAmount = Math.round(baseAmount * (vatRate / 100));
+          const baseAmount = calculatedUnitPrice * qty;
+          calculatedVatAmount = Math.round(baseAmount * (vatRate / 100));
+          calculatedTotal = baseAmount + calculatedVatAmount;
           
-          setFormData(prev => ({
-              ...prev,
+          // Logic quan trọng:
+          // Nếu mode = contract -> Cập nhật totalAmount
+          // Nếu mode = liquidation -> Cập nhật liquidationAmount
+          const updates: any = {
               serviceType: 'Trích lục bản đồ địa chính',
-              unitPrice: price,
+              unitPrice: calculatedUnitPrice,
               vatRate: vatRate,
-              vatAmount: vatAmount,
-              totalAmount: baseAmount + vatAmount,
-              areaType: currentAreaType
-          }));
+              vatAmount: calculatedVatAmount,
+              areaType: currentAreaType,
+          };
+
+          if (mode === 'liquidation') {
+              updates.liquidationAmount = calculatedTotal;
+          } else {
+              updates.totalAmount = calculatedTotal;
+          }
+          
+          setFormData(prev => ({...prev, ...updates}));
           return;
       }
 
       // 3. Logic Tách thửa
       if (activeTab === 'tt') {
           let totalBase = 0;
-          // Cập nhật lại giá cho từng item dựa trên AreaType mới (nếu có thay đổi)
-          const updatedItems = tachThuaItems.map(item => {
+          tachThuaItems.forEach(item => {
               const price = getDynamicPrice(item.serviceName);
               totalBase += (price * item.quantity);
-              // Lưu ý: Chúng ta chỉ tính tổng ở đây, việc update state tachThuaItems sẽ gây infinite loop nếu làm trực tiếp
-              // nên ta chỉ dùng giá trị price để tính toán.
-              return { ...item, price }; 
           });
           
-          const vatRate = 8; 
-          const vatAmount = Math.round(totalBase * (vatRate / 100));
-          setFormData(prev => ({ ...prev, unitPrice: 0, vatRate, vatAmount, totalAmount: totalBase + vatAmount, areaType: currentAreaType }));
-          
+          calculatedVatAmount = Math.round(totalBase * (vatRate / 100));
+          calculatedTotal = totalBase + calculatedVatAmount;
+
+          const updates: any = {
+              unitPrice: 0, 
+              vatRate, 
+              vatAmount: calculatedVatAmount, 
+              areaType: currentAreaType,
+          };
+
+          if (mode === 'liquidation') {
+              updates.liquidationAmount = calculatedTotal;
+          } else {
+              updates.totalAmount = calculatedTotal;
+          }
+
+          setFormData(prev => ({ ...prev, ...updates }));
           return;
       }
 
       // 4. Logic Đo đạc & Cắm mốc
       if (!formData.serviceType) return;
-      const price = getDynamicPrice(formData.serviceType);
+      calculatedUnitPrice = getDynamicPrice(formData.serviceType);
       
-      // Tìm VAT rate của dịch vụ đó
       const matchedItem = priceList.find(p => _nd(p.serviceName) === _nd(formData.serviceType));
-      const vatRate = matchedItem ? matchedItem.vatRate : 8;
       const vatIsPercent = matchedItem ? matchedItem.vatIsPercent : true;
 
       const qty = activeTab === 'cm' ? (formData.markerCount || 1) : (formData.plotCount || 1);
-      
-      const baseAmount = price * qty;
-      let vatAmount = 0;
+      const baseAmount = calculatedUnitPrice * qty;
       
       if (vatIsPercent) {
-          vatAmount = Math.round(baseAmount * (vatRate / 100));
+          calculatedVatAmount = Math.round(baseAmount * (vatRate / 100));
       } else {
-          vatAmount = vatRate * qty;
+          calculatedVatAmount = vatRate * qty;
       }
       
-      setFormData(prev => ({ 
-          ...prev, 
-          unitPrice: price, 
+      calculatedTotal = baseAmount + calculatedVatAmount;
+
+      const updates: any = {
+          unitPrice: calculatedUnitPrice, 
           vatRate: vatRate, 
-          vatAmount, 
-          totalAmount: baseAmount + vatAmount, 
-          areaType: currentAreaType 
-      }));
+          vatAmount: calculatedVatAmount, 
+          areaType: currentAreaType,
+      };
+
+      if (mode === 'liquidation') {
+          updates.liquidationAmount = calculatedTotal;
+      } else {
+          updates.totalAmount = calculatedTotal;
+      }
+
+      setFormData(prev => ({ ...prev, ...updates }));
       
-  }, [formData.area, formData.serviceType, formData.ward, formData.areaType, formData.plotCount, formData.markerCount, formData.quantity, tachThuaItems, activeTab, priceList]);
+  }, [formData.area, formData.serviceType, formData.ward, formData.areaType, formData.plotCount, formData.markerCount, formData.quantity, tachThuaItems, activeTab, priceList, mode]);
 
   const handleSearchRecord = () => {
       const found = records.find(r => r.code.toLowerCase() === searchCode.toLowerCase());
       if (found) {
-          // Tự động detect dịch vụ nếu là trích lục
           let suggestedService = '';
           const recType = (found.recordType || '').toLowerCase();
           
-          // Logic chọn tab tự động
           if (recType.includes('trích lục')) {
               setActiveTab('tl');
               suggestedService = 'Trích lục bản đồ địa chính';
@@ -275,7 +287,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
           setFormData(prev => ({ 
               ...prev, 
-              code: found.code, // Nếu muốn giữ mã hợp đồng giống mã hồ sơ
+              code: found.code,
               customerName: found.customerName, 
               phoneNumber: found.phoneNumber, 
               ward: found.ward, 
@@ -301,33 +313,34 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       }
       setLoading(true);
       
-      // Chuẩn hóa lại giá của các item tách thửa trước khi lưu (đề phòng giá trên UI khác giá lưu do đổi khu vực)
       const finalSplitItems = activeTab === 'tt' ? tachThuaItems.map(item => ({
           ...item,
           price: getDynamicPrice(item.serviceName)
       })) : [];
 
+      // Logic quan trọng:
+      // Nếu mode = liquidation, ta lưu liquidationAmount (giá trị đã tính toán trên form)
+      // Nếu mode = contract, ta lưu totalAmount (giá trị đã tính toán trên form)
+      // Các trường khác giữ nguyên
+      
       const contractData = { 
           ...formData, 
           splitItems: finalSplitItems, 
-          serviceType: activeTab === 'tt' ? 'Đo đạc tách thửa' : formData.serviceType 
+          serviceType: activeTab === 'tt' ? 'Đo đạc tách thửa' : formData.serviceType,
       } as Contract;
       
+      // Đảm bảo không bị null
       if (!contractData.id) contractData.id = Math.random().toString(36).substr(2, 9);
       
       const success = await onSave(contractData, !!initialData);
       setLoading(false);
 
       if (success) {
-          const msg = initialData ? 'Cập nhật hợp đồng thành công!' : 'Đã tạo hợp đồng mới thành công!';
+          const msg = initialData ? 'Cập nhật thành công!' : 'Đã tạo mới thành công!';
           setNotification({ type: 'success', message: msg });
-          // Nếu tạo mới thì reset form (giữ lại các field cần thiết nếu muốn, ở đây reset gần hết)
-          if (!initialData) {
-              // Giữ lại trạng thái tab và generate mã mới
-              handleReset(true); 
-          }
+          if (!initialData) handleReset(true); 
       } else {
-          setNotification({ type: 'error', message: 'Lỗi khi lưu hợp đồng. Vui lòng thử lại.' });
+          setNotification({ type: 'error', message: 'Lỗi khi lưu. Vui lòng thử lại.' });
       }
   };
 
@@ -338,7 +351,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
         serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
         unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
         createdDate: new Date().toISOString().split('T')[0], status: 'PENDING',
-        liquidationArea: 0
+        liquidationArea: 0, liquidationAmount: 0
       });
       setTachThuaItems([]);
       setSplitImportText('');
@@ -349,17 +362,18 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   const handlePrintClick = (type: 'contract' | 'liquidation') => {
       const currentData = { 
           ...formData, 
-          // Cập nhật giá mới nhất cho view in ấn
           splitItems: activeTab === 'tt' ? tachThuaItems.map(i => ({...i, price: getDynamicPrice(i.serviceName)})) : [], 
           serviceType: activeTab === 'tt' ? 'Đo đạc tách thửa' : formData.serviceType 
       };
+      // Khi in thanh lý, truyền đúng giá trị thanh lý để in ra form
+      if (type === 'liquidation') {
+          // Lưu ý: liquidationAmount đã được tính toán trong useEffect
+      }
       onPrint(currentData, type);
   };
 
-  // Helper
   const handleChange = (k: keyof Contract, v: any) => setFormData(p => ({ ...p, [k]: v }));
   
-  // Logic lấy danh sách dịch vụ
   const availableServices = (() => {
       const services = priceList.map(p => p.serviceName).filter((v, i, a) => a.indexOf(v) === i);
       let filtered = services.filter(n => {
@@ -373,6 +387,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   const inputClass = "w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
   const labelClass = "block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 ml-1";
+
+  // Check if we are in liquidation mode to show extra fields
+  const isLiquidationMode = mode === 'liquidation';
+
+  // Biến hiển thị tổng tiền (Tùy theo mode mà hiển thị totalAmount hay liquidationAmount)
+  const displayTotalAmount = isLiquidationMode ? (formData.liquidationAmount || 0) : (formData.totalAmount || 0);
 
   return (
     <form onSubmit={handleSubmit} className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in relative pb-10">
@@ -422,22 +442,25 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet ?? ''} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
                         <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot ?? ''} onChange={e => handleChange('landPlot', e.target.value)} /></div>
                     </div>
-                    <div><label className={labelClass}>Diện tích Hợp Đồng (m2)</label><input type="number" className={`${inputClass} font-bold text-blue-600`} value={formData.area ?? 0} onChange={e => handleChange('area', parseFloat(e.target.value))} /></div>
+                    <div>
+                        <label className={labelClass}>Diện tích Hợp Đồng (m2)</label>
+                        <input type="number" className={`${inputClass} font-bold text-blue-600`} value={formData.area ?? 0} onChange={e => handleChange('area', parseFloat(e.target.value))} />
+                    </div>
                     
                     {/* LIQUIDATION AREA FIELD - ONLY IN LIQUIDATION MODE */}
-                    {mode === 'liquidation' && (
-                        <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-2">
+                    {isLiquidationMode && (
+                        <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-2 animate-fade-in">
                             <label className={`${labelClass} text-green-700`}>Diện tích Thanh Lý (Thực tế)</label>
                             <div className="flex gap-2 items-center">
                                 <input 
                                     type="number" 
                                     className={`${inputClass} font-bold text-green-700 border-green-300 focus:border-green-500`} 
-                                    value={formData.liquidationArea ?? formData.area ?? 0}
+                                    value={formData.liquidationArea ?? 0}
                                     onChange={e => handleChange('liquidationArea', parseFloat(e.target.value))} 
                                 />
                                 <span className="text-xs font-bold text-green-600">m²</span>
                             </div>
-                            <p className="text-[10px] text-green-600 mt-1 italic">* Diện tích thực tế sau khi đo đạc xong.</p>
+                            <p className="text-[10px] text-green-600 mt-1 italic">* Hệ thống sẽ tự động tính lại giá trị thanh lý dựa trên diện tích này.</p>
                         </div>
                     )}
                 </div>
@@ -479,10 +502,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     </div>
 
                     {/* Pricing Box */}
-                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-2xl border border-purple-100 shadow-inner">
-                        <h4 className="font-bold text-purple-800 flex items-center gap-2 mb-4 text-lg">
-                            <div className="bg-white p-1.5 rounded-lg shadow-sm text-purple-600"><Banknote size={20} /></div> 
-                            Tính chi phí dịch vụ
+                    <div className={`bg-gradient-to-br p-6 rounded-2xl border shadow-inner ${isLiquidationMode ? 'from-orange-50 to-amber-50 border-orange-100' : 'from-purple-50 to-indigo-50 border-purple-100'}`}>
+                        <h4 className={`font-bold flex items-center gap-2 mb-4 text-lg ${isLiquidationMode ? 'text-orange-800' : 'text-purple-800'}`}>
+                            <div className={`p-1.5 rounded-lg shadow-sm ${isLiquidationMode ? 'bg-orange-100 text-orange-600' : 'bg-white text-purple-600'}`}><Banknote size={20} /></div> 
+                            {isLiquidationMode ? 'Quyết toán Thanh Lý' : 'Tính chi phí Hợp Đồng'}
                         </h4>
                         
                         {(activeTab === 'dd' || activeTab === 'cm' || activeTab === 'tl') && (
@@ -629,15 +652,15 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                                                 }} 
                                                             />
                                                         </td>
-                                                        {/* ADDED AREA INPUT FOR SPLIT ITEM */}
                                                         <td className="p-2">
                                                             <input 
                                                                 type="number" 
                                                                 className="w-full border border-purple-100 rounded-lg px-2 py-1.5 text-center text-sm outline-none bg-white font-bold text-blue-600 focus:border-purple-300" 
-                                                                value={item.area || 0} 
+                                                                value={item.area ?? ''} // Sửa: Chấp nhận giá trị undefined để hiện placeholder
                                                                 onChange={(e) => { 
                                                                     const newItems = [...tachThuaItems]; 
-                                                                    newItems[idx].area = parseFloat(e.target.value) || 0; 
+                                                                    // Sửa: Xử lý chuỗi rỗng để không bị ép về 0
+                                                                    newItems[idx].area = e.target.value ? parseFloat(e.target.value) : undefined; 
                                                                     setTachThuaItems(newItems); 
                                                                 }} 
                                                                 placeholder="DT"
@@ -659,7 +682,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                             })}
                                         </tbody>
                                     </table>
-                                    <button type="button" onClick={() => setTachThuaItems(prev => [...prev, { serviceName: '', quantity: 1, price: 0, area: 0 }])} className="w-full py-2 bg-purple-50 text-purple-600 text-xs font-bold hover:bg-purple-100 border-t border-purple-100 flex items-center justify-center gap-1 transition-colors"><Plus size={14}/> Thêm dòng</button>
+                                    <button type="button" onClick={() => setTachThuaItems(prev => [...prev, { serviceName: '', quantity: 1, price: 0, area: undefined }])} className="w-full py-2 bg-purple-50 text-purple-600 text-xs font-bold hover:bg-purple-100 border-t border-purple-100 flex items-center justify-center gap-1 transition-colors"><Plus size={14}/> Thêm dòng</button>
                                 </div>
                             </div>
                         )}
@@ -670,8 +693,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <span className="font-medium text-slate-700 bg-white/50 px-2 py-1 rounded border border-purple-100">{(formData.vatAmount ?? 0).toLocaleString('vi-VN')}</span>
                             </div>
                             <div className="text-right">
-                                <span className="text-xs text-purple-600 uppercase font-bold block mb-1">TỔNG TIỀN</span>
-                                <span className="text-2xl font-black text-purple-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-purple-100">{(formData.totalAmount ?? 0).toLocaleString('vi-VN')} <span className="text-sm font-medium text-slate-500">VNĐ</span></span>
+                                <span className={`text-xs uppercase font-bold block mb-1 ${isLiquidationMode ? 'text-orange-600' : 'text-purple-600'}`}>
+                                    {isLiquidationMode ? 'GIÁ TRỊ THANH LÝ' : 'TỔNG GIÁ TRỊ HĐ'}
+                                </span>
+                                <span className={`text-2xl font-black px-3 py-1 rounded-lg shadow-sm border ${isLiquidationMode ? 'text-orange-700 border-orange-100 bg-orange-100/50' : 'text-purple-700 border-purple-100 bg-white'}`}>
+                                    {displayTotalAmount.toLocaleString('vi-VN')} <span className="text-sm font-medium text-slate-500">VNĐ</span>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -684,24 +711,24 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     {/* ACTION BUTTONS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                         <div className="flex gap-2">
-                            <button type="submit" disabled={loading} className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold text-lg hover:bg-purple-700 shadow-lg shadow-purple-500/30 transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2">
-                                <Save size={20} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU HỢP ĐỒNG')}
+                            {mode === 'contract' ? (
+                                <button type="button" onClick={() => handlePrintClick('contract')} className="flex-1 px-4 py-3 bg-white text-indigo-700 rounded-xl font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 shadow-sm transition-all border border-indigo-200">
+                                    <ExternalLink size={18} /> Mở Hợp đồng
+                                </button>
+                            ) : (
+                                <button type="button" onClick={() => handlePrintClick('liquidation')} className="flex-1 px-4 py-3 bg-white text-green-700 rounded-xl font-bold hover:bg-green-50 flex items-center justify-center gap-2 shadow-sm transition-all border border-green-200">
+                                    <ExternalLink size={18} /> Mở Thanh lý
+                                </button>
+                            )}
+                        </div>
+                        
+                        <div className="flex gap-2">
+                            <button type="submit" disabled={loading} className={`flex-1 text-white py-3 rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/30' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30'}`}>
+                                <Save size={20} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'LƯU THANH LÝ' : 'CẬP NHẬT HỢP ĐỒNG') : 'LƯU HỢP ĐỒNG')}
                             </button>
                             <button type="button" onClick={() => handleReset(false)} className="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors shadow-sm font-bold border border-slate-200" title="Làm mới form">
                                 {initialData ? <X size={20} className="text-red-500" /> : <RotateCcw size={20} />}
                             </button>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                            {mode === 'contract' ? (
-                                <button type="button" onClick={() => handlePrintClick('contract')} className="flex-1 px-4 py-3 bg-white text-indigo-700 rounded-xl font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 shadow-sm transition-all border border-indigo-200">
-                                    <Printer size={18} /> In Hợp đồng
-                                </button>
-                            ) : (
-                                <button type="button" onClick={() => handlePrintClick('liquidation')} className="flex-1 px-4 py-3 bg-white text-green-700 rounded-xl font-bold hover:bg-green-50 flex items-center justify-center gap-2 shadow-sm transition-all border border-green-200">
-                                    <FileCheck size={18} /> In Thanh lý
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>

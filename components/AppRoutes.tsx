@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { RecordFile, Employee, User, UserRole, Holiday } from '../types';
 import { STATUS_LABELS } from '../constants';
@@ -16,6 +17,7 @@ import UtilitiesView from './UtilitiesView';
 import AccountSettingsView from './AccountSettingsView';
 import ReportSection from './ReportSection';
 import RecordRow from './RecordRow';
+import WorkScheduleView from './WorkScheduleView'; // NEW IMPORT
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -359,6 +361,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     users={users}
                     onResetUnread={() => props.setUnreadMessages(0)}
                     notificationEnabled={props.notificationEnabled}
+                />
+            );
+        // CASE WORK_SCHEDULE MỚI
+        case 'work_schedule':
+            return (
+                <WorkScheduleView 
+                    currentUser={currentUser}
                 />
             );
         case 'personal_profile':

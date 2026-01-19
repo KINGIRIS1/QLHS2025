@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter } from 'lucide-react';
+import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter, CalendarDays, Calendar } from 'lucide-react';
 
 interface DashboardViewProps {
     records: RecordFile[];
@@ -12,6 +12,12 @@ interface DashboardViewProps {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
 
 const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
+    // State chọn chế độ xem: Năm, Tháng, Tuần
+    const [viewMode, setViewMode] = useState<'year' | 'month' | 'week'>('year');
+    
+    // State chọn năm (cho chế độ Year)
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
     // 1. Tự động xác định danh sách các năm có trong dữ liệu
     const availableYears = useMemo(() => {
         const years = new Set<number>();
@@ -24,62 +30,82 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                 if (!isNaN(y)) years.add(y);
             }
         });
-        // Sắp xếp giảm dần (năm mới nhất lên đầu)
         return Array.from(years).sort((a, b) => b - a);
     }, [records]);
 
-    // State lưu năm đang chọn (Mặc định là năm đầu tiên trong danh sách - năm mới nhất)
-    const [selectedYear, setSelectedYear] = useState<number>(availableYears[0]);
-
-    // Cập nhật selectedYear khi availableYears thay đổi (ví dụ khi load dữ liệu xong)
-    useEffect(() => {
-        if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
-            setSelectedYear(availableYears[0]);
-        }
-    }, [availableYears, selectedYear]);
-
-    // 2. Lọc dữ liệu theo năm đã chọn
-    const recordsInYear = useMemo(() => {
+    // 2. Lọc dữ liệu theo chế độ xem
+    const filteredRecords = useMemo(() => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        
         return records.filter(r => {
             if (!r.receivedDate) return false;
-            return new Date(r.receivedDate).getFullYear() === selectedYear;
+            const rDate = new Date(r.receivedDate);
+            
+            if (viewMode === 'year') {
+                return rDate.getFullYear() === selectedYear;
+            } else if (viewMode === 'month') {
+                // Tháng này (của năm hiện tại)
+                return rDate.getFullYear() === currentYear && rDate.getMonth() === currentMonth;
+            } else if (viewMode === 'week') {
+                // Tuần này (Tính từ Thứ 2 đầu tuần)
+                const day = now.getDay();
+                const diff = now.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+                const monday = new Date(now);
+                monday.setHours(0,0,0,0);
+                monday.setDate(diff);
+                
+                const nextSunday = new Date(monday);
+                nextSunday.setDate(monday.getDate() + 6);
+                nextSunday.setHours(23,59,59,999);
+                
+                return rDate >= monday && rDate <= nextSunday;
+            }
+            return false;
         });
-    }, [records, selectedYear]);
+    }, [records, selectedYear, viewMode]);
 
-    // 3. Tính toán thống kê cho năm đã chọn
-    const total = recordsInYear.length;
-    const completed = recordsInYear.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED).length;
-    const withdrawn = recordsInYear.filter(r => r.status === RecordStatus.WITHDRAWN).length;
+    // 3. Tính toán thống kê
+    const total = filteredRecords.length;
+    const completed = filteredRecords.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED).length;
+    const withdrawn = filteredRecords.filter(r => r.status === RecordStatus.WITHDRAWN).length;
     const processing = total - completed - withdrawn;
 
     // --- Data cho Biểu đồ Địa bàn (Xã/Phường) ---
     const wardData = useMemo(() => {
         const counts: Record<string, number> = {};
-        recordsInYear.forEach(r => {
+        filteredRecords.forEach(r => {
             const w = getNormalizedWard(r.ward) || 'Khác';
             counts[w] = (counts[w] || 0) + 1;
         });
         return Object.entries(counts)
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value); 
-    }, [recordsInYear]);
+    }, [filteredRecords]);
 
     // --- Data cho Biểu đồ Loại hồ sơ ---
     const typeData = useMemo(() => {
         const counts: Record<string, number> = {};
-        recordsInYear.forEach(r => {
+        filteredRecords.forEach(r => {
             const t = getShortRecordType(r.recordType);
             counts[t] = (counts[t] || 0) + 1;
         });
         return Object.entries(counts)
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
-    }, [recordsInYear]);
+    }, [filteredRecords]);
+
+    const getTitle = () => {
+        if (viewMode === 'week') return "Tuần này";
+        if (viewMode === 'month') return `Tháng ${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+        return `Năm ${selectedYear}`;
+    };
 
     return (
         <div className="h-full overflow-y-auto space-y-4 md:space-y-6 p-2 flex flex-col custom-scrollbar">
             
-            {/* HEADER: BỘ ĐẾM NĂM */}
+            {/* HEADER */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0 sticky top-0 z-10">
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="bg-blue-600 text-white p-2 rounded-lg shadow-blue-200 shadow-md">
@@ -87,34 +113,47 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                     </div>
                     <div>
                         <h2 className="text-lg font-bold text-gray-800">Tổng quan tình hình</h2>
-                        <p className="text-xs text-gray-500 font-medium">Thống kê dữ liệu tự động theo năm</p>
+                        <p className="text-xs text-gray-500 font-medium">Thống kê dữ liệu: <span className="text-blue-600 font-bold">{getTitle()}</span></p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200 w-full md:w-auto justify-between md:justify-start">
-                    <div className="px-3 py-1 text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Filter size={14} /> <span className="hidden md:inline">Chọn năm:</span>
-                    </div>
-                    <select 
-                        value={selectedYear} 
-                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="bg-white border border-slate-300 text-gray-800 text-sm font-bold rounded-md focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none cursor-pointer hover:border-blue-400 transition-colors shadow-sm min-w-[100px] flex-1 md:flex-none"
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button 
+                        onClick={() => setViewMode('week')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${viewMode === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        {availableYears.map(year => (
-                            <option key={year} value={year}>Năm {year}</option>
-                        ))}
-                    </select>
+                        <CalendarDays size={14} /> Tuần này
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('month')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${viewMode === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <Calendar size={14} /> Tháng này
+                    </button>
+                    <div className="h-4 w-px bg-slate-300 mx-1"></div>
+                    <div className="flex items-center gap-1 px-1">
+                        <span className={`text-xs font-bold ${viewMode === 'year' ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setViewMode('year')}>Năm:</span>
+                        <select 
+                            value={selectedYear} 
+                            onChange={(e) => { setSelectedYear(parseInt(e.target.value)); setViewMode('year'); }}
+                            className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer hover:text-blue-600 transition-colors"
+                        >
+                            {availableYears.map(year => (
+                                <option key={year} value={year}>{year}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            {/* CARDS: THỐNG KÊ CHI TIẾT - Responsive Grid */}
+            {/* CARDS: THỐNG KÊ CHI TIẾT */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
                     <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:opacity-20 transition-all duration-300 transform rotate-12 z-0">
                         <FileText size={80} className="text-blue-600" />
                     </div>
                     <div className="relative z-10">
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Tổng nhận {selectedYear}</p>
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Tổng nhận</p>
                         <h3 className="text-4xl font-black text-gray-800 mt-2">{total}</h3>
                         <p className="text-[10px] text-blue-600 font-medium mt-1">Hồ sơ</p>
                     </div>
@@ -175,7 +214,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                 {/* CHART 1: Thống kê theo Địa bàn */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col h-[400px]">
                     <h3 className="text-sm font-bold text-gray-800 mb-4 shrink-0 flex items-center gap-2 uppercase tracking-wide">
-                        <MapPin size={18} className="text-blue-600" /> Phân bố theo địa bàn ({selectedYear})
+                        <MapPin size={18} className="text-blue-600" /> Phân bố theo địa bàn ({getTitle()})
                     </h3>
                     <div className="flex-1 min-h-0 w-full relative">
                         {wardData.length > 0 ? (
@@ -195,7 +234,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                             </div>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                <p>Chưa có dữ liệu năm {selectedYear}</p>
+                                <p>Chưa có dữ liệu {getTitle()}</p>
                             </div>
                         )}
                     </div>
@@ -204,7 +243,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                 {/* CHART 2: Phân loại Hồ sơ */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col h-[400px]">
                     <h3 className="text-sm font-bold text-gray-800 mb-4 shrink-0 flex items-center gap-2 uppercase tracking-wide">
-                        <Layers size={18} className="text-purple-600" /> Loại hình hồ sơ ({selectedYear})
+                        <Layers size={18} className="text-purple-600" /> Loại hình hồ sơ ({getTitle()})
                     </h3>
                     <div className="w-full flex-1 min-h-0 relative">
                         {typeData.length > 0 ? (
@@ -236,7 +275,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records }) => {
                             </div>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                <p>Chưa có dữ liệu năm {selectedYear}</p>
+                                <p>Chưa có dữ liệu {getTitle()}</p>
                             </div>
                         )}
                     </div>

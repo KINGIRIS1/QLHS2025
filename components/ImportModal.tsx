@@ -217,18 +217,47 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.deadline = calculateDeadline(record.recordType, record.receivedDate);
             }
 
-            // 4. TRẠNG THÁI & NGƯỜI XỬ LÝ
+            // 4. THÔNG TIN XUẤT (QUAN TRỌNG CHO VIỆC TỰ ĐỘNG HANDOVER)
+            const exportBatchRaw = getVal(['ĐỢT', 'BATCH']);
+            if (exportBatchRaw !== undefined) {
+                const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');
+                if (numStr) record.exportBatch = parseInt(numStr, 10);
+            }
+
+            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'NGÀY TRẢ']);
+            if (exportDateRaw !== undefined) {
+                record.exportDate = parseExcelDate(exportDateRaw);
+            }
+
+            // 5. TRẠNG THÁI & NGƯỜI XỬ LÝ
+            // Logic ưu tiên: Nếu có ngày xuất/đợt -> HANDOVER. Ngược lại mới xét cột Trạng Thái.
+            let explicitStatus: RecordStatus | undefined = undefined;
+
+            // Kiểm tra cột trạng thái từ Excel trước
             const statusRaw = getVal(['TRẠNG THÁI', 'STATUS']);
             if (statusRaw !== undefined) {
                 let sStr = String(statusRaw).toUpperCase();
-                let st = RecordStatus.RECEIVED;
-                if (sStr.includes('GIAO') || sStr.includes('ASSIGNED')) st = RecordStatus.ASSIGNED;
-                else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) st = RecordStatus.IN_PROGRESS;
-                else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING')) st = RecordStatus.PENDING_SIGN;
-                else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED')) st = RecordStatus.SIGNED;
-                else if (sStr.includes('XONG') || sStr.includes('HOÀN THÀNH') || sStr.includes('HANDOVER')) st = RecordStatus.HANDOVER;
-                record.status = st;
+                if (sStr.includes('GIAO') || sStr.includes('ASSIGNED')) explicitStatus = RecordStatus.ASSIGNED;
+                else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) explicitStatus = RecordStatus.IN_PROGRESS;
+                else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING')) explicitStatus = RecordStatus.PENDING_SIGN;
+                else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED')) explicitStatus = RecordStatus.SIGNED;
+                else if (sStr.includes('XONG') || sStr.includes('HOÀN THÀNH') || sStr.includes('HANDOVER')) explicitStatus = RecordStatus.HANDOVER;
+            }
+
+            // LOGIC TỰ ĐỘNG CHUYỂN TRẠNG THÁI (Override)
+            if (record.exportBatch || record.exportDate) {
+                // Nếu có thông tin xuất -> Chắc chắn là Đã Giao
+                record.status = RecordStatus.HANDOVER;
+                
+                // Nếu chưa có ngày hoàn thành, lấy ngày xuất làm ngày hoàn thành
+                if (!record.completedDate && record.exportDate) {
+                    record.completedDate = record.exportDate.split('T')[0];
+                }
+            } else if (explicitStatus) {
+                // Nếu không có thông tin xuất, dùng trạng thái từ Excel
+                record.status = explicitStatus;
             } else if (mode === 'create') {
+                // Mặc định cho tạo mới
                 record.status = RecordStatus.RECEIVED;
             }
 
@@ -238,28 +267,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 if (emp) {
                     record.assignedTo = emp.id;
                     if (mode === 'create') record.assignedDate = record.receivedDate;
-                }
-            }
-
-            // 5. THÔNG TIN XUẤT (QUAN TRỌNG CHO CÂU HỎI CỦA BẠN)
-            const exportBatchRaw = getVal(['ĐỢT', 'BATCH']);
-            if (exportBatchRaw !== undefined) {
-                const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');
-                if (numStr) record.exportBatch = parseInt(numStr, 10);
-            }
-
-            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE']);
-            if (exportDateRaw !== undefined) {
-                record.exportDate = parseExcelDate(exportDateRaw);
-            }
-
-            // LOGIC TỰ ĐỘNG CHUYỂN TRẠNG THÁI
-            // Nếu có Ngày Xuất hoặc Đợt Xuất -> Tự động coi là Đã Xong (HANDOVER)
-            if ((record.exportBatch || record.exportDate) && (!record.status || record.status !== RecordStatus.HANDOVER)) {
-                record.status = RecordStatus.HANDOVER;
-                // Nếu chưa có ngày hoàn thành thì lấy luôn ngày xuất làm ngày hoàn thành
-                if (!record.completedDate && record.exportDate) {
-                    record.completedDate = record.exportDate.split('T')[0];
                 }
             }
 
@@ -335,7 +342,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                             <ul className="list-disc pl-5 mt-1 space-y-1">
                                 <li>Hệ thống tìm hồ sơ theo <strong>Mã Hồ Sơ</strong>.</li>
                                 <li>Chỉ cập nhật các cột <strong>CÓ</strong> trong file Excel (VD: chỉ có cột Ngày Xuất thì chỉ cập nhật Ngày Xuất).</li>
-                                <li>Các cột <strong>KHÔNG CÓ</strong> trong file Excel sẽ được <strong>GIỮ NGUYÊN</strong> (không bị xóa trắng).</li>
+                                <li><strong>QUAN TRỌNG:</strong> Nếu có cột "Đợt" hoặc "Ngày xuất/Ngày trả", hệ thống sẽ tự động chuyển trạng thái sang "Đã giao 1 cửa" để không bị báo trễ hạn.</li>
                             </ul>
                         </div>
                     </>
@@ -368,7 +375,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                             <th className="p-3 border-b">#</th>
                             <th className="p-3 border-b">Mã HS</th>
                             <th className="p-3 border-b">Chủ Sử Dụng</th>
-                            <th className="p-3 border-b">Trạng Thái (Mới)</th>
+                            <th className="p-3 border-b">Trạng Thái (Dự kiến)</th>
                             <th className="p-3 border-b">Ngày Xuất</th>
                             <th className="p-3 border-b">Đợt</th>
                             <th className="p-3 border-b">Ghi Chú</th>
@@ -380,7 +387,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                                 <td className="p-3">{idx + 1}</td>
                                 <td className="p-3 font-medium text-blue-600">{record.code}</td>
                                 <td className="p-3 font-medium text-gray-500">{record.customerName || <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
-                                <td className="p-3">{record.status ? <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-bold">{record.status}</span> : <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
+                                <td className="p-3">{record.status ? <span className={`text-xs px-2 py-1 rounded-full font-bold ${record.status === RecordStatus.HANDOVER ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{record.status}</span> : <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
                                 <td className="p-3 font-mono text-green-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
                                 <td className="p-3 font-bold">{record.exportBatch || '-'}</td>
                                 <td className="p-3 text-gray-500 italic truncate max-w-[200px]">{record.content}</td>

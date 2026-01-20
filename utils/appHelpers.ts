@@ -71,8 +71,7 @@ export const DEFAULT_VISIBLE_COLUMNS = {
 
 // --- CÁC HÀM CHECK LOGIC ---
 export const isRecordOverdue = (record: RecordFile): boolean => {
-  // Danh sách các trạng thái coi như "Đã hoàn thành" hoặc "Dừng theo dõi"
-  // Bổ sung: RETURNED (Đã trả), SIGNED (Đã ký - coi như xong việc chuyên môn)
+  // 1. Kiểm tra trạng thái "Đã xong"
   const completedStatuses = [
       RecordStatus.HANDOVER,
       RecordStatus.RETURNED,
@@ -81,6 +80,12 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
   ];
 
   if (completedStatuses.includes(record.status)) return false;
+  
+  // 2. [QUAN TRỌNG] Kiểm tra dữ liệu thực tế (Fix lỗi trạng thái chưa cập nhật)
+  // Nếu đã có ngày xuất (đã giao 1 cửa) hoặc đã có ngày trả kết quả -> Coi như đã xong -> Không quá hạn
+  if (record.exportDate || record.exportBatch || record.resultReturnedDate) {
+      return false;
+  }
   
   if (!record.deadline) return false;
   const today = new Date();
@@ -99,6 +104,12 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
   ];
 
   if (completedStatuses.includes(record.status)) return false;
+  
+  // Kiểm tra dữ liệu thực tế: Nếu đã xong thì không báo sắp đến hạn
+  if (record.exportDate || record.exportBatch || record.resultReturnedDate) {
+      return false;
+  }
+
   if (isRecordOverdue(record)) return false;
   
   if (!record.deadline) return false;

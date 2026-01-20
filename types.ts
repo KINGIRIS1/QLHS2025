@@ -31,6 +31,7 @@ export interface Employee {
   id: string;
   name: string;
   department: string;
+  position?: string; // MỚI: Tách riêng chức vụ
   managedWards: string[];
 }
 

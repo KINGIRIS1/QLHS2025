@@ -8,7 +8,7 @@ interface AccountSettingsModalProps {
   onClose: () => void;
   currentUser: User;
   linkedEmployee: Employee | undefined;
-  onUpdate: (data: { name: string; password?: string; department?: string }) => Promise<boolean>;
+  onUpdate: (data: { name: string; password?: string; department?: string; position?: string }) => Promise<boolean>;
 }
 
 const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ 
@@ -24,6 +24,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   // Form State
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
+  const [position, setPosition] = useState('');
   
   // Password State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -37,6 +38,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     if (isOpen) {
       setName(currentUser.name);
       setDepartment(linkedEmployee?.department || '');
+      setPosition(linkedEmployee?.position || '');
       // Reset password fields
       setCurrentPassword('');
       setNewPassword('');
@@ -57,16 +59,17 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     setIsLoading(true);
 
     try {
-        const updateData: { name: string; password?: string; department?: string } = {
+        const updateData: { name: string; password?: string; department?: string; position?: string } = {
             name: name.trim()
         };
 
         // Validate Info
         if (!updateData.name) throw new Error("Tên hiển thị không được để trống.");
 
-        // Handle Department update if linked
+        // Handle Department/Position update if linked
         if (linkedEmployee) {
             updateData.department = department.trim();
+            updateData.position = position.trim();
         }
 
         // Handle Password Change
@@ -177,34 +180,50 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                                 value={name}
                                 disabled={isLoading}
                                 onChange={(e) => setName(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-400"
                                 placeholder="Nhập tên hiển thị..."
                             />
                             <UserIcon size={16} className="absolute left-3 top-3 text-gray-400" />
                         </div>
                     </div>
                     {linkedEmployee ? (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Phòng ban / Chức vụ</label>
-                            <div className="relative">
-                                <input 
-                                    type="text" 
-                                    value={department}
-                                    disabled={isLoading}
-                                    onChange={(e) => setDepartment(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400"
-                                    placeholder="Nhập phòng ban..."
-                                />
-                                <Briefcase size={16} className="absolute left-3 top-3 text-gray-400" />
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Phòng ban</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        value={department}
+                                        disabled={isLoading}
+                                        onChange={(e) => setDepartment(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                                        placeholder="Nhập phòng ban..."
+                                    />
+                                    <Briefcase size={16} className="absolute left-3 top-3 text-gray-400" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Chức vụ</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        value={position}
+                                        disabled={isLoading}
+                                        onChange={(e) => setPosition(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                                        placeholder="Nhập chức vụ..."
+                                    />
+                                    <UserIcon size={16} className="absolute left-3 top-3 text-gray-400" />
+                                </div>
                             </div>
                             <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
                                 <CheckCircle size={12} /> Đã liên kết với hồ sơ nhân viên.
                             </p>
-                        </div>
+                        </>
                     ) : (
                         <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
                             <p className="text-xs text-orange-700">
-                                Tài khoản này chưa liên kết với hồ sơ nhân viên nên không thể chỉnh sửa Phòng ban tại đây.
+                                Tài khoản này chưa liên kết với hồ sơ nhân viên nên không thể chỉnh sửa Phòng ban/Chức vụ tại đây.
                             </p>
                         </div>
                     )}

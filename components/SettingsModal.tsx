@@ -27,7 +27,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   // Thay đổi: Dùng Tab
   const [activeTab, setActiveTab] = useState<'list' | 'detail'>('list');
-  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: '', managedWards: [] });
+  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: '', position: '', managedWards: [] });
   const [isNew, setIsNew] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,7 +35,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
       if(isOpen) {
           setActiveTab('list');
-          setEditingEmployee({ id: '', name: '', department: '', managedWards: [] });
+          setEditingEmployee({ id: '', name: '', department: '', position: '', managedWards: [] });
           setIsNew(true);
       }
   }, [isOpen]);
@@ -62,7 +62,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setEditingEmployee({ 
           id: `NV${Math.floor(Math.random()*1000)}`, 
           name: '', 
-          department: '', 
+          department: '',
+          position: '',
           managedWards: [] 
       });
       setIsNew(true);
@@ -97,10 +98,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // --- IMPORT EXCEL LOGIC ---
   const handleDownloadSample = () => {
-      const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "PHỤ TRÁCH"];
+      const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "CHỨC VỤ", "PHỤ TRÁCH"];
       const data = [
-          ["NV001", "Trần Văn B", "Kỹ thuật", "Minh Hưng, Nha Bích"],
-          ["NV002", "Lê Thị C", "Văn phòng", ""],
+          ["NV001", "Trần Văn B", "Kỹ thuật", "Trưởng phòng", "Minh Hưng, Nha Bích"],
+          ["NV002", "Lê Thị C", "Văn phòng", "Nhân viên", ""],
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       const wb = XLSX.utils.book_new();
@@ -128,12 +129,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
            
            const id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '');
            const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '');
-           const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['CHỨC VỤ'] || normalizedRow['DEPARTMENT'] || '');
+           const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['DEPARTMENT'] || '');
+           const position = String(normalizedRow['CHỨC VỤ'] || normalizedRow['POSITION'] || '');
            const wardsRaw = String(normalizedRow['PHỤ TRÁCH'] || normalizedRow['XÃ PHƯỜNG'] || normalizedRow['KHU VỰC'] || '');
 
            if (id && name) {
                const managedWards = wardsRaw.split(',').map(w => w.trim()).filter(w => w);
-               onSaveEmployee({ id, name, department, managedWards });
+               onSaveEmployee({ id, name, department, position, managedWards });
                count++;
            }
         });
@@ -218,12 +220,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <h3 className="font-bold text-gray-800 text-base">{emp.name}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border">{emp.id}</span>
+                                                    {emp.position && <span className="text-xs text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{emp.position}</span>}
                                                     <span className="text-xs text-gray-500 font-medium">{emp.department}</span>
                                                 </div>
                                             </div>
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
                                                 {emp.name.charAt(0).toUpperCase()}
                                             </div>
                                         </div>
@@ -299,14 +302,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         placeholder="Ví dụ: Nguyễn Văn A"
                                     />
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Phòng ban / Chức vụ</label>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Phòng ban</label>
                                     <input 
                                         type="text" 
                                         value={editingEmployee.department || ''}
                                         onChange={(e) => handleChange('department', e.target.value)}
                                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                         placeholder="Ví dụ: Phòng Kỹ Thuật"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Chức vụ</label>
+                                    <input 
+                                        type="text" 
+                                        value={editingEmployee.position || ''}
+                                        onChange={(e) => handleChange('position', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                        placeholder="Ví dụ: Trưởng phòng"
                                     />
                                 </div>
                             </div>

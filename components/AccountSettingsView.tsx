@@ -6,7 +6,7 @@ import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Load
 interface AccountSettingsViewProps {
   currentUser: User;
   linkedEmployee: Employee | undefined;
-  onUpdate: (data: { name: string; password?: string; department?: string }) => Promise<boolean>;
+  onUpdate: (data: { name: string; password?: string; department?: string; position?: string }) => Promise<boolean>;
   notificationEnabled: boolean; // Prop mới
   setNotificationEnabled: (enabled: boolean) => void; // Prop mới
 }
@@ -24,6 +24,7 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
   // Form State
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
+  const [position, setPosition] = useState('');
   
   // Password State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -40,6 +41,7 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
     // Load dữ liệu khi component được mount
     setName(currentUser.name);
     setDepartment(linkedEmployee?.department || '');
+    setPosition(linkedEmployee?.position || '');
   }, [currentUser, linkedEmployee]);
 
   // Cuộn lên đầu khi có thông báo mới (Không tự động tắt nữa)
@@ -64,7 +66,7 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
     setIsLoading(true);
 
     try {
-        const updateData: { name: string; password?: string; department?: string } = {
+        const updateData: { name: string; password?: string; department?: string; position?: string } = {
             name: name.trim()
         };
 
@@ -74,6 +76,7 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
         // Handle Department update if linked
         if (linkedEmployee) {
             updateData.department = department.trim();
+            updateData.position = position.trim();
         }
 
         // Handle Password Change
@@ -221,23 +224,39 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
                                 </div>
 
                                 {linkedEmployee ? (
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Phòng ban / Chức vụ</label>
-                                        <div className="relative">
-                                            <input 
-                                                type="text" 
-                                                value={department}
-                                                disabled={isLoading}
-                                                onChange={(e) => setDepartment(e.target.value)}
-                                                className="w-full border border-gray-300 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
-                                                placeholder="Nhập phòng ban..."
-                                            />
-                                            <Briefcase size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Phòng ban</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="text" 
+                                                    value={department}
+                                                    disabled={isLoading}
+                                                    onChange={(e) => setDepartment(e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
+                                                    placeholder="Nhập phòng ban..."
+                                                />
+                                                <Briefcase size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Chức vụ</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="text" 
+                                                    value={position}
+                                                    disabled={isLoading}
+                                                    onChange={(e) => setPosition(e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
+                                                    placeholder="Nhập chức vụ..."
+                                                />
+                                                <UserIcon size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                                            </div>
                                         </div>
                                         <p className="text-sm text-green-600 mt-2 flex items-center gap-1 font-medium bg-green-50 w-fit px-2 py-1 rounded">
                                             <CheckCircle size={14} /> Tài khoản đã liên kết với hồ sơ nhân sự.
                                         </p>
-                                    </div>
+                                    </>
                                 ) : (
                                     <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 flex items-start gap-3">
                                         <AlertCircle className="text-orange-600 shrink-0" size={20} />

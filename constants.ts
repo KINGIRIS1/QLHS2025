@@ -109,18 +109,21 @@ export const MOCK_EMPLOYEES: Employee[] = [
     id: 'emp1', 
     name: 'Nguyễn Văn A', 
     department: 'Phòng Kỹ thuật', 
+    position: 'Trưởng phòng',
     managedWards: ['Minh Hưng'] 
   },
   { 
     id: 'emp2', 
     name: 'Trần Thị B', 
     department: 'Phòng Pháp chế', 
+    position: 'Chuyên viên',
     managedWards: ['Nha Bích', 'Chơn Thành'] 
   },
   { 
     id: 'emp3', 
     name: 'Lê Văn C', 
     department: 'Ban Lãnh đạo', 
+    position: 'Phó Giám Đốc',
     managedWards: [] 
   },
 ];

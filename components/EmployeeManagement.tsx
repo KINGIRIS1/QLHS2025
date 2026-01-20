@@ -21,7 +21,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   currentUser
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'detail'>('list');
-  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: '', managedWards: [] });
+  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: '', position: '', managedWards: [] });
   const [isNew, setIsNew] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,7 +38,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       onDeleteEmployee(id);
       if (editingEmployee.id === id) {
           setActiveTab('list');
-          setEditingEmployee({ id: '', name: '', department: '', managedWards: [] });
+          setEditingEmployee({ id: '', name: '', department: '', position: '', managedWards: [] });
       }
     }
   };
@@ -54,6 +54,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           id: `NV${Math.floor(Math.random()*1000)}`, 
           name: '', 
           department: '', 
+          position: '',
           managedWards: [] 
       });
       setIsNew(true);
@@ -88,10 +89,10 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   // --- IMPORT EXCEL LOGIC ---
   const handleDownloadSample = () => {
-      const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "PHỤ TRÁCH"];
+      const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "CHỨC VỤ", "PHỤ TRÁCH"];
       const data = [
-          ["NV001", "Trần Văn B", "Kỹ thuật", "Minh Hưng, Nha Bích"],
-          ["NV002", "Lê Thị C", "Văn phòng", ""],
+          ["NV001", "Trần Văn B", "Kỹ thuật", "Trưởng phòng", "Minh Hưng, Nha Bích"],
+          ["NV002", "Lê Thị C", "Văn phòng", "Nhân viên", ""],
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       const wb = XLSX.utils.book_new();
@@ -120,11 +121,12 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
            const id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '');
            const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '');
            const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['CHỨC VỤ'] || normalizedRow['DEPARTMENT'] || '');
+           const position = String(normalizedRow['CHỨC VỤ'] || normalizedRow['POSITION'] || '');
            const wardsRaw = String(normalizedRow['PHỤ TRÁCH'] || normalizedRow['XÃ PHƯỜNG'] || normalizedRow['KHU VỰC'] || '');
 
            if (id && name) {
                const managedWards = wardsRaw.split(',').map(w => w.trim()).filter(w => w);
-               onSaveEmployee({ id, name, department, managedWards });
+               onSaveEmployee({ id, name, department, position, managedWards });
                count++;
            }
         });
@@ -143,7 +145,8 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const filteredEmployees = employees.filter(emp => 
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     emp.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.department.toLowerCase().includes(searchTerm.toLowerCase())
+    emp.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.position && emp.position.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -183,7 +186,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input 
                                 type="text" 
-                                placeholder="Tìm tên, mã nhân viên, phòng ban..." 
+                                placeholder="Tìm tên, mã nhân viên, phòng ban, chức vụ..." 
                                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -232,8 +235,9 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                         </div>
                                         
                                         <h3 className="font-bold text-gray-800 text-base mb-1 truncate" title={emp.name}>{emp.name}</h3>
-                                        <div className="flex items-center gap-2 mb-3">
+                                        <div className="flex items-center gap-2 mb-3 flex-wrap">
                                             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200 font-mono">{emp.id}</span>
+                                            {emp.position && <span className="text-xs text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{emp.position}</span>}
                                             <span className="text-xs text-gray-500 font-medium truncate" title={emp.department}>{emp.department}</span>
                                         </div>
                                         
@@ -299,14 +303,24 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                         placeholder="Ví dụ: Nguyễn Văn A"
                                     />
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Phòng ban / Chức vụ</label>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Phòng ban</label>
                                     <input 
                                         type="text" 
                                         value={editingEmployee.department || ''}
                                         onChange={(e) => handleChange('department', e.target.value)}
                                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                         placeholder="Ví dụ: Phòng Kỹ Thuật"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Chức vụ</label>
+                                    <input 
+                                        type="text" 
+                                        value={editingEmployee.position || ''}
+                                        onChange={(e) => handleChange('position', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                        placeholder="Ví dụ: Trưởng phòng"
                                     />
                                 </div>
                             </div>

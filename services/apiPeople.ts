@@ -2,7 +2,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { Employee, User } from '../types';
 import { MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, mapEmployeeFromDb, mapEmployeeToDb } from './apiCore';
 
 // --- EMPLOYEES ---
 export const fetchEmployees = async (): Promise<Employee[]> => {
@@ -10,8 +10,9 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
     try {
         const { data, error } = await supabase.from('employees').select('*');
         if (error) throw error;
-        saveToCache(CACHE_KEYS.EMPLOYEES, data);
-        return data as Employee[];
+        const mapped = data.map(mapEmployeeFromDb);
+        saveToCache(CACHE_KEYS.EMPLOYEES, mapped);
+        return mapped;
     } catch (error) {
         logError("fetchEmployees", error);
         return getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
@@ -21,14 +22,15 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
 export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Promise<Employee | null> => {
     if (!isConfigured) return employee;
     try {
+        const payload = mapEmployeeToDb(employee);
         if (isUpdate) {
-            const { data, error } = await supabase.from('employees').update(employee).eq('id', employee.id).select();
+            const { data, error } = await supabase.from('employees').update(payload).eq('id', employee.id).select();
             if (error) throw error;
-            return data?.[0] as Employee;
+            return data?.[0] ? mapEmployeeFromDb(data[0]) : null;
         } else {
-            const { data, error } = await supabase.from('employees').insert([employee]).select();
+            const { data, error } = await supabase.from('employees').insert([payload]).select();
             if (error) throw error;
-            return data?.[0] as Employee;
+            return data?.[0] ? mapEmployeeFromDb(data[0]) : null;
         }
     } catch (error) {
         logError("saveEmployeeApi", error);

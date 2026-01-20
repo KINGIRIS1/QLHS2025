@@ -1,6 +1,6 @@
 
 import { supabase, isConfigured } from './supabaseClient';
-import { Contract, PriceItem } from '../types';
+import { Contract, PriceItem, Employee } from '../types';
 import { API_BASE_URL } from '../constants'; 
 
 // --- CACHE KEYS ---
@@ -191,7 +191,7 @@ export const mapContractToDb = (c: Contract) => ({
     created_date: c.createdDate,
     status: c.status,
     liquidation_area: c.liquidationArea,
-    liquidation_amount: c.liquidationAmount // Map trường mới
+    liquidation_amount: c.liquidationAmount
 });
 
 export const mapContractFromDb = (c: any): Contract => ({
@@ -220,7 +220,23 @@ export const mapContractFromDb = (c: any): Contract => ({
     createdDate: c.created_date || c.createdDate,
     status: c.status,
     liquidationArea: c.liquidation_area || c.liquidationArea,
-    liquidationAmount: c.liquidation_amount || c.liquidationAmount // Map trường mới
+    liquidationAmount: c.liquidation_amount || c.liquidationAmount
+});
+
+export const mapEmployeeToDb = (e: Employee) => ({
+    id: e.id,
+    name: e.name,
+    department: e.department,
+    position: e.position,
+    managed_wards: e.managedWards // Map camel to snake case for DB
+});
+
+export const mapEmployeeFromDb = (e: any): Employee => ({
+    id: e.id,
+    name: e.name,
+    department: e.department,
+    position: e.position,
+    managedWards: e.managed_wards || e.managedWards || []
 });
 
 export const mapPriceFromDb = (item: any): PriceItem => ({

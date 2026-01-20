@@ -53,6 +53,17 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
 
+  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
+  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút), coi như là Đã giao 1 cửa
+  const getDisplayStatus = (r: RecordFile) => {
+      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED) {
+          return RecordStatus.HANDOVER;
+      }
+      return r.status;
+  };
+  
+  const displayStatus = getDisplayStatus(record);
+
   // Class chung cho các ô: Căn trên (align-top)
   const cellClass = "p-3 align-top";
 
@@ -211,7 +222,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     <span className="text-[10px] font-normal">{resultReturnedDateStr}</span>
                 </span>
             ) : (
-                <div className="transform origin-top pt-1"><StatusBadge status={record.status} /></div> 
+                <div className="transform origin-top pt-1"><StatusBadge status={displayStatus} /></div> 
             )}
             
             {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}
@@ -239,13 +250,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
           <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
             <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Xem chi tiết"><Eye size={16} /></button>
             
-            {onReturnResult && (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+            {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
                 <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded transition-colors" title="Trả kết quả">
                     <FileCheck size={16} />
                 </button>
             )}
 
-            {record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && (
+            {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && (
               <button onClick={() => onAdvanceStatus(record)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Chuyển bước"><ArrowRight size={16} /></button>
             )}
             <button onClick={() => onEdit(record)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa"><Pencil size={16} /></button>

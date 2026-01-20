@@ -84,6 +84,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
     }
     
+    // LOGIC QUAN TRỌNG: Nếu có Đợt xuất hoặc Ngày xuất thì phải là HANDOVER (trừ khi Đã rút hoặc Đã trả)
+    if ((finalData.exportBatch || finalData.exportDate) && finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED) {
+        finalData.status = RecordStatus.HANDOVER;
+        // Nếu chưa có completedDate, lấy luôn ngày xuất (nếu có) hoặc hôm nay
+        if (!finalData.completedDate) {
+            finalData.completedDate = finalData.exportDate ? finalData.exportDate.split('T')[0] : new Date().toISOString().split('T')[0];
+        }
+    }
+
     // Để đảm bảo gửi null thay vì undefined cho API nếu cần xóa
     const cleanData = JSON.parse(JSON.stringify(finalData));
     if(finalData.status === RecordStatus.RECEIVED) {
@@ -148,7 +157,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
                                 
-                                {(formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.RETURNED) && (
+                                {(formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.RETURNED || formData.exportBatch) && (
                                     <div><label className="block text-xs font-bold text-green-700 mb-1">{formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : 'Ngày hoàn thành'}</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-800" value={val(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} /></div>
                                 )}
                                 
@@ -178,7 +187,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     </div>
                 </div>
 
-                {/* 3. VỊ TRÍ & THỬA ĐẤT */}
+                {/* 3. Vị Trí & Thửa Đất (Giữ nguyên) */}
                 <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">
                     <h3 className="text-sm font-bold text-blue-800 uppercase mb-4 flex items-center gap-2 border-b pb-2"><MapPin size={16} /> Vị trí & Thửa đất</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -206,6 +215,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích lục</label><input type="text" className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value={val(formData.excerptNumber)} onChange={(e) => handleChange('excerptNumber', e.target.value)} /></div>
                             <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Giao nhân viên xử lý</label><select className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value={val(formData.assignedTo)} onChange={(e) => handleChange('assignedTo', e.target.value)}><option value="">-- Chưa giao --</option>{employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>)}</select></div>
                         </div>
+                        {/* QUAN TRỌNG: Hiển thị thông tin xuất đợt */}
+                        {hasAdminRights && (
+                            <div className="grid grid-cols-2 gap-4 bg-indigo-50 p-3 rounded border border-indigo-200">
+                                <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Đợt xuất (Batch)</label><input type="number" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', parseInt(e.target.value))} /></div>
+                                <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Ngày xuất</label><input type="date" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', e.target.value)} /></div>
+                            </div>
+                        )}
+                        
                         {canEditResult && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { RecordFile, Employee, User, UserRole, Contract, SplitItem } from '../types';
+import { RecordFile, Employee, User, UserRole, Contract, SplitItem, RecordStatus } from '../types';
 import { STATUS_LABELS, getNormalizedWard } from '../constants';
 import StatusBadge from './StatusBadge';
 import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell, Receipt, DollarSign, CheckCircle2, Circle, Clock, ArrowDown, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator } from 'lucide-react';
@@ -356,6 +356,15 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
       </div>
   );
 
+  // LOGIC HIỂN THỊ STATUS
+  const getDisplayStatus = (r: RecordFile) => {
+      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED) {
+          return RecordStatus.HANDOVER;
+      }
+      return r.status;
+  };
+  const displayStatus = getDisplayStatus(record);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto flex flex-col animate-fade-in-up">
@@ -367,7 +376,7 @@ const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, empl
               <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
                 {record.code}
               </span>
-              <StatusBadge status={record.status} />
+              <StatusBadge status={displayStatus} />
             </div>
             <h2 className="text-xl font-bold text-gray-800">{record.recordType}</h2>
           </div>

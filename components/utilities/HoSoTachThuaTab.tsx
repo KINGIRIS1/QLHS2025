@@ -35,8 +35,13 @@ interface DetailData {
     TO_CU: string; THUA_CU: string; DT_CU: string; LOAI_DAT_CU: string;
     // Sau BĐ
     TO_MOI: string; THUA_TAM: string; THUA_CHINH_THUC: string; DT_MOI: string; LOAI_DAT_MOI: string;
+    
+    // Mục đích sử dụng (MỚI)
+    DT_ODT: string; // Đất ở (Nhập)
+    DT_CLN: string; // Đất NN (Tự tính)
+
     // Thông tin bổ sung
-    THONG_TIN_QH: string; // Cột mới: Thông tin quy hoạch/Diện tích thu hồi
+    THONG_TIN_QH: string; 
     
     TONG_DT: string; 
 }
@@ -50,7 +55,8 @@ const DEFAULT_COMMON: CommonData = {
 const DEFAULT_DETAIL: DetailData = {
     TO_CU: '', THUA_CU: '', DT_CU: '', LOAI_DAT_CU: '',
     TO_MOI: '', THUA_TAM: '', THUA_CHINH_THUC: '', DT_MOI: '', LOAI_DAT_MOI: '',
-    THONG_TIN_QH: '', // Init
+    DT_ODT: '', DT_CLN: '', // Init
+    THONG_TIN_QH: '', 
     TONG_DT: ''
 };
 
@@ -99,7 +105,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const firstRow = detailRows[0];
         const sourceThua = firstRow.THUA_CU;
         // Tính số thứ tự tiếp theo (Dựa trên số dòng hiện tại + 1)
-        // Ví dụ: Đang có 1 dòng (123-1), thêm dòng mới sẽ là 123-2
         const nextIndex = detailRows.length + 1;
 
         const newDetail: DetailData = {
@@ -124,12 +129,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     const handleRemoveDetailRow = (index: number) => {
         if (detailRows.length === 1) {
-            // Nếu chỉ còn 1 dòng thì reset data chứ không xóa hẳn (để giữ form)
             setDetailRows([{ ...DEFAULT_DETAIL }]); 
         } else {
-            // Nếu xóa dòng đầu tiên (index 0), cần chuyển dữ liệu dòng 0 xuống các dòng sau hoặc reset nếu cần.
-            // Tuy nhiên, logic đơn giản là xóa dòng đó đi.
-            // Vì detailRows lưu trữ data đầy đủ cho mỗi dòng nên xóa index 0 thì index 1 sẽ lên thay thế.
             setDetailRows(prev => prev.filter((_, i) => i !== index));
         }
     };
@@ -137,6 +138,18 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
     const handleDetailChange = (index: number, field: keyof DetailData, value: string) => {
         const newRows = [...detailRows];
         newRows[index] = { ...newRows[index], [field]: value };
+
+        // LOGIC TỰ ĐỘNG TÍNH TOÁN ĐẤT NN (DT_CLN)
+        // Khi thay đổi DT_MOI (Tổng DT thửa mới) hoặc DT_ODT (Đất ở)
+        if (field === 'DT_MOI' || field === 'DT_ODT') {
+            const dtMoi = parseFloat(field === 'DT_MOI' ? value : newRows[index].DT_MOI) || 0;
+            const dtOdt = parseFloat(field === 'DT_ODT' ? value : newRows[index].DT_ODT) || 0;
+            
+            // Đất NN = Tổng - Đất ở (Nếu âm thì bằng 0)
+            const dtCln = Math.max(0, dtMoi - dtOdt);
+            // Làm tròn 1 số thập phân nếu cần, hoặc giữ nguyên
+            newRows[index].DT_CLN = dtCln > 0 ? Number(dtCln.toFixed(1)).toString() : ''; 
+        }
 
         // LOGIC TỰ ĐỘNG ĐỒNG BỘ:
         // Nếu thay đổi các trường "Trước biến động" ở dòng đầu tiên (index 0), 
@@ -159,7 +172,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             // 2. Tự động lấy Tờ Mới từ Tờ Cũ
             if (field === 'TO_CU') {
                 newRows[index].TO_MOI = value;
-                // Đồng bộ TO_MOI cho các dòng dưới nếu chúng chưa có dữ liệu hoặc đang giống cũ
+                // Đồng bộ TO_MOI cho các dòng dưới
                 for (let i = 1; i < newRows.length; i++) {
                     if (!newRows[i].TO_MOI) newRows[i].TO_MOI = value;
                 }
@@ -167,7 +180,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             // 3. Tổng diện tích cuối bằng diện tích thửa đất trước biến động
             if (field === 'DT_CU') {
                 newRows[index].TONG_DT = value;
-                // Đồng bộ TONG_DT cho các dòng dưới
                 for (let i = 1; i < newRows.length; i++) {
                     newRows[i].TONG_DT = value;
                 }
@@ -189,34 +201,31 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             }));
 
             const sourceThua = found.landPlot || '';
+            const areaStr = found.area ? found.area.toString() : '';
             
             // Dữ liệu cho dòng mới hoặc dòng hiện tại
             const newDetail: DetailData = {
                 ...DEFAULT_DETAIL,
                 TO_CU: found.mapSheet || '',
                 THUA_CU: sourceThua,
-                DT_CU: found.area ? found.area.toString() : '',
+                DT_CU: areaStr,
                 
                 // Sau biến động
                 TO_MOI: found.mapSheet || '',
                 THUA_TAM: sourceThua ? `${sourceThua}-1` : '',
-                DT_MOI: '', 
+                DT_MOI: '', // Để trống để nhập tách thửa
                 LOAI_DAT_MOI: '',
                 THUA_CHINH_THUC: '',
                 
-                TONG_DT: found.area ? found.area.toString() : '',
+                DT_ODT: '',
+                DT_CLN: '', // Sẽ tính sau khi nhập DT_MOI
+                
+                TONG_DT: areaStr,
                 THONG_TIN_QH: ''
             };
 
-            // Nếu đang có 1 dòng trống thì điền vào đó
-            if (detailRows.length === 1 && !detailRows[0].TO_CU && !detailRows[0].THUA_CU) {
-                setDetailRows([newDetail]);
-            } else {
-                // Nếu đã có dữ liệu, hỏi user hoặc thêm mới. Ở đây ta ghi đè dòng đầu tiên để làm gốc tách thửa
-                // Vì logic tách thửa thường là 1 gốc -> nhiều mới.
-                // Reset về 1 dòng gốc
-                setDetailRows([newDetail]);
-            }
+            // Reset về 1 dòng gốc
+            setDetailRows([newDetail]);
             
             notify(`Đã lấy dữ liệu từ hồ sơ: ${found.code}`, 'success');
             setSearchQuery('');
@@ -260,7 +269,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             }
         }
         
-        // 1. Xóa cũ nếu đang sửa
         if (editingGroupId) {
             const oldRecords = savedList.filter(r => r.data.SO_HD === editingGroupId);
             for (const rec of oldRecords) {
@@ -268,9 +276,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             }
         }
 
-        // 2. Insert mới
         let successCount = 0;
-        // Lọc bỏ dòng trống hoàn toàn nếu có
         const validRows = detailRows.filter(r => r.TO_CU || r.THUA_CU || r.TO_MOI || r.THUA_CHINH_THUC);
         
         if (validRows.length === 0) {
@@ -320,6 +326,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const details: DetailData[] = groupRecords.map(r => ({
             TO_CU: r.data.TO_CU, THUA_CU: r.data.THUA_CU, DT_CU: r.data.DT_CU, LOAI_DAT_CU: r.data.LOAI_DAT_CU,
             TO_MOI: r.data.TO_MOI, THUA_TAM: r.data.THUA_TAM, THUA_CHINH_THUC: r.data.THUA_CHINH_THUC, DT_MOI: r.data.DT_MOI, LOAI_DAT_MOI: r.data.LOAI_DAT_MOI,
+            DT_ODT: r.data.DT_ODT || '', DT_CLN: r.data.DT_CLN || '',
             THONG_TIN_QH: r.data.THONG_TIN_QH || '',
             TONG_DT: r.data.TONG_DT
         }));
@@ -347,15 +354,10 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         setSearchQuery('');
     };
 
-    // --- SELECTION LOGIC ---
     const toggleSelectGroup = (soHD: string) => {
         if (!soHD) return;
         const newSet = new Set(selectedGroups);
-        if (newSet.has(soHD)) {
-            newSet.delete(soHD);
-        } else {
-            newSet.add(soHD);
-        }
+        if (newSet.has(soHD)) newSet.delete(soHD); else newSet.add(soHD);
         setSelectedGroups(newSet);
     };
 
@@ -364,27 +366,20 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         groupedList.forEach(item => {
             if (item.data.SO_HD) allGroups.add(item.data.SO_HD);
         });
-
-        if (selectedGroups.size === allGroups.size) {
-            setSelectedGroups(new Set()); 
-        } else {
-            setSelectedGroups(allGroups); 
-        }
+        if (selectedGroups.size === allGroups.size) setSelectedGroups(new Set()); 
+        else setSelectedGroups(allGroups); 
     };
 
-    // --- TRANSFER / REVERT LOGIC ---
     const handleChangeStatus = async (targetStatus: 'pending' | 'sent') => {
         if (selectedGroups.size === 0) {
             notify("Vui lòng chọn ít nhất 1 hồ sơ.", 'error');
             return;
         }
-
         const actionName = targetStatus === 'sent' ? 'LẬP DANH SÁCH (Chuyển đi)' : 'HUỶ DANH SÁCH (Trả lại)';
         if (!(await confirmAction(`Bạn có chắc chắn muốn ${actionName} cho ${selectedGroups.size} hồ sơ đã chọn?`))) return;
 
         setIsSaving(true);
         let count = 0;
-
         const recordsToUpdate = savedList.filter(r => r.data.SO_HD && selectedGroups.has(r.data.SO_HD));
 
         for (const rec of recordsToUpdate) {
@@ -399,17 +394,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         notify(`Đã cập nhật trạng thái cho ${count} dòng dữ liệu.`, 'success');
     };
 
-    // --- GROUPING & FILTERING LOGIC ---
     const groupedList = useMemo(() => {
         let list = savedList;
-
-        // 1. Filter by Tab (Status)
         list = list.filter(item => {
             const status = item.data.STATUS || 'pending';
             return status === listTab;
         });
-
-        // 2. Filter by Search
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
             list = list.filter(item => 
@@ -418,8 +408,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 (item.data.SO_HD || '').toLowerCase().includes(lower)
             );
         }
-
-        // 3. Sort by SO_HD
         list.sort((a, b) => {
             const hdA = a.data.SO_HD || '';
             const hdB = b.data.SO_HD || '';
@@ -428,27 +416,17 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             if (!hdB) return -1;
             return hdA.localeCompare(hdB);
         });
-
         return list;
     }, [savedList, searchTerm, listTab]);
 
     const getRowSpan = (index: number, field: string) => {
         const current = groupedList[index];
         const prev = groupedList[index - 1];
-        
         if (!current.data.SO_HD) return 1;
-
-        if (prev && prev.data.SO_HD === current.data.SO_HD) {
-            return 0; // Đã được gộp
-        }
-
+        if (prev && prev.data.SO_HD === current.data.SO_HD) return 0; 
         let count = 1;
         for (let i = index + 1; i < groupedList.length; i++) {
-            if (groupedList[i].data.SO_HD === current.data.SO_HD) {
-                count++;
-            } else {
-                break;
-            }
+            if (groupedList[i].data.SO_HD === current.data.SO_HD) count++; else break;
         }
         return count;
     };
@@ -456,22 +434,14 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
     const getGroupSTT = (index: number) => {
         const current = groupedList[index];
         if (!current.data.SO_HD) return index + 1;
-
         let firstIdx = index;
-        while(firstIdx > 0 && groupedList[firstIdx - 1].data.SO_HD === current.data.SO_HD) {
-            firstIdx--;
-        }
-        
+        while(firstIdx > 0 && groupedList[firstIdx - 1].data.SO_HD === current.data.SO_HD) firstIdx--;
         let groupCount = 0;
         let i = 0;
         while (i < firstIdx) {
             groupCount++;
             const hd = groupedList[i].data.SO_HD;
-            if (hd) {
-                while (i < firstIdx && groupedList[i].data.SO_HD === hd) i++;
-            } else {
-                i++;
-            }
+            if (hd) { while (i < firstIdx && groupedList[i].data.SO_HD === hd) i++; } else i++;
         }
         return groupCount + 1;
     }
@@ -483,33 +453,32 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const ws = XLSX.utils.aoa_to_sheet([]);
 
         const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ TÁCH THỬA CHỜ LẬP" : "DANH SÁCH HỒ SƠ TÁCH THỬA ĐÃ CHUYỂN";
-        // Cập nhật header cho Excel với cột mới
-        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Thông tin QH / DT thu hồi", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
-        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", "", ""];
+        
+        // Cập nhật Header cho Excel
+        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "TT Quy hoạch", "Mục đích SDĐ", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
+        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "Đất ở (m2)", "Đất NN (m2)", "", "", "", ""];
 
         XLSX.utils.sheet_add_aoa(ws, [
-            [title],
-            [""],
-            header1,
-            header2
+            [title], [""]
         ], { origin: "A1" });
+        
+        XLSX.utils.sheet_add_aoa(ws, [header1, header2], { origin: "A3" });
 
         const dataRows: any[] = [];
         const merges: any[] = [];
-        const totalCols = 15; // 0-15 = 16 cols
+        const totalCols = 17; // 0-17 = 18 cols
         
         merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }); 
-        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // STT
-        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Xã
-        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ (4 cols)
-        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ (5 cols)
         
-        // Merge các cột đơn lẻ còn lại ở header
-        for (let c = 11; c <= totalCols; c++) {
-            merges.push({ s: { r: 2, c: c }, e: { r: 3, c: c } });
-        }
+        // Merge Header Row 3 & 4
+        const simpleMerge = [0, 1, 11, 14, 15, 16, 17]; // STT, Xã, TTQH, TongDT, CanCu, SoHD, GhiChu
+        simpleMerge.forEach(c => merges.push({ s: { r: 2, c }, e: { r: 3, c } }));
+        
+        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ
+        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
+        merges.push({ s: { r: 2, c: 12 }, e: { r: 2, c: 13 } }); // Mục đích SD
 
-        let currentRow = 4;
+        let currentRow = 5;
 
         for (let i = 0; i < groupedList.length; i++) {
             const item = groupedList[i];
@@ -521,7 +490,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
-                d.THONG_TIN_QH, // Cột mới
+                d.THONG_TIN_QH, 
+                d.DT_ODT, d.DT_CLN, // Mới: Đất ở, Đất NN
                 d.TONG_DT,
                 span > 0 ? d.CAN_CU_PHAP_LY : '', 
                 span > 0 ? d.SO_HD : '',          
@@ -529,9 +499,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             ]);
 
             if (span > 1) {
-                // Merge common cols: STT(0), Xa(1), CanCu(13), SoHD(14), GhiChu(15)
+                // Merge common cols: STT(0), Xa(1), CanCu(15), SoHD(16), GhiChu(17)
                 // CỘNG THÊM: Merge cột Trước Biến Động (Tờ(2), Thửa(3), DT(4), Loại đất(5))
-                [0, 1, 2, 3, 4, 5, 13, 14, 15].forEach(colIdx => {
+                [0, 1, 2, 3, 4, 5, 15, 16, 17].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
             }
@@ -558,7 +528,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
                 // Center align: STT, Tờ, Thửa, Số HĐ
-                if ([0, 2, 3, 6, 7, 8, 14].includes(c)) ws[ref].s = centerStyle;
+                if ([0, 2, 3, 6, 7, 8, 16].includes(c)) ws[ref].s = centerStyle;
                 else ws[ref].s = cellStyle;
             }
         }
@@ -568,6 +538,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
             { wch: 20 }, // Thông tin QH
+            { wch: 10 }, { wch: 10 }, // Đất ở, Đất NN
             { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 20 }
         ];
 
@@ -650,29 +621,35 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
                         {/* 2. BODY: DETAIL LIST TABLE */}
                         <div className="flex-1 overflow-auto bg-white relative">
-                            <table className="w-full border-collapse min-w-[1200px]">
+                            <table className="w-full border-collapse min-w-[1400px]">
                                 <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 z-10 shadow-sm">
                                     <tr>
                                         <th className="p-2 border w-10 bg-gray-200">#</th>
                                         <th colSpan={4} className="p-2 border text-center bg-blue-50 text-blue-800">Thông tin Trước Biến Động</th>
                                         <th colSpan={5} className="p-2 border text-center bg-green-50 text-green-800">Thông tin Sau Biến Động (Tách Thửa)</th>
-                                        <th className="p-2 border w-40 bg-yellow-50 text-yellow-800">TT Quy hoạch / Thu hồi</th>
+                                        <th className="p-2 border w-32 bg-yellow-50 text-yellow-800">TT Quy hoạch</th>
+                                        <th colSpan={2} className="p-2 border w-32 bg-purple-50 text-purple-800">Mục đích SD (m2)</th>
                                         <th className="p-2 border w-24 bg-gray-200">Tổng DT</th>
                                         <th className="p-2 border w-10 bg-gray-200">Xóa</th>
                                     </tr>
                                     <tr>
                                         <th className="bg-gray-200 border"></th>
-                                        <th className="p-2 border w-16 text-center bg-blue-50">Tờ</th>
-                                        <th className="p-2 border w-16 text-center bg-blue-50">Thửa</th>
+                                        <th className="p-2 border w-14 text-center bg-blue-50">Tờ</th>
+                                        <th className="p-2 border w-14 text-center bg-blue-50">Thửa</th>
                                         <th className="p-2 border w-20 text-center bg-blue-50">DT (m2)</th>
                                         <th className="p-2 border w-20 text-center bg-blue-50">Loại đất</th>
                                         
-                                        <th className="p-2 border w-16 text-center bg-green-50">Tờ</th>
-                                        <th className="p-2 border w-16 text-center bg-green-50">Thửa Tạm</th>
-                                        <th className="p-2 border w-20 text-center bg-green-50 text-green-700">Thửa CT</th>
+                                        <th className="p-2 border w-14 text-center bg-green-50">Tờ</th>
+                                        <th className="p-2 border w-14 text-center bg-green-50">Thửa Tạm</th>
+                                        <th className="p-2 border w-16 text-center bg-green-50 text-green-700">Thửa CT</th>
                                         <th className="p-2 border w-20 text-center bg-green-50">DT (m2)</th>
                                         <th className="p-2 border w-20 text-center bg-green-50">Loại đất</th>
+                                        
                                         <th className="p-2 border bg-yellow-50"></th>
+                                        
+                                        <th className="p-2 border w-16 text-center bg-purple-50 text-purple-800">Đất ở</th>
+                                        <th className="p-2 border w-16 text-center bg-purple-50 text-purple-800">Đất NN</th>
+
                                         <th className="bg-gray-200 border"></th>
                                         <th className="bg-gray-200 border"></th>
                                     </tr>
@@ -700,7 +677,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                 </>
                                             ) : null}
 
-                                            {/* SAU */}
+                                            {/* SAU BIẾN ĐỘNG */}
                                             <td className="border p-0"><input className={detailInputClass} value={row.TO_MOI} onChange={e => handleDetailChange(idx, 'TO_MOI', e.target.value)} /></td>
                                             <td className="border p-0"><input className={detailInputClass} value={row.THUA_TAM} onChange={e => handleDetailChange(idx, 'THUA_TAM', e.target.value)} /></td>
                                             <td className="border p-0"><input className={`${detailInputClass} font-bold text-green-700 bg-green-50/30`} value={row.THUA_CHINH_THUC} onChange={e => handleDetailChange(idx, 'THUA_CHINH_THUC', e.target.value)} /></td>
@@ -709,6 +686,10 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
                                             {/* THONG TIN QH */}
                                             <td className="border p-0"><input className={`${detailInputClass} bg-yellow-50/30 text-left px-2`} value={row.THONG_TIN_QH || ''} onChange={e => handleDetailChange(idx, 'THONG_TIN_QH', e.target.value)} placeholder="..." /></td>
+
+                                            {/* MỤC ĐÍCH SỬ DỤNG (MỚI) */}
+                                            <td className="border p-0"><input className={`${detailInputClass} bg-purple-50/30 text-purple-800`} value={row.DT_ODT || ''} onChange={e => handleDetailChange(idx, 'DT_ODT', e.target.value)} placeholder="Nhập..." /></td>
+                                            <td className="border p-0 bg-gray-50"><input className={`${detailInputClass} bg-transparent text-gray-600 font-medium`} value={row.DT_CLN || ''} readOnly /></td>
 
                                             {/* TỔNG DT - GỘP Ô */}
                                             {idx === 0 ? (
@@ -723,7 +704,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         </tr>
                                     ))}
                                     <tr>
-                                        <td colSpan={13} className="p-2 border-t bg-gray-50">
+                                        <td colSpan={15} className="p-2 border-t bg-gray-50">
                                             <button onClick={handleAddDetailRow} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mx-auto px-3 py-1 bg-white border border-blue-200 rounded-full shadow-sm hover:shadow">
                                                 <Plus size={14}/> Thêm dòng thửa đất
                                             </button>
@@ -742,7 +723,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <td className={`p-2 text-center border-r border-gray-200 ${calculateTotals.isMismatch ? 'text-red-600' : 'text-green-600'}`}>
                                             {calculateTotals.totalAfter}
                                         </td>
-                                        <td colSpan={3} className="p-2 text-left">
+                                        <td colSpan={5} className="p-2 text-left">
                                             {calculateTotals.isMismatch ? (
                                                 <span className="text-xs text-red-500 flex items-center gap-1 animate-pulse">
                                                     <AlertTriangle size={14}/> Lệch {calculateTotals.diff} m²

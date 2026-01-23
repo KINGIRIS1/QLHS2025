@@ -259,27 +259,58 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
-    // --- GENERATE OWNERS HTML (LOGIC MỚI) ---
-    // Sử dụng mảng OWNERS nếu có, nếu không fallback về HO + TEN_CHU cũ
-    // Hiển thị Địa chỉ riêng cho từng chủ
-    let ownersHtml = "";
+    // --- GENERATE OWNERS HTML (LOGIC MỚI: TÁCH BIỆT 2 PHẦN) ---
+    // 1. Full (Có địa chỉ) - Dùng cho phần đầu "Tại khu đất của..."
+    let ownersHtmlFull = "";
+    // 2. Simple (Không địa chỉ) - Dùng cho phần "Đại diện chủ sử dụng"
+    let ownersHtmlSimple = "";
+
     if (formData.OWNERS && formData.OWNERS.length > 0) {
-        ownersHtml = formData.OWNERS.map((o: any) => {
+        
+        // 1. Generate Full HTML (Với logic tách dòng địa chỉ vợ/chồng nếu có)
+        ownersHtmlFull = formData.OWNERS.map((o: any) => {
+            let html = "";
+            
+            // Dòng chủ sở hữu chính
+            html += `<p style="margin-bottom: 5px;">${o.title}: <b>${o.name.toUpperCase()}</b></p>`;
+            
+            // Dòng địa chỉ chủ sở hữu chính (Luôn hiện nếu có)
+            if (o.address) {
+                html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>`;
+            }
+
+            // Nếu có vợ/chồng
+            if (o.hasSpouse) {
+                // Dòng tên vợ/chồng (Bắt đầu bằng "Và...")
+                html += `<p style="margin-bottom: 5px;">Và ${o.spouseTitle.toLowerCase()}: <b>${o.spouseName.toUpperCase()}</b></p>`;
+                
+                // Dòng địa chỉ vợ/chồng
+                // Ưu tiên địa chỉ riêng (spouseAddress), nếu không có thì lấy địa chỉ chung (address)
+                const spAddr = o.spouseAddress ? o.spouseAddress : o.address;
+                if (spAddr) {
+                    html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${spAddr}</p>`;
+                }
+            }
+            return html;
+        }).join('');
+
+        // 2. Generate Simple HTML (Vẫn giữ nguyên gộp dòng: "Ông A và Bà B")
+        ownersHtmlSimple = formData.OWNERS.map((o: any) => {
             let line = `${o.title}: <b>${o.name.toUpperCase()}</b>`;
             if (o.hasSpouse) {
                 line += ` và ${o.spouseTitle}: <b>${o.spouseName.toUpperCase()}</b>`;
             }
-            // Thêm dòng địa chỉ ngay dưới tên chủ (nếu có)
-            let addressLine = o.address ? `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>` : '';
-            
-            return `<p style="margin-bottom: 5px;">${line}</p>${addressLine}`;
+            return `<p style="margin-bottom: 5px;">${line}</p>`;
         }).join('');
+
     } else {
-        // Fallback
-        ownersHtml = `<p style="margin-bottom: 5px;">${formData.HO}: <b>${toTitleCase(formData.TEN_CHU)}</b></p>`;
-        // Fallback địa chỉ chung nếu không có danh sách owners chi tiết
+        // Fallback cho dữ liệu cũ (chưa có mảng OWNERS)
+        const line = `${formData.HO}: <b>${toTitleCase(formData.TEN_CHU)}</b>`;
+        ownersHtmlSimple = `<p style="margin-bottom: 5px;">${line}</p>`;
+        
+        ownersHtmlFull = `<p style="margin-bottom: 5px;">${line}</p>`;
         if (formData.DIA_CHI_CHU) {
-            ownersHtml += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${formData.DIA_CHI_CHU}</p>`;
+            ownersHtmlFull += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${formData.DIA_CHI_CHU}</p>`;
         }
     }
 
@@ -517,7 +548,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
         <p style="margin-bottom: 8px;">Hôm nay, vào lúc ${gioLap} giờ ${phutLap} phút, ngày ${ngayLap} tháng ${thangLap} năm ${namLap},</p>
         <p style="margin-bottom: 8px;">Tại khu đất của:</p>
-        ${ownersHtml}
+        ${ownersHtmlFull}
         
         <p style="margin-bottom: 5px;"><b>A. THÀNH PHẦN GỒM:</b></p>
         <p style="margin-bottom: 5px;"><b>I. Đại diện Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành:</b></p>
@@ -527,7 +558,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         ${phongKTSection}
 
         <p style="margin-bottom: 5px;"><b>${formData.HIEN_THI_PHONG_KT ? 'III' : 'II'}. Đại diện chủ sử dụng đất:</b></p>
-        ${ownersHtml}
+        ${ownersHtmlSimple}
         
         <p style="margin-bottom: 5px;">Và các hộ sử dụng đất liền kề:</p>
         <p style="margin-bottom: 15px;">${formData.HO_GIAP_RANH}</p>

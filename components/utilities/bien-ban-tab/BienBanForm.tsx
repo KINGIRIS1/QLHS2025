@@ -18,10 +18,11 @@ interface OwnerData {
     id: string;
     title: string;
     name: string;
-    address: string; // Thêm trường địa chỉ riêng
+    address: string; 
     hasSpouse: boolean;
     spouseTitle: string;
     spouseName: string;
+    spouseAddress?: string; // Thêm địa chỉ vợ/chồng
 }
 
 const DIRECTIONS = ['Bắc', 'Đông', 'Nam', 'Tây'];
@@ -75,7 +76,8 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                 address: formData.DIA_CHI_CHU || '', 
                 hasSpouse: false,
                 spouseTitle: 'Bà',
-                spouseName: ''
+                spouseName: '',
+                spouseAddress: ''
             }]);
         } else if (owners.length === 0) {
             // Mặc định 1 dòng trống
@@ -86,7 +88,8 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                 address: '',
                 hasSpouse: false,
                 spouseTitle: 'Bà',
-                spouseName: ''
+                spouseName: '',
+                spouseAddress: ''
             }]);
         }
     }, []); // Chỉ chạy 1 lần khi mount để tránh loop
@@ -122,7 +125,8 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
             address: lastAddress, 
             hasSpouse: false,
             spouseTitle: 'Bà',
-            spouseName: ''
+            spouseName: '',
+            spouseAddress: ''
         }]);
     };
 
@@ -136,6 +140,7 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
             newOwners[0].address = '';
             newOwners[0].hasSpouse = false;
             newOwners[0].spouseName = '';
+            newOwners[0].spouseAddress = '';
             setOwners(newOwners);
         }
     };
@@ -151,6 +156,8 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
         newOwners[index].hasSpouse = !newOwners[index].hasSpouse;
         if (newOwners[index].hasSpouse) {
             newOwners[index].spouseTitle = newOwners[index].title === 'Ông' ? 'Bà' : 'Ông';
+            // Mặc định địa chỉ vợ/chồng giống địa chỉ chủ (để trống để placeholder hiển thị)
+            if(!newOwners[index].spouseAddress) newOwners[index].spouseAddress = '';
         }
         setOwners(newOwners);
     };
@@ -349,6 +356,15 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                                         placeholder="Nhập tên..."
                                     />
                                 </div>
+                                <div className="col-span-12 mt-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Địa chỉ thường trú</label>
+                                    <input
+                                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] font-medium bg-white outline-none"
+                                        value={owner.address}
+                                        onChange={e => updateOwner(idx, 'address', e.target.value)}
+                                        placeholder="Nhập địa chỉ..."
+                                    />
+                                </div>
                             </div>
 
                             {/* Nút thêm vợ/chồng */}
@@ -385,21 +401,17 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                                             placeholder="Nhập tên vợ/chồng..."
                                         />
                                     </div>
+                                    <div className="col-span-12 mt-1">
+                                        <label className="text-[10px] font-bold text-pink-400 uppercase block mb-1">Địa chỉ vợ/chồng (Nếu khác)</label>
+                                        <input
+                                            className="w-full border border-pink-200 rounded-lg px-3 py-1.5 text-[13px] font-medium bg-white outline-none"
+                                            value={owner.spouseAddress}
+                                            onChange={e => updateOwner(idx, 'spouseAddress', e.target.value)}
+                                            placeholder="Để trống nếu cùng địa chỉ với chồng/vợ..."
+                                        />
+                                    </div>
                                 </div>
                             )}
-
-                            {/* ĐỊA CHỈ THƯỜNG TRÚ CỦA CHỦ NÀY */}
-                            <div className="mt-2 pt-2 border-t border-slate-200/50">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 flex items-center gap-1">
-                                    <MapPin size={12} /> Địa chỉ thường trú
-                                </label>
-                                <input 
-                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] bg-white outline-none" 
-                                    value={owner.address} 
-                                    onChange={e => updateOwner(idx, 'address', e.target.value)} 
-                                    placeholder={`Nhập địa chỉ của ${owner.title} ${owner.name}...`}
-                                />
-                            </div>
                         </div>
                     ))}
                 </div>
@@ -519,7 +531,7 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                         {row.objectName === 'Đường' && (<div className="col-span-3"><div className="relative"><input className="w-full border border-blue-300 rounded-lg px-1 py-1 text-[12px] text-center font-bold text-blue-600 bg-blue-50" value={row.roadNumber} onChange={e => updateBoundaryRow(row.id, 'roadNumber', e.target.value)} placeholder="Tên/Số..." /><div className="absolute -top-3 left-1 text-[9px] font-black text-blue-500 bg-white px-0.5 whitespace-nowrap">TÊN ĐƯỜNG/SỐ</div></div></div>)}
                         <div className={row.objectName === 'Đường' ? 'col-span-2' : 'col-span-3'}><input className="w-full border border-slate-200 rounded-lg px-1 py-1 text-[12px] text-center outline-none" value={row.adjacentPlot} onChange={e => updateBoundaryRow(row.id, 'adjacentPlot', e.target.value)} placeholder="Thửa" /></div>
                         <div className="col-span-2"><input className="w-full border border-purple-200 rounded-lg px-1 py-1 text-[12px] text-center outline-none bg-white font-bold text-purple-700" value={row.mapSheet} onChange={e => updateBoundaryRow(row.id, 'mapSheet', e.target.value)} placeholder="Tờ" /></div>
-                        <div className={row.objectName === 'Đường' ? 'col-span-3' : 'col-span-3'}><input className="w-full border border-slate-200 rounded-lg px-1 py-1 text-[12px] font-bold text-blue-600 text-center outline-none" value={row.area} onChange={e => updateBoundaryRow(row.id, 'area', e.target.value)} placeholder="DT" /></div>
+                        <div className="col-span-3"><input className="w-full border border-slate-200 rounded-lg px-1 py-1 text-[12px] font-bold text-blue-600 text-center outline-none" value={row.area} onChange={e => updateBoundaryRow(row.id, 'area', e.target.value)} placeholder="DT" /></div>
                     </div>
                     </div>
                 ))}

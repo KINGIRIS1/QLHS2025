@@ -96,7 +96,30 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     // --- LOGIC FORM ---
     const handleAddDetailRow = () => {
-        setDetailRows(prev => [...prev, { ...DEFAULT_DETAIL }]);
+        const firstRow = detailRows[0];
+        const sourceThua = firstRow.THUA_CU;
+        // Tính số thứ tự tiếp theo (Dựa trên số dòng hiện tại + 1)
+        // Ví dụ: Đang có 1 dòng (123-1), thêm dòng mới sẽ là 123-2
+        const nextIndex = detailRows.length + 1;
+
+        const newDetail: DetailData = {
+            ...DEFAULT_DETAIL,
+            // Tự động sao chép thông tin từ dòng đầu tiên (Phần Trước Biến Động)
+            TO_CU: firstRow.TO_CU, 
+            THUA_CU: firstRow.THUA_CU, 
+            LOAI_DAT_CU: firstRow.LOAI_DAT_CU,
+            // Diện tích cũ thường chỉ ghi ở dòng 1 hoặc chia nhỏ, ở đây để trống để user tự nhập nếu cần
+            DT_CU: '', 
+
+            // Phần Sau Biến Động
+            TO_MOI: firstRow.TO_MOI || firstRow.TO_CU, // Tờ mới thường giống tờ cũ
+            // Tự động sinh số thửa tạm: [Thửa Cũ]-[STT]
+            THUA_TAM: sourceThua ? `${sourceThua}-${nextIndex}` : '', 
+            
+            LOAI_DAT_MOI: firstRow.LOAI_DAT_MOI || firstRow.LOAI_DAT_CU // Gợi ý loại đất
+        };
+        
+        setDetailRows(prev => [...prev, newDetail]);
     };
 
     const handleRemoveDetailRow = (index: number) => {
@@ -110,6 +133,17 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
     const handleDetailChange = (index: number, field: keyof DetailData, value: string) => {
         const newRows = [...detailRows];
         newRows[index] = { ...newRows[index], [field]: value };
+
+        // LOGIC TỰ ĐỘNG CHO DÒNG ĐẦU TIÊN
+        if (index === 0 && field === 'THUA_CU') {
+            // Nếu nhập Thửa Cũ ở dòng 1 -> Tự động điền Thửa Tạm dòng 1 là [Thửa Cũ]-1
+            // Chỉ điền nếu Thửa Tạm đang trống hoặc đang theo format cũ để tránh ghi đè sửa đổi của user
+            const currentTam = newRows[index].THUA_TAM;
+            if (!currentTam || (value && currentTam.includes('-1'))) {
+                 newRows[index].THUA_TAM = value ? `${value}-1` : '';
+            }
+        }
+
         setDetailRows(newRows);
     };
 
@@ -124,12 +158,18 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 SO_HD: found.code
             }));
 
+            const sourceThua = found.landPlot || '';
+            
+            // Logic điền thông tin cho dòng đầu tiên hoặc dòng mới
             const newDetail: DetailData = {
                 ...DEFAULT_DETAIL,
                 TO_CU: found.mapSheet || '',
-                THUA_CU: found.landPlot || '',
+                THUA_CU: sourceThua,
                 DT_CU: found.area ? found.area.toString() : '',
-                DT_MOI: found.area ? found.area.toString() : '',
+                // Auto fill Thửa Tạm 123-1 nếu có Thửa Cũ
+                THUA_TAM: sourceThua ? `${sourceThua}-1` : '',
+                
+                DT_MOI: '', // Reset DT mới để user tự chia
                 TONG_DT: found.area ? found.area.toString() : '',
                 TO_MOI: found.mapSheet || '',
             };
@@ -142,6 +182,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 updated[lastIdx] = newDetail;
                 setDetailRows(updated);
             } else {
+                // Nếu thêm vào danh sách đã có, cần tính lại số thứ tự thửa tạm
+                const nextIndex = detailRows.length + 1;
+                newDetail.THUA_TAM = sourceThua ? `${sourceThua}-${nextIndex}` : '';
                 setDetailRows(prev => [...prev, newDetail]);
             }
             
@@ -797,15 +840,11 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                     </td>
                                                 )}
 
-                                                {/* MERGED "BEFORE" COLUMNS (For Tach Thua) */}
-                                                {shouldRenderCommon && (
-                                                    <td className="p-2 border-r text-xs align-middle bg-white" rowSpan={rowSpan}>
-                                                        <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
-                                                        <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
-                                                    </td>
-                                                )}
-
-                                                {/* DETAIL COLUMNS (Always render for "After") */}
+                                                {/* DETAIL COLUMNS (Always render) */}
+                                                <td className="p-2 border-r text-xs">
+                                                    <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
+                                                    <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
+                                                </td>
                                                 <td className="p-2 border-r text-xs">
                                                     <div>Tờ: <b>{item.data.TO_MOI}</b></div>
                                                     <div>Tạm: {item.data.THUA_TAM} <span className="text-gray-300">|</span> CT: <b className="text-green-700">{item.data.THUA_CHINH_THUC}</b></div>

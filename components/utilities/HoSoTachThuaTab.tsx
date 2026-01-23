@@ -134,13 +134,22 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const newRows = [...detailRows];
         newRows[index] = { ...newRows[index], [field]: value };
 
-        // LOGIC TỰ ĐỘNG CHO DÒNG ĐẦU TIÊN
-        if (index === 0 && field === 'THUA_CU') {
-            // Nếu nhập Thửa Cũ ở dòng 1 -> Tự động điền Thửa Tạm dòng 1 là [Thửa Cũ]-1
-            // Chỉ điền nếu Thửa Tạm đang trống hoặc đang theo format cũ để tránh ghi đè sửa đổi của user
-            const currentTam = newRows[index].THUA_TAM;
-            if (!currentTam || (value && currentTam.includes('-1'))) {
-                 newRows[index].THUA_TAM = value ? `${value}-1` : '';
+        // LOGIC TỰ ĐỘNG CHO DÒNG ĐẦU TIÊN (DÒNG GỐC)
+        if (index === 0) {
+            // 1. Tự động điền Thửa Tạm
+            if (field === 'THUA_CU') {
+                const currentTam = newRows[index].THUA_TAM;
+                if (!currentTam || (value && currentTam.includes('-1'))) {
+                     newRows[index].THUA_TAM = value ? `${value}-1` : '';
+                }
+            }
+            // 2. Tự động lấy Tờ Mới từ Tờ Cũ (Yêu cầu mới)
+            if (field === 'TO_CU') {
+                newRows[index].TO_MOI = value;
+            }
+            // 3. Tổng diện tích cuối bằng diện tích thửa đất trước biến động (Yêu cầu mới)
+            if (field === 'DT_CU') {
+                newRows[index].TONG_DT = value;
             }
         }
 
@@ -840,19 +849,21 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                     </td>
                                                 )}
 
-                                                {/* BEFORE CHANGE COLUMNS (Render with RowSpan) */}
-                                                {shouldRenderCommon && (
-                                                    <td className="p-2 border-r text-xs align-middle bg-white" rowSpan={rowSpan}>
-                                                        <div className="text-center font-bold text-gray-700">
-                                                            <div>Tờ: {item.data.TO_CU}</div>
-                                                            <div>Thửa: {item.data.THUA_CU}</div>
-                                                        </div>
-                                                        <div className="text-center mt-1">
-                                                            <div>{item.data.DT_CU} m²</div>
-                                                            <div className="italic text-gray-500">({item.data.LOAI_DAT_CU})</div>
-                                                        </div>
-                                                    </td>
-                                                )}
+                                                {/* DETAIL COLUMNS (Always render for AFTER CHANGE) */}
+                                                <td className="p-2 border-r text-xs align-middle bg-white" rowSpan={rowSpan}>
+                                                    {shouldRenderCommon && (
+                                                        <>
+                                                            <div className="text-center font-bold text-gray-700">
+                                                                <div>Tờ: {item.data.TO_CU}</div>
+                                                                <div>Thửa: {item.data.THUA_CU}</div>
+                                                            </div>
+                                                            <div className="text-center mt-1">
+                                                                <div>{item.data.DT_CU} m²</div>
+                                                                <div className="italic text-gray-500">({item.data.LOAI_DAT_CU})</div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </td>
 
                                                 {/* DETAIL COLUMNS (Always render for AFTER CHANGE) */}
                                                 <td className="p-2 border-r text-xs">

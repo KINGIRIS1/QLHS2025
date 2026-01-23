@@ -104,12 +104,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         const newDetail: DetailData = {
             ...DEFAULT_DETAIL,
-            // Tự động sao chép thông tin từ dòng đầu tiên (Phần Trước Biến Động)
+            // Tự động sao chép thông tin từ dòng đầu tiên (Phần Trước Biến Động) để đồng bộ dữ liệu
             TO_CU: firstRow.TO_CU, 
             THUA_CU: firstRow.THUA_CU, 
             LOAI_DAT_CU: firstRow.LOAI_DAT_CU,
-            // Diện tích cũ thường chỉ ghi ở dòng 1 hoặc chia nhỏ, ở đây để trống để user tự nhập nếu cần
-            DT_CU: '', 
+            DT_CU: firstRow.DT_CU, // Copy luôn diện tích cũ
+            TONG_DT: firstRow.TONG_DT, // Copy tổng DT
 
             // Phần Sau Biến Động
             TO_MOI: firstRow.TO_MOI || firstRow.TO_CU, // Tờ mới thường giống tờ cũ
@@ -124,8 +124,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     const handleRemoveDetailRow = (index: number) => {
         if (detailRows.length === 1) {
+            // Nếu chỉ còn 1 dòng thì reset data chứ không xóa hẳn (để giữ form)
             setDetailRows([{ ...DEFAULT_DETAIL }]); 
         } else {
+            // Nếu xóa dòng đầu tiên (index 0), cần chuyển dữ liệu dòng 0 xuống các dòng sau hoặc reset nếu cần.
+            // Tuy nhiên, logic đơn giản là xóa dòng đó đi.
+            // Vì detailRows lưu trữ data đầy đủ cho mỗi dòng nên xóa index 0 thì index 1 sẽ lên thay thế.
             setDetailRows(prev => prev.filter((_, i) => i !== index));
         }
     };
@@ -134,7 +138,16 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const newRows = [...detailRows];
         newRows[index] = { ...newRows[index], [field]: value };
 
-        // LOGIC TỰ ĐỘNG CHO DÒNG ĐẦU TIÊN (DÒNG GỐC)
+        // LOGIC TỰ ĐỘNG ĐỒNG BỘ:
+        // Nếu thay đổi các trường "Trước biến động" ở dòng đầu tiên (index 0), 
+        // thì cập nhật cho TẤT CẢ các dòng khác.
+        if (index === 0 && ['TO_CU', 'THUA_CU', 'DT_CU', 'LOAI_DAT_CU', 'TONG_DT'].includes(field)) {
+            for (let i = 1; i < newRows.length; i++) {
+                newRows[i] = { ...newRows[i], [field]: value };
+            }
+        }
+
+        // LOGIC TỰ ĐỘNG CỤ THỂ CHO DÒNG ĐẦU TIÊN
         if (index === 0) {
             // 1. Tự động điền Thửa Tạm
             if (field === 'THUA_CU') {
@@ -143,13 +156,21 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                      newRows[index].THUA_TAM = value ? `${value}-1` : '';
                 }
             }
-            // 2. Tự động lấy Tờ Mới từ Tờ Cũ (Yêu cầu mới)
+            // 2. Tự động lấy Tờ Mới từ Tờ Cũ
             if (field === 'TO_CU') {
                 newRows[index].TO_MOI = value;
+                // Đồng bộ TO_MOI cho các dòng dưới nếu chúng chưa có dữ liệu hoặc đang giống cũ
+                for (let i = 1; i < newRows.length; i++) {
+                    if (!newRows[i].TO_MOI) newRows[i].TO_MOI = value;
+                }
             }
-            // 3. Tổng diện tích cuối bằng diện tích thửa đất trước biến động (Yêu cầu mới)
+            // 3. Tổng diện tích cuối bằng diện tích thửa đất trước biến động
             if (field === 'DT_CU') {
                 newRows[index].TONG_DT = value;
+                // Đồng bộ TONG_DT cho các dòng dưới
+                for (let i = 1; i < newRows.length; i++) {
+                    newRows[i].TONG_DT = value;
+                }
             }
         }
 
@@ -169,32 +190,32 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
             const sourceThua = found.landPlot || '';
             
-            // Logic điền thông tin cho dòng đầu tiên hoặc dòng mới
+            // Dữ liệu cho dòng mới hoặc dòng hiện tại
             const newDetail: DetailData = {
                 ...DEFAULT_DETAIL,
                 TO_CU: found.mapSheet || '',
                 THUA_CU: sourceThua,
                 DT_CU: found.area ? found.area.toString() : '',
-                // Auto fill Thửa Tạm 123-1 nếu có Thửa Cũ
-                THUA_TAM: sourceThua ? `${sourceThua}-1` : '',
                 
-                DT_MOI: '', // Reset DT mới để user tự chia
-                TONG_DT: found.area ? found.area.toString() : '',
+                // Sau biến động
                 TO_MOI: found.mapSheet || '',
+                THUA_TAM: sourceThua ? `${sourceThua}-1` : '',
+                DT_MOI: '', 
+                LOAI_DAT_MOI: '',
+                THUA_CHINH_THUC: '',
+                
+                TONG_DT: found.area ? found.area.toString() : '',
+                THONG_TIN_QH: ''
             };
 
-            const lastIdx = detailRows.length - 1;
-            const isLastEmpty = !detailRows[lastIdx].TO_CU && !detailRows[lastIdx].THUA_CU;
-            
-            if (isLastEmpty) {
-                const updated = [...detailRows];
-                updated[lastIdx] = newDetail;
-                setDetailRows(updated);
+            // Nếu đang có 1 dòng trống thì điền vào đó
+            if (detailRows.length === 1 && !detailRows[0].TO_CU && !detailRows[0].THUA_CU) {
+                setDetailRows([newDetail]);
             } else {
-                // Nếu thêm vào danh sách đã có, cần tính lại số thứ tự thửa tạm
-                const nextIndex = detailRows.length + 1;
-                newDetail.THUA_TAM = sourceThua ? `${sourceThua}-${nextIndex}` : '';
-                setDetailRows(prev => [...prev, newDetail]);
+                // Nếu đã có dữ liệu, hỏi user hoặc thêm mới. Ở đây ta ghi đè dòng đầu tiên để làm gốc tách thửa
+                // Vì logic tách thửa thường là 1 gốc -> nhiều mới.
+                // Reset về 1 dòng gốc
+                setDetailRows([newDetail]);
             }
             
             notify(`Đã lấy dữ liệu từ hồ sơ: ${found.code}`, 'success');
@@ -206,11 +227,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     // --- LOGIC TÍNH TOÁN DIỆN TÍCH ---
     const calculateTotals = useMemo(() => {
-        // Trong trường hợp tách thửa, DT Trước chỉ tính 1 lần (dòng đầu tiên) nếu các dòng sau copy hoặc để trống
-        // Tuy nhiên, form hiện tại cho phép nhập từng dòng. Để đơn giản, ta tính tổng tất cả các dòng DT_CU nếu chúng khác nhau, 
-        // nhưng thường tách thửa là 1 thửa gốc -> N thửa mới.
-        // Ở đây ta giả định người dùng nhập đúng: DT_CU chỉ nhập ở dòng đầu hoặc nhập chia đều.
-        // Để kiểm tra chính xác, ta lấy DT_CU của dòng đầu tiên làm mốc (vì là 1 thửa gốc).
+        // Lấy DT_CU của dòng đầu tiên làm mốc (vì các dòng sau là bản sao hoặc gộp)
         const originalArea = parseFloat(detailRows[0].DT_CU) || 0;
         
         const totalAfter = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_MOI) || 0), 0);
@@ -253,6 +270,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         // 2. Insert mới
         let successCount = 0;
+        // Lọc bỏ dòng trống hoàn toàn nếu có
         const validRows = detailRows.filter(r => r.TO_CU || r.THUA_CU || r.TO_MOI || r.THUA_CHINH_THUC);
         
         if (validRows.length === 0) {
@@ -264,8 +282,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         for (const row of validRows) {
             const recordData = {
                 ...commonData,
-                // Khi tạo mới hoặc sửa, nếu chưa có status thì set là pending. 
-                // Nếu đang sửa và đã có status cũ, giữ nguyên (logic này có thể tùy chỉnh)
                 STATUS: commonData.STATUS || 'pending', 
                 ...row
             };
@@ -666,11 +682,23 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <tr key={idx} className="border-b border-gray-200 hover:bg-blue-50/20">
                                             <td className="border text-center text-gray-400 text-xs bg-gray-50">{idx + 1}</td>
                                             
-                                            {/* TRƯỚC */}
-                                            <td className="border p-0"><input className={detailInputClass} value={row.TO_CU} onChange={e => handleDetailChange(idx, 'TO_CU', e.target.value)} /></td>
-                                            <td className="border p-0"><input className={detailInputClass} value={row.THUA_CU} onChange={e => handleDetailChange(idx, 'THUA_CU', e.target.value)} /></td>
-                                            <td className="border p-0"><input className={detailInputClass} value={row.DT_CU} onChange={e => handleDetailChange(idx, 'DT_CU', e.target.value)} /></td>
-                                            <td className="border p-0"><input className={detailInputClass} value={row.LOAI_DAT_CU} onChange={e => handleDetailChange(idx, 'LOAI_DAT_CU', e.target.value)} /></td>
+                                            {/* TRƯỚC BIẾN ĐỘNG - GỘP Ô CHO DÒNG ĐẦU TIÊN */}
+                                            {idx === 0 ? (
+                                                <>
+                                                    <td className="border p-0 bg-white shadow-sm z-10 align-middle" rowSpan={detailRows.length}>
+                                                        <input className={`${detailInputClass} h-auto min-h-[40px]`} value={row.TO_CU} onChange={e => handleDetailChange(idx, 'TO_CU', e.target.value)} />
+                                                    </td>
+                                                    <td className="border p-0 bg-white shadow-sm z-10 align-middle" rowSpan={detailRows.length}>
+                                                        <input className={`${detailInputClass} h-auto min-h-[40px]`} value={row.THUA_CU} onChange={e => handleDetailChange(idx, 'THUA_CU', e.target.value)} />
+                                                    </td>
+                                                    <td className="border p-0 bg-white shadow-sm z-10 align-middle" rowSpan={detailRows.length}>
+                                                        <input className={`${detailInputClass} h-auto min-h-[40px]`} value={row.DT_CU} onChange={e => handleDetailChange(idx, 'DT_CU', e.target.value)} />
+                                                    </td>
+                                                    <td className="border p-0 bg-white shadow-sm z-10 align-middle" rowSpan={detailRows.length}>
+                                                        <input className={`${detailInputClass} h-auto min-h-[40px]`} value={row.LOAI_DAT_CU} onChange={e => handleDetailChange(idx, 'LOAI_DAT_CU', e.target.value)} />
+                                                    </td>
+                                                </>
+                                            ) : null}
 
                                             {/* SAU */}
                                             <td className="border p-0"><input className={detailInputClass} value={row.TO_MOI} onChange={e => handleDetailChange(idx, 'TO_MOI', e.target.value)} /></td>
@@ -682,7 +710,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                             {/* THONG TIN QH */}
                                             <td className="border p-0"><input className={`${detailInputClass} bg-yellow-50/30 text-left px-2`} value={row.THONG_TIN_QH || ''} onChange={e => handleDetailChange(idx, 'THONG_TIN_QH', e.target.value)} placeholder="..." /></td>
 
-                                            <td className="border p-0"><input className={`${detailInputClass} font-bold`} value={row.TONG_DT} onChange={e => handleDetailChange(idx, 'TONG_DT', e.target.value)} /></td>
+                                            {/* TỔNG DT - GỘP Ô */}
+                                            {idx === 0 ? (
+                                                <td className="border p-0 bg-white shadow-sm z-10 align-middle" rowSpan={detailRows.length}>
+                                                    <input className={`${detailInputClass} font-bold h-auto min-h-[40px]`} value={row.TONG_DT} onChange={e => handleDetailChange(idx, 'TONG_DT', e.target.value)} />
+                                                </td>
+                                            ) : null}
                                             
                                             <td className="border text-center">
                                                 <button onClick={() => handleRemoveDetailRow(idx)} className="text-gray-300 hover:text-red-500 p-1"><X size={16}/></button>

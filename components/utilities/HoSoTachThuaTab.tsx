@@ -840,11 +840,21 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                     </td>
                                                 )}
 
-                                                {/* DETAIL COLUMNS (Always render) */}
-                                                <td className="p-2 border-r text-xs">
-                                                    <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
-                                                    <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
-                                                </td>
+                                                {/* BEFORE CHANGE COLUMNS (Render with RowSpan) */}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-2 border-r text-xs align-middle bg-white" rowSpan={rowSpan}>
+                                                        <div className="text-center font-bold text-gray-700">
+                                                            <div>Tờ: {item.data.TO_CU}</div>
+                                                            <div>Thửa: {item.data.THUA_CU}</div>
+                                                        </div>
+                                                        <div className="text-center mt-1">
+                                                            <div>{item.data.DT_CU} m²</div>
+                                                            <div className="italic text-gray-500">({item.data.LOAI_DAT_CU})</div>
+                                                        </div>
+                                                    </td>
+                                                )}
+
+                                                {/* DETAIL COLUMNS (Always render for AFTER CHANGE) */}
                                                 <td className="p-2 border-r text-xs">
                                                     <div>Tờ: <b>{item.data.TO_MOI}</b></div>
                                                     <div>Tạm: {item.data.THUA_TAM} <span className="text-gray-300">|</span> CT: <b className="text-green-700">{item.data.THUA_CHINH_THUC}</b></div>

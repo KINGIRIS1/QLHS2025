@@ -27,11 +27,16 @@ export interface ChinhLyRecord extends GenericRecord {
     // data chứa các trường chỉnh lý biến động
 }
 
+export interface TachThuaRecord extends GenericRecord {
+    // data chứa các trường tách thửa (cấu trúc giống ChinhLyRecord)
+}
+
 // Mock Data Stores
 const MOCK_VPHC: VphcRecord[] = [];
 const MOCK_BIENBAN: BienBanRecord[] = [];
 const MOCK_THONGTIN: ThongTinRecord[] = [];
 const MOCK_CHINHLY: ChinhLyRecord[] = [];
+const MOCK_TACHTHUA: TachThuaRecord[] = [];
 
 // Helper sinh ID ngẫu nhiên
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -243,7 +248,7 @@ export const deleteThongTinRecord = async (id: string): Promise<boolean> => {
 };
 
 // ============================================================================
-// 4. DANH SÁCH CHỈNH LÝ BIẾN ĐỘNG (NEW)
+// 4. DANH SÁCH CHỈNH LÝ BIẾN ĐỘNG
 // ============================================================================
 
 export const fetchChinhLyRecords = async (): Promise<ChinhLyRecord[]> => {
@@ -304,6 +309,71 @@ export const deleteChinhLyRecord = async (id: string): Promise<boolean> => {
         return true;
     } catch (error) {
         logError("deleteChinhLyRecord", error);
+        return false;
+    }
+};
+
+// ============================================================================
+// 5. HỒ SƠ TÁCH THỬA (NEW)
+// ============================================================================
+
+export const fetchTachThuaRecords = async (): Promise<TachThuaRecord[]> => {
+    if (!isConfigured) return MOCK_TACHTHUA;
+    try {
+        const { data, error } = await supabase
+            .from('tachthua_records')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data as TachThuaRecord[];
+    } catch (error) {
+        return MOCK_TACHTHUA;
+    }
+};
+
+export const saveTachThuaRecord = async (record: Partial<TachThuaRecord>): Promise<boolean> => {
+    if (!isConfigured) {
+        if (!record.id) {
+            const newRec = { ...record, id: generateId(), created_at: new Date().toISOString() } as TachThuaRecord;
+            MOCK_TACHTHUA.unshift(newRec);
+        } else {
+            const idx = MOCK_TACHTHUA.findIndex(r => r.id === record.id);
+            if (idx !== -1) MOCK_TACHTHUA[idx] = { ...MOCK_TACHTHUA[idx], ...record } as TachThuaRecord;
+        }
+        return true;
+    }
+    try {
+        if (record.id) {
+            const { error } = await supabase.from('tachthua_records').update({ 
+                customer_name: record.customer_name,
+                data: record.data,
+                created_by: record.created_by
+            }).eq('id', record.id);
+            if (error) throw error;
+        } else {
+            const newRecord = { ...record, id: generateId() };
+            const { error } = await supabase.from('tachthua_records').insert([newRecord]);
+            if (error) throw error;
+        }
+        return true;
+    } catch (error) {
+        logError("saveTachThuaRecord", error);
+        return false;
+    }
+};
+
+export const deleteTachThuaRecord = async (id: string): Promise<boolean> => {
+    if (!isConfigured) {
+        const idx = MOCK_TACHTHUA.findIndex(r => r.id === id);
+        if (idx !== -1) MOCK_TACHTHUA.splice(idx, 1);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('tachthua_records').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteTachThuaRecord", error);
         return false;
     }
 };

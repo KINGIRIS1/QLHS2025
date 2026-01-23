@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2 } from 'lucide-react';
+import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid } from 'lucide-react';
 import { User as UserType, RecordFile } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
 import VPHCTab from './utilities/VPHCTab';
 import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
+import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -17,7 +18,7 @@ export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -114,17 +115,23 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
                   onClick={() => setActiveTab('chinhly')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chinhly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                  <Table2 size={16} /> DS Chỉnh lý biến động
+                  <Table2 size={16} /> Hồ sơ Chỉnh lý
+              </button>
+              <button 
+                  onClick={() => setActiveTab('tachthua')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'tachthua' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Grid size={16} /> Hồ sơ Tách thửa
               </button>
               <button 
                   onClick={() => setActiveTab('saiso')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'saiso' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'saiso' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                   <Calculator size={16} /> Tính sai số
               </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -153,7 +160,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
               <CungCapThongTinTab currentUser={currentUser} notify={notify} />
           </div>
 
-          {/* TAB 4: CHỈNH LÝ BIẾN ĐỘNG */}
+          {/* TAB 4: HỒ SƠ CHỈNH LÝ (ĐỔI TÊN) */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'chinhly' ? 'block' : 'hidden'}`}>
               <ChinhLyBienDongTab 
                   currentUser={currentUser} 
@@ -162,7 +169,15 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
               />
           </div>
 
-          {/* TAB 5: TÍNH SAI SỐ */}
+          {/* TAB 5: HỒ SƠ TÁCH THỬA (MỚI) */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'tachthua' ? 'block' : 'hidden'}`}>
+              <HoSoTachThuaTab 
+                  currentUser={currentUser} 
+                  notify={notify}
+              />
+          </div>
+
+          {/* TAB 6: TÍNH SAI SỐ */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'saiso' ? 'block' : 'hidden'}`}>
               <SaiSoTab />
           </div>

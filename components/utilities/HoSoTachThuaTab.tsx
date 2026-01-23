@@ -35,6 +35,8 @@ interface DetailData {
     TO_CU: string; THUA_CU: string; DT_CU: string; LOAI_DAT_CU: string;
     // Sau BĐ
     TO_MOI: string; THUA_TAM: string; THUA_CHINH_THUC: string; DT_MOI: string; LOAI_DAT_MOI: string;
+    // Thông tin bổ sung
+    THONG_TIN_QH: string; // Cột mới: Thông tin quy hoạch/Diện tích thu hồi
     
     TONG_DT: string; 
 }
@@ -48,6 +50,7 @@ const DEFAULT_COMMON: CommonData = {
 const DEFAULT_DETAIL: DetailData = {
     TO_CU: '', THUA_CU: '', DT_CU: '', LOAI_DAT_CU: '',
     TO_MOI: '', THUA_TAM: '', THUA_CHINH_THUC: '', DT_MOI: '', LOAI_DAT_MOI: '',
+    THONG_TIN_QH: '', // Init
     TONG_DT: ''
 };
 
@@ -151,13 +154,19 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     // --- LOGIC TÍNH TOÁN DIỆN TÍCH ---
     const calculateTotals = useMemo(() => {
-        const totalBefore = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_CU) || 0), 0);
+        // Trong trường hợp tách thửa, DT Trước chỉ tính 1 lần (dòng đầu tiên) nếu các dòng sau copy hoặc để trống
+        // Tuy nhiên, form hiện tại cho phép nhập từng dòng. Để đơn giản, ta tính tổng tất cả các dòng DT_CU nếu chúng khác nhau, 
+        // nhưng thường tách thửa là 1 thửa gốc -> N thửa mới.
+        // Ở đây ta giả định người dùng nhập đúng: DT_CU chỉ nhập ở dòng đầu hoặc nhập chia đều.
+        // Để kiểm tra chính xác, ta lấy DT_CU của dòng đầu tiên làm mốc (vì là 1 thửa gốc).
+        const originalArea = parseFloat(detailRows[0].DT_CU) || 0;
+        
         const totalAfter = detailRows.reduce((sum, row) => sum + (parseFloat(row.DT_MOI) || 0), 0);
-        const diff = Math.abs(totalBefore - totalAfter);
+        const diff = Math.abs(originalArea - totalAfter);
         const isMismatch = diff > 0.1; 
 
         return {
-            totalBefore: parseFloat(totalBefore.toFixed(2)),
+            totalBefore: parseFloat(originalArea.toFixed(2)),
             totalAfter: parseFloat(totalAfter.toFixed(2)),
             isMismatch,
             diff: parseFloat(diff.toFixed(2))
@@ -171,8 +180,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         if (calculateTotals.isMismatch) {
             const warningMsg = `CẢNH BÁO SAI LỆCH DIỆN TÍCH!\n\n` +
-                `- Tổng diện tích TRƯỚC biến động: ${calculateTotals.totalBefore} m²\n` +
-                `- Tổng diện tích SAU biến động: ${calculateTotals.totalAfter} m²\n` +
+                `- Diện tích gốc (Dòng 1): ${calculateTotals.totalBefore} m²\n` +
+                `- Tổng diện tích sau tách: ${calculateTotals.totalAfter} m²\n` +
                 `- Chênh lệch: ${calculateTotals.diff} m²\n\n` +
                 `Bạn có chắc chắn muốn lưu không?`;
             
@@ -243,6 +252,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const details: DetailData[] = groupRecords.map(r => ({
             TO_CU: r.data.TO_CU, THUA_CU: r.data.THUA_CU, DT_CU: r.data.DT_CU, LOAI_DAT_CU: r.data.LOAI_DAT_CU,
             TO_MOI: r.data.TO_MOI, THUA_TAM: r.data.THUA_TAM, THUA_CHINH_THUC: r.data.THUA_CHINH_THUC, DT_MOI: r.data.DT_MOI, LOAI_DAT_MOI: r.data.LOAI_DAT_MOI,
+            THONG_TIN_QH: r.data.THONG_TIN_QH || '',
             TONG_DT: r.data.TONG_DT
         }));
 
@@ -405,8 +415,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const ws = XLSX.utils.aoa_to_sheet([]);
 
         const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ TÁCH THỬA CHỜ LẬP" : "DANH SÁCH HỒ SƠ TÁCH THỬA ĐÃ CHUYỂN";
-        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
-        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", ""];
+        // Cập nhật header cho Excel với cột mới
+        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Thông tin QH / DT thu hồi", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
+        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", "", ""];
 
         XLSX.utils.sheet_add_aoa(ws, [
             [title],
@@ -417,16 +428,18 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         const dataRows: any[] = [];
         const merges: any[] = [];
+        const totalCols = 15; // 0-15 = 16 cols
         
-        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }); 
-        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); 
-        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); 
-        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); 
-        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); 
-        merges.push({ s: { r: 2, c: 11 }, e: { r: 3, c: 11 } }); 
-        merges.push({ s: { r: 2, c: 12 }, e: { r: 3, c: 12 } }); 
-        merges.push({ s: { r: 2, c: 13 }, e: { r: 3, c: 13 } }); 
-        merges.push({ s: { r: 2, c: 14 }, e: { r: 3, c: 14 } }); 
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }); 
+        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // STT
+        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Xã
+        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ (4 cols)
+        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ (5 cols)
+        
+        // Merge các cột đơn lẻ còn lại ở header
+        for (let c = 11; c <= totalCols; c++) {
+            merges.push({ s: { r: 2, c: c }, e: { r: 3, c: c } });
+        }
 
         let currentRow = 4;
 
@@ -440,6 +453,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
+                d.THONG_TIN_QH, // Cột mới
                 d.TONG_DT,
                 span > 0 ? d.CAN_CU_PHAP_LY : '', 
                 span > 0 ? d.SO_HD : '',          
@@ -447,7 +461,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             ]);
 
             if (span > 1) {
-                [0, 1, 12, 13, 14].forEach(colIdx => {
+                // Merge common cols: STT(0), Xa(1), CanCu(13), SoHD(14), GhiChu(15)
+                // CỘNG THÊM: Merge cột Trước Biến Động (Tờ(2), Thửa(3), DT(4), Loại đất(5))
+                [0, 1, 2, 3, 4, 5, 13, 14, 15].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
             }
@@ -462,7 +478,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
 
         for (let r = 2; r <= 3; r++) {
-            for (let c = 0; c <= 14; c++) {
+            for (let c = 0; c <= totalCols; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
                 ws[ref].s = headerStyle;
@@ -470,10 +486,11 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         }
 
         for (let r = 4; r < 4 + dataRows.length; r++) {
-            for (let c = 0; c <= 14; c++) {
+            for (let c = 0; c <= totalCols; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
-                if ([0, 2, 3, 6, 7, 8, 13].includes(c)) ws[ref].s = centerStyle;
+                // Center align: STT, Tờ, Thửa, Số HĐ
+                if ([0, 2, 3, 6, 7, 8, 14].includes(c)) ws[ref].s = centerStyle;
                 else ws[ref].s = cellStyle;
             }
         }
@@ -482,6 +499,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             { wch: 5 }, { wch: 15 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
+            { wch: 20 }, // Thông tin QH
             { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 20 }
         ];
 
@@ -564,12 +582,13 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
                         {/* 2. BODY: DETAIL LIST TABLE */}
                         <div className="flex-1 overflow-auto bg-white relative">
-                            <table className="w-full border-collapse min-w-[1000px]">
+                            <table className="w-full border-collapse min-w-[1200px]">
                                 <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 z-10 shadow-sm">
                                     <tr>
                                         <th className="p-2 border w-10 bg-gray-200">#</th>
                                         <th colSpan={4} className="p-2 border text-center bg-blue-50 text-blue-800">Thông tin Trước Biến Động</th>
                                         <th colSpan={5} className="p-2 border text-center bg-green-50 text-green-800">Thông tin Sau Biến Động (Tách Thửa)</th>
+                                        <th className="p-2 border w-40 bg-yellow-50 text-yellow-800">TT Quy hoạch / Thu hồi</th>
                                         <th className="p-2 border w-24 bg-gray-200">Tổng DT</th>
                                         <th className="p-2 border w-10 bg-gray-200">Xóa</th>
                                     </tr>
@@ -585,6 +604,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <th className="p-2 border w-20 text-center bg-green-50 text-green-700">Thửa CT</th>
                                         <th className="p-2 border w-20 text-center bg-green-50">DT (m2)</th>
                                         <th className="p-2 border w-20 text-center bg-green-50">Loại đất</th>
+                                        <th className="p-2 border bg-yellow-50"></th>
                                         <th className="bg-gray-200 border"></th>
                                         <th className="bg-gray-200 border"></th>
                                     </tr>
@@ -607,6 +627,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                             <td className="border p-0"><input className={detailInputClass} value={row.DT_MOI} onChange={e => handleDetailChange(idx, 'DT_MOI', e.target.value)} /></td>
                                             <td className="border p-0"><input className={detailInputClass} value={row.LOAI_DAT_MOI} onChange={e => handleDetailChange(idx, 'LOAI_DAT_MOI', e.target.value)} /></td>
 
+                                            {/* THONG TIN QH */}
+                                            <td className="border p-0"><input className={`${detailInputClass} bg-yellow-50/30 text-left px-2`} value={row.THONG_TIN_QH || ''} onChange={e => handleDetailChange(idx, 'THONG_TIN_QH', e.target.value)} placeholder="..." /></td>
+
                                             <td className="border p-0"><input className={`${detailInputClass} font-bold`} value={row.TONG_DT} onChange={e => handleDetailChange(idx, 'TONG_DT', e.target.value)} /></td>
                                             
                                             <td className="border text-center">
@@ -615,7 +638,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         </tr>
                                     ))}
                                     <tr>
-                                        <td colSpan={12} className="p-2 border-t bg-gray-50">
+                                        <td colSpan={13} className="p-2 border-t bg-gray-50">
                                             <button onClick={handleAddDetailRow} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mx-auto px-3 py-1 bg-white border border-blue-200 rounded-full shadow-sm hover:shadow">
                                                 <Plus size={14}/> Thêm dòng thửa đất
                                             </button>
@@ -634,7 +657,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <td className={`p-2 text-center border-r border-gray-200 ${calculateTotals.isMismatch ? 'text-red-600' : 'text-green-600'}`}>
                                             {calculateTotals.totalAfter}
                                         </td>
-                                        <td colSpan={2} className="p-2 text-left">
+                                        <td colSpan={3} className="p-2 text-left">
                                             {calculateTotals.isMismatch ? (
                                                 <span className="text-xs text-red-500 flex items-center gap-1 animate-pulse">
                                                     <AlertTriangle size={14}/> Lệch {calculateTotals.diff} m²
@@ -732,6 +755,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Xã / Phường</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Trước BĐ</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Sau BĐ</th>
+                                        <th className="p-3 border-b border-r w-[120px] bg-white">Thông tin QH</th>
                                         <th className="p-3 border-b border-r w-[80px] bg-white">Tổng DT</th>
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Căn cứ pháp lý</th>
                                         <th className="p-3 border-b border-r w-[100px] bg-white">Số HĐ</th>
@@ -773,16 +797,23 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                     </td>
                                                 )}
 
-                                                {/* DETAIL COLUMNS (Always render) */}
-                                                <td className="p-2 border-r text-xs">
-                                                    {/* ĐÃ BỎ HIỂN THỊ TÊN CHỦ */}
-                                                    <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
-                                                    <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
-                                                </td>
+                                                {/* MERGED "BEFORE" COLUMNS (For Tach Thua) */}
+                                                {shouldRenderCommon && (
+                                                    <td className="p-2 border-r text-xs align-middle bg-white" rowSpan={rowSpan}>
+                                                        <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
+                                                        <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
+                                                    </td>
+                                                )}
+
+                                                {/* DETAIL COLUMNS (Always render for "After") */}
                                                 <td className="p-2 border-r text-xs">
                                                     <div>Tờ: <b>{item.data.TO_MOI}</b></div>
                                                     <div>Tạm: {item.data.THUA_TAM} <span className="text-gray-300">|</span> CT: <b className="text-green-700">{item.data.THUA_CHINH_THUC}</b></div>
                                                     <div>DT: {item.data.DT_MOI} ({item.data.LOAI_DAT_MOI})</div>
+                                                </td>
+                                                
+                                                <td className="p-2 border-r text-xs italic text-gray-600">
+                                                    {item.data.THONG_TIN_QH || ''}
                                                 </td>
 
                                                 {/* COMMON COLUMNS (Right side) */}

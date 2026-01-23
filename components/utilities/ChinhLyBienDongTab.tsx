@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User as UserType, RecordFile } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
@@ -435,13 +436,17 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
-        const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ CHỜ LẬP" : "DANH SÁCH ĐÃ CHUYỂN CHỈNH LÝ";
-        // Cập nhật header cho Excel với cột mới
-        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Thông tin QH / DT thu hồi", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
-        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", "", ""];
+        // UPDATED TITLE & FOOTER
+        const title1 = "DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC";
+        const title2 = "CHI NHÁNH CHƠN THÀNH";
+        
+        // Header: Bỏ cột Ghi chú, đổi tên cột Số HĐ
+        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Thông tin QH / DT thu hồi", "Tổng DT (m2)", "Căn cứ pháp lý", "Ghi chú (Số hợp đồng)"];
+        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "", ""];
 
         XLSX.utils.sheet_add_aoa(ws, [
-            [title],
+            [title1],
+            [title2],
             [""],
             header1,
             header2
@@ -458,20 +463,24 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
 
         const dataRows: any[] = [];
         const merges: any[] = [];
-        const totalCols = 15; // 0-15 = 16 cols
+        const totalCols = 14; // 15 columns total (0-14)
         
+        // Merge Title (Row 0 & 1)
         merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }); 
-        merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // STT
-        merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Xã
-        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ (4 cols)
-        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ (5 cols)
+        merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } }); 
+
+        // Merge Headers (Row 3 & 4)
+        merges.push({ s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }); // STT
+        merges.push({ s: { r: 3, c: 1 }, e: { r: 4, c: 1 } }); // Xã
+        merges.push({ s: { r: 3, c: 2 }, e: { r: 3, c: 5 } }); // Trước BĐ (4 cols)
+        merges.push({ s: { r: 3, c: 6 }, e: { r: 3, c: 10 } }); // Sau BĐ (5 cols)
         
-        // Merge các cột đơn lẻ còn lại ở header
+        // Merge các cột đơn lẻ còn lại ở header (11, 12, 13, 14)
         for (let c = 11; c <= totalCols; c++) {
-            merges.push({ s: { r: 2, c: c }, e: { r: 3, c: c } });
+            merges.push({ s: { r: 3, c: c }, e: { r: 4, c: c } });
         }
 
-        let currentRow = 4;
+        let currentRow = 5; // Start data at A6
 
         for (let i = 0; i < groupedList.length; i++) {
             const item = groupedList[i];
@@ -483,30 +492,55 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                 span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
-                d.THONG_TIN_QH, // Cột mới
+                d.THONG_TIN_QH, 
                 d.TONG_DT,
                 span > 0 ? d.CAN_CU_PHAP_LY : '', 
-                span > 0 ? d.SO_HD : '',          
-                span > 0 ? d.GHI_CHU : ''         
+                span > 0 ? d.SO_HD : '', // Đưa Số HĐ vào cột cuối (đã đổi tên thành Ghi chú)
             ]);
 
             if (span > 1) {
-                // Merge common cols: STT(0), Xa(1), CanCu(13), SoHD(14), GhiChu(15)
-                [0, 1, 13, 14, 15].forEach(colIdx => {
+                // Merge common cols: STT(0), Xa(1), CanCu(13), GhiChu/SoHD(14)
+                [0, 1, 13, 14].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
             }
             currentRow++;
         }
 
-        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A5" });
+        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A6" });
+        
+        // NEW FOOTER
+        const footerStartRow = currentRow + 1; // 1 spacer row
+        const currentYear = new Date().getFullYear();
+
+        XLSX.utils.sheet_add_aoa(ws, [
+            [`Ngày      tháng      năm ${currentYear}`, "", "", "", "", "", "", "", "", "", "", "", "", "", `Ngày      tháng      năm ${currentYear}`],
+            ["Người đề xuất", "", "", "", "", "", "", "", "", "", "", "", "", "", "Giám Đốc"]
+        ], { origin: { r: footerStartRow, c: 0 } });
+
+        // Footer Merges: Left side (0-3) and Right side (11-14)
+        merges.push({ s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 3 } });
+        merges.push({ s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 3 } });
+        
+        merges.push({ s: { r: footerStartRow, c: 11 }, e: { r: footerStartRow, c: 14 } });
+        merges.push({ s: { r: footerStartRow + 1, c: 11 }, e: { r: footerStartRow + 1, c: 14 } });
+
         ws['!merges'] = merges;
 
-        const headerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
-        const cellStyle = { font: { sz: 12, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
+        // Styles
+        const titleStyle = { font: { bold: true, sz: 14, name: "Times New Roman" }, alignment: { horizontal: "center" } };
+        const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
+        const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
+        const footerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center" } };
+        const footerDateStyle = { font: { italic: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center" } };
 
-        for (let r = 2; r <= 3; r++) {
+        // Apply Title Styles
+        if(ws['A1']) ws['A1'].s = titleStyle;
+        if(ws['A2']) ws['A2'].s = titleStyle;
+
+        // Apply Header Styles (Rows 3, 4)
+        for (let r = 3; r <= 4; r++) {
             for (let c = 0; c <= totalCols; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
@@ -514,7 +548,8 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
-        for (let r = 4; r < 4 + dataRows.length; r++) {
+        // Apply Data Styles
+        for (let r = 5; r < 5 + dataRows.length; r++) {
             for (let c = 0; c <= totalCols; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
@@ -523,13 +558,24 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
+        // Apply Footer Styles
+        const leftDate = XLSX.utils.encode_cell({r: footerStartRow, c: 0});
+        const leftSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 0});
+        const rightDate = XLSX.utils.encode_cell({r: footerStartRow, c: 11});
+        const rightSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 11});
+
+        if(ws[leftDate]) ws[leftDate].s = footerDateStyle;
+        if(ws[leftSign]) ws[leftSign].s = footerStyle;
+        if(ws[rightDate]) ws[rightDate].s = footerDateStyle;
+        if(ws[rightSign]) ws[rightSign].s = footerStyle;
+
         // Tăng độ rộng cột cho khổ A3
         ws['!cols'] = [
             { wch: 6 },  { wch: 18 }, // STT, Xã
             { wch: 7 },  { wch: 7 },  { wch: 10 }, { wch: 10 }, // Trước BĐ
             { wch: 7 },  { wch: 7 },  { wch: 10 }, { wch: 10 }, { wch: 10 }, // Sau BĐ
             { wch: 25 }, // Thông tin QH
-            { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 25 } // Tổng DT, Căn cứ, Số HĐ, Ghi chú
+            { wch: 12 }, { wch: 30 }, { wch: 25 } // Tổng DT, Căn cứ, Ghi chú (Số HĐ)
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_ChinhLy");

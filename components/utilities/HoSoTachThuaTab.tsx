@@ -454,9 +454,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const title1 = "DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC";
         const title2 = "CHI NHÁNH CHƠN THÀNH";
         
-        // Cập nhật Header cho Excel
-        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "TT Quy hoạch", "Mục đích SDĐ", "", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
-        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "Đất ở (m2)", "Đất NN (m2)", "", "", ""];
+        // Cập nhật Header cho Excel (Bỏ cột Ghi chú, đổi tên cột Số HĐ)
+        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "TT Quy hoạch", "Mục đích SDĐ", "", "Căn cứ pháp lý", "Ghi chú (Số hợp đồng)"];
+        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "Đất ở (m2)", "Đất NN (m2)", "", ""];
 
         XLSX.utils.sheet_add_aoa(ws, [
             [title1],
@@ -477,15 +477,14 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         const dataRows: any[] = [];
         const merges: any[] = [];
-        const totalCols = 17; // 0-17 = 18 cols
+        const totalCols = 16; // 0-16 = 17 cols (Reduced by 1)
         
         // Merge Title
         merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }); 
         merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } }); 
         
         // Merge Header Row 3 & 4 (Index 3, 4)
-        // STT(0), Xã(1), Tổng DT(11), TTQH(12), CanCu(15), SoHD(16), GhiChu(17)
-        const simpleMerge = [0, 1, 11, 12, 15, 16, 17];
+        const simpleMerge = [0, 1, 11, 12, 15, 16];
         simpleMerge.forEach(c => merges.push({ s: { r: 3, c }, e: { r: 4, c } }));
         
         merges.push({ s: { r: 3, c: 2 }, e: { r: 3, c: 5 } }); // Trước BĐ
@@ -509,13 +508,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 d.THONG_TIN_QH,
                 d.DT_ODT, d.DT_CLN, 
                 span > 0 ? d.CAN_CU_PHAP_LY : '', 
-                span > 0 ? d.SO_HD : '',          
-                span > 0 ? d.GHI_CHU : ''         
+                span > 0 ? d.SO_HD : '', // Đưa Số HĐ vào cột cuối (đổi tên thành Ghi chú)         
             ]);
 
             if (span > 1) {
                 // Merge common cols
-                [0, 1, 2, 3, 4, 5, 11, 15, 16, 17].forEach(colIdx => {
+                [0, 1, 2, 3, 4, 5, 11, 15, 16].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
             }
@@ -537,15 +535,15 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         merges.push({ s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 4 } });
         merges.push({ s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 4 } });
 
-        // Merge for Footer Right (Columns 13-17)
-        merges.push({ s: { r: footerStartRow, c: 13 }, e: { r: footerStartRow, c: 17 } });
-        merges.push({ s: { r: footerStartRow + 1, c: 13 }, e: { r: footerStartRow + 1, c: 17 } });
+        // Merge for Footer Right (Columns 13-16)
+        merges.push({ s: { r: footerStartRow, c: 13 }, e: { r: footerStartRow, c: 16 } });
+        merges.push({ s: { r: footerStartRow + 1, c: 13 }, e: { r: footerStartRow + 1, c: 16 } });
 
         ws['!merges'] = merges;
 
-        // Styles
-        const headerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
-        const cellStyle = { font: { sz: 12, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
+        // Styles (Font size 11)
+        const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
+        const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
         const titleStyle = { font: { bold: true, sz: 14, name: "Times New Roman" }, alignment: { horizontal: "center" } };
         const footerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center" } };
@@ -593,7 +591,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             { wch: 10 }, // Tổng DT
             { wch: 25 }, // Thông tin QH
             { wch: 10 }, { wch: 10 }, // Đất ở, NN
-            { wch: 15 }, { wch: 12 }, { wch: 25 } // Căn cứ, Số HĐ, Ghi chú
+            { wch: 15 }, { wch: 25 } // Căn cứ, Ghi chú (Số HĐ)
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_TachThua");

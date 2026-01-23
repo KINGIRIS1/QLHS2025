@@ -452,35 +452,40 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
-        const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ TÁCH THỬA CHỜ LẬP" : "DANH SÁCH HỒ SƠ TÁCH THỬA ĐÃ CHUYỂN";
+        const title1 = "DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC";
+        const title2 = "CHI NHÁNH CHƠN THÀNH";
         
         // Cập nhật Header cho Excel
         const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "TT Quy hoạch", "Mục đích SDĐ", "", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
         const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "Đất ở (m2)", "Đất NN (m2)", "", "", ""];
 
         XLSX.utils.sheet_add_aoa(ws, [
-            [title], [""]
+            [title1],
+            [title2],
+            [""]
         ], { origin: "A1" });
         
-        XLSX.utils.sheet_add_aoa(ws, [header1, header2], { origin: "A3" });
+        XLSX.utils.sheet_add_aoa(ws, [header1, header2], { origin: "A4" });
 
         const dataRows: any[] = [];
         const merges: any[] = [];
         const totalCols = 17; // 0-17 = 18 cols
         
+        // Merge Title
         merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }); 
+        merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } }); 
         
-        // Merge Header Row 3 & 4
+        // Merge Header Row 3 & 4 (Index 3, 4)
         // STT(0), Xã(1), Tổng DT(11), TTQH(12), CanCu(15), SoHD(16), GhiChu(17)
         const simpleMerge = [0, 1, 11, 12, 15, 16, 17];
-        simpleMerge.forEach(c => merges.push({ s: { r: 2, c }, e: { r: 3, c } }));
+        simpleMerge.forEach(c => merges.push({ s: { r: 3, c }, e: { r: 4, c } }));
         
-        merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ
-        merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
-        merges.push({ s: { r: 2, c: 13 }, e: { r: 2, c: 14 } }); // Mục đích SD (Index mới)
+        merges.push({ s: { r: 3, c: 2 }, e: { r: 3, c: 5 } }); // Trước BĐ
+        merges.push({ s: { r: 3, c: 6 }, e: { r: 3, c: 10 } }); // Sau BĐ
+        merges.push({ s: { r: 3, c: 13 }, e: { r: 3, c: 14 } }); // Mục đích SD
 
-        // CHỈNH SỬA: currentRow phải bắt đầu từ 4 (vì data start ở A5, tức index 4)
-        let currentRow = 4;
+        // Data starts at A6 -> Index 5
+        let currentRow = 5;
 
         for (let i = 0; i < groupedList.length; i++) {
             const item = groupedList[i];
@@ -502,7 +507,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
             if (span > 1) {
                 // Merge common cols
-                // STT(0), Xa(1), Trước BĐ(2,3,4,5), Tổng DT(11), Căn cứ(15), HĐ(16), Ghi chú(17)
                 [0, 1, 2, 3, 4, 5, 11, 15, 16, 17].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
@@ -510,14 +514,41 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             currentRow++;
         }
 
-        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A5" });
+        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A6" });
+        
+        // Footer: Chữ ký
+        const footerStartRow = currentRow + 2;
+        const currentYear = new Date().getFullYear();
+        
+        XLSX.utils.sheet_add_aoa(ws, [
+            [`Ngày      tháng      năm ${currentYear}`, "", "", "", "", "", "", "", "", "", "", "", "", `Ngày      tháng      năm ${currentYear}`],
+            ["Người đề xuất", "", "", "", "", "", "", "", "", "", "", "", "", "Giám Đốc"]
+        ], { origin: { r: footerStartRow, c: 0 } });
+
+        // Merge for Footer Left (Columns 0-4)
+        merges.push({ s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 4 } });
+        merges.push({ s: { r: footerStartRow + 1, c: 0 }, e: { r: footerStartRow + 1, c: 4 } });
+
+        // Merge for Footer Right (Columns 13-17)
+        merges.push({ s: { r: footerStartRow, c: 13 }, e: { r: footerStartRow, c: 17 } });
+        merges.push({ s: { r: footerStartRow + 1, c: 13 }, e: { r: footerStartRow + 1, c: 17 } });
+
         ws['!merges'] = merges;
 
+        // Styles
         const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
         const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
+        const titleStyle = { font: { bold: true, sz: 14, name: "Times New Roman" }, alignment: { horizontal: "center" } };
+        const footerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center" } };
+        const footerDateStyle = { font: { italic: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center" } };
 
-        for (let r = 2; r <= 3; r++) {
+        // Apply Title Styles
+        if(ws['A1']) ws['A1'].s = titleStyle;
+        if(ws['A2']) ws['A2'].s = titleStyle;
+
+        // Apply Header Styles (Rows 3, 4)
+        for (let r = 3; r <= 4; r++) {
             for (let c = 0; c <= totalCols; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
@@ -525,23 +556,34 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             }
         }
 
-        for (let r = 4; r < 4 + dataRows.length; r++) {
+        // Apply Data Styles
+        for (let r = 5; r < 5 + dataRows.length; r++) {
             for (let c = 0; c <= totalCols; c++) {
                 const ref = XLSX.utils.encode_cell({ r, c });
                 if (!ws[ref]) ws[ref] = { v: "", t: "s" };
-                // Center align: STT, Tờ, Thửa, Số HĐ
                 if ([0, 2, 3, 6, 7, 8, 16].includes(c)) ws[ref].s = centerStyle;
                 else ws[ref].s = cellStyle;
             }
         }
 
+        // Apply Footer Styles
+        const leftDate = XLSX.utils.encode_cell({r: footerStartRow, c: 0});
+        const leftSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 0});
+        const rightDate = XLSX.utils.encode_cell({r: footerStartRow, c: 13});
+        const rightSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 13});
+
+        if(ws[leftDate]) ws[leftDate].s = footerDateStyle;
+        if(ws[leftSign]) ws[leftSign].s = footerStyle;
+        if(ws[rightDate]) ws[rightDate].s = footerDateStyle;
+        if(ws[rightSign]) ws[rightSign].s = footerStyle;
+
         ws['!cols'] = [
             { wch: 5 }, { wch: 15 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
-            { wch: 10 }, // Tổng DT
-            { wch: 20 }, // Thông tin QH
-            { wch: 10 }, { wch: 10 }, // Đất ở, Đất NN
+            { wch: 10 }, 
+            { wch: 20 }, 
+            { wch: 10 }, { wch: 10 }, 
             { wch: 25 }, { wch: 12 }, { wch: 20 }
         ];
 

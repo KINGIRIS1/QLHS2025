@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { User as UserType, RecordFile } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
@@ -448,6 +447,15 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             header2
         ], { origin: "A1" });
 
+        // Cấu hình in khổ A3 Ngang
+        ws['!pageSetup'] = { 
+            paperSize: 8, // 8 = A3
+            orientation: 'landscape', 
+            fitToWidth: 1, 
+            fitToHeight: 0 
+        };
+        ws['!margins'] = { left: 0.3, right: 0.3, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
+
         const dataRows: any[] = [];
         const merges: any[] = [];
         const totalCols = 15; // 0-15 = 16 cols
@@ -494,8 +502,8 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A5" });
         ws['!merges'] = merges;
 
-        const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
-        const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
+        const headerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
+        const cellStyle = { font: { sz: 12, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
 
         for (let r = 2; r <= 3; r++) {
@@ -515,12 +523,13 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
+        // Tăng độ rộng cột cho khổ A3
         ws['!cols'] = [
-            { wch: 5 }, { wch: 15 }, 
-            { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
-            { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
-            { wch: 20 }, // Thông tin QH
-            { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 20 }
+            { wch: 6 },  { wch: 18 }, // STT, Xã
+            { wch: 7 },  { wch: 7 },  { wch: 10 }, { wch: 10 }, // Trước BĐ
+            { wch: 7 },  { wch: 7 },  { wch: 10 }, { wch: 10 }, { wch: 10 }, // Sau BĐ
+            { wch: 25 }, // Thông tin QH
+            { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 25 } // Tổng DT, Căn cứ, Số HĐ, Ghi chú
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_ChinhLy");

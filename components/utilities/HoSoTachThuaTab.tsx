@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { User as UserType, RecordFile } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
@@ -467,6 +466,15 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         
         XLSX.utils.sheet_add_aoa(ws, [header1, header2], { origin: "A4" });
 
+        // Cấu hình in khổ A3 Ngang
+        ws['!pageSetup'] = { 
+            paperSize: 8, // 8 = A3
+            orientation: 'landscape', 
+            fitToWidth: 1, 
+            fitToHeight: 0 
+        };
+        ws['!margins'] = { left: 0.3, right: 0.3, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
+
         const dataRows: any[] = [];
         const merges: any[] = [];
         const totalCols = 17; // 0-17 = 18 cols
@@ -536,8 +544,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         ws['!merges'] = merges;
 
         // Styles
-        const headerStyle = { font: { bold: true, sz: 11, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
-        const cellStyle = { font: { sz: 11, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
+        const headerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: "E0E0E0" } } };
+        const cellStyle = { font: { sz: 12, name: "Times New Roman" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, alignment: { vertical: "center", wrapText: true } };
         const centerStyle = { ...cellStyle, alignment: { ...cellStyle.alignment, horizontal: "center" } };
         const titleStyle = { font: { bold: true, sz: 14, name: "Times New Roman" }, alignment: { horizontal: "center" } };
         const footerStyle = { font: { bold: true, sz: 12, name: "Times New Roman" }, alignment: { horizontal: "center" } };
@@ -577,14 +585,15 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         if(ws[rightDate]) ws[rightDate].s = footerDateStyle;
         if(ws[rightSign]) ws[rightSign].s = footerStyle;
 
+        // Tăng độ rộng cột cho khổ A3
         ws['!cols'] = [
-            { wch: 5 }, { wch: 15 }, 
-            { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
-            { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
-            { wch: 10 }, 
-            { wch: 20 }, 
-            { wch: 10 }, { wch: 10 }, 
-            { wch: 25 }, { wch: 12 }, { wch: 20 }
+            { wch: 6 },  { wch: 18 }, // STT, Xã
+            { wch: 7 },  { wch: 7 },  { wch: 10 }, { wch: 10 }, // Trước BĐ
+            { wch: 7 },  { wch: 7 },  { wch: 10 }, { wch: 10 }, { wch: 10 }, // Sau BĐ
+            { wch: 10 }, // Tổng DT
+            { wch: 25 }, // Thông tin QH
+            { wch: 10 }, { wch: 10 }, // Đất ở, NN
+            { wch: 15 }, { wch: 12 }, { wch: 25 } // Căn cứ, Số HĐ, Ghi chú
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_TachThua");
@@ -806,7 +815,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                 onClick={() => setListTab('sent')}
                                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${listTab === 'sent' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                             >
-                                <FolderCheck size={16} /> Đã chuyển
+                                <FolderCheck size={16} /> Đã chuyển chỉnh lý
                             </button>
                         </div>
 

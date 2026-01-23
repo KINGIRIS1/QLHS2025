@@ -52,7 +52,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     SO_THUA_CU: '', SO_TO_CU: '', 
     DT_CU: '0', DT_ODT: '0', DT_CLN: '0',
     HIEN_TRANG: 'Đất trống', LOAI_COC: 'Cọc bê tông', DT_MOI: '0', 
-    DT_BDDC_2024: '0', 
+    DT_BDDC_2024: '0',
     HO_GIAP_RANH: '...................................................................',
     NGUYEN_NHAN_TEXT: '', 
     NGUYEN_NHAN_BDDC: DEFAULT_BDDC_CAUSE,
@@ -259,46 +259,54 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
-    // --- GENERATE OWNERS HTML (LOGIC MỚI: TÁCH BIỆT 2 PHẦN) ---
-    // 1. Full (Có địa chỉ) - Dùng cho phần đầu "Tại khu đất của..."
+    // --- GENERATE OWNERS HTML (LOGIC MỚI CẬP NHẬT: GỘP NẾU CÙNG ĐỊA CHỈ) ---
     let ownersHtmlFull = "";
-    // 2. Simple (Không địa chỉ) - Dùng cho phần "Đại diện chủ sử dụng"
     let ownersHtmlSimple = "";
 
     if (formData.OWNERS && formData.OWNERS.length > 0) {
         
-        // 1. Generate Full HTML (Với logic tách dòng địa chỉ vợ/chồng nếu có)
+        // 1. Generate Full HTML
         ownersHtmlFull = formData.OWNERS.map((o: any) => {
             let html = "";
             
-            // Dòng chủ sở hữu chính
-            html += `<p style="margin-bottom: 5px;">${o.title}: <b>${o.name.toUpperCase()}</b></p>`;
-            
-            // Dòng địa chỉ chủ sở hữu chính (Luôn hiện nếu có)
-            if (o.address) {
-                html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>`;
-            }
-
-            // Nếu có vợ/chồng
+            // Check nếu có vợ/chồng
             if (o.hasSpouse) {
-                // Dòng tên vợ/chồng (Bắt đầu bằng "Và...")
-                html += `<p style="margin-bottom: 5px;">Và ${o.spouseTitle.toLowerCase()}: <b>${o.spouseName.toUpperCase()}</b></p>`;
-                
-                // Dòng địa chỉ vợ/chồng
-                // Ưu tiên địa chỉ riêng (spouseAddress), nếu không có thì lấy địa chỉ chung (address)
-                const spAddr = o.spouseAddress ? o.spouseAddress : o.address;
-                if (spAddr) {
-                    html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${spAddr}</p>`;
+                // Kiểm tra xem có nhập địa chỉ riêng cho vợ/chồng không
+                const isSameAddress = !o.spouseAddress || o.spouseAddress.trim() === '';
+
+                if (isSameAddress) {
+                    // TRƯỜNG HỢP CÙNG ĐỊA CHỈ: Gộp dòng tên
+                    html += `<p style="margin-bottom: 5px;">${o.title}: <b>${o.name.toUpperCase()}</b> Và ${o.spouseTitle.toLowerCase()}: <b>${o.spouseName.toUpperCase()}</b></p>`;
+                    // Hiển thị địa chỉ chung (của chồng/chủ)
+                    if (o.address) {
+                        html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>`;
+                    }
+                } else {
+                    // TRƯỜNG HỢP KHÁC ĐỊA CHỈ: Tách dòng
+                    html += `<p style="margin-bottom: 5px;">${o.title}: <b>${o.name.toUpperCase()}</b></p>`;
+                    if (o.address) {
+                        html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>`;
+                    }
+                    html += `<p style="margin-bottom: 5px;">Và ${o.spouseTitle.toLowerCase()}: <b>${o.spouseName.toUpperCase()}</b></p>`;
+                    if (o.spouseAddress) {
+                        html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.spouseAddress}</p>`;
+                    }
+                }
+            } else {
+                // Chỉ có 1 chủ
+                html += `<p style="margin-bottom: 5px;">${o.title}: <b>${o.name.toUpperCase()}</b></p>`;
+                if (o.address) {
+                    html += `<p style="margin-bottom: 5px;">Địa chỉ thường trú: ${o.address}</p>`;
                 }
             }
             return html;
         }).join('');
 
-        // 2. Generate Simple HTML (Vẫn giữ nguyên gộp dòng: "Ông A và Bà B")
+        // 2. Generate Simple HTML (Cho phần ký tên hoặc mục II)
         ownersHtmlSimple = formData.OWNERS.map((o: any) => {
             let line = `${o.title}: <b>${o.name.toUpperCase()}</b>`;
             if (o.hasSpouse) {
-                line += ` và ${o.spouseTitle}: <b>${o.spouseName.toUpperCase()}</b>`;
+                line += ` và ${o.spouseTitle.toLowerCase()}: <b>${o.spouseName.toUpperCase()}</b>`;
             }
             return `<p style="margin-bottom: 5px;">${line}</p>`;
         }).join('');

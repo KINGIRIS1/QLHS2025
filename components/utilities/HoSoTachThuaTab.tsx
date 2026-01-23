@@ -454,9 +454,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ TÁCH THỬA CHỜ LẬP" : "DANH SÁCH HỒ SƠ TÁCH THỬA ĐÃ CHUYỂN";
         
-        // Cập nhật Header cho Excel
-        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "TT Quy hoạch", "Mục đích SDĐ", "", "Tổng DT (m2)", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
-        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "Đất ở (m2)", "Đất NN (m2)", "", "", "", ""];
+        // Cập nhật Header cho Excel: Đưa Tổng DT lên trước TT Quy hoạch
+        const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "TT Quy hoạch", "Mục đích SDĐ", "", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
+        const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "Đất ở (m2)", "Đất NN (m2)", "", "", ""];
 
         XLSX.utils.sheet_add_aoa(ws, [
             [title], [""]
@@ -471,12 +471,13 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }); 
         
         // Merge Header Row 3 & 4
-        const simpleMerge = [0, 1, 11, 14, 15, 16, 17]; // STT, Xã, TTQH, TongDT, CanCu, SoHD, GhiChu
+        // STT(0), Xã(1), Tổng DT(11), TTQH(12), CanCu(15), SoHD(16), GhiChu(17)
+        const simpleMerge = [0, 1, 11, 12, 15, 16, 17];
         simpleMerge.forEach(c => merges.push({ s: { r: 2, c }, e: { r: 3, c } }));
         
         merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 5 } }); // Trước BĐ
         merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
-        merges.push({ s: { r: 2, c: 12 }, e: { r: 2, c: 13 } }); // Mục đích SD
+        merges.push({ s: { r: 2, c: 13 }, e: { r: 2, c: 14 } }); // Mục đích SD (Index mới)
 
         let currentRow = 5;
 
@@ -490,18 +491,23 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
-                d.THONG_TIN_QH, 
-                d.DT_ODT, d.DT_CLN, // Mới: Đất ở, Đất NN
-                d.TONG_DT,
+                
+                // --- ĐÃ ĐỔI THỨ TỰ ---
+                d.TONG_DT, // Index 11
+                d.THONG_TIN_QH, // Index 12
+                // ---------------------
+
+                d.DT_ODT, d.DT_CLN, // Mục đích SD
                 span > 0 ? d.CAN_CU_PHAP_LY : '', 
                 span > 0 ? d.SO_HD : '',          
                 span > 0 ? d.GHI_CHU : ''         
             ]);
 
             if (span > 1) {
-                // Merge common cols: STT(0), Xa(1), CanCu(15), SoHD(16), GhiChu(17)
-                // CỘNG THÊM: Merge cột Trước Biến Động (Tờ(2), Thửa(3), DT(4), Loại đất(5))
-                [0, 1, 2, 3, 4, 5, 15, 16, 17].forEach(colIdx => {
+                // Merge common cols
+                // STT(0), Xa(1), Trước BĐ(2,3,4,5), Tổng DT(11), Căn cứ(15), HĐ(16), Ghi chú(17)
+                // CHÚ Ý: Đã thêm 2,3,4,5 vào danh sách gộp theo yêu cầu
+                [0, 1, 2, 3, 4, 5, 11, 15, 16, 17].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });
             }
@@ -537,9 +543,10 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             { wch: 5 }, { wch: 15 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, 
             { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, 
+            { wch: 10 }, // Tổng DT
             { wch: 20 }, // Thông tin QH
             { wch: 10 }, { wch: 10 }, // Đất ở, Đất NN
-            { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 20 }
+            { wch: 25 }, { wch: 12 }, { wch: 20 }
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, "DS_TachThua");
@@ -627,9 +634,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <th className="p-2 border w-10 bg-gray-200">#</th>
                                         <th colSpan={4} className="p-2 border text-center bg-blue-50 text-blue-800">Thông tin Trước Biến Động</th>
                                         <th colSpan={5} className="p-2 border text-center bg-green-50 text-green-800">Thông tin Sau Biến Động (Tách Thửa)</th>
+                                        <th className="p-2 border w-24 bg-gray-200">Tổng DT</th>
                                         <th className="p-2 border w-32 bg-yellow-50 text-yellow-800">TT Quy hoạch</th>
                                         <th colSpan={2} className="p-2 border w-32 bg-purple-50 text-purple-800">Mục đích SD (m2)</th>
-                                        <th className="p-2 border w-24 bg-gray-200">Tổng DT</th>
                                         <th className="p-2 border w-10 bg-gray-200">Xóa</th>
                                     </tr>
                                     <tr>
@@ -645,12 +652,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <th className="p-2 border w-20 text-center bg-green-50">DT (m2)</th>
                                         <th className="p-2 border w-20 text-center bg-green-50">Loại đất</th>
                                         
+                                        <th className="bg-gray-200 border"></th>
                                         <th className="p-2 border bg-yellow-50"></th>
                                         
                                         <th className="p-2 border w-16 text-center bg-purple-50 text-purple-800">Đất ở</th>
                                         <th className="p-2 border w-16 text-center bg-purple-50 text-purple-800">Đất NN</th>
 
-                                        <th className="bg-gray-200 border"></th>
                                         <th className="bg-gray-200 border"></th>
                                     </tr>
                                 </thead>
@@ -684,19 +691,19 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                             <td className="border p-0"><input className={detailInputClass} value={row.DT_MOI} onChange={e => handleDetailChange(idx, 'DT_MOI', e.target.value)} /></td>
                                             <td className="border p-0"><input className={detailInputClass} value={row.LOAI_DAT_MOI} onChange={e => handleDetailChange(idx, 'LOAI_DAT_MOI', e.target.value)} /></td>
 
-                                            {/* THONG TIN QH */}
-                                            <td className="border p-0"><input className={`${detailInputClass} bg-yellow-50/30 text-left px-2`} value={row.THONG_TIN_QH || ''} onChange={e => handleDetailChange(idx, 'THONG_TIN_QH', e.target.value)} placeholder="..." /></td>
-
-                                            {/* MỤC ĐÍCH SỬ DỤNG (MỚI) */}
-                                            <td className="border p-0"><input className={`${detailInputClass} bg-purple-50/30 text-purple-800`} value={row.DT_ODT || ''} onChange={e => handleDetailChange(idx, 'DT_ODT', e.target.value)} placeholder="Nhập..." /></td>
-                                            <td className="border p-0 bg-gray-50"><input className={`${detailInputClass} bg-transparent text-gray-600 font-medium`} value={row.DT_CLN || ''} readOnly /></td>
-
                                             {/* TỔNG DT - GỘP Ô */}
                                             {idx === 0 ? (
                                                 <td className="border p-0 bg-white shadow-sm z-10 align-middle" rowSpan={detailRows.length}>
                                                     <input className={`${detailInputClass} font-bold h-auto min-h-[40px]`} value={row.TONG_DT} onChange={e => handleDetailChange(idx, 'TONG_DT', e.target.value)} />
                                                 </td>
                                             ) : null}
+
+                                            {/* THONG TIN QH */}
+                                            <td className="border p-0"><input className={`${detailInputClass} bg-yellow-50/30 text-left px-2`} value={row.THONG_TIN_QH || ''} onChange={e => handleDetailChange(idx, 'THONG_TIN_QH', e.target.value)} placeholder="..." /></td>
+
+                                            {/* MỤC ĐÍCH SỬ DỤNG (MỚI) */}
+                                            <td className="border p-0"><input className={`${detailInputClass} bg-purple-50/30 text-purple-800`} value={row.DT_ODT || ''} onChange={e => handleDetailChange(idx, 'DT_ODT', e.target.value)} placeholder="Nhập..." /></td>
+                                            <td className="border p-0 bg-gray-50"><input className={`${detailInputClass} bg-transparent text-gray-600 font-medium`} value={row.DT_CLN || ''} readOnly /></td>
                                             
                                             <td className="border text-center">
                                                 <button onClick={() => handleRemoveDetailRow(idx)} className="text-gray-300 hover:text-red-500 p-1"><X size={16}/></button>
@@ -821,8 +828,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Xã / Phường</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Trước BĐ</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Sau BĐ</th>
-                                        <th className="p-3 border-b border-r w-[120px] bg-white">Thông tin QH</th>
                                         <th className="p-3 border-b border-r w-[80px] bg-white">Tổng DT</th>
+                                        <th className="p-3 border-b border-r w-[120px] bg-white">Thông tin QH</th>
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Căn cứ pháp lý</th>
                                         <th className="p-3 border-b border-r w-[100px] bg-white">Số HĐ</th>
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Ghi chú</th>
@@ -886,16 +893,17 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                     <div>DT: {item.data.DT_MOI} ({item.data.LOAI_DAT_MOI})</div>
                                                 </td>
                                                 
-                                                <td className="p-2 border-r text-xs italic text-gray-600">
-                                                    {item.data.THONG_TIN_QH || ''}
-                                                </td>
-
                                                 {/* COMMON COLUMNS (Right side) */}
                                                 {shouldRenderCommon && (
                                                     <td className="p-3 text-center border-r align-middle font-bold bg-white" rowSpan={rowSpan}>
                                                         {item.data.TONG_DT}
                                                     </td>
                                                 )}
+
+                                                <td className="p-2 border-r text-xs italic text-gray-600">
+                                                    {item.data.THONG_TIN_QH || ''}
+                                                </td>
+
                                                 {shouldRenderCommon && (
                                                     <td className="p-3 text-xs text-gray-500 border-r align-middle bg-white" rowSpan={rowSpan}>
                                                         {item.data.CAN_CU_PHAP_LY}

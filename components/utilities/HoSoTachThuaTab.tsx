@@ -454,7 +454,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
         const title = listTab === 'pending' ? "DANH SÁCH HỒ SƠ TÁCH THỬA CHỜ LẬP" : "DANH SÁCH HỒ SƠ TÁCH THỬA ĐÃ CHUYỂN";
         
-        // Cập nhật Header cho Excel: Đưa Tổng DT lên trước TT Quy hoạch
+        // Cập nhật Header cho Excel
         const header1 = ["STT", "Xã, Phường", "Thông tin trước biến động", "", "", "", "Thông tin sau biến động", "", "", "", "", "Tổng DT (m2)", "TT Quy hoạch", "Mục đích SDĐ", "", "Căn cứ pháp lý", "Số HĐ", "Ghi chú"];
         const header2 = ["", "", "Tờ BĐĐC", "Số thửa", "Diện tích (m2)", "Loại đất", "Tờ BĐĐC", "Số thửa tạm", "Số thửa chính thức", "Diện tích (m2)", "Loại đất", "", "", "Đất ở (m2)", "Đất NN (m2)", "", "", ""];
 
@@ -479,7 +479,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         merges.push({ s: { r: 2, c: 6 }, e: { r: 2, c: 10 } }); // Sau BĐ
         merges.push({ s: { r: 2, c: 13 }, e: { r: 2, c: 14 } }); // Mục đích SD (Index mới)
 
-        let currentRow = 5;
+        // CHỈNH SỬA: currentRow phải bắt đầu từ 4 (vì data start ở A5, tức index 4)
+        let currentRow = 4;
 
         for (let i = 0; i < groupedList.length; i++) {
             const item = groupedList[i];
@@ -491,13 +492,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                 span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
-                
-                // --- ĐÃ ĐỔI THỨ TỰ ---
-                d.TONG_DT, // Index 11
-                d.THONG_TIN_QH, // Index 12
-                // ---------------------
-
-                d.DT_ODT, d.DT_CLN, // Mục đích SD
+                d.TONG_DT,
+                d.THONG_TIN_QH,
+                d.DT_ODT, d.DT_CLN, 
                 span > 0 ? d.CAN_CU_PHAP_LY : '', 
                 span > 0 ? d.SO_HD : '',          
                 span > 0 ? d.GHI_CHU : ''         
@@ -506,7 +503,6 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             if (span > 1) {
                 // Merge common cols
                 // STT(0), Xa(1), Trước BĐ(2,3,4,5), Tổng DT(11), Căn cứ(15), HĐ(16), Ghi chú(17)
-                // CHÚ Ý: Đã thêm 2,3,4,5 vào danh sách gộp theo yêu cầu
                 [0, 1, 2, 3, 4, 5, 11, 15, 16, 17].forEach(colIdx => {
                     merges.push({ s: { r: currentRow, c: colIdx }, e: { r: currentRow + span - 1, c: colIdx } });
                 });

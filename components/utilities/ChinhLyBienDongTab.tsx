@@ -513,10 +513,14 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         const footerStartRow = currentRow + 1; // 1 spacer row
         const currentYear = new Date().getFullYear();
 
-        XLSX.utils.sheet_add_aoa(ws, [
-            [`Ngày      tháng      năm ${currentYear}`, "", "", "", "", "", "", "", "", "", "", "", "", "", `Ngày      tháng      năm ${currentYear}`],
-            ["Người đề xuất", "", "", "", "", "", "", "", "", "", "", "", "", "", "Giám Đốc"]
-        ], { origin: { r: footerStartRow, c: 0 } });
+        // CHÚ Ý: Footer Text được đặt ở Index 11 (start column of right merge)
+        // Mảng dữ liệu: Index 0=Left, Index 1..10=Empty, Index 11=Right
+        const footerData = [
+            [`Ngày      tháng      năm ${currentYear}`, "", "", "", "", "", "", "", "", "", "", `Ngày      tháng      năm ${currentYear}`],
+            ["Người đề xuất", "", "", "", "", "", "", "", "", "", "", "Giám Đốc"]
+        ];
+
+        XLSX.utils.sheet_add_aoa(ws, footerData, { origin: { r: footerStartRow, c: 0 } });
 
         // Footer Merges: Left side (0-3) and Right side (11-14)
         merges.push({ s: { r: footerStartRow, c: 0 }, e: { r: footerStartRow, c: 3 } });
@@ -558,7 +562,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
-        // Apply Footer Styles
+        // Apply Footer Styles (Targeting index 0 and index 11)
         const leftDate = XLSX.utils.encode_cell({r: footerStartRow, c: 0});
         const leftSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 0});
         const rightDate = XLSX.utils.encode_cell({r: footerStartRow, c: 11});

@@ -173,7 +173,23 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     return `${time} ${d}/${m}`;
   };
 
-  const getDeadlineStatus = (deadlineStr?: string) => {
+  const getDeadlineStatus = (record: RecordFile) => {
+      // 1. Kiểm tra nếu đã hoàn thành/xuất hồ sơ thì KHÔNG tính trễ hạn
+      // Nếu có exportBatch hoặc exportDate hoặc status là HANDOVER/RETURNED/SIGNED -> Coi như xong
+      if (
+          record.status === RecordStatus.HANDOVER || 
+          record.status === RecordStatus.RETURNED || 
+          record.status === RecordStatus.WITHDRAWN ||
+          record.status === RecordStatus.SIGNED ||
+          record.exportBatch || 
+          record.exportDate ||
+          record.resultReturnedDate
+      ) {
+           return { color: 'text-gray-600', icon: null, text: '' };
+      }
+
+      // 2. Nếu chưa xong, kiểm tra deadline
+      const deadlineStr = record.deadline;
       if (!deadlineStr) return { color: 'text-gray-600', icon: null, text: '' };
       
       const today = new Date();
@@ -324,7 +340,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {paginatedDisplayRecords.map((r, index) => {
-                            const deadlineStatus = getDeadlineStatus(r.deadline || undefined);
+                            const deadlineStatus = getDeadlineStatus(r);
                             const rowClass = activeTab === 'reminder' ? 'hover:bg-pink-50/50 bg-pink-50/10' : 'hover:bg-blue-50/50';
                             
                             return (

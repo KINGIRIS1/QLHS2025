@@ -1,9 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { RecordFile, Employee, User, UserRole, Contract, SplitItem, RecordStatus } from '../types';
-import { STATUS_LABELS, getNormalizedWard } from '../constants';
+import React, { useState, useEffect } from 'react';
+import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
+import { getNormalizedWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, Calendar, FileText, User as UserIcon, Info, Phone, Lock, ShieldAlert, Printer, Trash2, Pencil, Loader2, StickyNote, Save, Bell, Receipt, DollarSign, CheckCircle2, Circle, Clock, ArrowDown, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
@@ -456,7 +456,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             <div>
                                 <label className="text-xs text-gray-500 uppercase font-semibold">Số điện thoại</label>
                                 <div className="flex items-center gap-2 mt-1">
-                                    <Phone size={14} className="text-gray-400" />
+                                    <span className="text-gray-400"><UserIcon size={14} /></span>
                                     <p className="text-base font-medium text-gray-900">{record.phoneNumber || '---'}</p>
                                 </div>
                             </div>
@@ -599,7 +599,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     {record.privateNotes && (
                       <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 shadow-inner">
                         <div className="flex items-center gap-2 mb-2 text-yellow-800 font-bold text-sm">
-                            <Lock size={16} />
+                            <Info size={16} />
                             <span>Ghi chú nội bộ</span>
                             <span className="text-[10px] font-normal px-2 py-0.5 bg-yellow-200 rounded-full border border-yellow-300">Admin Only</span>
                         </div>

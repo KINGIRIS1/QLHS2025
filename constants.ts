@@ -13,6 +13,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
   [RecordStatus.ASSIGNED]: 'Đã giao việc',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
+  [RecordStatus.COMPLETED_WORK]: 'Đã thực hiện', // MỚI
   [RecordStatus.PENDING_SIGN]: 'Chờ ký kiểm tra',
   [RecordStatus.SIGNED]: 'Đã ký duyệt',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
@@ -24,6 +25,7 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'bg-gray-100 text-gray-800',
   [RecordStatus.ASSIGNED]: 'bg-blue-100 text-blue-800',
   [RecordStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800',
+  [RecordStatus.COMPLETED_WORK]: 'bg-cyan-100 text-cyan-800', // MỚI
   [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
   [RecordStatus.SIGNED]: 'bg-indigo-100 text-indigo-800',
   [RecordStatus.HANDOVER]: 'bg-green-100 text-green-800',

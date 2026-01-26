@@ -300,6 +300,13 @@ function App() {
               updates.exportBatch = null;
               updates.exportDate = null;
               break;
+          // MỚI: Trạng thái Đã thực hiện
+          case RecordStatus.COMPLETED_WORK:
+              // Giữ nguyên assignedDate
+              updates.submissionDate = null; 
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              break;
           case RecordStatus.PENDING_SIGN:
               updates.submissionDate = todayStr; 
               updates.approvalDate = null;
@@ -400,7 +407,8 @@ function App() {
           setIsAssignModalOpen(true); 
           return; 
       }
-      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+      // UPDATE: Thêm COMPLETED_WORK vào luồng
+      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];

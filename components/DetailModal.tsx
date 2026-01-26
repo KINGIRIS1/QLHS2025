@@ -570,31 +570,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         </div>
                     </div>
 
-                    {/* Ghi chú cá nhân */}
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-inner">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 text-blue-800 font-bold text-sm">
-                                <StickyNote size={16} />
-                                <span>Ghi chú cá nhân (Của bạn)</span>
-                            </div>
-                            <button 
-                                onClick={handleSavePersonalNote} 
-                                disabled={isSavingNote}
-                                className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-all"
-                            >
-                                {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                Lưu ghi chú
-                            </button>
-                        </div>
-                        <textarea
-                            rows={3}
-                            className="w-full bg-white border border-blue-300 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            placeholder="Nhập ghi chú riêng của bạn về hồ sơ này..."
-                            value={personalNote}
-                            onChange={(e) => setPersonalNote(e.target.value)}
-                        />
-                    </div>
-
                     {/* Ghi chú nội bộ */}
                     {record.privateNotes && (
                       <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 shadow-inner">
@@ -666,6 +641,17 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         </div>
                     </div>
 
+                    {/* EMPLOYEE INFO */}
+                    <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
+                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Người xử lý hồ sơ</h4>
+                        <div className="flex items-center gap-3 p-3 bg-white rounded-lg text-sm font-bold text-gray-700 border border-gray-200 shadow-sm">
+                            <div className="bg-gray-100 p-2 rounded-full">
+                                <UserIcon size={16} className="text-gray-600"/>
+                            </div>
+                            {getEmployeeName(record.assignedTo)}
+                        </div>
+                    </div>
+
                     {/* REMINDER CARD */}
                     <div className="bg-pink-50 p-5 rounded-xl border border-pink-200 shadow-sm">
                         <div className="flex justify-between items-center mb-3">
@@ -691,15 +677,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         </p>
                     </div>
 
-                    {/* EMPLOYEE INFO */}
-                    <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
-                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Người xử lý hồ sơ</h4>
-                        <div className="flex items-center gap-3 p-3 bg-white rounded-lg text-sm font-bold text-gray-700 border border-gray-200 shadow-sm">
-                            <div className="bg-gray-100 p-2 rounded-full">
-                                <UserIcon size={16} className="text-gray-600"/>
+                    {/* Ghi chú cá nhân */}
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-inner">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 text-blue-800 font-bold text-sm">
+                                <StickyNote size={16} />
+                                <span>Ghi chú cá nhân (Của bạn)</span>
                             </div>
-                            {getEmployeeName(record.assignedTo)}
+                            <button 
+                                onClick={handleSavePersonalNote} 
+                                disabled={isSavingNote}
+                                className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-all"
+                            >
+                                {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                Lưu ghi chú
+                            </button>
                         </div>
+                        <textarea
+                            rows={3}
+                            className="w-full bg-white border border-blue-300 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            placeholder="Nhập ghi chú riêng của bạn về hồ sơ này..."
+                            value={personalNote}
+                            onChange={(e) => setPersonalNote(e.target.value)}
+                        />
                     </div>
 
                     {record.exportBatch && (
@@ -722,6 +722,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             docxBlob={previewBlob}
             fileName={previewFileName}
         />
+      </div>
     </div>
   );
 };

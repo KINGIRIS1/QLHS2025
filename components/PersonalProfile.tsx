@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
@@ -34,7 +34,8 @@ function removeVietnameseTones(str: string): string {
 }
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'reminder'>('pending');
+  // Thêm tab 'completed_work' và 'pending_sign'
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'reminder'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -48,43 +49,32 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     return records.filter(r => user.employeeId && r.assignedTo === user.employeeId);
   }, [records, user.employeeId]);
   
-  // 1. Hồ sơ Đang thực hiện
+  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS)
   const pendingRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
-
-      if (searchTerm) {
-          const lowerSearch = removeVietnameseTones(searchTerm);
-          const rawSearch = searchTerm.toLowerCase();
-          list = list.filter(r => {
-             const nameNorm = removeVietnameseTones(r.customerName || '');
-             const codeRaw = (r.code || '').toLowerCase();
-             const wardNorm = removeVietnameseTones(r.ward || '');
-             
-             return nameNorm.includes(lowerSearch) || codeRaw.includes(rawSearch) || wardNorm.includes(lowerSearch);
-          });
-      }
-
-      return list.sort((a, b) => {
-          const aValue = a[sortConfig.key];
-          const bValue = b[sortConfig.key];
-
-          if (!aValue) return 1;
-          if (!bValue) return -1;
-
-          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          return 0;
-      });
+      return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
-  // 2. Hồ sơ Có hẹn nhắc việc
+  // 2. Hồ sơ Đã thực hiện (COMPLETED_WORK)
+  const completedWorkRecords = useMemo(() => {
+      let list = myRecords.filter(r => r.status === RecordStatus.COMPLETED_WORK);
+      return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
+  // 3. Hồ sơ Chờ ký (PENDING_SIGN) - Chuyển thành Tab chính
+  const reviewRecords = useMemo(() => {
+      let list = myRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
+      return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
+  // 4. Hồ sơ Có hẹn nhắc việc
   const reminderRecords = useMemo(() => {
       let list = myRecords.filter(r => 
           r.reminderDate && 
           r.status !== RecordStatus.HANDOVER && 
           r.status !== RecordStatus.WITHDRAWN
       );
-
+      // Logic search & sort riêng cho reminder
       if (searchTerm) {
           const lowerSearch = removeVietnameseTones(searchTerm);
           const rawSearch = searchTerm.toLowerCase();
@@ -94,8 +84,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
              return nameNorm.includes(lowerSearch) || codeRaw.includes(rawSearch);
           });
       }
-
-      // Mặc định sắp xếp theo thời gian nhắc (gần nhất lên đầu)
       return list.sort((a, b) => {
           const timeA = new Date(a.reminderDate!).getTime();
           const timeB = new Date(b.reminderDate!).getTime();
@@ -103,11 +91,38 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       });
   }, [myRecords, searchTerm]);
 
-  const reviewRecords = myRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
-  const completedRecords = myRecords.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER);
+  // Helper filter & sort chung
+  function filterAndSort(list: RecordFile[], term: string, sort: any) {
+      if (term) {
+          const lowerSearch = removeVietnameseTones(term);
+          const rawSearch = term.toLowerCase();
+          list = list.filter(r => {
+             const nameNorm = removeVietnameseTones(r.customerName || '');
+             const codeRaw = (r.code || '').toLowerCase();
+             const wardNorm = removeVietnameseTones(r.ward || '');
+             return nameNorm.includes(lowerSearch) || codeRaw.includes(rawSearch) || wardNorm.includes(lowerSearch);
+          });
+      }
+      return list.sort((a, b) => {
+          const aValue = a[sort.key as keyof RecordFile];
+          const bValue = b[sort.key as keyof RecordFile];
+          if (!aValue) return 1;
+          if (!bValue) return -1;
+          if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+          return 0;
+      });
+  }
+
+  // Tổng hợp các chỉ số
+  const completedTotal = myRecords.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER).length;
 
   // Xác định danh sách hiển thị dựa trên Tab đang chọn
-  const displayRecords = activeTab === 'pending' ? pendingRecords : reminderRecords;
+  const displayRecords = 
+      activeTab === 'pending' ? pendingRecords : 
+      activeTab === 'completed_work' ? completedWorkRecords :
+      activeTab === 'pending_sign' ? reviewRecords :
+      reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
   
@@ -124,8 +139,18 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       setSortConfig({ key, direction });
   };
 
+  // --- ACTIONS ---
+  
+  // 1. Chuyển sang ĐÃ THỰC HIỆN (Từ tab Đang thực hiện)
+  const handleMarkAsDone = async (record: RecordFile) => {
+    if (await confirmAction(`Xác nhận đã hoàn thành công việc cho hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã thực hiện".`)) {
+      onUpdateStatus(record, RecordStatus.COMPLETED_WORK);
+    }
+  };
+
+  // 2. Chuyển sang CHỜ KÝ (Từ tab Đã thực hiện)
   const handleForwardToSign = async (record: RecordFile) => {
-    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?\nHãy chắc chắn bạn đã hoàn thành công việc.`)) {
+    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?`)) {
       onUpdateStatus(record, RecordStatus.PENDING_SIGN);
     }
   };
@@ -187,69 +212,79 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             <h2 className="text-xl font-bold text-gray-800 mb-2">Tài khoản chưa liên kết nhân sự</h2>
             <p className="text-gray-600 max-w-md mb-6">
                 Tài khoản <strong>{user.username}</strong> hiện là quản trị viên hệ thống nhưng chưa được liên kết với hồ sơ nhân viên cụ thể.
-                <br/><br/>
-                Để xem danh sách công việc cá nhân, vui lòng vào menu <strong>Quản lý tài khoản</strong> và cập nhật thông tin "Liên kết hồ sơ nhân viên".
             </p>
-            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
-                <AlertTriangle size={16} />
-                <span>Gợi ý: Nếu bạn muốn xem tất cả hồ sơ, hãy dùng menu <strong>"Tất cả hồ sơ"</strong>.</span>
-            </div>
         </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full space-y-4 animate-fade-in-up overflow-hidden">
-      {/* Header thống kê - FIXED (SHRINK-0) */}
+      {/* Header thống kê */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
              <Briefcase className="text-blue-600" />
              Xin chào, {user.name}
           </h2>
-          <p className="text-gray-500 mt-1">Dưới đây là danh sách hồ sơ bạn đang phụ trách.</p>
+          <p className="text-gray-500 mt-1">Danh sách hồ sơ bạn đang phụ trách.</p>
         </div>
         <div className="flex gap-4 w-full md:w-auto justify-center">
              <div className="flex-1 md:flex-none text-center px-4 py-2 bg-blue-50 rounded-lg border border-blue-100 min-w-[100px]">
                 <div className="text-2xl font-bold text-blue-700">{pendingRecords.length}</div>
                 <div className="text-xs text-blue-600 uppercase font-semibold">Đang xử lý</div>
              </div>
+             <div className="flex-1 md:flex-none text-center px-4 py-2 bg-cyan-50 rounded-lg border border-cyan-100 min-w-[100px]">
+                <div className="text-2xl font-bold text-cyan-700">{completedWorkRecords.length}</div>
+                <div className="text-xs text-cyan-600 uppercase font-semibold">Đã thực hiện</div>
+             </div>
              <div className="flex-1 md:flex-none text-center px-4 py-2 bg-purple-50 rounded-lg border border-purple-100 min-w-[100px]">
                 <div className="text-2xl font-bold text-purple-700">{reviewRecords.length}</div>
                 <div className="text-xs text-purple-600 uppercase font-semibold">Chờ ký</div>
              </div>
              <div className="flex-1 md:flex-none text-center px-4 py-2 bg-green-50 rounded-lg border border-green-100 min-w-[100px]">
-                <div className="text-2xl font-bold text-green-700">{completedRecords.length}</div>
+                <div className="text-2xl font-bold text-green-700">{completedTotal}</div>
                 <div className="text-xs text-green-600 uppercase font-semibold">Hoàn thành</div>
              </div>
         </div>
       </div>
 
-      {/* DANH SÁCH CÔNG VIỆC CHÍNH (SCROLLABLE CONTENT) */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         
-        {/* TAB NAVIGATION & SEARCH */}
+        {/* TABS & SEARCH */}
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-            <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+            <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm overflow-x-auto max-w-full">
                 <button 
                     onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
-                        activeTab === 'pending' 
-                        ? 'bg-blue-600 text-white shadow-sm' 
-                        : 'text-gray-600 hover:bg-gray-100'
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'pending' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
                     <Clock size={16} /> Đang thực hiện ({pendingRecords.length})
                 </button>
                 <button 
-                    onClick={() => { setActiveTab('reminder'); setCurrentPage(1); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
-                        activeTab === 'reminder' 
-                        ? 'bg-pink-600 text-white shadow-sm' 
-                        : 'text-gray-600 hover:bg-gray-100'
+                    onClick={() => { setActiveTab('completed_work'); setCurrentPage(1); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'completed_work' ? 'bg-cyan-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
-                    <Bell size={16} /> Có hẹn nhắc việc ({reminderRecords.length})
+                    <CheckSquare size={16} /> Đã thực hiện ({completedWorkRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('pending_sign'); setCurrentPage(1); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'pending_sign' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <Send size={16} /> Chờ ký ({reviewRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('reminder'); setCurrentPage(1); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'reminder' ? 'bg-pink-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <Bell size={16} /> Nhắc việc ({reminderRecords.length})
                 </button>
             </div>
             
@@ -275,26 +310,21 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                             <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
                             <th className="p-3 w-[130px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
                             
-                            {/* Cột thời gian thay đổi tùy theo Tab */}
                             <th className="p-3 w-[150px]">
-                                {activeTab === 'pending' 
-                                    ? renderSortHeader('Hẹn trả', 'deadline') 
-                                    : <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>
+                                {activeTab === 'reminder' 
+                                    ? <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>
+                                    : renderSortHeader('Hẹn trả', 'deadline')
                                 }
                             </th>
                             
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
-                            
-                            {/* Cột Chỉnh lý BĐ - CẬP NHẬT: Thay checkbox bằng button */}
                             <th className="p-3 text-center w-[100px]">Chỉnh lý</th>
-
                             <th className="p-3 text-center w-[180px]">Thao tác chính</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {paginatedDisplayRecords.map((r, index) => {
                             const deadlineStatus = getDeadlineStatus(r.deadline || undefined);
-                            // Highlight màu hồng nhạt nếu là tab reminder
                             const rowClass = activeTab === 'reminder' ? 'hover:bg-pink-50/50 bg-pink-50/10' : 'hover:bg-blue-50/50';
                             
                             return (
@@ -304,25 +334,23 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                     <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName || ''}>{r.customerName}</div></td>
                                     <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType || ''}>{getShortRecordType(r.recordType || undefined)}</div></td>
                                     
-                                    {/* Hiển thị thời gian */}
                                     <td className="p-3 align-middle">
-                                        {activeTab === 'pending' ? (
+                                        {activeTab === 'reminder' ? (
+                                            <div className="flex items-center gap-1.5 text-pink-700 font-bold bg-pink-100 px-2 py-1 rounded w-fit text-xs">
+                                                <Bell size={12} className="fill-pink-700"/>
+                                                {formatDateTime(r.reminderDate || undefined)}
+                                            </div>
+                                        ) : (
                                             <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>
                                                 {deadlineStatus.icon}
                                                 <span>{formatDate(r.deadline || undefined)}</span>
                                                 <span className="text-[10px] uppercase ml-1">{deadlineStatus.text}</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-1.5 text-pink-700 font-bold bg-pink-100 px-2 py-1 rounded w-fit text-xs">
-                                                <Bell size={12} className="fill-pink-700"/>
-                                                {formatDateTime(r.reminderDate || undefined)}
                                             </div>
                                         )}
                                     </td>
 
                                     <td className="p-3 text-center align-middle"><StatusBadge status={r.status} /></td>
                                     
-                                    {/* BUTTON CHỈNH LÝ (Thay thế checkbox) */}
                                     <td className="p-3 text-center align-middle">
                                         {onMapCorrection && (
                                             <button 
@@ -342,31 +370,31 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
 
                                     <td className="p-3 align-middle">
                                         <div className="flex justify-center gap-2">
-                                            <button 
-                                                onClick={() => onViewRecord(r)}
-                                                className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm"
-                                            >
+                                            <button onClick={() => onViewRecord(r)} className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm">
                                                 Chi tiết
                                             </button>
                                             
                                             {/* Nút Thanh lý */}
                                             {onCreateLiquidation && (
-                                                <button 
-                                                    onClick={() => onCreateLiquidation(r)}
-                                                    className="px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
-                                                    title="Thanh lý hợp đồng"
-                                                >
+                                                <button onClick={() => onCreateLiquidation(r)} className="px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" title="Thanh lý hợp đồng">
                                                     <FileCheck size={14} /> Thanh lý
                                                 </button>
                                             )}
 
-                                            <button 
-                                                onClick={() => handleForwardToSign(r)}
-                                                title="Chuyển sang bước Ký kiểm tra"
-                                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
-                                            >
-                                                Trình kiểm tra <Send size={14} />
-                                            </button>
+                                            {/* Logic nút chuyển trạng thái theo từng Tab */}
+                                            {activeTab === 'pending' && (
+                                                <button onClick={() => handleMarkAsDone(r)} title="Đánh dấu đã xong việc" className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
+                                                    Đã thực hiện <CheckSquare size={14} />
+                                                </button>
+                                            )}
+
+                                            {activeTab === 'completed_work' && (
+                                                <button onClick={() => handleForwardToSign(r)} title="Chuyển sang bước Ký kiểm tra" className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
+                                                    Trình ký <Send size={14} />
+                                                </button>
+                                            )}
+                                            
+                                            {/* Tab Chờ ký không có nút hành động (chỉ xem) */}
                                         </div>
                                     </td>
                                 </tr>
@@ -377,7 +405,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                     <CheckCircle size={48} className="text-gray-200 mb-2" />
-                    <p>{searchTerm ? 'Không tìm thấy hồ sơ phù hợp.' : (activeTab === 'pending' ? 'Tuyệt vời! Bạn không còn hồ sơ tồn đọng.' : 'Không có lịch hẹn nhắc việc nào.')}</p>
+                    <p>{searchTerm ? 'Không tìm thấy hồ sơ phù hợp.' : 'Không có hồ sơ nào trong danh sách này.'}</p>
                 </div>
             )}
         </div>
@@ -389,78 +417,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, displayRecords.length)}</strong> trên tổng <strong>{displayRecords.length}</strong>
                 </span>
                 <div className="flex items-center gap-1">
-                    <button 
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <ChevronLeft size={18} />
-                    </button>
-                    {Array.from({ length: totalPages }).map((_, idx) => (
-                         <button
-                            key={idx}
-                            onClick={() => setCurrentPage(idx + 1)}
-                            className={`w-7 h-7 flex items-center justify-center rounded text-xs font-medium transition-all ${
-                                currentPage === idx + 1 
-                                ? 'bg-blue-600 text-white shadow-sm' 
-                                : 'hover:bg-gray-200 text-gray-600'
-                            }`}
-                        >
-                            {idx + 1}
-                        </button>
-                    ))}
-                    <button 
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <ChevronRight size={18} />
-                    </button>
+                    <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={18} /></button>
+                    <span className="text-xs font-medium mx-2">Trang {currentPage} / {totalPages}</span>
+                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={18} /></button>
                 </div>
             </div>
-        )}
-      </div>
-
-       {/* DANH SÁCH CHỜ KÝ (Scrollable within limits) */}
-       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-90 shrink-0 max-h-64 flex flex-col">
-        <div className="p-4 border-b border-gray-100 bg-purple-50 flex items-center gap-2 shrink-0">
-            <CheckCircle size={18} className="text-purple-600" />
-            <h3 className="font-bold text-gray-800">Đã trình ký / Chờ kết quả ({reviewRecords.length})</h3>
-        </div>
-        {reviewRecords.length > 0 ? (
-            <div className="overflow-y-auto">
-                <table className="w-full text-left table-fixed">
-                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0 shadow-sm">
-                        <tr>
-                            <th className="p-3 w-[120px]">Mã HS</th>
-                            <th className="p-3 w-[200px]">Chủ sử dụng</th>
-                            <th className="p-3 w-[120px]">Ngày nộp</th>
-                            <th className="p-3 text-center w-[120px]">Trạng thái</th>
-                            <th className="p-3 text-right w-[80px]">Chi tiết</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-sm">
-                        {reviewRecords.map(r => (
-                            <tr key={r.id} className="hover:bg-gray-50">
-                                <td className="p-3 font-medium text-gray-700 truncate" title={r.code || ''}>{r.code}</td>
-                                <td className="p-3 truncate" title={r.customerName || ''}>{r.customerName}</td>
-                                <td className="p-3 text-gray-500">{formatDate(r.receivedDate || undefined)}</td>
-                                <td className="p-3 text-center"><StatusBadge status={r.status} /></td>
-                                <td className="p-3 text-right">
-                                    <button 
-                                        onClick={() => onViewRecord(r)}
-                                        className="text-blue-600 hover:underline text-xs"
-                                    >
-                                        Xem
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        ) : (
-            <div className="p-4 text-center text-sm text-gray-400 italic">Chưa có hồ sơ nào đang chờ ký.</div>
         )}
       </div>
     </div>

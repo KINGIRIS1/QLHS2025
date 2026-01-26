@@ -4,7 +4,8 @@ export enum RecordStatus {
   RECEIVED = 'RECEIVED',         // Tiếp nhận
   ASSIGNED = 'ASSIGNED',         // Giao nhân viên
   IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
-  PENDING_SIGN = 'PENDING_SIGN', // Chờ ký kiểm tra
+  COMPLETED_WORK = 'COMPLETED_WORK', // Đã thực hiện (Mới: Nhân viên làm xong, chưa trình)
+  PENDING_SIGN = 'PENDING_SIGN', // Chờ ký kiểm tra (Đã trình)
   SIGNED = 'SIGNED',             // Đã ký (Lập danh sách ký)
   HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
   RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)

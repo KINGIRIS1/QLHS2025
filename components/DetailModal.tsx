@@ -336,25 +336,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   };
 
   // Helper cho Timeline
-  const TimelineItem = ({ date, label, icon: Icon, isLast, colorClass }: any) => (
-      <div className="relative flex gap-4">
-          <div className="flex flex-col items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 bg-white ${date ? colorClass.border : 'border-gray-200'}`}>
-                  {date ? <CheckCircle2 size={16} className={colorClass.text} /> : <Circle size={16} className="text-gray-300" />}
+  // Updated: Hỗ trợ forceActive cho các bước không có ngày tháng cụ thể
+  const TimelineItem = ({ date, label, icon: Icon, isLast, colorClass, forceActive }: any) => {
+      const isActive = !!date || !!forceActive;
+      return (
+          <div className="relative flex gap-4">
+              <div className="flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 bg-white ${isActive ? colorClass.border : 'border-gray-200'}`}>
+                      {isActive ? <CheckCircle2 size={16} className={colorClass.text} /> : <Circle size={16} className="text-gray-300" />}
+                  </div>
+                  {!isLast && <div className={`w-0.5 grow ${isActive ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
               </div>
-              {!isLast && <div className={`w-0.5 grow ${date ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
-          </div>
-          <div className={`pb-6 ${!isLast ? '' : ''}`}>
-              <p className={`text-xs font-bold uppercase mb-0.5 ${date ? colorClass.text : 'text-gray-400'}`}>{label}</p>
-              <div className="flex items-center gap-2">
-                  <Icon size={14} className={date ? 'text-gray-500' : 'text-gray-300'} />
-                  <span className={`text-sm font-medium ${date ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-                      {formatDate(date) || 'Chưa thực hiện'}
-                  </span>
+              <div className={`pb-6 ${!isLast ? '' : ''}`}>
+                  <p className={`text-xs font-bold uppercase mb-0.5 ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
+                  <div className="flex items-center gap-2">
+                      <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
+                      <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                          {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
+                      </span>
+                  </div>
               </div>
           </div>
-      </div>
-  );
+      );
+  };
 
   // LOGIC HIỂN THỊ STATUS
   const getDisplayStatus = (r: RecordFile) => {
@@ -364,6 +368,15 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       return r.status;
   };
   const displayStatus = getDisplayStatus(record);
+
+  // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
+  const isWorkDone = [
+      RecordStatus.COMPLETED_WORK,
+      RecordStatus.PENDING_SIGN,
+      RecordStatus.SIGNED,
+      RecordStatus.HANDOVER,
+      RecordStatus.RETURNED
+  ].includes(record.status);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -613,6 +626,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={UserIcon}
                                 colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
                             />
+                            
+                            {/* MỚI: BƯỚC ĐÃ THỰC HIỆN */}
+                            <TimelineItem 
+                                date={null} 
+                                forceActive={isWorkDone}
+                                label="ĐÃ THỰC HIỆN" 
+                                icon={CheckSquare}
+                                colorClass={{text: 'text-cyan-700', border: 'border-cyan-600', bg: 'bg-cyan-600'}}
+                            />
+
                             <TimelineItem 
                                 date={record.submissionDate} 
                                 label="TRÌNH KÝ" 

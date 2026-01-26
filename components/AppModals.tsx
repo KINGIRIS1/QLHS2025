@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { RecordFile, Employee, User, RecordStatus } from '../types';
 import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
 import SystemSettingsModal from './SystemSettingsModal';
 import AssignModal from './AssignModal';
-import DetailModal from './DetailModal';
+import { DetailModal } from './DetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';

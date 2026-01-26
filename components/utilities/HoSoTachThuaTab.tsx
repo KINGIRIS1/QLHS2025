@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserType, RecordFile } from '../../types';
+import { User as UserType, RecordFile, NotifyFunction } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { TachThuaRecord, fetchTachThuaRecords, saveTachThuaRecord, deleteTachThuaRecord } from '../../services/apiUtilities';
-import { NotifyFunction } from '../../components/UtilitiesView';
 import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, Layers, CheckSquare, Square, ArrowRight, FolderCheck, RotateCcw, AlertTriangle, CheckCircle2, X, Grid } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
@@ -758,7 +758,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                     <tr>
                                         <td colSpan={15} className="p-2 border-t bg-gray-50">
                                             <button onClick={handleAddDetailRow} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mx-auto px-3 py-1 bg-white border border-blue-200 rounded-full shadow-sm hover:shadow">
-                                                <Plus size={14}/> Thêm dòng thửa đất
+                                                <Plus size={14}/> Thêm dòng tách thửa
                                             </button>
                                         </td>
                                     </tr>
@@ -766,16 +766,16 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                 {/* FOOTER: HIỂN THỊ TỔNG CỘNG ĐỂ KIỂM TRA */}
                                 <tfoot>
                                     <tr className="bg-gray-100 font-bold border-t-2 border-gray-300 text-sm">
-                                        <td colSpan={3} className="p-2 text-right text-gray-600 border-r border-gray-200">Tổng cộng Trước:</td>
+                                        <td colSpan={3} className="p-2 text-right text-gray-600 border-r border-gray-200">Tổng cộng (Gốc):</td>
                                         <td className={`p-2 text-center border-r border-gray-200 ${calculateTotals.isMismatch ? 'text-red-600' : 'text-blue-600'}`}>
                                             {calculateTotals.totalBefore}
                                         </td>
                                         <td className="p-2 border-r border-gray-200"></td>
-                                        <td colSpan={3} className="p-2 text-right text-gray-600 border-r border-gray-200">Tổng cộng Sau:</td>
+                                        <td colSpan={3} className="p-2 text-right text-gray-600 border-r border-gray-200">Tổng cộng (Sau tách):</td>
                                         <td className={`p-2 text-center border-r border-gray-200 ${calculateTotals.isMismatch ? 'text-red-600' : 'text-green-600'}`}>
                                             {calculateTotals.totalAfter}
                                         </td>
-                                        <td colSpan={5} className="p-2 text-left">
+                                        <td colSpan={6} className="p-2 text-left">
                                             {calculateTotals.isMismatch ? (
                                                 <span className="text-xs text-red-500 flex items-center gap-1 animate-pulse">
                                                     <AlertTriangle size={14}/> Lệch {calculateTotals.diff} m²
@@ -813,7 +813,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                 onClick={() => setListTab('sent')}
                                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${listTab === 'sent' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                             >
-                                <FolderCheck size={16} /> Đã chuyển chỉnh lý
+                                <FolderCheck size={16} /> Đã chuyển tách thửa
                             </button>
                         </div>
 
@@ -830,7 +830,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                             </div>
                             
                             <div className="flex items-center gap-2">
-                                {/* TRANSFER BUTTON (Only visible in Pending Tab with Selection) */}
+                                {/* TRANSFER BUTTON */}
                                 {listTab === 'pending' && selectedGroups.size > 0 && (
                                     <button 
                                         onClick={() => handleChangeStatus('sent')} 
@@ -840,7 +840,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                     </button>
                                 )}
 
-                                {/* REVERT BUTTON (Only visible in Sent Tab with Selection) */}
+                                {/* REVERT BUTTON */}
                                 {listTab === 'sent' && selectedGroups.size > 0 && (
                                     <button 
                                         onClick={() => handleChangeStatus('pending')} 
@@ -874,7 +874,8 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Trước BĐ</th>
                                         <th className="p-3 border-b border-r min-w-[200px] bg-white">Thông tin Sau BĐ</th>
                                         <th className="p-3 border-b border-r w-[80px] bg-white">Tổng DT</th>
-                                        <th className="p-3 border-b border-r w-[120px] bg-white">Thông tin QH</th>
+                                        <th className="p-3 border-b border-r w-[120px] bg-white">TT Quy hoạch</th>
+                                        <th className="p-3 border-b border-r w-[120px] bg-white">Mục đích SD</th>
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Căn cứ pháp lý</th>
                                         <th className="p-3 border-b border-r w-[100px] bg-white">Số HĐ</th>
                                         <th className="p-3 border-b border-r w-[150px] bg-white">Ghi chú</th>
@@ -915,23 +916,11 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                                     </td>
                                                 )}
 
-                                                {/* DETAIL COLUMNS (Always render for AFTER CHANGE) */}
-                                                <td className="p-2 border-r text-xs align-middle bg-white" rowSpan={rowSpan}>
-                                                    {shouldRenderCommon && (
-                                                        <>
-                                                            <div className="text-center font-bold text-gray-700">
-                                                                <div>Tờ: {item.data.TO_CU}</div>
-                                                                <div>Thửa: {item.data.THUA_CU}</div>
-                                                            </div>
-                                                            <div className="text-center mt-1">
-                                                                <div>{item.data.DT_CU} m²</div>
-                                                                <div className="italic text-gray-500">({item.data.LOAI_DAT_CU})</div>
-                                                            </div>
-                                                        </>
-                                                    )}
+                                                {/* DETAIL COLUMNS (Always render) */}
+                                                <td className="p-2 border-r text-xs">
+                                                    <div>Tờ: <b>{item.data.TO_CU}</b> - Thửa: <b>{item.data.THUA_CU}</b></div>
+                                                    <div>DT: {item.data.DT_CU} ({item.data.LOAI_DAT_CU})</div>
                                                 </td>
-
-                                                {/* DETAIL COLUMNS (Always render for AFTER CHANGE) */}
                                                 <td className="p-2 border-r text-xs">
                                                     <div>Tờ: <b>{item.data.TO_MOI}</b></div>
                                                     <div>Tạm: {item.data.THUA_TAM} <span className="text-gray-300">|</span> CT: <b className="text-green-700">{item.data.THUA_CHINH_THUC}</b></div>
@@ -947,6 +936,11 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
                                                 <td className="p-2 border-r text-xs italic text-gray-600">
                                                     {item.data.THONG_TIN_QH || ''}
+                                                </td>
+
+                                                <td className="p-2 border-r text-xs">
+                                                    {item.data.DT_ODT && <div>ONT: {item.data.DT_ODT}</div>}
+                                                    {item.data.DT_CLN && <div>CLN: {item.data.DT_CLN}</div>}
                                                 </td>
 
                                                 {shouldRenderCommon && (
@@ -977,7 +971,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                             </tr>
                                         );
                                     }) : (
-                                        <tr><td colSpan={11} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>
+                                        <tr><td colSpan={13} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>
                                     )}
                                 </tbody>
                             </table>

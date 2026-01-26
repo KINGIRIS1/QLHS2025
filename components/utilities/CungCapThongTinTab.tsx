@@ -3,12 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { PhieuInfoData, generatePreviewData, PLANNING_PRESETS, PlanningConfig, parseNumber } from '../../services/phieuInfoService';
 import { Settings, X, Plus, Trash2, RotateCcw, RefreshCw, Download, List, PlusCircle, Save } from 'lucide-react';
 import saveAs from 'file-saver';
-import { User as UserType } from '../../types';
+import { User as UserType, NotifyFunction } from '../../types';
 import InfoForm from './info-tab/InfoForm';
 import InfoPreview from './info-tab/InfoPreview';
 import InfoList from './info-tab/InfoList';
 import { ThongTinRecord, fetchThongTinRecords, saveThongTinRecord, deleteThongTinRecord } from '../../services/apiUtilities';
-import { NotifyFunction } from '../../components/UtilitiesView';
 
 interface ProviderConfig {
     name: string;

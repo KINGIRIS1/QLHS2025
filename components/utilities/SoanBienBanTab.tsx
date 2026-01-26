@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { User as UserType } from '../../types';
+import { User as UserType, NotifyFunction } from '../../types';
 import saveAs from 'file-saver';
 import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings } from 'lucide-react';
 import BienBanForm from './bien-ban-tab/BienBanForm';
 import BienBanPreview from './bien-ban-tab/BienBanPreview';
 import BienBanList from './bien-ban-tab/BienBanList';
 import { BienBanRecord, fetchBienBanRecords, saveBienBanRecord, deleteBienBanRecord } from '../../services/apiUtilities';
-import { NotifyFunction } from '../../components/UtilitiesView';
 
 interface BoundaryChange {
   id: string;

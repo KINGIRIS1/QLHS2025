@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserType, RecordFile } from '../../types';
+import { User as UserType, RecordFile, NotifyFunction } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { ChinhLyRecord, fetchChinhLyRecords, saveChinhLyRecord, deleteChinhLyRecord } from '../../services/apiUtilities';
-import { NotifyFunction } from '../../components/UtilitiesView';
 import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, Layers, CheckSquare, Square, ArrowRight, FolderCheck, RotateCcw, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';

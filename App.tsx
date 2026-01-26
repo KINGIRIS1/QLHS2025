@@ -458,7 +458,6 @@ function App() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         setIsSystemSettingsOpen={setIsSystemSettingsOpen}
         isGeneratingReport={isGeneratingReport}
-        // Removed isUpdateAvailable passing to Sidebar as it is handled by Modal now
         isUpdateAvailable={false} 
         latestVersion={latestVersion}
         updateUrl={updateUrl}
@@ -466,12 +465,11 @@ function App() {
         warningCount={recordFilterProps.warningCount}
         activeRemindersCount={activeRemindersCount}
         connectionStatus={connectionStatus}
-        // New Props for Update Modal
         showUpdateModal={isUpdateAvailable && !updateDeferred}
         updateVersion={latestVersion}
         updateDownloadStatus={updateStatus}
         updateProgress={updateProgress}
-        updateSpeed={updateSpeed} // Pass new prop
+        updateSpeed={updateSpeed}
         onUpdateNow={handleUpdateNow}
         onUpdateLater={handleUpdateLater}
     >

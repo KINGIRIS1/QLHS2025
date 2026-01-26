@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User as UserType } from '../../types';
+import { User as UserType, NotifyFunction } from '../../types';
 import saveAs from 'file-saver';
 import { Settings, List, PlusCircle, Save } from 'lucide-react';
 import VPHCForm from './vphc-tab/VPHCForm';
@@ -9,7 +9,6 @@ import VPHCList from './vphc-tab/VPHCList';
 import TemplateConfigModal from '../TemplateConfigModal';
 import { generateDocxBlobAsync, STORAGE_KEYS, hasTemplate } from '../../services/docxService';
 import { VphcRecord, fetchVphcRecords, saveVphcRecord, deleteVphcRecord } from '../../services/apiUtilities';
-import { NotifyFunction } from '../../components/UtilitiesView';
 
 interface VPHCTabProps {
     currentUser?: UserType;

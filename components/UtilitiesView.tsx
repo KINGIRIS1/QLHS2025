@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid } from 'lucide-react';
-import { User as UserType, RecordFile } from '../types';
+import { User as UserType, RecordFile, NotifyFunction, NotifyType } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
 import VPHCTab from './utilities/VPHCTab';
@@ -13,9 +13,6 @@ interface UtilitiesViewProps {
     currentUser: UserType;
     initialRecordForCorrection?: RecordFile | null; // New prop for auto-navigation
 }
-
-export type NotifyType = 'success' | 'error' | 'info';
-export type NotifyFunction = (message: string, type?: NotifyType) => void;
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
   const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua'>('bienban');

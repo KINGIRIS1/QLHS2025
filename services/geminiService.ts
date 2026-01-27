@@ -190,3 +190,56 @@ export const generateReport = async (
     return "<div class='p-4 bg-red-50 text-red-700'>Lỗi kết nối AI hoặc quota đã hết. Vui lòng kiểm tra lại API Key.</div>";
   }
 };
+
+// --- HÀM MỚI: ĐÁNH GIÁ NHÂN VIÊN ---
+export const generateEmployeeEvaluation = async (
+    employeeName: string,
+    stats: any,
+    badRecords: any[], // Danh sách các hồ sơ trễ hạn lâu
+    timeLabel: string
+): Promise<string> => {
+    try {
+        const ai = getAiClient();
+        if (!ai) return "<div class='text-red-600'>Chưa cấu hình API Key.</div>";
+
+        const prompt = `
+            Bạn là một quản lý nhân sự công tâm và chuyên nghiệp. Hãy viết một đoạn nhận xét, đánh giá hiệu quả công việc cho nhân viên dựa trên số liệu sau.
+
+            THÔNG TIN NHÂN VIÊN:
+            - Họ tên: ${employeeName}
+            - Giai đoạn: ${timeLabel}
+
+            SỐ LIỆU THỐNG KÊ:
+            - Tổng hồ sơ được giao: ${stats.total}
+            - Hoàn thành đúng hạn: ${stats.onTime}
+            - Sắp tới hạn (Cần lưu ý): ${stats.approaching}
+            - Trễ hạn (Chưa xong): ${stats.overdue}
+            - Tỷ lệ hoàn thành đúng hạn: ${stats.onTimeRate}%
+
+            DANH SÁCH HỒ SƠ TRỄ HẠN QUÁ LÂU (>7 ngày):
+            ${JSON.stringify(badRecords)}
+
+            YÊU CẦU ĐẦU RA (HTML):
+            Viết một báo cáo ngắn (khoảng 200-300 chữ) bằng thẻ HTML (không dùng thẻ html, body, head), style chuyên nghiệp, font Times New Roman gồm các phần:
+            1. **Đánh giá chung**: Nhận xét về khối lượng công việc và mức độ hoàn thành. Dùng giọng văn khích lệ nếu tốt, nghiêm khắc nhắc nhở nếu tệ.
+            2. **Phân tích tồn tại**: Nếu có hồ sơ trễ hạn, hãy chỉ ra cụ thể mã hồ sơ nào trễ lâu nhất và cần ưu tiên xử lý. Nếu không có trễ hạn, hãy khen ngợi.
+            3. **Đề xuất/Kiến nghị**: Đưa ra lời khuyên cụ thể để nhân viên cải thiện hoặc duy trì phong độ.
+
+            Lưu ý: 
+            - Nếu tỷ lệ đúng hạn > 90%: Đánh giá Tốt/Xuất sắc.
+            - Nếu tỷ lệ đúng hạn 70-90%: Đánh giá Khá/Đạt.
+            - Nếu tỷ lệ đúng hạn < 70%: Cần chấn chỉnh.
+            - Tô đậm các con số quan trọng.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: { temperature: 0.4 }
+        });
+
+        return response.text || "Không thể tạo đánh giá.";
+    } catch (error) {
+        return "<div class='text-red-600'>Lỗi khi gọi AI. Vui lòng kiểm tra kết nối.</div>";
+    }
+};

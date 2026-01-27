@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue, removeVietnameseTones } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
+import EmployeeStatsView from './report/EmployeeStatsView';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -31,7 +32,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ai'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ai' | 'employee'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -108,7 +109,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         setFromDate(fromStr);
         setToDate(toStr);
         setReportType(type);
-        setActiveTab('list');
+        if (activeTab === 'employee') {
+            // Keep tab
+        } else {
+            setActiveTab('list');
+        }
     };
 
     const handleGenerateClick = () => {
@@ -228,37 +233,38 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 </div>
 
                 {/* Stat Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
-                        <div><div className="text-2xl font-bold text-blue-800">{stats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
-                    </div>
-                    <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
-                        <div><div className="text-2xl font-bold text-green-800">{stats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
-                    </div>
-                    <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
-                        <div><div className="text-2xl font-bold text-orange-800">{stats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
-                    </div>
-                    {/* Updated Red Card for Split Overdue */}
-                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center text-red-800">
-                                <span className="text-xs font-semibold">Chưa xong:</span>
-                                <span className="text-xl font-bold">{stats.overduePending}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-red-600/70">
-                                <span className="text-xs font-semibold">Đã xong:</span>
-                                <span className="text-sm font-bold">{stats.overdueCompleted}</span>
-                            </div>
-                            <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
-                                Tổng trễ hạn
+                {activeTab !== 'employee' && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+                        <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
+                            <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
+                            <div><div className="text-2xl font-bold text-blue-800">{stats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
+                        </div>
+                        <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
+                            <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
+                            <div><div className="text-2xl font-bold text-green-800">{stats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
+                        </div>
+                        <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
+                            <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
+                            <div><div className="text-2xl font-bold text-orange-800">{stats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
+                        </div>
+                        <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
+                            <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-center text-red-800">
+                                    <span className="text-xs font-semibold">Chưa xong:</span>
+                                    <span className="text-xl font-bold">{stats.overduePending}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-red-600/70">
+                                    <span className="text-xs font-semibold">Đã xong:</span>
+                                    <span className="text-sm font-bold">{stats.overdueCompleted}</span>
+                                </div>
+                                <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
+                                    Tổng trễ hạn
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Content Tabs */}
@@ -270,6 +276,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <ListFilter size={16}/> Danh sách kết quả ({filteredData.length})
                 </button>
                 <button 
+                    onClick={() => setActiveTab('employee')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <UserCheck size={16}/> Thống kê nhân viên
+                </button>
+                <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
@@ -278,10 +290,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             </div>
 
             {/* TAB CONTENT */}
-            <div className="flex-1 overflow-hidden bg-slate-100 p-4">
+            <div className="flex-1 overflow-hidden bg-slate-100 p-0">
                 {activeTab === 'list' && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-hidden flex flex-col animate-fade-in-up">
-                        <div className="flex-1 overflow-auto">
+                    <div className="bg-white rounded-none h-full overflow-hidden flex flex-col animate-fade-in-up p-4">
+                        <div className="flex-1 overflow-auto rounded-xl border border-gray-200">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10">
                                     <tr>
@@ -302,7 +314,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                         const emp = employees.find(e => e.id === r.assignedTo);
                                         const isOverdue = isRecordOverdue(r);
                                         
-                                        // Logic xác định trễ đã xong để highlight
                                         let isCompletedLate = false;
                                         if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
                                             if (r.deadline && r.completedDate) {
@@ -348,8 +359,17 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 )}
 
+                {activeTab === 'employee' && (
+                    <EmployeeStatsView 
+                        records={records}
+                        employees={employees}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                    />
+                )}
+
                 {activeTab === 'ai' && (
-                    <div className="h-full flex flex-col items-center">
+                    <div className="h-full flex flex-col items-center p-4">
                         {/* AI Toolbar */}
                         <div className="w-full flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
                             <div className="flex items-center gap-2">

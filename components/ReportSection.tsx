@@ -276,16 +276,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <ListFilter size={16}/> Danh sách kết quả ({filteredData.length})
                 </button>
                 <button 
-                    onClick={() => setActiveTab('employee')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <UserCheck size={16}/> Thống kê nhân viên
-                </button>
-                <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     <Sparkles size={16}/> Văn bản Báo cáo (AI)
+                </button>
+                <button 
+                    onClick={() => setActiveTab('employee')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <UserCheck size={16}/> Thống kê nhân viên
                 </button>
             </div>
 
@@ -359,15 +359,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 )}
 
-                {activeTab === 'employee' && (
-                    <EmployeeStatsView 
-                        records={records}
-                        employees={employees}
-                        fromDate={fromDate}
-                        toDate={toDate}
-                    />
-                )}
-
                 {activeTab === 'ai' && (
                     <div className="h-full flex flex-col items-center p-4">
                         {/* AI Toolbar */}
@@ -408,6 +399,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             )}
                         </div>
                     </div>
+                )}
+
+                {activeTab === 'employee' && (
+                    <EmployeeStatsView 
+                        records={records}
+                        employees={employees}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                    />
                 )}
             </div>
 

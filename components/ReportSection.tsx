@@ -1,11 +1,12 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue, removeVietnameseTones } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import EmployeeStatsView from './report/EmployeeStatsView';
+import WardStatsView from './report/WardStatsView'; // Import component mới
 
 interface ReportSectionProps {
     reportContent: string;
@@ -32,11 +33,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ai' | 'employee'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee'>('list'); // Thêm 'ward_stats'
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
     const [apiKey, setApiKey] = useState('');
+
+    // Pagination States
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(20);
 
     useEffect(() => {
         if (isKeyModalOpen) {
@@ -70,6 +75,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             return matchDate && matchWard;
         });
     }, [records, fromDate, toDate, selectedWard]);
+
+    // Reset pagination when data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filteredData]);
+
+    const paginatedData = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredData.slice(start, start + itemsPerPage);
+    }, [filteredData, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
     const stats = useMemo(() => {
         const total = filteredData.length;
@@ -109,7 +126,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         setFromDate(fromStr);
         setToDate(toStr);
         setReportType(type);
-        if (activeTab === 'employee') {
+        if (activeTab === 'employee' || activeTab === 'ward_stats') {
             // Keep tab
         } else {
             setActiveTab('list');
@@ -276,6 +293,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <ListFilter size={16}/> Danh sách kết quả ({filteredData.length})
                 </button>
                 <button 
+                    onClick={() => setActiveTab('ward_stats')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <PieChart size={16}/> Thống kê theo Xã
+                </button>
+                <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
@@ -310,9 +333,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {filteredData.length > 0 ? filteredData.map((r, i) => {
+                                    {paginatedData.length > 0 ? paginatedData.map((r, i) => {
                                         const emp = employees.find(e => e.id === r.assignedTo);
                                         const isOverdue = isRecordOverdue(r);
+                                        const rowIndex = (currentPage - 1) * itemsPerPage + i + 1;
                                         
                                         let isCompletedLate = false;
                                         if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
@@ -325,7 +349,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
                                         return (
                                         <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
-                                            <td className="p-3 text-center text-gray-400">{i + 1}</td>
+                                            <td className="p-3 text-center text-gray-400">{rowIndex}</td>
                                             <td className="p-3 font-medium text-blue-600">{r.code}</td>
                                             <td className="p-3 font-medium">{r.customerName}</td>
                                             <td className="p-3 text-gray-600">{getNormalizedWard(r.ward)}</td>
@@ -356,7 +380,37 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                 </tbody>
                             </table>
                         </div>
+                        {/* Pagination Footer */}
+                        {filteredData.length > 0 && (
+                            <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-between items-center shrink-0 rounded-b-xl">
+                                <span className="text-xs text-gray-500">
+                                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> trên tổng <strong>{filteredData.length}</strong>
+                                </span>
+                                <div className="flex items-center gap-1">
+                                    <div className="flex items-center mr-4 gap-2">
+                                        <span className="text-xs text-gray-500">Số lượng:</span>
+                                        <select 
+                                            value={itemsPerPage} 
+                                            onChange={(e) => setItemsPerPage(Number(e.target.value))} 
+                                            className="border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                                        >
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                            <option value={100}>100</option>
+                                            <option value={500}>500</option>
+                                        </select>
+                                    </div>
+                                    <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                                    <span className="text-xs font-medium mx-2">Trang {currentPage} / {totalPages}</span>
+                                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                                </div>
+                            </div>
+                        )}
                     </div>
+                )}
+
+                {activeTab === 'ward_stats' && (
+                    <WardStatsView records={filteredData} />
                 )}
 
                 {activeTab === 'ai' && (

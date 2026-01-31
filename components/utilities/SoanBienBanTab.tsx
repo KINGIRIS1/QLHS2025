@@ -525,6 +525,20 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     const thangLap = formData.THANG_LAP || '...';
     const namLap = formData.NAM_LAP || '...';
 
+    // --- CẬP NHẬT LOGIC TÍNH GIỜ KẾT THÚC ---
+    let endGio = '...';
+    let endPhut = phutLap; // Phút giữ nguyên
+    
+    if (formData.GIO_LAP) {
+        let g = parseInt(formData.GIO_LAP, 10);
+        if (!isNaN(g)) {
+            // Cộng 1 giờ, nếu qua 24 thì reset về 0 (đơn giản hóa)
+            g = (g + 1) % 24; 
+            endGio = g.toString().padStart(2, '0');
+        }
+    }
+    // ------------------------------------------
+
     const dienTichHienThi = formData.HIEN_THI_BIEN_DONG_BDDC ? formData.DT_BDDC_2024 : formData.DT_MOI;
     const textDienTich = `, diện tích: <b>${dienTichHienThi} m²</b>`;
 
@@ -608,7 +622,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
         ${yKienPhongKTText}
 
-        <p style="${indentStyle} margin-top: 15px;">Biên bản kết thúc vào lúc ${gioLap} giờ ${phutLap} phút cùng ngày và được lập thành 02 bản, có nội dung như nhau./.</p>
+        <p style="${indentStyle} margin-top: 15px;">Biên bản kết thúc vào lúc ${endGio} giờ ${endPhut} phút cùng ngày và được lập thành 02 bản, có nội dung như nhau./.</p>
 
         ${signatureTable}
 

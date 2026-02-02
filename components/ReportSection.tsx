@@ -112,43 +112,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
     }, [filteredData]);
 
-    // --- STATS CHO TAB NHÂN VIÊN (Tính toán riêng để hiển thị card trên cùng) ---
-    const employeeStats = useMemo(() => {
-        if (activeTab !== 'employee') return null;
-
-        // Lọc theo nhân viên được chọn (nếu có)
-        const targetRecords = selectedEmpId 
-            ? filteredData.filter(r => r.assignedTo === selectedEmpId)
-            : filteredData;
-
-        const total = targetRecords.length;
-        let onTime = 0;
-        let overdue = 0;
-        let approaching = 0;
-
-        targetRecords.forEach(r => {
-            // Đã hoàn thành hoặc Rút
-            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.SIGNED) {
-                if (r.deadline && r.completedDate) {
-                    const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                    const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                    if (c > d) overdue++; else onTime++;
-                } else {
-                    onTime++;
-                }
-            } else {
-                // Đang xử lý
-                if (isRecordOverdue(r)) overdue++;
-                else if (isRecordApproaching(r)) approaching++;
-                else onTime++;
-            }
-        });
-
-        const onTimeRate = total > 0 ? ((onTime / total) * 100).toFixed(1) : '0';
-
-        return { total, onTime, overdue, approaching, onTimeRate };
-    }, [filteredData, selectedEmpId, activeTab]);
-
     const handleQuickReport = (type: 'week' | 'month') => {
         const now = new Date();
         let start = new Date();
@@ -287,8 +250,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 </div>
 
-                {/* STATS CARDS: HIỂN THỊ KHÁC NHAU TÙY TAB */}
-                {activeTab !== 'employee' ? (
+                {/* STATS CARDS: CHỈ HIỆN KHI KHÔNG PHẢI TAB NHÂN VIÊN */}
+                {activeTab !== 'employee' && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
                         <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
                             <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
@@ -319,40 +282,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </div>
                         </div>
                     </div>
-                ) : (
-                    // CARD CHO TAB NHÂN VIÊN
-                    employeeStats && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
-                            <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
-                                <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
-                                <div>
-                                    <div className="text-2xl font-bold text-blue-800">{employeeStats.total}</div>
-                                    <div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ (NV)</div>
-                                </div>
-                            </div>
-                            <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
-                                <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle size={20}/></div>
-                                <div>
-                                    <div className="text-2xl font-bold text-green-800">{employeeStats.onTime}</div>
-                                    <div className="text-xs text-green-600 uppercase font-bold">Đúng hạn ({employeeStats.onTimeRate}%)</div>
-                                </div>
-                            </div>
-                            <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
-                                <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
-                                <div>
-                                    <div className="text-2xl font-bold text-orange-800">{employeeStats.approaching}</div>
-                                    <div className="text-xs text-orange-600 uppercase font-bold">Sắp tới hạn</div>
-                                </div>
-                            </div>
-                            <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
-                                <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
-                                <div>
-                                    <div className="text-2xl font-bold text-red-800">{employeeStats.overdue}</div>
-                                    <div className="text-xs text-red-600 uppercase font-bold">Trễ hạn</div>
-                                </div>
-                            </div>
-                        </div>
-                    )
                 )}
             </div>
 

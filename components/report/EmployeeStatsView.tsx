@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, AlertOctagon, Sparkles, Loader2 } from 'lucide-react';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -119,7 +119,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         <div className="flex flex-col h-full bg-slate-50 p-4 overflow-y-auto">
             
             {/* 1. EMPLOYEE SELECTOR (Sticky) */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4 sticky top-0 z-10">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4 flex items-center gap-4 sticky top-0 z-10">
                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
                     <UserIcon size={24} />
                 </div>
@@ -142,7 +142,42 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 </div>
             </div>
 
-            {/* 2. DETAILED ANALYSIS (CHỈ HIỆN KHI ĐÃ CHỌN NHÂN VIÊN) */}
+            {/* 2. STATS CARDS GRID (Thêm vào đây để đồng bộ kích thước với tab khác) */}
+            {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in mb-6">
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
+                        <div>
+                            <div className="text-2xl font-bold text-blue-800">{stats.total}</div>
+                            <div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ (NV)</div>
+                        </div>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
+                        <div>
+                            <div className="text-2xl font-bold text-green-800">{stats.onTime}</div>
+                            <div className="text-xs text-green-600 uppercase font-bold">Đúng hạn ({stats.onTimeRate}%)</div>
+                        </div>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
+                        <div>
+                            <div className="text-2xl font-bold text-orange-800">{stats.approaching}</div>
+                            <div className="text-xs text-orange-600 uppercase font-bold">Sắp tới hạn</div>
+                        </div>
+                    </div>
+                    {/* Thẻ trễ hạn (Được đơn giản hóa để khớp kích thước) */}
+                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
+                        <div>
+                            <div className="text-2xl font-bold text-red-800">{stats.overdue}</div>
+                            <div className="text-xs text-red-600 uppercase font-bold">Tổng Trễ hạn</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 3. DETAILED ANALYSIS (CHỈ HIỆN KHI ĐÃ CHỌN NHÂN VIÊN) */}
             {selectedEmpId ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up">
                     {/* PROBLEM RECORDS */}

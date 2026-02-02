@@ -137,33 +137,9 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-slate-100 p-4 overflow-y-auto">
             
-            {/* 1. EMPLOYEE SELECTOR */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4 sticky top-0 z-10">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                    <UserIcon size={24} />
-                </div>
-                <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                        {selectedEmpId ? 'Đang xem dữ liệu của:' : 'Chọn nhân viên để xem chi tiết & đánh giá:'}
-                    </label>
-                    <div className="relative">
-                        <select 
-                            className="w-full md:w-1/2 p-2.5 border border-gray-300 rounded-lg font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors"
-                            value={selectedEmpId}
-                            onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
-                        >
-                            <option value="">-- Tất cả nhân viên (Tổng hợp) --</option>
-                            {employees.map(emp => (
-                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {/* 2. STATS CARDS GRID - UPDATED UI */}
+            {/* 1. STATS CARDS GRID - MOVED TO TOP */}
             {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in mb-6 shrink-0">
                     {/* BLUE CARD: TOTAL */}
                     <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
                         <div className="bg-blue-200 p-3 rounded-xl text-blue-600">
@@ -217,6 +193,30 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* 2. EMPLOYEE SELECTOR - MOVED DOWN */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4 shrink-0">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                    <UserIcon size={24} />
+                </div>
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                        {selectedEmpId ? 'Đang xem dữ liệu của:' : 'Chọn nhân viên để xem chi tiết & đánh giá:'}
+                    </label>
+                    <div className="relative">
+                        <select 
+                            className="w-full md:w-1/2 p-2.5 border border-gray-300 rounded-lg font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors"
+                            value={selectedEmpId}
+                            onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
+                        >
+                            <option value="">-- Tất cả nhân viên (Tổng hợp) --</option>
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            </div>
 
             {/* 3. DETAILED ANALYSIS */}
             {selectedEmpId ? (

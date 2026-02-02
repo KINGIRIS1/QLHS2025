@@ -323,31 +323,31 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     // CARD CHO TAB NHÂN VIÊN
                     employeeStats && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
-                            <div className="bg-white p-3 rounded-xl border border-gray-200 flex items-center gap-3 shadow-sm">
-                                <div className="bg-blue-100 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
+                            <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
+                                <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
                                 <div>
-                                    <div className="text-2xl font-bold text-gray-800">{employeeStats.total}</div>
-                                    <div className="text-xs text-gray-500 uppercase font-bold">Tổng hồ sơ (NV)</div>
+                                    <div className="text-2xl font-bold text-blue-800">{employeeStats.total}</div>
+                                    <div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ (NV)</div>
                                 </div>
                             </div>
-                            <div className="bg-green-50 p-3 rounded-xl border border-green-200 flex items-center gap-3 shadow-sm">
+                            <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
                                 <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle size={20}/></div>
                                 <div>
-                                    <div className="text-2xl font-bold text-green-700">{employeeStats.onTime}</div>
+                                    <div className="text-2xl font-bold text-green-800">{employeeStats.onTime}</div>
                                     <div className="text-xs text-green-600 uppercase font-bold">Đúng hạn ({employeeStats.onTimeRate}%)</div>
                                 </div>
                             </div>
-                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-200 flex items-center gap-3 shadow-sm">
+                            <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
                                 <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
                                 <div>
-                                    <div className="text-2xl font-bold text-orange-700">{employeeStats.approaching}</div>
+                                    <div className="text-2xl font-bold text-orange-800">{employeeStats.approaching}</div>
                                     <div className="text-xs text-orange-600 uppercase font-bold">Sắp tới hạn</div>
                                 </div>
                             </div>
-                            <div className="bg-red-50 p-3 rounded-xl border border-red-200 flex items-center gap-3 shadow-sm">
+                            <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
                                 <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
                                 <div>
-                                    <div className="text-2xl font-bold text-red-700">{employeeStats.overdue}</div>
+                                    <div className="text-2xl font-bold text-red-800">{employeeStats.overdue}</div>
                                     <div className="text-xs text-red-600 uppercase font-bold">Trễ hạn</div>
                                 </div>
                             </div>

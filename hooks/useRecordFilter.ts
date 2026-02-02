@@ -10,7 +10,20 @@ export const useRecordFilter = (
     employees: Employee[]
 ) => {
     // Filter States
-    const [searchTerm, setSearchTerm] = useState('');
+    // CẬP NHẬT: Sử dụng Object để lưu search term riêng cho từng view
+    const [searchStates, setSearchStates] = useState<Record<string, string>>({});
+    
+    // Lấy search term của view hiện tại (mặc định rỗng nếu chưa có)
+    const searchTerm = searchStates[currentView] || '';
+
+    // Hàm set search term chỉ cập nhật cho view hiện tại
+    const setSearchTerm = (term: string) => {
+        setSearchStates(prev => ({
+            ...prev,
+            [currentView]: term
+        }));
+    };
+
     const [filterDate, setFilterDate] = useState(''); 
     const [filterSpecificDate, setFilterSpecificDate] = useState('');
     const [filterFromDate, setFilterFromDate] = useState('');
@@ -105,7 +118,7 @@ export const useRecordFilter = (
             result = result.filter(r => r.status === RecordStatus.RECEIVED);
         }
 
-        // Search Term
+        // Search Term (Sử dụng searchTerm đã được tách theo view)
         if (searchTerm) {
             const lowerSearch = removeVietnameseTones(searchTerm);
             result = result.filter(r => {

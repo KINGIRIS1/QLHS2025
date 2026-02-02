@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Settings2, CheckSquare, Square, Plus, Trash2, MoveHorizontal, Quote, LandPlot, ClipboardList, User as UserIcon, AlertTriangle, Users, Heart, MapPin } from 'lucide-react';
+import { User, Settings2, CheckSquare, Square, Plus, Trash2, MoveHorizontal, Quote, LandPlot, ClipboardList, User as UserIcon, AlertTriangle, Users, Heart, MapPin, Settings } from 'lucide-react';
 
 interface BoundaryChange {
   id: string;
@@ -50,13 +50,15 @@ interface BienBanFormProps {
     setBoundaryChangesBDDC: (data: BoundaryChange[]) => void;
     
     onResetFile: () => void;
+    issuingAuthorities: string[]; // Danh sách cơ quan cấp
+    onOpenConfig: () => void; // Hàm mở modal cấu hình
 }
 
 const BienBanForm: React.FC<BienBanFormProps> = ({ 
     formData, setFormData, 
     boundaryChanges, setBoundaryChanges, 
     boundaryChangesBDDC, setBoundaryChangesBDDC,
-    onResetFile 
+    onResetFile, issuingAuthorities, onOpenConfig
 }) => {
     
     // Local state cho danh sách chủ sử dụng
@@ -420,12 +422,31 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
             {/* Giấy chứng nhận cũ (Giữ nguyên) */}
             <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="text-[13px] font-black text-amber-600 uppercase tracking-widest mb-4 flex items-center gap-2.5 border-b border-amber-50 pb-2"><ClipboardList size={16} /> 2. Thông tin GCN</h3>
-                {/* ... (Nội dung cũ) ... */}
+                
                 <div className="grid grid-cols-2 gap-3">
                     <div><label className="text-[12px] font-bold text-amber-700 block mb-1 uppercase">Số phát hành</label><input className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-medium bg-white outline-none" value={formData.SO_GCN} onChange={e => handleChange('SO_GCN', e.target.value)} /></div>
                     <div><label className="text-[12px] font-bold text-amber-700 block mb-1 uppercase">Số vào sổ</label><input className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-medium bg-white outline-none" value={formData.SO_VAO_SO} onChange={e => handleChange('SO_VAO_SO', e.target.value)} /></div>
                     <div><label className="text-[12px] font-bold text-amber-700 block mb-1 uppercase">Ngày cấp GCN</label><input type="date" className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-medium bg-white outline-none" value={formData.NGAY_CAP} onChange={e => handleChange('NGAY_CAP', e.target.value)} /></div>
-                    <div><label className="text-[12px] font-bold text-amber-700 block mb-1 uppercase">Cơ quan cấp</label><input className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-medium bg-white outline-none" value={formData.DV_CAP_GCN} onChange={e => handleChange('DV_CAP_GCN', e.target.value)} /></div>
+                    <div>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-[12px] font-bold text-amber-700 uppercase">Cơ quan cấp</label>
+                            <button onClick={onOpenConfig} className="text-gray-400 hover:text-amber-600 p-0.5 rounded transition-colors" title="Cấu hình danh sách">
+                                <Settings size={12} />
+                            </button>
+                        </div>
+                        <input 
+                            list="issuing-authorities"
+                            className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-medium bg-white outline-none" 
+                            value={formData.DV_CAP_GCN} 
+                            onChange={e => handleChange('DV_CAP_GCN', e.target.value)} 
+                            placeholder="Nhập hoặc chọn..."
+                        />
+                        <datalist id="issuing-authorities">
+                            {issuingAuthorities.map((auth, idx) => (
+                                <option key={idx} value={auth} />
+                            ))}
+                        </datalist>
+                    </div>
                     <div><label className="text-[12px] font-bold text-amber-700 block mb-1 uppercase">Thửa (GCN)</label><input className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-bold text-center outline-none" value={formData.SO_THUA_CU} onChange={e => handleChange('SO_THUA_CU', e.target.value)} /></div>
                     <div><label className="text-[12px] font-bold text-amber-700 block mb-1 uppercase">Tờ (GCN)</label><input className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] font-bold text-center outline-none" value={formData.SO_TO_CU} onChange={e => handleChange('SO_TO_CU', e.target.value)} /></div>
                     <div className="col-span-2 grid grid-cols-3 gap-3 pt-3 border-t border-amber-50 mt-2">

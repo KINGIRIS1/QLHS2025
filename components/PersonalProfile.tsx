@@ -219,6 +219,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       );
   };
 
+  // Helper để lấy tên Tab hiện tại cho placeholder
+  const getTabLabel = () => {
+      switch(activeTab) {
+          case 'pending': return 'Đang thực hiện';
+          case 'completed_work': return 'Đã thực hiện';
+          case 'pending_sign': return 'Chờ ký';
+          case 'reminder': return 'Nhắc việc';
+          default: return 'danh sách';
+      }
+  };
+
   if (!user.employeeId) {
     return (
         <div className="flex flex-col items-center justify-center h-96 bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -271,7 +282,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
             <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm overflow-x-auto max-w-full">
                 <button 
-                    onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
+                    onClick={() => { setActiveTab('pending'); setCurrentPage(1); setSearchTerm(''); }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                         activeTab === 'pending' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -279,7 +290,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     <Clock size={16} /> Đang thực hiện ({pendingRecords.length})
                 </button>
                 <button 
-                    onClick={() => { setActiveTab('completed_work'); setCurrentPage(1); }}
+                    onClick={() => { setActiveTab('completed_work'); setCurrentPage(1); setSearchTerm(''); }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                         activeTab === 'completed_work' ? 'bg-cyan-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -287,7 +298,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     <CheckSquare size={16} /> Đã thực hiện ({completedWorkRecords.length})
                 </button>
                 <button 
-                    onClick={() => { setActiveTab('pending_sign'); setCurrentPage(1); }}
+                    onClick={() => { setActiveTab('pending_sign'); setCurrentPage(1); setSearchTerm(''); }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                         activeTab === 'pending_sign' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -295,7 +306,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     <Send size={16} /> Chờ ký ({reviewRecords.length})
                 </button>
                 <button 
-                    onClick={() => { setActiveTab('reminder'); setCurrentPage(1); }}
+                    onClick={() => { setActiveTab('reminder'); setCurrentPage(1); setSearchTerm(''); }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                         activeTab === 'reminder' ? 'bg-pink-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -308,7 +319,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                     type="text" 
-                    placeholder="Tìm mã, tên, địa chỉ..." 
+                    placeholder={`Tìm trong ${getTabLabel()}...`}
                     className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                     value={searchTerm}
                     onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}

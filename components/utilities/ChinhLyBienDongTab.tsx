@@ -62,7 +62,12 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
 
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [savedList, setSavedList] = useState<ChinhLyRecord[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
+    
+    // Thay đổi: Quản lý từ khóa tìm kiếm riêng cho từng tab
+    const [searchTerms, setSearchTerms] = useState<{ pending: string; sent: string }>({
+        pending: '',
+        sent: ''
+    });
     
     // Selection State
     const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
@@ -362,9 +367,10 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             return status === listTab;
         });
 
-        // 2. Filter by Search
-        if (searchTerm) {
-            const lower = searchTerm.toLowerCase();
+        // 2. Filter by Search (Dùng search term riêng của tab hiện tại)
+        const currentSearchTerm = searchTerms[listTab];
+        if (currentSearchTerm) {
+            const lower = currentSearchTerm.toLowerCase();
             list = list.filter(item => 
                 (item.customer_name || '').toLowerCase().includes(lower) ||
                 (item.data.XA || '').toLowerCase().includes(lower) ||
@@ -383,7 +389,7 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
         });
 
         return list;
-    }, [savedList, searchTerm, listTab]);
+    }, [savedList, searchTerms, listTab]);
 
     const getRowSpan = (index: number, field: string) => {
         const current = groupedList[index];
@@ -561,16 +567,16 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
             }
         }
 
-        // Apply Footer Styles (Targeting index 0 and index 11)
-        const leftDate = XLSX.utils.encode_cell({r: footerStartRow, c: 0});
-        const leftSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 0});
-        const rightDate = XLSX.utils.encode_cell({r: footerStartRow, c: 11});
-        const rightSign = XLSX.utils.encode_cell({r: footerStartRow + 1, c: 11});
+        // Apply Footer Styles (NO BORDER)
+        const giaoRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 0 });
+        const giaoNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 0 });
+        const nhanRef = XLSX.utils.encode_cell({ r: footerStartRow, c: 11 });
+        const nhanNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: 11 });
 
-        if(ws[leftDate]) ws[leftDate].s = footerDateStyle;
-        if(ws[leftSign]) ws[leftSign].s = footerStyle;
-        if(ws[rightDate]) ws[rightDate].s = footerDateStyle;
-        if(ws[rightSign]) ws[rightSign].s = footerStyle;
+        if(ws[giaoRef]) ws[giaoRef].s = footerDateStyle;
+        if(ws[giaoNoteRef]) ws[giaoNoteRef].s = footerStyle;
+        if(ws[nhanRef]) ws[nhanRef].s = footerDateStyle;
+        if(ws[nhanNoteRef]) ws[nhanNoteRef].s = footerStyle;
 
         // Tăng độ rộng cột cho khổ A3
         ws['!cols'] = [
@@ -784,8 +790,9 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                 <input 
                                     className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none" 
                                     placeholder="Tìm kiếm..." 
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
+                                    // Thay đổi: Dùng search term riêng cho từng tab
+                                    value={searchTerms[listTab]}
+                                    onChange={e => setSearchTerms(prev => ({ ...prev, [listTab]: e.target.value }))}
                                 />
                             </div>
                             

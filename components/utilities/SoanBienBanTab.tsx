@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User as UserType, NotifyFunction } from '../../types';
 import saveAs from 'file-saver';
-import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings } from 'lucide-react';
+import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings, Trash2, X, Plus } from 'lucide-react';
 import BienBanForm from './bien-ban-tab/BienBanForm';
 import BienBanPreview from './bien-ban-tab/BienBanPreview';
 import BienBanList from './bien-ban-tab/BienBanList';
@@ -27,6 +27,14 @@ interface SoanBienBanTabProps {
 
 const DEFAULT_BDDC_CAUSE = "Khi đo đạc lập bản đồ địa chính không có sự chỉ ranh của chủ sử dụng đất và các chủ sử dụng giáp ranh dẫn đến ranh giới mốc giới chưa được các bên xác định chính xác";
 
+const DEFAULT_ISSUING_AUTHORITIES = [
+    "Sở Tài nguyên và Môi trường tỉnh Bình Phước",
+    "Văn phòng Đăng ký Đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành",
+    "Chi nhánh Văn phòng Đăng ký Đất đai thị xã Chơn Thành",
+    "UBND huyện Chơn Thành",
+    "UBND huyện Bình Long (cũ)"
+];
+
 const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, notify }) => {
   // Mode: 'create' or 'list'
   const [mode, setMode] = useState<'create' | 'list'>('create');
@@ -38,6 +46,14 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   const [isProcessing, setIsProcessing] = useState(false);
   const [exportedFilePath, setExportedFilePath] = useState<string | null>(null);
   
+  // State quản lý danh sách Cơ quan cấp
+  const [issuingAuthorities, setIssuingAuthorities] = useState<string[]>(() => {
+      const saved = localStorage.getItem('issuing_authorities_list');
+      return saved ? JSON.parse(saved) : DEFAULT_ISSUING_AUTHORITIES;
+  });
+  const [isConfigAuthorities, setIsConfigAuthorities] = useState(false);
+  const [tempAuthorities, setTempAuthorities] = useState<string[]>([]);
+
   const [formData, setFormData] = useState({
     GIO_LAP: '',
     PHUT_LAP: '',
@@ -47,7 +63,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     HO: 'Ông', TEN_CHU: '', DIA_CHI_CHU: '',
     OWNERS: [], // Mảng chứa danh sách chủ (New)
     SO_THUA_MOI: '', SO_TO_106: '', SO_TO_MOI: '', DIA_CHI_THUA: '', PHUONG: 'phường Chơn Thành',
-    SO_GCN: '', SO_VAO_SO: '', DV_CAP_GCN: 'Sở Tài nguyên và Môi trường', NGAY_CAP: '',
+    SO_GCN: '', SO_VAO_SO: '', DV_CAP_GCN: 'Sở Tài nguyên và Môi trường tỉnh Bình Phước', NGAY_CAP: '',
     SO_THUA_CU: '', SO_TO_CU: '', 
     DT_CU: '0', DT_ODT: '0', DT_CLN: '0',
     HIEN_TRANG: 'Đất trống', LOAI_COC: 'Cọc bê tông', DT_MOI: '0', 
@@ -113,7 +129,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         HO: 'Ông', TEN_CHU: '', DIA_CHI_CHU: '',
         OWNERS: [],
         SO_THUA_MOI: '', SO_TO_106: '', SO_TO_MOI: '', DIA_CHI_THUA: '', PHUONG: 'phường Chơn Thành',
-        SO_GCN: '', SO_VAO_SO: '', DV_CAP_GCN: 'Sở Tài nguyên và Môi trường', NGAY_CAP: '',
+        SO_GCN: '', SO_VAO_SO: '', DV_CAP_GCN: 'Sở Tài nguyên và Môi trường tỉnh Bình Phước', NGAY_CAP: '',
         SO_THUA_CU: '', SO_TO_CU: '', 
         DT_CU: '0', DT_ODT: '0', DT_CLN: '0',
         HIEN_TRANG: 'Đất trống', LOAI_COC: 'Cọc bê tông', DT_MOI: '0', 
@@ -181,6 +197,33 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   };
 
   const resetFile = () => setExportedFilePath(null);
+
+  // LOGIC CONFIG ISSUING AUTHORITIES
+  const openAuthorityConfig = () => {
+      setTempAuthorities([...issuingAuthorities]);
+      setIsConfigAuthorities(true);
+  };
+
+  const saveAuthorityConfig = () => {
+      setIssuingAuthorities(tempAuthorities);
+      localStorage.setItem('issuing_authorities_list', JSON.stringify(tempAuthorities));
+      setIsConfigAuthorities(false);
+      notify("Đã lưu danh sách cơ quan cấp.", 'success');
+  };
+
+  const addTempAuthority = () => {
+      setTempAuthorities([...tempAuthorities, '']);
+  };
+
+  const updateTempAuthority = (index: number, value: string) => {
+      const newArr = [...tempAuthorities];
+      newArr[index] = value;
+      setTempAuthorities(newArr);
+  };
+
+  const removeTempAuthority = (index: number) => {
+      setTempAuthorities(tempAuthorities.filter((_, i) => i !== index));
+  };
 
   // LOGIC KIỂM TRA KHỚP DIỆN TÍCH
   const checkAreaMismatch = () => {
@@ -728,6 +771,8 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
                             boundaryChangesBDDC={boundaryChangesBDDC}
                             setBoundaryChangesBDDC={setBoundaryChangesBDDC}
                             onResetFile={resetFile}
+                            issuingAuthorities={issuingAuthorities}
+                            onOpenConfig={openAuthorityConfig}
                         />
                         <div className="p-4 bg-white border-t border-gray-200 flex justify-end">
                             <button onClick={() => handleSaveRecord(false)} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm">
@@ -767,6 +812,51 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
                 </div>
             )}
         </div>
+
+        {/* MODAL CONFIG ISSUING AUTHORITIES */}
+        {isConfigAuthorities && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-xl w-full max-w-md shadow-2xl animate-fade-in-up flex flex-col max-h-[80vh]">
+                    <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+                        <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                            <Settings className="text-blue-600" size={18} /> Cấu hình Cơ quan cấp GCN
+                        </h3>
+                        <button onClick={() => setIsConfigAuthorities(false)}><X size={20} className="text-gray-400 hover:text-red-500"/></button>
+                    </div>
+                    
+                    <div className="p-4 overflow-y-auto flex-1 bg-gray-50 space-y-3">
+                        {tempAuthorities.map((auth, idx) => (
+                            <div key={idx} className="flex gap-2 items-center">
+                                <input 
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                                    placeholder="Nhập tên cơ quan..." 
+                                    value={auth} 
+                                    onChange={e => updateTempAuthority(idx, e.target.value)} 
+                                />
+                                <button 
+                                    onClick={() => removeTempAuthority(idx)} 
+                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Xóa"
+                                >
+                                    <Trash2 size={16}/>
+                                </button>
+                            </div>
+                        ))}
+                        <button 
+                            onClick={addTempAuthority} 
+                            className="w-full border-2 border-dashed border-blue-200 text-blue-600 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Plus size={16} /> Thêm cơ quan
+                        </button>
+                    </div>
+
+                    <div className="p-4 border-t bg-white flex justify-end gap-3 rounded-b-xl">
+                        <button onClick={() => setIsConfigAuthorities(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium text-sm">Hủy</button>
+                        <button onClick={saveAuthorityConfig} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-md">Lưu Thay Đổi</button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

@@ -30,7 +30,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // State chọn xã phường
     const [selectedWard, setSelectedWard] = useState<string>('all');
     
-    // State chọn nhân viên (Dùng chung cho Tab Thống kê nhân viên)
+    // State chọn nhân viên (Lifting state up)
     const [selectedEmpId, setSelectedEmpId] = useState<string>('');
 
     // Report Type State
@@ -91,16 +91,37 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
-    // --- STATS CHO CÁC TAB THƯỜNG ---
+    // --- STATS CHO CÁC TAB ---
+    // Updated: Hỗ trợ lọc theo nhân viên khi ở tab Employee
     const generalStats = useMemo(() => {
-        const total = filteredData.length;
-        const completed = filteredData.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED).length;
-        const withdrawn = filteredData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
+        let sourceData = filteredData;
+
+        // Nếu đang ở tab Nhân viên và đã chọn nhân viên -> Lọc theo nhân viên đó
+        if (activeTab === 'employee' && selectedEmpId) {
+            sourceData = filteredData.filter(r => r.assignedTo === selectedEmpId);
+        }
+
+        const total = sourceData.length;
+        // Tính cả SIGNED là completed để đồng bộ logic
+        const completed = sourceData.filter(r => 
+            r.status === RecordStatus.HANDOVER || 
+            r.status === RecordStatus.RETURNED || 
+            r.status === RecordStatus.SIGNED ||
+            !!r.exportBatch || !!r.exportDate // Đã xuất cũng tính là xong
+        ).length;
         
-        const overduePending = filteredData.filter(r => isRecordOverdue(r)).length;
+        const withdrawn = sourceData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
         
-        const overdueCompleted = filteredData.filter(r => {
-            if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED) return false;
+        // Logic overdue pending: Quá hạn và chưa xong (chưa xuất/chưa trả/chưa rút)
+        const overduePending = sourceData.filter(r => {
+            if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || r.exportBatch) return false;
+            return isRecordOverdue(r);
+        }).length;
+        
+        // Logic overdue completed: Đã xong nhưng bị trễ
+        const overdueCompleted = sourceData.filter(r => {
+            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
+            if (!isDone) return false;
             if (!r.deadline || !r.completedDate) return false;
             const d = new Date(r.deadline); d.setHours(0,0,0,0);
             const c = new Date(r.completedDate); c.setHours(0,0,0,0);
@@ -110,7 +131,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const processing = total - completed - withdrawn;
         
         return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
-    }, [filteredData]);
+    }, [filteredData, activeTab, selectedEmpId]);
 
     const handleQuickReport = (type: 'week' | 'month') => {
         const now = new Date();
@@ -250,39 +271,37 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 </div>
 
-                {/* STATS CARDS: CHỈ HIỆN KHI KHÔNG PHẢI TAB NHÂN VIÊN */}
-                {activeTab !== 'employee' && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
-                        <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
-                            <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
-                            <div><div className="text-2xl font-bold text-blue-800">{generalStats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
-                        </div>
-                        <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
-                            <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
-                            <div><div className="text-2xl font-bold text-green-800">{generalStats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
-                        </div>
-                        <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
-                            <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
-                            <div><div className="text-2xl font-bold text-orange-800">{generalStats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
-                        </div>
-                        <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
-                            <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
-                            <div className="flex-1">
-                                <div className="flex justify-between items-center text-red-800">
-                                    <span className="text-xs font-semibold">Chưa xong:</span>
-                                    <span className="text-xl font-bold">{generalStats.overduePending}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-red-600/70">
-                                    <span className="text-xs font-semibold">Đã xong:</span>
-                                    <span className="text-sm font-bold">{generalStats.overdueCompleted}</span>
-                                </div>
-                                <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
-                                    Tổng trễ hạn
-                                </div>
+                {/* STATS CARDS: HIỂN THỊ LUÔN (Theo yêu cầu layout mới) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
+                        <div><div className="text-2xl font-bold text-blue-800">{generalStats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
+                        <div><div className="text-2xl font-bold text-green-800">{generalStats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
+                        <div><div className="text-2xl font-bold text-orange-800">{generalStats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
+                    </div>
+                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
+                        <div className="flex-1">
+                            <div className="flex justify-between items-center text-red-800">
+                                <span className="text-xs font-semibold">Chưa xong:</span>
+                                <span className="text-xl font-bold">{generalStats.overduePending}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-red-600/70">
+                                <span className="text-xs font-semibold">Đã xong:</span>
+                                <span className="text-sm font-bold">{generalStats.overdueCompleted}</span>
+                            </div>
+                            <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
+                                Tổng trễ hạn
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Content Tabs */}

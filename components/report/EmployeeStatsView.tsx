@@ -30,7 +30,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         });
     }, [records, fromDate, toDate]);
 
-    // Calculate Stats
+    // Calculate Stats (Used for AI and Lists, visual cards are handled by parent ReportSection)
     const stats = useMemo(() => {
         const targetRecords = selectedEmpId 
             ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
@@ -46,7 +46,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const overdueRecords: { record: RecordFile, daysOver: number }[] = [];
 
         targetRecords.forEach(r => {
-            // Xác định đã xong hay chưa (bao gồm đã xuất hồ sơ hoặc trạng thái cuối)
+            // Xác định đã xong hay chưa
             const isFinished = [
                 RecordStatus.HANDOVER, 
                 RecordStatus.RETURNED, 
@@ -56,24 +56,18 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 
             if (isFinished) {
                 completedCount++;
-                // Kiểm tra trễ hạn cho hồ sơ đã xong
                 if (r.deadline && r.completedDate) {
                     const d = new Date(r.deadline); d.setHours(0,0,0,0);
                     const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                    if (c > d) {
-                        overdueCompletedCount++;
-                    }
+                    if (c > d) overdueCompletedCount++;
                 }
             } else {
                 processingCount++;
-                // Kiểm tra trễ hạn cho hồ sơ chưa xong
                 if (r.deadline) {
                     const d = new Date(r.deadline); d.setHours(0,0,0,0);
                     const today = new Date(); today.setHours(0,0,0,0);
                     if (today > d) {
                         overduePendingCount++;
-                        
-                        // Tính số ngày trễ để hiển thị chi tiết
                         const diffTime = today.getTime() - d.getTime();
                         const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                         overdueRecords.push({ record: r, daysOver });
@@ -82,11 +76,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             }
         });
 
-        // Tìm hồ sơ trễ lâu nhất (trong danh sách chưa xong)
         overdueRecords.sort((a, b) => b.daysOver - a.daysOver);
         const longestOverdue = overdueRecords.length > 0 ? overdueRecords[0] : null;
-        
-        // Lọc hồ sơ trễ quá lâu (> 10 ngày)
         const longOverdueList = overdueRecords.filter(item => item.daysOver > 10);
 
         return {
@@ -113,11 +104,10 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             daysOverdue: i.daysOver
         }));
 
-        // Chuẩn bị dữ liệu cho AI
         const aiStats = {
             total: stats.total,
             onTime: stats.completedCount - stats.overdueCompletedCount,
-            approaching: 0, // Không tính trong view này
+            approaching: 0, 
             overdue: stats.overduePendingCount,
             onTimeRate: stats.total > 0 ? (((stats.completedCount - stats.overdueCompletedCount) / stats.total) * 100).toFixed(1) : 0
         };
@@ -136,66 +126,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
-            {/* 1. SECTION SỐ LIỆU THỐNG KÊ (ĐƯA LÊN TRÊN CÙNG) */}
-            {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in mb-6 shrink-0">
-                    
-                    {/* CARD 1: TỔNG HỒ SƠ */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Tổng hồ sơ</p>
-                            <h3 className="text-3xl font-black text-blue-600">{stats.total}</h3>
-                        </div>
-                        <div className="bg-blue-50 p-3 rounded-xl text-blue-600 group-hover:scale-110 transition-transform">
-                            <ListFilter size={28}/>
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500"></div>
-                    </div>
-
-                    {/* CARD 2: ĐÃ HOÀN THÀNH */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Đã hoàn thành</p>
-                            <h3 className="text-3xl font-black text-emerald-500">{stats.completedCount}</h3>
-                        </div>
-                        <div className="bg-emerald-50 p-3 rounded-xl text-emerald-500 group-hover:scale-110 transition-transform">
-                            <CheckCircle2 size={28}/>
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500"></div>
-                    </div>
-
-                    {/* CARD 3: ĐANG XỬ LÝ */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Đang xử lý</p>
-                            <h3 className="text-3xl font-black text-orange-500">{stats.processingCount}</h3>
-                        </div>
-                        <div className="bg-orange-50 p-3 rounded-xl text-orange-500 group-hover:scale-110 transition-transform">
-                            <Clock size={28}/>
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-500"></div>
-                    </div>
-
-                    {/* CARD 4: TRỄ HẠN (CẢNH BÁO) */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-red-100 flex items-center justify-between relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-1">Trễ hạn (Chưa xong)</p>
-                            <div className="flex items-baseline gap-2">
-                                <h3 className="text-3xl font-black text-red-600">{stats.overduePendingCount}</h3>
-                                {stats.overdueCompletedCount > 0 && (
-                                    <span className="text-xs text-red-300 font-medium">(+{stats.overdueCompletedCount} đã xong)</span>
-                                )}
-                            </div>
-                        </div>
-                        <div className="bg-red-50 p-3 rounded-xl text-red-500 group-hover:scale-110 transition-transform animate-pulse">
-                            <AlertTriangle size={28}/>
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-red-500"></div>
-                    </div>
-                </div>
-            )}
-
-            {/* 2. EMPLOYEE FILTER & TITLE */}
+            {/* 1. EMPLOYEE FILTER & TITLE */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row items-center gap-4 shrink-0">
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
@@ -224,7 +155,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 </div>
             </div>
 
-            {/* 3. DETAILED CONTENT */}
+            {/* 2. DETAILED CONTENT */}
             {selectedEmpId ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up flex-1 min-h-0">
                     

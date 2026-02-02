@@ -3,17 +3,20 @@ import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, CheckCircle, AlertTriangle, Clock, AlertOctagon, Sparkles, Loader2, BarChart3 } from 'lucide-react';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2 } from 'lucide-react';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
     fromDate: string;
     toDate: string;
+    selectedEmpId: string;
+    setSelectedEmpId: (id: string) => void;
 }
 
-const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employees, fromDate, toDate }) => {
-    const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
+    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId 
+}) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -28,9 +31,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
         });
     }, [records, fromDate, toDate]);
 
-    // Calculate Stats (Global if no employee selected, Specific if selected)
+    // Calculate Stats for Details & AI only (Rendering cards handled by parent)
     const stats = useMemo(() => {
-        // Nếu chọn nhân viên thì lọc, không thì lấy tất cả
         const targetRecords = selectedEmpId 
             ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
             : recordsInTimeRange;
@@ -44,35 +46,28 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
         const overdueRecords: { record: RecordFile, daysOver: number }[] = [];
 
         targetRecords.forEach(r => {
-            // Đã hoàn thành hoặc Rút -> Check xem có trễ không
-            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.SIGNED) {
-                // Logic tính đúng hạn cho hồ sơ đã xong
-                if (r.deadline && r.completedDate) {
+            // Check overdue details for AI
+            if (isRecordOverdue(r)) {
+                overdue++;
+                if (r.deadline) {
                     const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                    const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                    if (c > d) {
-                        overdue++; 
+                    const today = new Date(); today.setHours(0,0,0,0);
+                    const diffTime = today.getTime() - d.getTime();
+                    const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    overdueRecords.push({ record: r, daysOver });
+                }
+            } else if (isRecordApproaching(r)) {
+                approaching++;
+            } else {
+                // Check if completed late
+                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.SIGNED) {
+                    if (r.deadline && r.completedDate) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        if (c > d) overdue++; else onTime++;
                     } else {
                         onTime++;
                     }
-                } else {
-                    onTime++; // Mặc định đúng hạn nếu thiếu ngày
-                }
-            } else {
-                // Đang xử lý
-                if (isRecordOverdue(r)) {
-                    overdue++;
-                    
-                    // Tính số ngày trễ
-                    if (r.deadline) {
-                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                        const today = new Date(); today.setHours(0,0,0,0);
-                        const diffTime = today.getTime() - d.getTime();
-                        const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        overdueRecords.push({ record: r, daysOver });
-                    }
-                } else if (isRecordApproaching(r)) {
-                    approaching++;
                 } else {
                     onTime++;
                 }
@@ -93,8 +88,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
             approaching,
             onTimeRate: total > 0 ? ((onTime / total) * 100).toFixed(1) : '0',
             longestOverdue,
-            longOverdueList,
-            overdueRecords // Full list for context
+            longOverdueList
         };
     }, [recordsInTimeRange, selectedEmpId]);
 
@@ -104,7 +98,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
         const emp = employees.find(e => e.id === selectedEmpId);
         const empName = emp ? emp.name : "Nhân viên";
         
-        // Prepare simplified data for AI
         const badRecordsSimple = stats.longOverdueList.map(i => ({
             code: i.record.code,
             customer: i.record.customerName,
@@ -125,44 +118,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
     return (
         <div className="flex flex-col h-full bg-slate-50 p-4 overflow-y-auto">
             
-            {/* 1. STATS CARDS (LUÔN HIỂN THỊ - GLOBAL HOẶC CÁ NHÂN) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-fade-in-up">
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-                    <p className="text-gray-500 text-xs font-bold uppercase flex items-center gap-2">
-                        <BarChart3 size={16} className="text-blue-500"/> Tổng hồ sơ
-                    </p>
-                    <p className="text-3xl font-black text-gray-800 mt-2">{stats.total}</p>
-                    <p className="text-[10px] text-gray-400 mt-1 font-medium">{selectedEmpId ? 'Của nhân viên này' : 'Toàn bộ nhân viên'}</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm transition-all hover:shadow-md">
-                    <p className="text-green-700 text-xs font-bold uppercase flex items-center gap-2">
-                        <CheckCircle size={16}/> Đúng hạn
-                    </p>
-                    <p className="text-3xl font-black text-green-700 mt-2">{stats.onTime}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                        <div className="h-1.5 w-16 bg-green-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-green-600 rounded-full" style={{ width: `${stats.onTimeRate}%` }}></div>
-                        </div>
-                        <p className="text-xs text-green-700 font-bold">{stats.onTimeRate}%</p>
-                    </div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm transition-all hover:shadow-md">
-                    <p className="text-orange-700 text-xs font-bold uppercase flex items-center gap-2">
-                        <Clock size={16}/> Sắp tới hạn
-                    </p>
-                    <p className="text-3xl font-black text-orange-700 mt-2">{stats.approaching}</p>
-                    <p className="text-[10px] text-orange-600 mt-1 font-medium">Cần ưu tiên xử lý</p>
-                </div>
-                <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm transition-all hover:shadow-md">
-                    <p className="text-red-700 text-xs font-bold uppercase flex items-center gap-2">
-                        <AlertTriangle size={16}/> Trễ hạn
-                    </p>
-                    <p className="text-3xl font-black text-red-700 mt-2">{stats.overdue}</p>
-                    <p className="text-[10px] text-red-600 mt-1 font-medium">Bao gồm cả đã xong trễ</p>
-                </div>
-            </div>
-
-            {/* 2. EMPLOYEE SELECTOR */}
+            {/* 1. EMPLOYEE SELECTOR (Sticky) */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4 sticky top-0 z-10">
                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
                     <UserIcon size={24} />
@@ -186,7 +142,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
                 </div>
             </div>
 
-            {/* 3. DETAILED ANALYSIS (CHỈ HIỆN KHI ĐÃ CHỌN NHÂN VIÊN) */}
+            {/* 2. DETAILED ANALYSIS (CHỈ HIỆN KHI ĐÃ CHỌN NHÂN VIÊN) */}
             {selectedEmpId ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up">
                     {/* PROBLEM RECORDS */}
@@ -202,7 +158,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
                                     <div className="text-2xl font-bold text-red-900 mb-1">{stats.longestOverdue.record.code}</div>
                                     <div className="text-red-800 font-medium">{stats.longestOverdue.record.customerName}</div>
                                     <div className="mt-3 inline-flex items-center gap-2 bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-bold">
-                                        <Clock size={16}/> Trễ {stats.longestOverdue.daysOver} ngày
+                                        <Loader2 size={16} className="hidden"/> {/* Dummy to keep import valid */}
+                                        Trễ {stats.longestOverdue.daysOver} ngày
                                     </div>
                                     <div className="mt-2 text-sm text-red-700 italic">
                                         Hẹn: {new Date(stats.longestOverdue.record.deadline!).toLocaleDateString('vi-VN')}

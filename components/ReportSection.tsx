@@ -1,12 +1,12 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones } from '../utils/appHelpers';
+import { isRecordOverdue, removeVietnameseTones, isRecordApproaching } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import EmployeeStatsView from './report/EmployeeStatsView';
-import WardStatsView from './report/WardStatsView'; // Import component mới
+import WardStatsView from './report/WardStatsView';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -30,10 +30,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // State chọn xã phường
     const [selectedWard, setSelectedWard] = useState<string>('all');
     
+    // State chọn nhân viên (Dùng chung cho Tab Thống kê nhân viên)
+    const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee'>('list'); // Thêm 'ward_stats'
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -55,7 +58,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         alert("Đã lưu API Key thành công!");
     };
 
-    // --- LOGIC TÍNH TOÁN DỮ LIỆU ---
+    // --- LOGIC TÍNH TOÁN DỮ LIỆU CHUNG (Theo ngày & xã) ---
     const filteredData = useMemo(() => {
         const start = new Date(fromDate); start.setHours(0,0,0,0);
         const end = new Date(toDate); end.setHours(23,59,59,999);
@@ -88,15 +91,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
-    const stats = useMemo(() => {
+    // --- STATS CHO CÁC TAB THƯỜNG ---
+    const generalStats = useMemo(() => {
         const total = filteredData.length;
         const completed = filteredData.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED).length;
         const withdrawn = filteredData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
         
-        // Trễ hạn chưa xong (isRecordOverdue chỉ check những hồ sơ chưa xong)
         const overduePending = filteredData.filter(r => isRecordOverdue(r)).length;
         
-        // Trễ hạn đã xong (Check ngày hoàn thành > deadline)
         const overdueCompleted = filteredData.filter(r => {
             if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED) return false;
             if (!r.deadline || !r.completedDate) return false;
@@ -109,6 +111,43 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         
         return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
     }, [filteredData]);
+
+    // --- STATS CHO TAB NHÂN VIÊN (Tính toán riêng để hiển thị card trên cùng) ---
+    const employeeStats = useMemo(() => {
+        if (activeTab !== 'employee') return null;
+
+        // Lọc theo nhân viên được chọn (nếu có)
+        const targetRecords = selectedEmpId 
+            ? filteredData.filter(r => r.assignedTo === selectedEmpId)
+            : filteredData;
+
+        const total = targetRecords.length;
+        let onTime = 0;
+        let overdue = 0;
+        let approaching = 0;
+
+        targetRecords.forEach(r => {
+            // Đã hoàn thành hoặc Rút
+            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.SIGNED) {
+                if (r.deadline && r.completedDate) {
+                    const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                    const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                    if (c > d) overdue++; else onTime++;
+                } else {
+                    onTime++;
+                }
+            } else {
+                // Đang xử lý
+                if (isRecordOverdue(r)) overdue++;
+                else if (isRecordApproaching(r)) approaching++;
+                else onTime++;
+            }
+        });
+
+        const onTimeRate = total > 0 ? ((onTime / total) * 100).toFixed(1) : '0';
+
+        return { total, onTime, overdue, approaching, onTimeRate };
+    }, [filteredData, selectedEmpId, activeTab]);
 
     const handleQuickReport = (type: 'week' | 'month') => {
         const now = new Date();
@@ -153,7 +192,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
-        // Truyền thêm selectedWard vào hàm export
         onExportExcel(fromDate, toDate, selectedWard);
     };
 
@@ -249,31 +287,31 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 </div>
 
-                {/* Stat Cards */}
-                {activeTab !== 'employee' && (
+                {/* STATS CARDS: HIỂN THỊ KHÁC NHAU TÙY TAB */}
+                {activeTab !== 'employee' ? (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
                         <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
                             <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
-                            <div><div className="text-2xl font-bold text-blue-800">{stats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
+                            <div><div className="text-2xl font-bold text-blue-800">{generalStats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
                         </div>
                         <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
                             <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
-                            <div><div className="text-2xl font-bold text-green-800">{stats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
+                            <div><div className="text-2xl font-bold text-green-800">{generalStats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
                         </div>
                         <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
                             <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
-                            <div><div className="text-2xl font-bold text-orange-800">{stats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
+                            <div><div className="text-2xl font-bold text-orange-800">{generalStats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
                         </div>
                         <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
                             <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
                             <div className="flex-1">
                                 <div className="flex justify-between items-center text-red-800">
                                     <span className="text-xs font-semibold">Chưa xong:</span>
-                                    <span className="text-xl font-bold">{stats.overduePending}</span>
+                                    <span className="text-xl font-bold">{generalStats.overduePending}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-red-600/70">
                                     <span className="text-xs font-semibold">Đã xong:</span>
-                                    <span className="text-sm font-bold">{stats.overdueCompleted}</span>
+                                    <span className="text-sm font-bold">{generalStats.overdueCompleted}</span>
                                 </div>
                                 <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
                                     Tổng trễ hạn
@@ -281,6 +319,40 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </div>
                         </div>
                     </div>
+                ) : (
+                    // CARD CHO TAB NHÂN VIÊN
+                    employeeStats && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+                            <div className="bg-white p-3 rounded-xl border border-gray-200 flex items-center gap-3 shadow-sm">
+                                <div className="bg-blue-100 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
+                                <div>
+                                    <div className="text-2xl font-bold text-gray-800">{employeeStats.total}</div>
+                                    <div className="text-xs text-gray-500 uppercase font-bold">Tổng hồ sơ (NV)</div>
+                                </div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-xl border border-green-200 flex items-center gap-3 shadow-sm">
+                                <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle size={20}/></div>
+                                <div>
+                                    <div className="text-2xl font-bold text-green-700">{employeeStats.onTime}</div>
+                                    <div className="text-xs text-green-600 uppercase font-bold">Đúng hạn ({employeeStats.onTimeRate}%)</div>
+                                </div>
+                            </div>
+                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-200 flex items-center gap-3 shadow-sm">
+                                <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
+                                <div>
+                                    <div className="text-2xl font-bold text-orange-700">{employeeStats.approaching}</div>
+                                    <div className="text-xs text-orange-600 uppercase font-bold">Sắp tới hạn</div>
+                                </div>
+                            </div>
+                            <div className="bg-red-50 p-3 rounded-xl border border-red-200 flex items-center gap-3 shadow-sm">
+                                <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
+                                <div>
+                                    <div className="text-2xl font-bold text-red-700">{employeeStats.overdue}</div>
+                                    <div className="text-xs text-red-600 uppercase font-bold">Trễ hạn</div>
+                                </div>
+                            </div>
+                        </div>
+                    )
                 )}
             </div>
 
@@ -461,6 +533,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         employees={employees}
                         fromDate={fromDate}
                         toDate={toDate}
+                        selectedEmpId={selectedEmpId}
+                        setSelectedEmpId={setSelectedEmpId}
                     />
                 )}
             </div>

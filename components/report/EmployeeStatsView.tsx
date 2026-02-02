@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, CheckCircle, AlertTriangle, Clock, AlertOctagon, Sparkles, Loader2, Search } from 'lucide-react';
+import { User as UserIcon, CheckCircle, AlertTriangle, Clock, AlertOctagon, Sparkles, Loader2, BarChart3 } from 'lucide-react';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -17,7 +17,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
 
-    // Filter records by date range first (Passed from Parent usually, but we filter again to be safe)
+    // Filter records by date range first
     const recordsInTimeRange = useMemo(() => {
         const start = new Date(fromDate); start.setHours(0,0,0,0);
         const end = new Date(toDate); end.setHours(23,59,59,999);
@@ -28,12 +28,14 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
         });
     }, [records, fromDate, toDate]);
 
-    // Calculate Stats for Selected Employee
+    // Calculate Stats (Global if no employee selected, Specific if selected)
     const stats = useMemo(() => {
-        if (!selectedEmpId) return null;
+        // Nếu chọn nhân viên thì lọc, không thì lấy tất cả
+        const targetRecords = selectedEmpId 
+            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
+            : recordsInTimeRange;
 
-        const myRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId);
-        const total = myRecords.length;
+        const total = targetRecords.length;
         
         let onTime = 0;
         let overdue = 0;
@@ -41,7 +43,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
         
         const overdueRecords: { record: RecordFile, daysOver: number }[] = [];
 
-        myRecords.forEach(r => {
+        targetRecords.forEach(r => {
             // Đã hoàn thành hoặc Rút -> Check xem có trễ không
             if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.SIGNED) {
                 // Logic tính đúng hạn cho hồ sơ đã xong
@@ -49,9 +51,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
                     const d = new Date(r.deadline); d.setHours(0,0,0,0);
                     const c = new Date(r.completedDate); c.setHours(0,0,0,0);
                     if (c > d) {
-                        // Trễ hạn đã xong (vẫn tính vào chỉ số chất lượng nhưng không liệt kê vào danh sách cần xử lý gấp)
-                        // Tuy nhiên yêu cầu là "số hồ sơ trễ hạn", ta có thể gộp cả trễ đang làm và trễ đã xong
-                        // Hoặc tách ra. Ở đây ta tính tổng trễ.
                         overdue++; 
                     } else {
                         onTime++;
@@ -126,20 +125,59 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
     return (
         <div className="flex flex-col h-full bg-slate-50 p-4 overflow-y-auto">
             
-            {/* EMPLOYEE SELECTOR */}
+            {/* 1. STATS CARDS (LUÔN HIỂN THỊ - GLOBAL HOẶC CÁ NHÂN) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-fade-in-up">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                    <p className="text-gray-500 text-xs font-bold uppercase flex items-center gap-2">
+                        <BarChart3 size={16} className="text-blue-500"/> Tổng hồ sơ
+                    </p>
+                    <p className="text-3xl font-black text-gray-800 mt-2">{stats.total}</p>
+                    <p className="text-[10px] text-gray-400 mt-1 font-medium">{selectedEmpId ? 'Của nhân viên này' : 'Toàn bộ nhân viên'}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm transition-all hover:shadow-md">
+                    <p className="text-green-700 text-xs font-bold uppercase flex items-center gap-2">
+                        <CheckCircle size={16}/> Đúng hạn
+                    </p>
+                    <p className="text-3xl font-black text-green-700 mt-2">{stats.onTime}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <div className="h-1.5 w-16 bg-green-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-green-600 rounded-full" style={{ width: `${stats.onTimeRate}%` }}></div>
+                        </div>
+                        <p className="text-xs text-green-700 font-bold">{stats.onTimeRate}%</p>
+                    </div>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm transition-all hover:shadow-md">
+                    <p className="text-orange-700 text-xs font-bold uppercase flex items-center gap-2">
+                        <Clock size={16}/> Sắp tới hạn
+                    </p>
+                    <p className="text-3xl font-black text-orange-700 mt-2">{stats.approaching}</p>
+                    <p className="text-[10px] text-orange-600 mt-1 font-medium">Cần ưu tiên xử lý</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm transition-all hover:shadow-md">
+                    <p className="text-red-700 text-xs font-bold uppercase flex items-center gap-2">
+                        <AlertTriangle size={16}/> Trễ hạn
+                    </p>
+                    <p className="text-3xl font-black text-red-700 mt-2">{stats.overdue}</p>
+                    <p className="text-[10px] text-red-600 mt-1 font-medium">Bao gồm cả đã xong trễ</p>
+                </div>
+            </div>
+
+            {/* 2. EMPLOYEE SELECTOR */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4 sticky top-0 z-10">
                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
                     <UserIcon size={24} />
                 </div>
                 <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chọn nhân viên cần đánh giá</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                        {selectedEmpId ? 'Đang xem dữ liệu của:' : 'Chọn nhân viên để xem chi tiết & đánh giá:'}
+                    </label>
                     <div className="relative">
                         <select 
-                            className="w-full md:w-1/2 p-2 border border-gray-300 rounded-lg font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full md:w-1/2 p-2.5 border border-gray-300 rounded-lg font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors"
                             value={selectedEmpId}
                             onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
                         >
-                            <option value="">-- Chọn nhân viên --</option>
+                            <option value="">-- Tất cả nhân viên (Tổng hợp) --</option>
                             {employees.map(emp => (
                                 <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
                             ))}
@@ -148,126 +186,101 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ records, employee
                 </div>
             </div>
 
-            {selectedEmpId && stats ? (
-                <div className="space-y-6 animate-fade-in-up">
-                    
-                    {/* STATS CARDS */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                            <p className="text-gray-500 text-xs font-bold uppercase">Tổng hồ sơ</p>
-                            <p className="text-3xl font-black text-gray-800 mt-1">{stats.total}</p>
+            {/* 3. DETAILED ANALYSIS (CHỈ HIỆN KHI ĐÃ CHỌN NHÂN VIÊN) */}
+            {selectedEmpId ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up">
+                    {/* PROBLEM RECORDS */}
+                    <div className="space-y-4">
+                        {/* Longest Overdue */}
+                        <div className="bg-red-100 p-5 rounded-xl border border-red-200 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10"><AlertOctagon size={100} /></div>
+                            <h4 className="font-bold text-red-800 flex items-center gap-2 mb-3">
+                                <AlertOctagon size={20}/> Hồ sơ trễ hạn lâu nhất
+                            </h4>
+                            {stats.longestOverdue ? (
+                                <div>
+                                    <div className="text-2xl font-bold text-red-900 mb-1">{stats.longestOverdue.record.code}</div>
+                                    <div className="text-red-800 font-medium">{stats.longestOverdue.record.customerName}</div>
+                                    <div className="mt-3 inline-flex items-center gap-2 bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-bold">
+                                        <Clock size={16}/> Trễ {stats.longestOverdue.daysOver} ngày
+                                    </div>
+                                    <div className="mt-2 text-sm text-red-700 italic">
+                                        Hẹn: {new Date(stats.longestOverdue.record.deadline!).toLocaleDateString('vi-VN')}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-red-600 italic">Không có hồ sơ nào đang trễ hạn.</p>
+                            )}
                         </div>
-                        <div className="bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm">
-                            <p className="text-green-600 text-xs font-bold uppercase flex items-center gap-1"><CheckCircle size={14}/> Đúng hạn</p>
-                            <p className="text-3xl font-black text-green-700 mt-1">{stats.onTime}</p>
-                            <p className="text-xs text-green-600 mt-1 font-medium">Tỷ lệ: {stats.onTimeRate}%</p>
-                        </div>
-                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
-                            <p className="text-orange-600 text-xs font-bold uppercase flex items-center gap-1"><Clock size={14}/> Sắp tới hạn</p>
-                            <p className="text-3xl font-black text-orange-700 mt-1">{stats.approaching}</p>
-                            <p className="text-xs text-orange-600 mt-1 font-medium">Cần xử lý gấp</p>
-                        </div>
-                        <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
-                            <p className="text-red-600 text-xs font-bold uppercase flex items-center gap-1"><AlertTriangle size={14}/> Trễ hạn</p>
-                            <p className="text-3xl font-black text-red-700 mt-1">{stats.overdue}</p>
-                            <p className="text-xs text-red-600 mt-1 font-medium">Bao gồm cả đã xong trễ</p>
+
+                        {/* List of Long Overdue */}
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div className="p-4 bg-gray-50 border-b border-gray-200">
+                                <h4 className="font-bold text-gray-700 text-sm uppercase">Danh sách trễ hạn quá lâu ({'>'}10 ngày)</h4>
+                            </div>
+                            <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                {stats.longOverdueList.length > 0 ? (
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-gray-50 text-gray-500 font-medium text-xs uppercase sticky top-0">
+                                            <tr>
+                                                <th className="p-3">Mã HS</th>
+                                                <th className="p-3">Khách hàng</th>
+                                                <th className="p-3 text-center">Số ngày</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {stats.longOverdueList.map((item, idx) => (
+                                                <tr key={idx} className="hover:bg-red-50">
+                                                    <td className="p-3 font-medium text-blue-600">{item.record.code}</td>
+                                                    <td className="p-3 text-gray-700">{item.record.customerName}</td>
+                                                    <td className="p-3 text-center font-bold text-red-600">{item.daysOver}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="p-6 text-center text-gray-400 text-sm italic">
+                                        Tốt! Không có hồ sơ nào trễ quá 10 ngày.
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* PROBLEM RECORDS */}
-                        <div className="space-y-4">
-                            {/* Longest Overdue */}
-                            <div className="bg-red-100 p-5 rounded-xl border border-red-200 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-4 opacity-10"><AlertOctagon size={100} /></div>
-                                <h4 className="font-bold text-red-800 flex items-center gap-2 mb-3">
-                                    <AlertOctagon size={20}/> Hồ sơ trễ hạn lâu nhất
-                                </h4>
-                                {stats.longestOverdue ? (
-                                    <div>
-                                        <div className="text-2xl font-bold text-red-900 mb-1">{stats.longestOverdue.record.code}</div>
-                                        <div className="text-red-800 font-medium">{stats.longestOverdue.record.customerName}</div>
-                                        <div className="mt-3 inline-flex items-center gap-2 bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-bold">
-                                            <Clock size={16}/> Trễ {stats.longestOverdue.daysOver} ngày
-                                        </div>
-                                        <div className="mt-2 text-sm text-red-700 italic">
-                                            Hẹn: {new Date(stats.longestOverdue.record.deadline!).toLocaleDateString('vi-VN')}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-red-600 italic">Không có hồ sơ nào đang trễ hạn.</p>
-                                )}
-                            </div>
-
-                            {/* List of Long Overdue */}
-                            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                                <div className="p-4 bg-gray-50 border-b border-gray-200">
-                                    <h4 className="font-bold text-gray-700 text-sm uppercase">Danh sách trễ hạn quá lâu ({'>'}10 ngày)</h4>
-                                </div>
-                                <div className="max-h-60 overflow-y-auto">
-                                    {stats.longOverdueList.length > 0 ? (
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-gray-50 text-gray-500 font-medium text-xs uppercase sticky top-0">
-                                                <tr>
-                                                    <th className="p-3">Mã HS</th>
-                                                    <th className="p-3">Khách hàng</th>
-                                                    <th className="p-3 text-center">Số ngày</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
-                                                {stats.longOverdueList.map((item, idx) => (
-                                                    <tr key={idx} className="hover:bg-red-50">
-                                                        <td className="p-3 font-medium text-blue-600">{item.record.code}</td>
-                                                        <td className="p-3 text-gray-700">{item.record.customerName}</td>
-                                                        <td className="p-3 text-center font-bold text-red-600">{item.daysOver}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    ) : (
-                                        <div className="p-6 text-center text-gray-400 text-sm italic">
-                                            Tốt! Không có hồ sơ nào trễ quá 10 ngày.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                    {/* AI ANALYSIS */}
+                    <div className="flex flex-col bg-white rounded-xl border border-purple-200 shadow-sm h-full">
+                        <div className="p-4 bg-purple-50 border-b border-purple-100 flex justify-between items-center rounded-t-xl">
+                            <h4 className="font-bold text-purple-800 flex items-center gap-2">
+                                <Sparkles size={18}/> Đánh giá hiệu quả (AI)
+                            </h4>
+                            <button 
+                                onClick={handleGenerateReview} 
+                                disabled={isGenerating}
+                                className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 disabled:opacity-50 transition-all shadow-sm"
+                            >
+                                {isGenerating ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14}/>} 
+                                {aiEvaluation ? 'Phân tích lại' : 'Phân tích ngay'}
+                            </button>
                         </div>
-
-                        {/* AI ANALYSIS */}
-                        <div className="flex flex-col bg-white rounded-xl border border-purple-200 shadow-sm h-full">
-                            <div className="p-4 bg-purple-50 border-b border-purple-100 flex justify-between items-center rounded-t-xl">
-                                <h4 className="font-bold text-purple-800 flex items-center gap-2">
-                                    <Sparkles size={18}/> Đánh giá hiệu quả (AI)
-                                </h4>
-                                <button 
-                                    onClick={handleGenerateReview} 
-                                    disabled={isGenerating}
-                                    className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 disabled:opacity-50 transition-all shadow-sm"
-                                >
-                                    {isGenerating ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14}/>} 
-                                    {aiEvaluation ? 'Phân tích lại' : 'Phân tích ngay'}
-                                </button>
-                            </div>
-                            <div className="p-6 flex-1 bg-purple-50/10">
-                                {aiEvaluation ? (
-                                    <div 
-                                        className="prose prose-sm max-w-none text-gray-700 font-serif leading-relaxed animate-fade-in"
-                                        dangerouslySetInnerHTML={{ __html: aiEvaluation }}
-                                    />
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60 min-h-[200px]">
-                                        <Sparkles size={48} className="mb-3 text-purple-200"/>
-                                        <p className="text-center text-sm">Bấm "Phân tích ngay" để AI đánh giá<br/>hiệu quả làm việc của nhân viên này.</p>
-                                    </div>
-                                )}
-                            </div>
+                        <div className="p-6 flex-1 bg-purple-50/10">
+                            {aiEvaluation ? (
+                                <div 
+                                    className="prose prose-sm max-w-none text-gray-700 font-serif leading-relaxed animate-fade-in"
+                                    dangerouslySetInnerHTML={{ __html: aiEvaluation }}
+                                />
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60 min-h-[200px]">
+                                    <Sparkles size={48} className="mb-3 text-purple-200"/>
+                                    <p className="text-center text-sm">Bấm "Phân tích ngay" để AI đánh giá<br/>hiệu quả làm việc của nhân viên này.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                    <UserIcon size={48} className="mb-4 opacity-20"/>
-                    <p>Vui lòng chọn một nhân viên để xem thống kê chi tiết.</p>
+                <div className="flex flex-col items-center justify-center h-48 bg-slate-100 rounded-xl border border-dashed border-slate-300 text-gray-400">
+                    <UserIcon size={32} className="mb-2 opacity-50"/>
+                    <p className="text-sm font-medium">Chọn một nhân viên cụ thể để xem chi tiết các hồ sơ trễ hạn và sử dụng AI đánh giá.</p>
                 </div>
             )}
         </div>

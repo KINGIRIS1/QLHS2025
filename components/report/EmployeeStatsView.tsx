@@ -1,9 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
-import { isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase } from 'lucide-react';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -135,81 +134,88 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-100 p-4 overflow-y-auto">
+        <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
-            {/* 1. STATS CARDS GRID - MOVED TO TOP */}
+            {/* 1. SECTION SỐ LIỆU THỐNG KÊ (ĐƯA LÊN TRÊN CÙNG) */}
             {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in mb-6 shrink-0">
-                    {/* BLUE CARD: TOTAL */}
-                    <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
-                        <div className="bg-blue-200 p-3 rounded-xl text-blue-600">
-                            <ListFilter size={24}/>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in mb-6 shrink-0">
+                    
+                    {/* CARD 1: TỔNG HỒ SƠ */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Tổng hồ sơ</p>
+                            <h3 className="text-3xl font-black text-blue-600">{stats.total}</h3>
                         </div>
-                        <div>
-                            <div className="text-3xl font-black text-blue-800 leading-none mb-1">{stats.total}</div>
-                            <div className="text-xs text-blue-600 font-bold uppercase tracking-wider">Tổng Hồ Sơ</div>
+                        <div className="bg-blue-50 p-3 rounded-xl text-blue-600 group-hover:scale-110 transition-transform">
+                            <ListFilter size={28}/>
                         </div>
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500"></div>
                     </div>
 
-                    {/* GREEN CARD: COMPLETED */}
-                    <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
-                        <div className="bg-emerald-200 p-3 rounded-xl text-emerald-600">
-                            <CheckCircle2 size={24}/>
+                    {/* CARD 2: ĐÃ HOÀN THÀNH */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Đã hoàn thành</p>
+                            <h3 className="text-3xl font-black text-emerald-500">{stats.completedCount}</h3>
                         </div>
-                        <div>
-                            <div className="text-3xl font-black text-emerald-800 leading-none mb-1">{stats.completedCount}</div>
-                            <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider">Đã Xong</div>
+                        <div className="bg-emerald-50 p-3 rounded-xl text-emerald-500 group-hover:scale-110 transition-transform">
+                            <CheckCircle2 size={28}/>
                         </div>
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500"></div>
                     </div>
 
-                    {/* ORANGE CARD: PROCESSING */}
-                    <div className="bg-orange-50/50 border border-orange-100 p-4 rounded-xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
-                        <div className="bg-orange-200 p-3 rounded-xl text-orange-600">
-                            <Clock size={24}/>
+                    {/* CARD 3: ĐANG XỬ LÝ */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Đang xử lý</p>
+                            <h3 className="text-3xl font-black text-orange-500">{stats.processingCount}</h3>
                         </div>
-                        <div>
-                            <div className="text-3xl font-black text-orange-800 leading-none mb-1">{stats.processingCount}</div>
-                            <div className="text-xs text-orange-600 font-bold uppercase tracking-wider">Đang Xử Lý</div>
+                        <div className="bg-orange-50 p-3 rounded-xl text-orange-500 group-hover:scale-110 transition-transform">
+                            <Clock size={28}/>
                         </div>
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-500"></div>
                     </div>
 
-                    {/* RED CARD: OVERDUE (SPLIT) */}
-                    <div className="bg-red-50/50 border border-red-100 p-4 rounded-xl flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
-                        <div className="bg-white p-2.5 rounded-lg text-red-500 shadow-sm border border-red-100">
-                            <AlertTriangle size={24}/>
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center text-red-700 font-bold text-sm mb-1">
-                                <span>Chưa xong:</span>
-                                <span className="text-lg">{stats.overduePendingCount}</span>
+                    {/* CARD 4: TRỄ HẠN (CẢNH BÁO) */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-red-100 flex items-center justify-between relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-1">Trễ hạn (Chưa xong)</p>
+                            <div className="flex items-baseline gap-2">
+                                <h3 className="text-3xl font-black text-red-600">{stats.overduePendingCount}</h3>
+                                {stats.overdueCompletedCount > 0 && (
+                                    <span className="text-xs text-red-300 font-medium">(+{stats.overdueCompletedCount} đã xong)</span>
+                                )}
                             </div>
-                            <div className="w-full h-px bg-red-200 mb-1.5"></div>
-                            <div className="flex justify-between items-center text-red-400 text-xs font-medium">
-                                <span>Đã xong (Trễ):</span>
-                                <span>{stats.overdueCompletedCount}</span>
-                            </div>
-                            <div className="text-[9px] text-red-500 uppercase font-black text-right mt-1 tracking-widest opacity-60">Tổng Trễ Hạn</div>
                         </div>
+                        <div className="bg-red-50 p-3 rounded-xl text-red-500 group-hover:scale-110 transition-transform animate-pulse">
+                            <AlertTriangle size={28}/>
+                        </div>
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-red-500"></div>
                     </div>
                 </div>
             )}
 
-            {/* 2. EMPLOYEE SELECTOR - MOVED DOWN */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4 shrink-0">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                    <UserIcon size={24} />
+            {/* 2. EMPLOYEE FILTER & TITLE */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row items-center gap-4 shrink-0">
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
+                        <Briefcase size={20} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-gray-800 text-sm uppercase">Thống kê chi tiết</h4>
+                        <p className="text-xs text-gray-500">Chọn nhân viên để xem hiệu suất làm việc</p>
+                    </div>
                 </div>
-                <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                        {selectedEmpId ? 'Đang xem dữ liệu của:' : 'Chọn nhân viên để xem chi tiết & đánh giá:'}
-                    </label>
+                
+                <div className="flex-1 w-full">
                     <div className="relative">
+                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <select 
-                            className="w-full md:w-1/2 p-2.5 border border-gray-300 rounded-lg font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors"
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300"
                             value={selectedEmpId}
                             onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
                         >
-                            <option value="">-- Tất cả nhân viên (Tổng hợp) --</option>
+                            <option value="">-- Tổng hợp tất cả nhân viên --</option>
                             {employees.map(emp => (
                                 <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
                             ))}
@@ -218,69 +224,73 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 </div>
             </div>
 
-            {/* 3. DETAILED ANALYSIS */}
+            {/* 3. DETAILED CONTENT */}
             {selectedEmpId ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up flex-1 min-h-0">
-                    {/* PROBLEM RECORDS */}
+                    
+                    {/* LEFT COL: PROBLEM RECORDS */}
                     <div className="space-y-4 flex flex-col h-full overflow-hidden">
-                        {/* Longest Overdue */}
+                        {/* Top Problem Card */}
                         <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm relative overflow-hidden shrink-0">
                             <div className="absolute top-0 right-0 p-4 opacity-5"><AlertOctagon size={100} className="text-red-500" /></div>
-                            <h4 className="font-bold text-red-700 flex items-center gap-2 mb-3 uppercase text-sm">
-                                <AlertOctagon size={18}/> Hồ sơ tồn đọng lâu nhất
+                            <h4 className="font-bold text-red-700 flex items-center gap-2 mb-3 uppercase text-xs tracking-wider">
+                                <AlertOctagon size={16}/> Hồ sơ tồn đọng lâu nhất
                             </h4>
                             {stats.longestOverdue ? (
-                                <div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="text-2xl font-black text-red-800">{stats.longestOverdue.record.code}</div>
-                                        <div className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">
+                                <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="text-xl font-black text-red-800">{stats.longestOverdue.record.code}</div>
+                                        <div className="bg-white text-red-600 px-2 py-1 rounded border border-red-200 text-xs font-bold shadow-sm">
                                             Trễ {stats.longestOverdue.daysOver} ngày
                                         </div>
                                     </div>
-                                    <div className="text-gray-700 font-medium">{stats.longestOverdue.record.customerName}</div>
-                                    <div className="mt-2 text-xs text-gray-500">
-                                        Ngày nhận: {new Date(stats.longestOverdue.record.receivedDate!).toLocaleDateString('vi-VN')} • 
-                                        Hẹn trả: <span className="text-red-600 font-bold">{new Date(stats.longestOverdue.record.deadline!).toLocaleDateString('vi-VN')}</span>
+                                    <div className="text-gray-800 font-bold text-sm mb-1">{stats.longestOverdue.record.customerName}</div>
+                                    <div className="text-xs text-gray-500 flex gap-3">
+                                        <span>Ngày nhận: {new Date(stats.longestOverdue.record.receivedDate!).toLocaleDateString('vi-VN')}</span>
+                                        <span>Hẹn trả: <span className="text-red-600 font-bold">{new Date(stats.longestOverdue.record.deadline!).toLocaleDateString('vi-VN')}</span></span>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-3 text-green-600 py-2">
-                                    <CheckCircle2 size={32} />
-                                    <span className="font-medium">Tuyệt vời! Không có hồ sơ nào đang trễ hạn.</span>
+                                <div className="flex items-center gap-3 text-green-600 py-4 bg-green-50 rounded-lg justify-center border border-green-100">
+                                    <CheckCircle2 size={24} />
+                                    <span className="font-bold text-sm">Tuyệt vời! Không có hồ sơ nào trễ hạn.</span>
                                 </div>
                             )}
                         </div>
 
                         {/* List of Long Overdue */}
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-                            <div className="p-4 bg-gray-50 border-b border-gray-200 shrink-0">
-                                <h4 className="font-bold text-gray-700 text-sm uppercase flex items-center gap-2">
-                                    <ListFilter size={16} /> Danh sách trễ hạn nguy cấp ({'>'}10 ngày)
+                            <div className="p-3 bg-gray-50 border-b border-gray-200 shrink-0">
+                                <h4 className="font-bold text-gray-700 text-xs uppercase flex items-center gap-2">
+                                    <ListFilter size={14} /> Danh sách trễ hạn nguy cấp ({'>'}10 ngày)
                                 </h4>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
                                 {stats.longOverdueList.length > 0 ? (
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-white text-gray-500 font-medium text-xs uppercase sticky top-0 shadow-sm">
+                                        <thead className="bg-white text-gray-500 font-medium text-xs uppercase sticky top-0 shadow-sm z-10">
                                             <tr>
-                                                <th className="p-3 bg-gray-50">Mã HS</th>
+                                                <th className="p-3 bg-gray-50 w-24">Mã HS</th>
                                                 <th className="p-3 bg-gray-50">Khách hàng</th>
-                                                <th className="p-3 bg-gray-50 text-center">Số ngày</th>
+                                                <th className="p-3 bg-gray-50 text-center w-20">Số ngày</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {stats.longOverdueList.map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-red-50 transition-colors">
-                                                    <td className="p-3 font-medium text-blue-600">{item.record.code}</td>
-                                                    <td className="p-3 text-gray-700">{item.record.customerName}</td>
-                                                    <td className="p-3 text-center font-bold text-red-600 bg-red-50/50">{item.daysOver}</td>
+                                                    <td className="p-3 font-bold text-blue-600 text-xs">{item.record.code}</td>
+                                                    <td className="p-3 text-gray-700 font-medium">{item.record.customerName}</td>
+                                                    <td className="p-3 text-center">
+                                                        <span className="inline-block px-2 py-0.5 rounded bg-red-100 text-red-700 font-bold text-xs">
+                                                            {item.daysOver}
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 ) : (
                                     <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm italic p-6">
-                                        <CheckCircle2 size={40} className="mb-2 text-green-200" />
                                         <p>Không có hồ sơ nào trễ quá 10 ngày.</p>
                                     </div>
                                 )}
@@ -288,22 +298,22 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* AI ANALYSIS */}
-                    <div className="flex flex-col bg-white rounded-xl border border-purple-200 shadow-sm h-full overflow-hidden">
-                        <div className="p-4 bg-purple-50 border-b border-purple-100 flex justify-between items-center shrink-0">
-                            <h4 className="font-bold text-purple-800 flex items-center gap-2">
-                                <Sparkles size={18}/> Đánh giá hiệu quả (AI)
+                    {/* RIGHT COL: AI ANALYSIS */}
+                    <div className="flex flex-col bg-white rounded-xl border border-indigo-200 shadow-sm h-full overflow-hidden">
+                        <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center shrink-0">
+                            <h4 className="font-bold text-indigo-800 flex items-center gap-2 text-sm uppercase">
+                                <Sparkles size={16} className="text-indigo-600"/> Đánh giá hiệu quả (AI)
                             </h4>
                             <button 
                                 onClick={handleGenerateReview} 
                                 disabled={isGenerating}
-                                className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 disabled:opacity-50 transition-all shadow-sm"
+                                className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50 transition-all shadow-sm active:scale-95"
                             >
                                 {isGenerating ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14}/>} 
                                 {aiEvaluation ? 'Phân tích lại' : 'Phân tích ngay'}
                             </button>
                         </div>
-                        <div className="p-6 flex-1 bg-gradient-to-b from-purple-50/30 to-white overflow-y-auto custom-scrollbar">
+                        <div className="p-6 flex-1 bg-white overflow-y-auto custom-scrollbar">
                             {aiEvaluation ? (
                                 <div 
                                     className="prose prose-sm max-w-none text-gray-800 font-serif leading-relaxed animate-fade-in"
@@ -311,7 +321,9 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                                 />
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60 min-h-[200px]">
-                                    <Sparkles size={48} className="mb-3 text-purple-200"/>
+                                    <div className="bg-indigo-50 p-4 rounded-full mb-3">
+                                        <Sparkles size={32} className="text-indigo-300"/>
+                                    </div>
                                     <p className="text-center text-sm font-medium">Bấm "Phân tích ngay" để AI tổng hợp số liệu<br/>và đánh giá hiệu quả làm việc.</p>
                                 </div>
                             )}
@@ -319,7 +331,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-dashed border-slate-300 text-gray-400 m-4">
+                <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-dashed border-slate-300 text-gray-400 m-4 shadow-sm">
                     <UserIcon size={48} className="mb-3 opacity-20"/>
                     <p className="text-sm font-medium">Vui lòng chọn một nhân viên cụ thể ở trên để xem chi tiết.</p>
                 </div>

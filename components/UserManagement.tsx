@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Employee } from '../types';
-import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, Briefcase } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, Briefcase, Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { confirmAction } from '../utils/appHelpers';
+import * as XLSX from 'xlsx-js-style';
 
 interface UserManagementProps {
   users: User[];
@@ -21,6 +22,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const initialFormState: User = {
     username: '',
@@ -74,18 +76,123 @@ const UserManagement: React.FC<UserManagementProps> = ({
       return emp ? `${emp.name} (${emp.department})` : empId;
   };
 
+  // --- TÍNH NĂNG IMPORT EXCEL ---
+
+  const handleDownloadSample = () => {
+      const headers = ["USERNAME", "PASSWORD", "DISPLAY_NAME", "ROLE", "EMPLOYEE_ID"];
+      const data = [
+          ["nguyenvana", "123456", "Nguyễn Văn A", "EMPLOYEE", "NV001"],
+          ["admin_phu", "123456", "Trần Thị B", "SUBADMIN", ""],
+      ];
+      
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      
+      // Định dạng độ rộng cột
+      ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Mau_Tai_Khoan");
+      XLSX.writeFile(wb, "Mau_Nhap_Tai_Khoan.xlsx");
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        const wb = XLSX.read(data, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        rows.forEach((row: any) => {
+           const normalizedRow: Record<string, any> = {};
+           // Chuẩn hóa key về chữ hoa để dễ xử lý
+           Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
+           
+           const username = String(normalizedRow['USERNAME'] || normalizedRow['TÊN ĐĂNG NHẬP'] || '').trim();
+           const password = String(normalizedRow['PASSWORD'] || normalizedRow['MẬT KHẨU'] || '123').trim();
+           const name = String(normalizedRow['DISPLAY_NAME'] || normalizedRow['TÊN HIỂN THỊ'] || normalizedRow['HỌ TÊN'] || '').trim();
+           
+           // Xử lý Role
+           let roleStr = String(normalizedRow['ROLE'] || normalizedRow['VAI TRÒ'] || 'EMPLOYEE').toUpperCase().trim();
+           let role: UserRole = UserRole.EMPLOYEE;
+           
+           if (roleStr === 'ADMIN') role = UserRole.ADMIN;
+           else if (roleStr === 'SUBADMIN') role = UserRole.SUBADMIN;
+           else if (roleStr === 'TEAM_LEADER' || roleStr === 'NHÓM TRƯỞNG') role = UserRole.TEAM_LEADER;
+           else if (roleStr === 'ONEDOOR' || roleStr === 'MỘT CỬA') role = UserRole.ONEDOOR;
+
+           const employeeId = String(normalizedRow['EMPLOYEE_ID'] || normalizedRow['MÃ NV'] || '').trim();
+
+           if (username && name) {
+               // Kiểm tra trùng lặp
+               if (users.find(u => u.username === username)) {
+                   failCount++; // Bỏ qua nếu đã tồn tại
+               } else {
+                   onAddUser({
+                       username,
+                       password,
+                       name,
+                       role,
+                       employeeId
+                   });
+                   successCount++;
+               }
+           }
+        });
+
+        alert(`Kết quả nhập liệu:\n- Thành công: ${successCount} tài khoản\n- Bỏ qua (Trùng lặp): ${failCount} tài khoản`);
+
+      } catch (error) {
+        console.error(error);
+        alert('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng.');
+      } finally {
+         if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <Shield className="text-blue-600" /> Quản Lý Tài Khoản
             </h2>
-            <button
-                onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm"
-            >
-                <Plus size={16} /> Thêm tài khoản
-            </button>
+            <div className="flex gap-2">
+                <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleImportExcel}
+                    accept=".xlsx, .xls"
+                    className="hidden"
+                />
+                <button 
+                    onClick={handleDownloadSample}
+                    className="flex items-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-xs shadow-sm transition-colors"
+                >
+                    <Download size={14} /> Tải mẫu
+                </button>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 font-medium text-xs shadow-sm transition-colors"
+                >
+                    <FileSpreadsheet size={14} /> Nhập Excel
+                </button>
+                <button
+                    onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+                    className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 font-medium text-xs shadow-sm transition-colors"
+                >
+                    <Plus size={14} /> Thêm tài khoản
+                </button>
+            </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-0">

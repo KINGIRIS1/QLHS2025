@@ -17,14 +17,14 @@ import UtilitiesView from './UtilitiesView';
 import AccountSettingsView from './AccountSettingsView';
 import ReportSection from './ReportSection';
 import RecordRow from './RecordRow';
-import WorkScheduleView from './WorkScheduleView'; // NEW IMPORT
+import WorkScheduleView from './WorkScheduleView';
 
 // Icons
-import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon } from 'lucide-react';
 
 interface AppRoutesProps {
     currentView: string;
-    setCurrentView: (view: string) => void; // Added setCurrentView
+    setCurrentView: (view: string) => void;
     currentUser: User;
     records: RecordFile[];
     employees: Employee[];
@@ -122,12 +122,42 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
     // --- RENDER RECORD LIST (Extracted to be used in switch) ---
     const renderRecordList = () => {
+        // Kiểm tra xem có đang ở chế độ xem Hồ sơ đo đạc (bao gồm cả tab Giao hồ sơ cũ)
+        const isMeasurementView = currentView === 'all_records' || currentView === 'assign_tasks';
+        
+        let title = 'Danh sách Hồ sơ';
+        if (currentView === 'check_list') title = 'Danh sách Trình Ký';
+        else if (currentView === 'handover_list') title = 'Danh sách Trả Kết Quả';
+        else if (currentView === 'assign_tasks') title = 'Hồ sơ chưa giao';
+        else if (currentView === 'all_records') title = 'Hồ sơ đo đạc';
+
         return (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
+                
+                {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
+                {isMeasurementView && (
+                    <div className="flex border-b border-gray-200 bg-gray-50 px-4">
+                        <button 
+                            onClick={() => props.setCurrentView('all_records')}
+                            className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${currentView === 'all_records' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <FileText size={16} /> Tất cả hồ sơ
+                        </button>
+                        {(isAdmin || isSubadmin || currentUser.role === UserRole.TEAM_LEADER) && (
+                            <button 
+                                onClick={() => props.setCurrentView('assign_tasks')}
+                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${currentView === 'assign_tasks' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <UserPlusIcon size={16} /> Hồ sơ chưa giao
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            {currentView === 'check_list' ? 'Danh sách Trình Ký' : currentView === 'handover_list' ? 'Danh sách Trả Kết Quả' : currentView === 'assign_tasks' ? 'Giao Hồ Sơ Mới' : 'Danh sách Hồ sơ'}
+                            {title}
                             {!canPerformAction && <span className="text-xs font-normal text-gray-500 px-2 py-0.5 bg-gray-100 rounded-full border">Chỉ xem</span>}
                         </h2>
                         <div className="relative flex-1 sm:w-64 max-w-md">
@@ -363,7 +393,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     notificationEnabled={props.notificationEnabled}
                 />
             );
-        // CASE WORK_SCHEDULE MỚI
         case 'work_schedule':
             return (
                 <WorkScheduleView 
@@ -393,7 +422,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     employees={employees}
                     currentUser={currentUser}
                     records={records}
-                    holidays={holidays} // Truyền holidays
+                    holidays={holidays}
                 />
             );
         case 'receive_contract':
@@ -470,7 +499,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 />
             );
         default:
-            // Handles 'all_records', 'check_list', 'handover_list', 'assign_tasks'
             return renderRecordList();
     }
 };

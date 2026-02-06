@@ -52,9 +52,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
     { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
     { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
-    { id: 'all_records', label: 'Tất cả hồ sơ', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
+    // Đã đổi tên thành "Hồ sơ đo đạc"
+    { id: 'all_records', label: 'Hồ sơ đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
     { id: 'archive_records', label: 'Hồ sơ lưu trữ', icon: FolderArchive, visible: true },
-    { id: 'assign_tasks', label: 'Giao hồ sơ', icon: UserPlus, visible: hasManagerRights },
+    // Đã xóa menu "Giao hồ sơ" (assign_tasks) ở đây để đưa vào Tab con
     { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
     { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
     { id: 'check_list', label: 'DS Ký kiểm tra', icon: ClipboardList, visible: isAdmin || isSubadmin },
@@ -121,33 +122,38 @@ const Sidebar: React.FC<SidebarProps> = ({
              if (isOneDoor && !oneDoorAllowedViews.includes(item.id)) return false;
              if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
              return item.visible;
-          }).map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleMenuClick(item.id)}
-              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${
-                currentView === item.id
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20 font-semibold'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white font-medium'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon size={18} className={currentView === item.id ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'} />
-                <span className="text-sm">{item.label}</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                  {item.id === 'reports' && isGeneratingReport && (
-                    <Loader2 size={14} className="animate-spin text-amber-400" />
-                  )}
-                  {item.badge !== undefined && item.badge > 0 && (
-                      <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm animate-pulse ${item.badgeColor || 'bg-red-500'}`}>
-                          {item.badge > 99 ? '99+' : item.badge}
-                      </span>
-                  )}
-              </div>
-            </button>
-          ))}
+          }).map((item) => {
+            // Logic Active: Sáng khi ID trùng khớp HOẶC (đang ở tab con 'assign_tasks' thì sáng tab cha 'all_records')
+            const isActive = currentView === item.id || (item.id === 'all_records' && currentView === 'assign_tasks');
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleMenuClick(item.id)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20 font-semibold'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon size={18} className={isActive ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'} />
+                  <span className="text-sm">{item.label}</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    {item.id === 'reports' && isGeneratingReport && (
+                      <Loader2 size={14} className="animate-spin text-amber-400" />
+                    )}
+                    {item.badge !== undefined && item.badge > 0 && (
+                        <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm animate-pulse ${item.badgeColor || 'bg-red-500'}`}>
+                            {item.badge > 99 ? '99+' : item.badge}
+                        </span>
+                    )}
+                </div>
+              </button>
+            );
+          })}
           
           {!isTeamLeader && !isEmployee && (isAdmin || isSubadmin) && (
             <div className="pt-4 mt-4 border-t border-slate-800 space-y-1">

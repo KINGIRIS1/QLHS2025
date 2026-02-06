@@ -18,6 +18,7 @@ import AccountSettingsView from './AccountSettingsView';
 import ReportSection from './ReportSection';
 import RecordRow from './RecordRow';
 import WorkScheduleView from './WorkScheduleView';
+import ArchiveRecords from './ArchiveRecords';
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon } from 'lucide-react';
@@ -475,6 +476,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     currentUser={currentUser}
                     initialRecordForCorrection={props.recordForMapCorrection}
                 />
+            );
+        case 'archive_records':
+            return (
+                <ArchiveRecords currentUser={currentUser} />
             );
         case 'account_settings':
             return (

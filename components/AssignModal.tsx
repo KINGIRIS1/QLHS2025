@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Employee, RecordFile } from '../types';
 import { X, Check, MapPin, User, Users, Search, Briefcase } from 'lucide-react';
@@ -77,7 +76,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // CẬP NHẬT LOGIC: Tự động xác định địa bàn mục tiêu
+  // Tự động xác định địa bàn mục tiêu từ các hồ sơ được chọn
   const targetWardName = useMemo(() => {
       if (selectedRecords.length === 0) return null;
       
@@ -87,7 +86,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       // Chuẩn hóa tên xã đầu tiên để so sánh
       const normFirst = removeVietnameseTones(firstWard);
 
-      // Kiểm tra tính đồng nhất
+      // Kiểm tra tính đồng nhất: Tất cả hồ sơ phải cùng 1 xã/phường
       const isUniform = selectedRecords.every(r => 
           r.ward && removeVietnameseTones(r.ward) === normFirst
       );
@@ -95,9 +94,9 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       return isUniform ? firstWard : null;
   }, [selectedRecords]);
 
-  // Logic chia nhóm nhân viên
+  // Logic chia nhóm nhân viên: Đề xuất (Trái) & Khác (Phải)
   const { recommended, others } = useMemo(() => {
-    // Lọc theo tìm kiếm trước
+    // 1. Lọc theo từ khóa tìm kiếm trước
     const filteredEmployees = employees.filter(e => 
         e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.department.toLowerCase().includes(searchTerm.toLowerCase())
@@ -106,28 +105,41 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
     const rec: Employee[] = [];
     const oth: Employee[] = [];
 
-    // Helper: Check nếu là nhân viên đo đạc/kỹ thuật
+    // Helper: Xác định nhân viên chuyên môn (Đo đạc/Kỹ thuật)
+    // Chỉ những người này mới được vào danh sách Đề xuất
     const checkIsSurveyTeam = (emp: Employee) => {
         const dept = (emp.department || '').toLowerCase();
         const pos = (emp.position || '').toLowerCase();
-        // Các từ khóa nhận diện tổ đo đạc
-        const keywords = ['kỹ thuật', 'đo đạc', 'tổ đo', 'địa chính'];
+        
+        // Các từ khóa nhận diện chuyên môn kỹ thuật/đo đạc
+        const keywords = [
+            'kỹ thuật', 'đo đạc', 'tổ đo', 'địa chính', 
+            'nội nghiệp', 'ngoại nghiệp', 'biên tập', 'bản đồ',
+            'tổ 1', 'tổ 2', 'tổ 3' // Các tên tổ chuyên môn cụ thể
+        ];
+        
+        // Loại trừ các từ khóa hành chính
+        const excludeKeywords = ['văn thư', 'kế toán', 'một cửa', 'tiếp nhận', 'hành chính', 'bảo vệ', 'tạp vụ'];
+        
+        if (excludeKeywords.some(k => dept.includes(k) || pos.includes(k))) return false;
+
         return keywords.some(k => dept.includes(k) || pos.includes(k));
     };
 
     filteredEmployees.forEach(emp => {
-        // Kiểm tra xem nhân viên có quản lý địa bàn này không
+        // Điều kiện 1: Có quản lý địa bàn này không?
         let isManaged = false;
         if (targetWardName) {
             const targetNorm = removeVietnameseTones(targetWardName);
             isManaged = emp.managedWards && emp.managedWards.some(w => removeVietnameseTones(w) === targetNorm);
         }
 
+        // Điều kiện 2: Có phải nhân viên kỹ thuật/đo đạc không?
         const isSurvey = checkIsSurveyTeam(emp);
 
-        // ĐIỀU KIỆN ĐỀ XUẤT (RECOMMENDED):
-        // 1. Phải phụ trách đúng địa bàn (isManaged)
-        // 2. VÀ phải thuộc tổ Đo đạc/Kỹ thuật (isSurvey)
+        // LOGIC CHIA NHÓM:
+        // Đề xuất = (Quản lý đúng địa bàn) VÀ (Là dân kỹ thuật)
+        // Tất cả trường hợp còn lại (khác địa bàn HOẶC làm văn phòng/một cửa) -> Đưa vào nhóm Khác
         if (isManaged && isSurvey) {
             rec.push(emp);
         } else {
@@ -135,20 +147,23 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         }
     });
 
-    // Sắp xếp danh sách "Khác": Ưu tiên nhân viên Tổ đo đạc lên đầu
+    // Sắp xếp danh sách "Khác":
+    // Ưu tiên nhân viên Kỹ thuật (nhưng khác địa bàn) lên đầu danh sách để dễ tìm
     oth.sort((a, b) => {
         const aSurvey = checkIsSurveyTeam(a) ? 1 : 0;
         const bSurvey = checkIsSurveyTeam(b) ? 1 : 0;
-        return bSurvey - aSurvey; // Survey team lên trước
+        
+        if (aSurvey !== bSurvey) return bSurvey - aSurvey; // Survey team lên trước
+        return a.name.localeCompare(b.name); // Sau đó sort tên
     });
 
     return { recommended: rec, others: oth };
   }, [employees, targetWardName, searchTerm]);
 
-  // Helper check lại để truyền prop vào component con
+  // Helper check lại để truyền prop vào UI component con (hiển thị icon briefcase)
   const isSurveyTeamMember = (emp: Employee) => {
       const dept = (emp.department || '').toLowerCase();
-      return dept.includes('kỹ thuật') || dept.includes('đo đạc') || dept.includes('tổ đo');
+      return ['kỹ thuật', 'đo đạc', 'tổ đo', 'địa chính', 'nội nghiệp', 'ngoại nghiệp'].some(k => dept.includes(k));
   };
 
   if (!isOpen) return null;
@@ -194,7 +209,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         {/* Body - Flex Layout */}
         <div className="flex-1 flex overflow-hidden">
              
-             {/* LEFT SIDE: RECOMMENDED (30-35%) */}
+             {/* LEFT SIDE: RECOMMENDED (30-35%) - CHỈ HIỆN KỸ THUẬT ĐÚNG TUYẾN */}
              <div className="w-[320px] bg-blue-50/50 border-r border-blue-100 flex flex-col shrink-0">
                  <div className="p-4 border-b border-blue-100 bg-blue-50/80 sticky top-0 backdrop-blur-sm z-10">
                      <div className="flex items-center gap-2 text-sm font-bold text-blue-800 uppercase tracking-wide">
@@ -240,13 +255,14 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                  </div>
              </div>
 
-             {/* RIGHT SIDE: OTHERS (Grid 2 Cols) */}
+             {/* RIGHT SIDE: OTHERS (Grid 2 Cols) - CÁC TỔ KHÁC + KỸ THUẬT TRÁI TUYẾN */}
              <div className="flex-1 flex flex-col bg-white">
                  <div className="p-4 border-b border-gray-100 sticky top-0 bg-white z-10">
                      <div className="flex items-center gap-2 text-sm font-bold text-gray-600 uppercase tracking-wide">
                         <User size={16} />
                         Nhân viên khác ({others.length})
                      </div>
+                     <p className="text-[11px] text-gray-400 mt-0.5">Bao gồm: Kỹ thuật khác tuyến, Văn phòng, Một cửa, Lãnh đạo...</p>
                  </div>
 
                  <div className="p-4 overflow-y-auto flex-1 custom-scrollbar bg-slate-50">

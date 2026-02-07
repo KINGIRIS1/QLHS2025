@@ -21,7 +21,7 @@ import WorkScheduleView from './WorkScheduleView';
 import ArchiveRecords from './ArchiveRecords';
 
 // Icons
-import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon } from 'lucide-react';
+import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send } from 'lucide-react';
 
 interface AppRoutesProps {
     currentView: string;
@@ -123,12 +123,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
     // --- RENDER RECORD LIST (Extracted to be used in switch) ---
     const renderRecordList = () => {
-        // Kiểm tra xem có đang ở chế độ xem Hồ sơ đo đạc (bao gồm cả tab Giao hồ sơ cũ)
-        const isMeasurementView = currentView === 'all_records' || currentView === 'assign_tasks';
+        // Kiểm tra xem có đang ở chế độ xem Hồ sơ đo đạc (bao gồm tất cả các tab con)
+        const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
         
         let title = 'Danh sách Hồ sơ';
         if (currentView === 'check_list') title = 'Danh sách Trình Ký';
-        else if (currentView === 'handover_list') title = 'Danh sách Trả Kết Quả';
+        else if (currentView === 'handover_list') title = 'Danh sách Giao 1 cửa';
         else if (currentView === 'assign_tasks') title = 'Hồ sơ chưa giao';
         else if (currentView === 'all_records') title = 'Hồ sơ đo đạc';
 
@@ -137,19 +137,38 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 
                 {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
                 {isMeasurementView && (
-                    <div className="flex border-b border-gray-200 bg-gray-50 px-4">
+                    <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
                         <button 
                             onClick={() => props.setCurrentView('all_records')}
-                            className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${currentView === 'all_records' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === 'all_records' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                         >
                             <FileText size={16} /> Tất cả hồ sơ
                         </button>
+                        
                         {(isAdmin || isSubadmin || currentUser.role === UserRole.TEAM_LEADER) && (
                             <button 
                                 onClick={() => props.setCurrentView('assign_tasks')}
-                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${currentView === 'assign_tasks' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === 'assign_tasks' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                             >
-                                <UserPlusIcon size={16} /> Hồ sơ chưa giao
+                                <UserPlusIcon size={16} /> Chưa giao
+                            </button>
+                        )}
+
+                        {(isAdmin || isSubadmin) && (
+                            <button 
+                                onClick={() => props.setCurrentView('check_list')}
+                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === 'check_list' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <ClipboardList size={16} /> Trình ký
+                            </button>
+                        )}
+
+                        {(isAdmin || isSubadmin || currentUser.role === UserRole.ONEDOOR) && (
+                            <button 
+                                onClick={() => props.setCurrentView('handover_list')}
+                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === 'handover_list' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <Send size={16} /> Giao 1 cửa
                             </button>
                         )}
                     </div>
@@ -504,6 +523,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 />
             );
         default:
+            // This now handles 'all_records', 'assign_tasks', 'check_list', 'handover_list'
             return renderRecordList();
     }
 };

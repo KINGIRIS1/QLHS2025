@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive } from 'lucide-react';
-import { User, UserRole } from '../types';
-import { APP_VERSION } from '../constants';
+import { User, UserRole } from './types';
+import { APP_VERSION } from './constants';
 
 interface SidebarProps {
   currentView: string;
@@ -42,8 +42,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
   const hasManagerRights = isAdmin || isSubadmin || isTeamLeader;
 
+  // Cập nhật danh sách các view được phép
   const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'assign_tasks', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records'];
 
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
@@ -52,14 +53,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
     { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
     { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
-    // Đã đổi tên thành "Hồ sơ đo đạc"
+    // Đổi tên thành "Hồ sơ đo đạc"
     { id: 'all_records', label: 'Hồ sơ đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
     { id: 'archive_records', label: 'Hồ sơ lưu trữ', icon: FolderArchive, visible: true },
-    // Đã xóa menu "Giao hồ sơ" (assign_tasks) ở đây để đưa vào Tab con
     { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
     { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
-    { id: 'check_list', label: 'DS Ký kiểm tra', icon: ClipboardList, visible: isAdmin || isSubadmin },
-    { id: 'handover_list', label: 'DS Giao 1 cửa', icon: Send, visible: isAdmin || isSubadmin || isOneDoor },
+    // Đã xóa menu "DS Ký kiểm tra" và "DS Giao 1 cửa" để đưa vào làm tab con của "Hồ sơ đo đạc"
     { id: 'reports', label: 'Báo cáo & Thống kê', icon: BarChart3, visible: !isOneDoor },
     { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: true },
   ];
@@ -123,9 +122,10 @@ const Sidebar: React.FC<SidebarProps> = ({
              if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
              return item.visible;
           }).map((item) => {
-            // Logic Active: Sáng khi ID trùng khớp HOẶC (đang ở tab con 'assign_tasks' thì sáng tab cha 'all_records')
-            const isActive = currentView === item.id || (item.id === 'all_records' && currentView === 'assign_tasks');
-
+            // Logic Active: Sáng khi ID trùng khớp HOẶC (đang ở các tab con của 'all_records')
+            const isActive = currentView === item.id || 
+                             (item.id === 'all_records' && ['assign_tasks', 'check_list', 'handover_list'].includes(currentView));
+            
             return (
               <button
                 key={item.id}

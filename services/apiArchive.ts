@@ -114,3 +114,79 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
         return false;
     }
 };
+
+export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): Promise<boolean> => {
+    if (!isConfigured) {
+        records.forEach(r => {
+            const newRec = { 
+                ...r, 
+                id: Math.random().toString(36).substr(2, 9), 
+                created_at: new Date().toISOString() 
+            } as ArchiveRecord;
+            MOCK_ARCHIVE.unshift(newRec);
+        });
+        saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+        return true;
+    }
+    try {
+        // Chuẩn hóa dữ liệu trước khi insert
+        const payload = records.map(r => {
+            const p: any = { ...r };
+            delete p.id; // Để DB tự sinh UUID
+            if (p.ngay_thang === '') p.ngay_thang = null;
+            return p;
+        });
+
+        const { error } = await supabase.from('archive_records').insert(payload);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("importArchiveRecords", error);
+        return false;
+    }
+};
+
+export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<ArchiveRecord>): Promise<boolean> => {
+    if (!isConfigured) {
+        MOCK_ARCHIVE = MOCK_ARCHIVE.map(r => {
+            if (ids.includes(r.id)) {
+                // Merge data field if exists
+                const newData = updates.data ? { ...r.data, ...updates.data } : r.data;
+                return { ...r, ...updates, data: newData } as ArchiveRecord;
+            }
+            return r;
+        });
+        saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+        return true;
+    }
+    try {
+        // Lưu ý: data field trong supabase update sẽ replace toàn bộ jsonb nếu không dùng jsonb_set.
+        // Tuy nhiên, ở đây ta giả định updates.data chứa các trường cần merge, nhưng Supabase JS client update jsonb là replace.
+        // Để merge, ta cần logic phức tạp hơn hoặc fetch về rồi update.
+        // Nhưng với yêu cầu "Chuyển Scan", ta chỉ update thêm trường vào data.
+        // Cách đơn giản: Dùng RPC hoặc chấp nhận fetch-update nếu số lượng ít.
+        // Hoặc: update từng dòng (chậm nhưng an toàn cho JSON merge).
+        
+        // Cách tối ưu hơn cho Supabase: Update các trường thường, còn JSON thì...
+        // Tạm thời loop update để đảm bảo merge JSON đúng (an toàn nhất mà không cần store procedure)
+        
+        const { data: currentRecords, error: fetchError } = await supabase
+            .from('archive_records')
+            .select('id, data')
+            .in('id', ids);
+            
+        if (fetchError) throw fetchError;
+
+        const promises = currentRecords.map(r => {
+            const mergedData = { ...r.data, ...(updates.data || {}) };
+            const payload = { ...updates, data: mergedData };
+            return supabase.from('archive_records').update(payload).eq('id', r.id);
+        });
+
+        await Promise.all(promises);
+        return true;
+    } catch (error) {
+        logError("updateArchiveRecordsBatch", error);
+        return false;
+    }
+};

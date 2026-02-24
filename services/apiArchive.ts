@@ -61,24 +61,39 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         return true;
     }
     try {
+        // Chuẩn hóa dữ liệu
+        const payload: any = { ...record };
+        
+        // Xử lý ngày tháng: Nếu rỗng thì set null để tránh lỗi định dạng DATE của PostgreSQL
+        if (payload.ngay_thang === '') payload.ngay_thang = null;
+
         if (record.id) {
             const { error } = await supabase.from('archive_records').update({ 
-                status: record.status,
-                so_hieu: record.so_hieu,
-                trich_yeu: record.trich_yeu,
-                ngay_thang: record.ngay_thang,
-                noi_nhan_gui: record.noi_nhan_gui,
-                data: record.data
+                status: payload.status,
+                so_hieu: payload.so_hieu,
+                trich_yeu: payload.trich_yeu,
+                ngay_thang: payload.ngay_thang,
+                noi_nhan_gui: payload.noi_nhan_gui,
+                data: payload.data
             }).eq('id', record.id);
             if (error) throw error;
         } else {
-            const newRecord = { ...record, id: Math.random().toString(36).substr(2, 9) };
-            const { error } = await supabase.from('archive_records').insert([newRecord]);
+            // Khi Insert: KHÔNG tự sinh ID bằng Math.random() vì DB dùng UUID.
+            // Để Supabase/Postgres tự sinh ID.
+            delete payload.id; 
+            
+            const { error } = await supabase.from('archive_records').insert([payload]);
             if (error) throw error;
         }
         return true;
-    } catch (error) {
-        logError("saveArchiveRecord", error);
+    } catch (error: any) {
+        // Xử lý thông báo lỗi cụ thể cho 22P02 (Sai kiểu dữ liệu, ví dụ text vào trường UUID hoặc Date sai format)
+        if (error.code === '22P02') {
+            console.error("Lỗi định dạng dữ liệu (22P02):", error.message);
+            logError("saveArchiveRecord", "Sai định dạng dữ liệu (Lỗi 22P02). Kiểm tra các trường Số hoặc Ngày tháng.");
+        } else {
+            logError("saveArchiveRecord", error);
+        }
         return false;
     }
 };

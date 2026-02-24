@@ -11,6 +11,7 @@ const COLUMNS = [
     { key: 'ten_chuyen_quyen', label: 'TÊN CHỦ SỬ DỤNG CHUYỂN QUYỀN', width: '250px' },
     { key: 'ten_chu_su_dung', label: 'TÊN CHỦ SỬ DỤNG', width: '250px' },
     { key: 'loai_bien_dong', label: 'Loại biến động', width: '200px' },
+    { key: 'loai_gcn', label: 'Loại GCN', width: '150px' },
     { key: 'ngay_nhan', label: 'Ngày nhận hồ sơ', width: '140px', type: 'date' },
     { key: 'so_to', label: 'Số tờ', width: '80px' },
     { key: 'so_thua', label: 'Số thửa', width: '80px' },
@@ -109,6 +110,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 ten_chuyen_quyen: '',
                 ten_chu_su_dung: '',
                 loai_bien_dong: '',
+                loai_gcn: 'GCN mới',
                 ngay_nhan: new Date().toISOString().split('T')[0],
                 so_to: '',
                 so_thua: '',
@@ -198,6 +200,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                     // Update: Thêm 'chủ sử dụng' vào keywords
                     ten_chu_su_dung: findCol(['tên chủ', 'bên b', 'người sử dụng', 'chủ sử dụng'], ['chuyển quyền']),
                     loai_bien_dong: findCol(['biến động', 'loại hồ sơ']),
+                    loai_gcn: findCol(['loại gcn', 'gcn']),
                     ngay_nhan: findCol(['ngày nhận']),
                     so_to: findCol(['tờ', 'số tờ']),
                     so_thua: findCol(['thửa', 'số thửa']),
@@ -232,6 +235,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         ten_chuyen_quyen: getValue(colMap.ten_chuyen_quyen),
                         ten_chu_su_dung: getValue(colMap.ten_chu_su_dung),
                         loai_bien_dong: getValue(colMap.loai_bien_dong),
+                        loai_gcn: getValue(colMap.loai_gcn) || 'GCN mới',
                         ngay_nhan: getValue(colMap.ngay_nhan),
                         so_to: getValue(colMap.so_to),
                         so_thua: getValue(colMap.so_thua),
@@ -347,6 +351,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 'Tên chuyển quyền': r.data?.ten_chuyen_quyen,
                 'Tên chủ sử dụng': r.data?.ten_chu_su_dung,
                 'Loại biến động': r.data?.loai_bien_dong,
+                'Loại GCN': r.data?.loai_gcn,
                 'Ngày nhận': r.data?.ngay_nhan,
                 'Số tờ': r.data?.so_to,
                 'Số thửa': r.data?.so_thua,
@@ -491,6 +496,19 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                                                         rows={2}
                                                         style={{ minHeight: '40px' }}
                                                     />
+                                                ) : col.key === 'loai_gcn' ? (
+                                                    <select
+                                                        className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                        value={r.data?.[col.key] || 'GCN mới'}
+                                                        onChange={(e) => {
+                                                            handleCellChange(r.id, col.key, e.target.value);
+                                                            handleBlur({ ...r, data: { ...r.data, [col.key]: e.target.value } });
+                                                        }}
+                                                        disabled={activeTab === 'scanned'}
+                                                    >
+                                                        <option value="GCN mới">GCN mới</option>
+                                                        <option value="GCN trang 4">GCN trang 4</option>
+                                                    </select>
                                                 ) : (
                                                     <input 
                                                         type={col.type || 'text'}

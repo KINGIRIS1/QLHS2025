@@ -1,16 +1,9 @@
-
-
-
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { User } from '../../types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
-import { Search, Plus, Trash2, Save, BookOpen, Loader2, Upload, FileSpreadsheet, Send, CheckCircle2 } from 'lucide-react';
-import { confirmAction } from '../../utils/appHelpers';
+import { User } from '../../types';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
-
-interface VaoSoViewProps {
-    currentUser: User;
-}
+import { confirmAction } from '../../utils/appHelpers';
 
 // Định nghĩa các cột
 const COLUMNS = [
@@ -30,53 +23,62 @@ const COLUMNS = [
     { key: 'ghi_chu', label: 'GHI CHÚ', width: '250px' }
 ];
 
+interface VaoSoViewProps {
+    currentUser: User;
+}
+
 const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
-    const [savingId, setSavingId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'pending' | 'scanned'>('pending');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [savingId, setSavingId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
+    
+    // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 20;
+    const itemsPerPage = 50;
 
-    useEffect(() => { loadData(); }, []);
+    // Batch Modal State
+    const [showBatchModal, setShowBatchModal] = useState(false);
+
+    useEffect(() => {
+        loadData();
+    }, []);
 
     const loadData = async () => {
         setLoading(true);
         const data = await fetchArchiveRecords('vaoso');
-        // Đảm bảo data field luôn tồn tại
-        const processed = data.map(r => ({
-            ...r,
-            data: r.data || {}
-        }));
-        setRecords(processed);
+        setRecords(data);
         setLoading(false);
     };
 
     const filteredRecords = useMemo(() => {
         let filtered = records;
-        
+
         // Filter by Tab
-        if (activeTab === 'pending') {
-            filtered = records.filter(r => !r.data?.is_scanned);
-        } else {
+        if (activeTab === 'all') {
+            // Danh sách tổng: Hiển thị tối đa 1000 dòng mới nhất
+            filtered = records.slice(0, 1000);
+        } else if (activeTab === 'pending') {
+            // Chờ chuyển Scan: Đã được đánh dấu chuyển scan NHƯNG chưa có đợt scan (chưa scan xong)
+            filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
+        } else if (activeTab === 'scanned') {
+            // Đã chuyển Scan: Đã có đợt scan
             filtered = records.filter(r => r.data?.is_scanned);
         }
 
+        // Filter by Search
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
-            filtered = filtered.filter(r => {
-                const d = r.data || {};
-                return (
-                    (d.ma_ho_so || '').toLowerCase().includes(lower) ||
-                    (d.ten_chu_su_dung || '').toLowerCase().includes(lower) ||
-                    (d.ten_chuyen_quyen || '').toLowerCase().includes(lower)
-                );
-            });
+            filtered = filtered.filter(r => 
+                r.so_hieu?.toLowerCase().includes(lower) ||
+                r.trich_yeu?.toLowerCase().includes(lower) ||
+                JSON.stringify(r.data).toLowerCase().includes(lower)
+            );
         }
+
         return filtered;
     }, [records, searchTerm, activeTab]);
 
@@ -90,6 +92,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
     // Reset page when tab or search changes
     useEffect(() => {
         setCurrentPage(1);
+        setSelectedIds(new Set()); // Clear selection on tab change
     }, [activeTab, searchTerm]);
 
     const handleAddNew = async () => {
@@ -107,7 +110,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 ten_chu_su_dung: '',
                 loai_bien_dong: '',
                 ngay_nhan: new Date().toISOString().split('T')[0],
-                // ngay_tra_kq_1 removed
                 so_to: '',
                 so_thua: '',
                 tong_dien_tich: '',
@@ -119,34 +121,22 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 ghi_chu: ''
             }
         };
-
+        
         await saveArchiveRecord(newRecord);
-        await loadData();
+        loadData();
     };
 
     const handleDelete = async (id: string) => {
-        if (await confirmAction('Xóa dòng này?')) {
+        if (await confirmAction("Bạn có chắc chắn muốn xóa hồ sơ này?")) {
             await deleteArchiveRecord(id);
-            setRecords(prev => prev.filter(r => r.id !== id));
-            setSelectedIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(id);
-                return newSet;
-            });
+            loadData();
         }
     };
 
     const handleCellChange = (id: string, key: string, value: string) => {
         setRecords(prev => prev.map(r => {
             if (r.id === id) {
-                const newData = { ...r.data, [key]: value };
-                const updates: any = { data: newData };
-                if (key === 'ma_ho_so') updates.so_hieu = value;
-                if (key === 'ghi_chu') updates.trich_yeu = value;
-                if (key === 'ngay_nhan') updates.ngay_thang = value;
-                if (key === 'ten_chu_su_dung') updates.noi_nhan_gui = value;
-                
-                return { ...r, ...updates };
+                return { ...r, data: { ...r.data, [key]: value } };
             }
             return r;
         }));
@@ -158,15 +148,15 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
         setSavingId(null);
     };
 
-    // --- IMPORT EXCEL ---
     const handleImportClick = () => {
-        if (fileInputRef.current) fileInputRef.current.click();
+        fileInputRef.current?.click();
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        setLoading(true);
         const reader = new FileReader();
         reader.onload = async (evt) => {
             try {
@@ -174,9 +164,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 const wb = XLSX.read(bstr, { type: 'binary' });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+                const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-                // Tìm dòng header
+                // Tìm dòng tiêu đề
                 let headerRowIdx = -1;
                 for (let i = 0; i < Math.min(data.length, 10); i++) {
                     const rowStr = JSON.stringify(data[i]).toLowerCase();
@@ -205,11 +195,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 const colMap = {
                     ma_ho_so: findCol(['mã hồ sơ', 'mã hs']),
                     ten_chuyen_quyen: findCol(['chuyển quyền', 'bên a']),
-                    // Loại trừ 'chuyển quyền' để tránh nhầm với cột Tên chủ sử dụng chuyển quyền
-                    ten_chu_su_dung: findCol(['tên chủ', 'bên b', 'người sử dụng'], ['chuyển quyền']),
+                    // Update: Thêm 'chủ sử dụng' vào keywords
+                    ten_chu_su_dung: findCol(['tên chủ', 'bên b', 'người sử dụng', 'chủ sử dụng'], ['chuyển quyền']),
                     loai_bien_dong: findCol(['biến động', 'loại hồ sơ']),
                     ngay_nhan: findCol(['ngày nhận']),
-                    // ngay_tra_kq_1 removed
                     so_to: findCol(['tờ', 'số tờ']),
                     so_thua: findCol(['thửa', 'số thửa']),
                     tong_dien_tich: findCol(['tổng diện tích', 'dt']),
@@ -230,11 +219,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         let val = row[idx];
                         if (val === undefined || val === null) return '';
                         
+                        // Xử lý ngày tháng Excel (serial number)
                         if (typeof val === 'number' && val > 20000 && val < 60000) {
-                             try {
-                                 const date = XLSX.SSF.parse_date_code(val);
-                                 return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;
-                             } catch { return String(val); }
+                             const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                             return date.toISOString().split('T')[0];
                         }
                         return String(val).trim();
                     };
@@ -245,7 +233,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         ten_chu_su_dung: getValue(colMap.ten_chu_su_dung),
                         loai_bien_dong: getValue(colMap.loai_bien_dong),
                         ngay_nhan: getValue(colMap.ngay_nhan),
-                        // ngay_tra_kq_1 removed
                         so_to: getValue(colMap.so_to),
                         so_thua: getValue(colMap.so_thua),
                         tong_dien_tich: getValue(colMap.tong_dien_tich),
@@ -254,28 +241,28 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         so_phat_hanh: getValue(colMap.so_phat_hanh),
                         ngay_ky_gcn: getValue(colMap.ngay_ky_gcn),
                         ngay_ky_phieu_tk: getValue(colMap.ngay_ky_phieu_tk),
-                        ghi_chu: getValue(colMap.ghi_chu)
+                        ghi_chu: getValue(colMap.ghi_chu),
+                        is_pending_scan: false, // Mặc định chưa chuyển scan
+                        is_scanned: false
                     };
 
                     newRecords.push({
                         type: 'vaoso',
                         status: 'completed',
                         so_hieu: recordData.ma_ho_so,
-                        trich_yeu: recordData.ghi_chu,
-                        ngay_thang: recordData.ngay_nhan || '',
-                        noi_nhan_gui: recordData.ten_chu_su_dung,
+                        trich_yeu: `${recordData.loai_bien_dong} - ${recordData.ten_chu_su_dung}`,
+                        ngay_thang: recordData.ngay_nhan || new Date().toISOString().split('T')[0],
                         created_by: currentUser.username,
                         data: recordData
                     });
                 });
 
                 if (newRecords.length > 0) {
-                    setLoading(true);
                     await importArchiveRecords(newRecords);
-                    await loadData();
-                    alert(`Đã nhập thành công ${newRecords.length} dòng.`);
+                    alert(`Đã import thành công ${newRecords.length} hồ sơ.`);
+                    loadData();
                 } else {
-                    alert("Không tìm thấy dữ liệu hợp lệ để nhập.");
+                    alert("Không đọc được dữ liệu nào từ file.");
                 }
 
             } catch (error) {
@@ -289,134 +276,123 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
         reader.readAsBinaryString(file);
     };
 
-    // --- CHUYỂN SCAN ---
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            // Select all in current view (filtered)
-            const allIds = new Set(filteredRecords.map(r => r.id));
-            setSelectedIds(allIds);
+            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
         } else {
             setSelectedIds(new Set());
         }
     };
 
     const handleSelectRow = (id: string) => {
-        setSelectedIds(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) newSet.delete(id);
-            else newSet.add(id);
-            return newSet;
-        });
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedIds(newSet);
     };
 
-    const performTransfer = async (ids: string[]) => {
-        setLoading(true);
-        const batchId = `SCAN_${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}`;
-        const scanDate = new Date().toISOString();
+    // Chuyển sang tab "Chờ chuyển Scan"
+    const handleMoveToPending = async () => {
+        if (selectedIds.size === 0) return;
+        if (!await confirmAction(`Bạn có chắc muốn chuyển ${selectedIds.size} hồ sơ sang danh sách Chờ Scan?`)) return;
 
-        const updates: Partial<ArchiveRecord> = {
-            data: {
+        setLoading(true);
+        const updates = {
+            data: { is_pending_scan: true }
+        };
+        await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+        setLoading(false);
+        setSelectedIds(new Set());
+        loadData();
+    };
+
+    const handleMoveToPendingSingle = async (id: string) => {
+        setLoading(true);
+        const updates = {
+            data: { is_pending_scan: true }
+        };
+        await updateArchiveRecordsBatch([id], updates);
+        setLoading(false);
+        loadData();
+    };
+
+    // Mở modal tạo đợt (từ tab Pending)
+    const handleOpenBatchModal = () => {
+        if (selectedIds.size === 0) return;
+        setShowBatchModal(true);
+    };
+
+    // Xác nhận tạo đợt scan
+    const handleConfirmBatch = async (batch: number, date: string) => {
+        setLoading(true);
+        const updates = {
+            data: { 
                 is_scanned: true,
-                scan_batch_id: batchId,
-                scan_date: scanDate
+                scan_batch_id: batch.toString(),
+                scan_date: date,
+                is_pending_scan: false // Đã scan xong thì bỏ cờ pending (hoặc giữ tùy logic, ở đây bỏ để biến mất khỏi tab pending)
             }
         };
-
-        const success = await updateArchiveRecordsBatch(ids, updates);
-        if (success) {
-            await loadData();
-            setSelectedIds(new Set());
-            alert("Đã chuyển danh sách Scan thành công!");
-        } else {
-            alert("Có lỗi xảy ra khi chuyển Scan.");
-        }
+        await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
         setLoading(false);
+        setSelectedIds(new Set());
+        loadData();
     };
 
-    const handleTransferScan = async () => {
-        if (selectedIds.size === 0) {
-            alert("Vui lòng chọn ít nhất một hồ sơ để chuyển Scan.");
-            return;
-        }
-
-        if (await confirmAction(`Bạn có chắc muốn chuyển ${selectedIds.size} hồ sơ sang danh sách Scan?`)) {
-            await performTransfer(Array.from(selectedIds));
-        }
-    };
-
-    const handleTransferSingle = async (id: string) => {
-        if (await confirmAction(`Chuyển hồ sơ này sang danh sách Scan?`)) {
-            await performTransfer([id]);
-        }
-    };
-
-    // --- XUẤT EXCEL ---
     const handleExportExcel = () => {
-        if (filteredRecords.length === 0) {
-            alert("Không có dữ liệu để xuất.");
-            return;
-        }
-
-        const wb = XLSX.utils.book_new();
-        
-        // Header
-        const headers = ["STT", ...COLUMNS.map(c => c.label)];
-        if (activeTab === 'scanned') headers.push("Ngày chuyển Scan", "Đợt Scan");
-
-        const data = filteredRecords.map((r, idx) => {
-            const row: (string | number)[] = [idx + 1];
-            COLUMNS.forEach(col => {
-                row.push(r.data?.[col.key] || '');
-            });
+        const dataToExport = filteredRecords.map((r, idx) => {
+            const row: any = {
+                'STT': idx + 1,
+                'Mã hồ sơ': r.data?.ma_ho_so,
+                'Tên chuyển quyền': r.data?.ten_chuyen_quyen,
+                'Tên chủ sử dụng': r.data?.ten_chu_su_dung,
+                'Loại biến động': r.data?.loai_bien_dong,
+                'Ngày nhận': r.data?.ngay_nhan,
+                'Số tờ': r.data?.so_to,
+                'Số thửa': r.data?.so_thua,
+                'Tổng diện tích': r.data?.tong_dien_tich,
+                'Diện tích thổ cư': r.data?.dien_tich_tho_cu,
+                'Địa danh': r.data?.dia_danh,
+                'Số phát hành': r.data?.so_phat_hanh,
+                'Ngày ký GCN': r.data?.ngay_ky_gcn,
+                'Ngày ký phiếu TK': r.data?.ngay_ky_phieu_tk,
+                'Ghi chú': r.data?.ghi_chu
+            };
             if (activeTab === 'scanned') {
-                row.push(r.data?.scan_date ? new Date(r.data.scan_date).toLocaleString('vi-VN') : '');
-                row.push(r.data?.scan_batch_id || '');
+                row['Ngày Scan'] = r.data?.scan_date;
+                row['Đợt Scan'] = r.data?.scan_batch_id;
             }
             return row;
         });
 
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-        
-        // Style header
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-            const address = XLSX.utils.encode_cell({ r: 0, c: C });
-            if (!ws[address]) continue;
-            ws[address].s = {
-                font: { bold: true },
-                fill: { fgColor: { rgb: "E0E0E0" } },
-                border: { bottom: { style: "thin" } }
-            };
-        }
-
-        // Auto width (simple approximation)
-        ws['!cols'] = headers.map(() => ({ wch: 20 }));
-
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "DanhSach");
-        const fileName = `DanhSach_${activeTab === 'pending' ? 'ChoScan' : 'DaScan'}_${new Date().toISOString().slice(0,10)}.xlsx`;
-        XLSX.writeFile(wb, fileName);
+        XLSX.writeFile(wb, `VaoSo_${activeTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex flex-col h-full bg-white rounded-xl shadow-sm overflow-hidden">
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 flex flex-wrap gap-4 items-center bg-gray-50 justify-between">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                 <div className="flex items-center gap-4">
-                    <div className="font-bold text-gray-700 flex items-center gap-2 text-lg">
-                        <BookOpen size={20} className="text-teal-600" /> Sổ Đăng Ký Biến Động
-                    </div>
-                    
-                    {/* Tabs */}
-                    <div className="flex bg-gray-200 rounded-lg p-1 gap-1">
+                    <h2 className="text-lg font-bold text-gray-800 uppercase">Sổ Vào Số</h2>
+                    <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                        <button 
+                            onClick={() => setActiveTab('all')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            Danh sách
+                        </button>
                         <button 
                             onClick={() => setActiveTab('pending')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'pending' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
                             Chờ chuyển Scan
                         </button>
                         <button 
                             onClick={() => setActiveTab('scanned')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'scanned' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
                             Đã chuyển Scan
                         </button>
@@ -424,7 +400,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <div className="relative min-w-[200px]">
+                    <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input 
                             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" 
@@ -434,7 +410,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         />
                     </div>
                     
-                    {activeTab === 'pending' && (
+                    {activeTab === 'all' && (
                         <>
                             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                             <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 shadow-sm">
@@ -444,11 +420,17 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                                 <Plus size={16}/> Thêm mới
                             </button>
                             {selectedIds.size > 0 && (
-                                <button onClick={handleTransferScan} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
+                                <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
                                     <Send size={16}/> Chuyển Scan ({selectedIds.size})
                                 </button>
                             )}
                         </>
+                    )}
+
+                    {activeTab === 'pending' && selectedIds.size > 0 && (
+                        <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
+                            <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
+                        </button>
                     )}
 
                     <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm">
@@ -532,9 +514,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                                             </>
                                         )}
                                         <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200 flex gap-1 justify-center">
-                                            {activeTab === 'pending' && (
+                                            {activeTab === 'all' && (
                                                 <button 
-                                                    onClick={() => handleTransferSingle(r.id)} 
+                                                    onClick={() => handleMoveToPendingSingle(r.id)} 
                                                     className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition-colors" 
                                                     title="Chuyển Scan"
                                                 >
@@ -553,7 +535,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                                 )) : (
                                     <tr>
                                         <td colSpan={COLUMNS.length + 5} className="p-8 text-center text-gray-400 italic">
-                                            {activeTab === 'pending' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 'Chưa có hồ sơ nào được chuyển Scan.'}
+                                            {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 
+                                             activeTab === 'pending' ? 'Chưa có hồ sơ chờ chuyển scan.' :
+                                             'Chưa có hồ sơ nào được chuyển Scan.'}
                                         </td>
                                     </tr>
                                 )}
@@ -588,9 +572,176 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                     </>
                 )}
             </div>
+
+            {/* Batch Modal */}
+            <BatchModal 
+                isOpen={showBatchModal}
+                onClose={() => setShowBatchModal(false)}
+                onConfirm={handleConfirmBatch}
+                records={records}
+                selectedCount={selectedIds.size}
+            />
+        </div>
+    );
+};
+
+// Batch Modal Component
+interface BatchModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (batch: number, date: string) => void;
+    records: ArchiveRecord[];
+    selectedCount: number;
+}
+
+const BatchModal: React.FC<BatchModalProps> = ({ isOpen, onClose, onConfirm, records, selectedCount }) => {
+    const [mode, setMode] = useState<'new' | 'existing'>('new');
+    const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const nextBatchInfo = useMemo(() => {
+        let maxBatch = 0;
+        records.forEach(r => {
+            if (r.data?.scan_batch_id && r.data?.scan_date?.startsWith(todayStr)) {
+                const b = parseInt(r.data.scan_batch_id);
+                if (!isNaN(b) && b > maxBatch) maxBatch = b;
+            }
+        });
+        return { batch: maxBatch + 1, date: todayStr };
+    }, [records, todayStr]);
+
+    const historyBatches = useMemo(() => {
+        const batches: Record<string, any> = {};
+        records.forEach(r => {
+            if (r.data?.is_scanned && r.data?.scan_batch_id && r.data?.scan_date) {
+                const datePart = r.data.scan_date.split('T')[0];
+                const key = `${datePart}_${r.data.scan_batch_id}`;
+                if (!batches[key]) {
+                    batches[key] = { date: datePart, batch: r.data.scan_batch_id, count: 0, fullDate: r.data.scan_date };
+                }
+                batches[key].count++;
+            }
+        });
+        return Object.values(batches).sort((a: any, b: any) => b.date.localeCompare(a.date) || b.batch - a.batch);
+    }, [records]);
+
+    useEffect(() => {
+        if (mode === 'existing' && historyBatches.length > 0 && !selectedExistingBatch) {
+            const first = historyBatches[0];
+            setSelectedExistingBatch(`${first.date}_${first.batch}`);
+        }
+    }, [mode, historyBatches]);
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        if (mode === 'new') {
+            onConfirm(nextBatchInfo.batch, nextBatchInfo.date);
+        } else {
+            if (!selectedExistingBatch) {
+                alert('Vui lòng chọn một đợt cũ.');
+                return;
+            }
+            const [datePart, batchNumStr] = selectedExistingBatch.split('_');
+            const batchNum = parseInt(batchNumStr);
+            const found = historyBatches.find((h: any) => h.date === datePart && h.batch === batchNum);
+            
+            if (found) {
+                onConfirm(found.batch, found.fullDate);
+            }
+        }
+        onClose();
+    };
+
+    const formatDate = (d: string) => {
+        const parts = d.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up flex flex-col overflow-hidden">
+                <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-800 text-lg">Tạo Đợt Chuyển Scan</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    <p className="text-sm text-gray-600 mb-2">
+                        Bạn đang tạo đợt cho <strong>{selectedCount}</strong> hồ sơ.
+                    </p>
+
+                    {/* Option 1: New Batch */}
+                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${mode === 'new' ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
+                        <input 
+                            type="radio" 
+                            name="batchMode" 
+                            checked={mode === 'new'} 
+                            onChange={() => setMode('new')}
+                            className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 font-bold text-gray-800">
+                                <Plus size={16} className="text-blue-600" /> Tạo đợt mới (Hôm nay)
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1 pl-6">
+                                Đợt tiếp theo: <span className="font-bold text-blue-700">Đợt {nextBatchInfo.batch}</span>
+                                <br/>
+                                <span className="text-xs text-gray-500">Ngày: {formatDate(todayStr)}</span>
+                            </div>
+                        </div>
+                    </label>
+
+                    {/* Option 2: Existing Batch */}
+                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${mode === 'existing' ? 'bg-green-50 border-green-500 shadow-sm' : 'bg-white border-gray-200 hover:border-green-300'}`}>
+                        <input 
+                            type="radio" 
+                            name="batchMode" 
+                            checked={mode === 'existing'} 
+                            onChange={() => setMode('existing')}
+                            className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
+                        />
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 font-bold text-gray-800">
+                                <History size={16} className="text-green-600" /> Thêm vào đợt cũ
+                            </div>
+                            
+                            <div className="mt-2 pl-6">
+                                <select 
+                                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-green-500 outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                                    disabled={mode !== 'existing'}
+                                    value={selectedExistingBatch}
+                                    onChange={(e) => setSelectedExistingBatch(e.target.value)}
+                                >
+                                    {historyBatches.length > 0 ? (
+                                        historyBatches.map((h: any) => (
+                                            <option key={`${h.date}_${h.batch}`} value={`${h.date}_${h.batch}`}>
+                                                Đợt {h.batch} - Ngày {formatDate(h.date)} (Đã có {h.count} HS)
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option value="">Chưa có đợt nào</option>
+                                    )}
+                                </select>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium text-sm">
+                        Hủy bỏ
+                    </button>
+                    <button 
+                        onClick={handleConfirm} 
+                        className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm transition-transform active:scale-95"
+                    >
+                        <CheckCircle2 size={16} /> Xác nhận
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
 
 export default VaoSoView;
-

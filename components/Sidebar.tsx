@@ -70,7 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Determine if sidebar is expanded (Mobile always expanded if open, Desktop depends on hover)
-  const isExpanded = mobileOpen || isHovered;
+  const isExpanded = mobileOpen;
 
   return (
     <>
@@ -83,12 +83,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <div 
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
         className={`
           fixed md:static inset-y-0 left-0 z-50 shrink-0 bg-[#0f172a] text-white min-h-screen flex flex-col shadow-xl transition-all duration-300 ease-in-out
           ${mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
-          ${!mobileOpen && (isHovered ? 'md:w-64' : 'md:w-20')}
+          ${!mobileOpen && 'md:w-20'}
         `}
       >
         {/* BRAND HEADER */}

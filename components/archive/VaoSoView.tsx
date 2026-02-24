@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 
@@ -26,9 +26,10 @@ const COLUMNS = [
 
 interface VaoSoViewProps {
     currentUser: User;
+    wards: string[];
 }
 
-const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
+const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +44,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
 
     // Batch Modal State
     const [showBatchModal, setShowBatchModal] = useState(false);
+
+    // Export Handover Modal State
+    const [showExportHandoverModal, setShowExportHandoverModal] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -393,13 +397,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                             onClick={() => setActiveTab('pending')}
                             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
-                            Chờ chuyển Scan
+                            Chờ chuyển Scan/1 Cửa
                         </button>
                         <button 
                             onClick={() => setActiveTab('scanned')}
                             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
-                            Đã chuyển Scan
+                            Đã chuyển Scan/1 Cửa
                         </button>
                     </div>
                 </div>
@@ -435,6 +439,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                     {activeTab === 'pending' && selectedIds.size > 0 && (
                         <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
                             <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
+                        </button>
+                    )}
+
+                    {activeTab === 'scanned' && (
+                        <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-purple-700 shadow-sm">
+                            <FileOutput size={16}/> Xuất danh sách
                         </button>
                     )}
 
@@ -599,6 +609,14 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 records={records}
                 selectedCount={selectedIds.size}
             />
+
+            {/* Export Handover Modal */}
+            <ExportHandoverModal
+                isOpen={showExportHandoverModal}
+                onClose={() => setShowExportHandoverModal(false)}
+                records={records}
+                wards={wards}
+            />
         </div>
     );
 };
@@ -755,6 +773,263 @@ const BatchModal: React.FC<BatchModalProps> = ({ isOpen, onClose, onConfirm, rec
                         className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm transition-transform active:scale-95"
                     >
                         <CheckCircle2 size={16} /> Xác nhận
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Export Handover Modal Component
+interface ExportHandoverModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    records: ArchiveRecord[];
+    wards: string[];
+}
+
+const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClose, records, wards }) => {
+    const [selectedBatch, setSelectedBatch] = useState<string>('');
+    const [selectedGcnType, setSelectedGcnType] = useState<string>('GCN mới');
+    const [selectedWard, setSelectedWard] = useState<string>('all');
+
+    const historyBatches = useMemo(() => {
+        const batches: Record<string, any> = {};
+        records.forEach(r => {
+            if (r.data?.is_scanned && r.data?.scan_batch_id && r.data?.scan_date) {
+                const datePart = r.data.scan_date.split('T')[0];
+                const key = `${datePart}_${r.data.scan_batch_id}`;
+                if (!batches[key]) {
+                    batches[key] = { date: datePart, batch: r.data.scan_batch_id, count: 0, fullDate: r.data.scan_date };
+                }
+                batches[key].count++;
+            }
+        });
+        return Object.values(batches).sort((a: any, b: any) => b.date.localeCompare(a.date) || b.batch - a.batch);
+    }, [records]);
+
+    useEffect(() => {
+        if (isOpen && historyBatches.length > 0 && !selectedBatch) {
+            const first = historyBatches[0];
+            setSelectedBatch(`${first.date}_${first.batch}`);
+        }
+    }, [isOpen, historyBatches]);
+
+    if (!isOpen) return null;
+
+    const formatDate = (d: string) => {
+        const parts = d.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    };
+
+    const handleExport = () => {
+        if (!selectedBatch) {
+            alert('Vui lòng chọn đợt xuất.');
+            return;
+        }
+
+        const [datePart, batchNumStr] = selectedBatch.split('_');
+        const batchNum = parseInt(batchNumStr);
+        const batchInfo = historyBatches.find((h: any) => h.date === datePart && h.batch === batchNum);
+        
+        if (!batchInfo) return;
+
+        // Filter records
+        const filtered = records.filter(r => {
+            const isBatchMatch = r.data?.is_scanned && 
+                                 r.data?.scan_batch_id === batchNumStr && 
+                                 r.data?.scan_date?.startsWith(datePart);
+            const isTypeMatch = r.data?.loai_gcn === selectedGcnType;
+            const isWardMatch = selectedWard === 'all' || r.data?.dia_danh?.toLowerCase().includes(selectedWard.toLowerCase());
+            
+            return isBatchMatch && isTypeMatch && isWardMatch;
+        });
+
+        if (filtered.length === 0) {
+            alert('Không có hồ sơ nào thỏa mãn điều kiện lọc.');
+            return;
+        }
+
+        // Generate Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet([]);
+
+        // Styles
+        const styleCenterBold = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+        const styleTitle = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+        const styleItalicCenter = { font: { italic: true, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' } };
+        const styleHeader = { font: { bold: true }, border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, fill: { fgColor: { rgb: "E0E0E0" } } };
+        const styleCell = { border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }, alignment: { vertical: 'center', wrapText: true } };
+        const styleCellCenter = { ...styleCell, alignment: { ...styleCell.alignment, horizontal: 'center' } };
+
+        const exportDate = formatDate(datePart);
+
+        // Row 1: Title
+        XLSX.utils.sheet_add_aoa(ws, [[
+            "DANH SÁCH BÀN GIAO GCNQSD ĐẤT TỪ VPĐKĐĐ SANG\nBỘ PHẬN TIẾP NHẬN VÀ TRẢ KẾT QUẢ"
+        ]], { origin: "A1" });
+        
+        // Merge A1:G1 (assuming 7 columns)
+        if(!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } });
+        ws['A1'].s = styleTitle;
+        ws['A1'].v = "DANH SÁCH BÀN GIAO GCNQSD ĐẤT TỪ VPĐKĐĐ SANG\nBỘ PHẬN TIẾP NHẬN VÀ TRẢ KẾT QUẢ";
+
+        // Row 2: GCN Type (Right aligned or separate cell?)
+        // The user request shows GCN Type on the right of the second line of the title.
+        // But Excel cells are grid. Let's put it in a separate row or merge differently.
+        // User example:
+        // DANH SÁCH ...
+        // BỘ PHẬN ...                                                  GCN mới
+        // Let's put "GCN mới" in the last column of row 2.
+        
+        XLSX.utils.sheet_add_aoa(ws, [[selectedGcnType]], { origin: "G2" });
+        ws['G2'].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'right' } };
+
+        // Row 3: Date - Batch
+        XLSX.utils.sheet_add_aoa(ws, [[`Ngày ${exportDate} - Danh sách số ${batchNum}`]], { origin: "A3" });
+        ws['!merges'].push({ s: { r: 2, c: 0 }, e: { r: 2, c: 6 } });
+        ws['A3'].s = styleItalicCenter;
+
+        // Table Header (Row 5)
+        const headers = ["STT", "Mã hồ sơ", "Tên chủ sử dụng", "Địa chỉ (Địa danh)", "Số tờ", "Số thửa", "Ghi chú"];
+        XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A5" });
+        
+        headers.forEach((_, i) => {
+            const cellRef = XLSX.utils.encode_cell({ r: 4, c: i });
+            ws[cellRef].s = styleHeader;
+        });
+
+        // Data Rows
+        const dataRows = filtered.map((r, idx) => [
+            idx + 1,
+            r.data?.ma_ho_so || '',
+            r.data?.ten_chu_su_dung || '',
+            r.data?.dia_danh || '',
+            r.data?.so_to || '',
+            r.data?.so_thua || '',
+            r.data?.ghi_chu || ''
+        ]);
+
+        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A6" });
+
+        // Apply styles to data
+        dataRows.forEach((row, rIdx) => {
+            row.forEach((_, cIdx) => {
+                const cellRef = XLSX.utils.encode_cell({ r: 5 + rIdx, c: cIdx });
+                if (cIdx === 0 || cIdx === 4 || cIdx === 5) { // STT, To, Thua centered
+                    ws[cellRef].s = styleCellCenter;
+                } else {
+                    ws[cellRef].s = styleCell;
+                }
+            });
+        });
+
+        // Column Widths
+        ws['!cols'] = [
+            { wch: 5 },  // STT
+            { wch: 15 }, // Ma HS
+            { wch: 30 }, // Ten chu
+            { wch: 25 }, // Dia chi
+            { wch: 8 },  // To
+            { wch: 8 },  // Thua
+            { wch: 20 }  // Ghi chu
+        ];
+
+        // Row Heights
+        ws['!rows'] = [
+            { hpt: 40 }, // Title
+            { hpt: 20 }, // Subtitle
+            { hpt: 20 }, // Date
+            { hpt: 10 }, // Spacer
+            { hpt: 25 }  // Header
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, "DanhSachBanGiao");
+        XLSX.writeFile(wb, `DanhSachBanGiao_${selectedGcnType.replace(/ /g, '')}_${datePart}_Dot${batchNum}.xlsx`);
+        
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up flex flex-col overflow-hidden">
+                <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-800 text-lg">Xuất Danh Sách Bàn Giao</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    {/* Batch Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Chọn Đợt Xuất</label>
+                        <select 
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+                            value={selectedBatch}
+                            onChange={(e) => setSelectedBatch(e.target.value)}
+                        >
+                            {historyBatches.map((h: any) => (
+                                <option key={`${h.date}_${h.batch}`} value={`${h.date}_${h.batch}`}>
+                                    Đợt {h.batch} - Ngày {formatDate(h.date)} ({h.count} HS)
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* GCN Type Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Loại GCN</label>
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="gcnType" 
+                                    value="GCN mới" 
+                                    checked={selectedGcnType === 'GCN mới'} 
+                                    onChange={(e) => setSelectedGcnType(e.target.value)}
+                                    className="text-purple-600 focus:ring-purple-500"
+                                />
+                                <span>GCN mới</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="gcnType" 
+                                    value="GCN trang 4" 
+                                    checked={selectedGcnType === 'GCN trang 4'} 
+                                    onChange={(e) => setSelectedGcnType(e.target.value)}
+                                    className="text-purple-600 focus:ring-purple-500"
+                                />
+                                <span>GCN trang 4</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Ward Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Xã/Phường</label>
+                        <select 
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+                            value={selectedWard}
+                            onChange={(e) => setSelectedWard(e.target.value)}
+                        >
+                            <option value="all">Tất cả</option>
+                            {wards.map(w => (
+                                <option key={w} value={w}>{w}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium text-sm">
+                        Hủy bỏ
+                    </button>
+                    <button 
+                        onClick={handleExport} 
+                        className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-bold text-sm shadow-sm transition-transform active:scale-95"
+                    >
+                        <FileOutput size={16} /> Xuất Excel
                     </button>
                 </div>
             </div>

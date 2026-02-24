@@ -8,9 +8,10 @@ import CongVanView from './archive/CongVanView';
 
 interface ArchiveRecordsProps {
     currentUser: User;
+    wards: string[];
 }
 
-const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser }) => {
+const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) => {
     const [activeTab, setActiveTab] = useState<'saoluc' | 'vaoso' | 'congvan'>('saoluc');
 
     return (
@@ -42,7 +43,7 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser }) => {
             {/* CONTENT AREA */}
             <div className="flex-1 overflow-hidden p-4">
                 {activeTab === 'saoluc' && <SaoLucView currentUser={currentUser} />}
-                {activeTab === 'vaoso' && <VaoSoView currentUser={currentUser} />}
+                {activeTab === 'vaoso' && <VaoSoView currentUser={currentUser} wards={wards} />}
                 {activeTab === 'congvan' && <CongVanView currentUser={currentUser} />}
             </div>
         </div>

@@ -498,7 +498,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             );
         case 'archive_records':
             return (
-                <ArchiveRecords currentUser={currentUser} />
+                <ArchiveRecords currentUser={currentUser} wards={wards} />
             );
         case 'account_settings':
             return (

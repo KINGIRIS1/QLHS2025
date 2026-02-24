@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 
 // Định nghĩa các cột
 const COLUMNS = [
+    { key: 'so_vao_so', label: 'Số vào sổ', width: '100px' },
     { key: 'ma_ho_so', label: 'Mã hồ sơ giao dịch', width: '150px' },
     { key: 'ten_chuyen_quyen', label: 'TÊN CHỦ SỬ DỤNG CHUYỂN QUYỀN', width: '250px' },
     { key: 'ten_chu_su_dung', label: 'TÊN CHỦ SỬ DỤNG', width: '250px' },
@@ -48,6 +49,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Export Handover Modal State
     const [showExportHandoverModal, setShowExportHandoverModal] = useState(false);
 
+    // Settings Modal State
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [currentBookNumber, setCurrentBookNumber] = useState<number>(0);
+
     useEffect(() => {
         loadData();
     }, []);
@@ -56,6 +61,26 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         setLoading(true);
         const data = await fetchArchiveRecords('vaoso');
         setRecords(data);
+        
+        // Calculate max book number from existing records
+        let maxNum = 0;
+        data.forEach(r => {
+            const num = parseInt(r.data?.so_vao_so || '0');
+            if (!isNaN(num) && num > maxNum) {
+                maxNum = num;
+            }
+        });
+        
+        // If local storage has a higher number, use it
+        const stored = localStorage.getItem('vaoso_current_book_number');
+        if (stored) {
+            const storedNum = parseInt(stored);
+            if (!isNaN(storedNum) && storedNum > maxNum) {
+                maxNum = storedNum;
+            }
+        }
+        setCurrentBookNumber(maxNum);
+        
         setLoading(false);
     };
 
@@ -110,6 +135,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             noi_nhan_gui: '',
             created_by: currentUser.username,
             data: {
+                so_vao_so: '',
                 ma_ho_so: '',
                 ten_chuyen_quyen: '',
                 ten_chu_su_dung: '',
@@ -151,6 +177,23 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const handleBlur = async (record: ArchiveRecord) => {
         setSavingId(record.id);
         await saveArchiveRecord(record);
+        setSavingId(null);
+    };
+
+    const handleGetBookNumber = async (record: ArchiveRecord) => {
+        const nextNum = currentBookNumber + 1;
+        const updatedRecord = {
+            ...record,
+            data: { ...record.data, so_vao_so: nextNum.toString() }
+        };
+        
+        // Optimistic update
+        setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+        setCurrentBookNumber(nextNum);
+        localStorage.setItem('vaoso_current_book_number', nextNum.toString());
+
+        setSavingId(record.id);
+        await saveArchiveRecord(updatedRecord);
         setSavingId(null);
     };
 
@@ -199,6 +242,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                     headers.findIndex(h => h && keywords.some(k => h.includes(k)) && !excludes.some(e => h.includes(e)));
 
                 const colMap = {
+                    so_vao_so: findCol(['số vào sổ', 'svs']),
                     ma_ho_so: findCol(['mã hồ sơ', 'mã hs']),
                     ten_chuyen_quyen: findCol(['chuyển quyền', 'bên a']),
                     // Update: Thêm 'chủ sử dụng' vào keywords
@@ -235,6 +279,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                     };
 
                     const recordData = {
+                        so_vao_so: getValue(colMap.so_vao_so),
                         ma_ho_so: getValue(colMap.ma_ho_so),
                         ten_chuyen_quyen: getValue(colMap.ten_chuyen_quyen),
                         ten_chu_su_dung: getValue(colMap.ten_chu_su_dung),
@@ -351,6 +396,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         const dataToExport = filteredRecords.map((r, idx) => {
             const row: any = {
                 'STT': idx + 1,
+                'Số vào sổ': r.data?.so_vao_so,
                 'Mã hồ sơ': r.data?.ma_ho_so,
                 'Tên chuyển quyền': r.data?.ten_chuyen_quyen,
                 'Tên chủ sử dụng': r.data?.ten_chu_su_dung,
@@ -421,6 +467,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                     
                     {activeTab === 'all' && (
                         <>
+                            <button 
+                                onClick={() => setShowSettingsModal(true)} 
+                                className="flex items-center gap-2 bg-gray-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-gray-700 shadow-sm"
+                                title="Cài đặt số vào sổ"
+                            >
+                                <Settings size={16}/>
+                            </button>
                             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                             <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 shadow-sm">
                                 <Upload size={16}/> Import Excel
@@ -496,7 +549,27 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         </td>
                                         {COLUMNS.map(col => (
                                             <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
-                                                {(col.key === 'ten_chuyen_quyen' || col.key === 'ten_chu_su_dung') ? (
+                                                {col.key === 'so_vao_so' ? (
+                                                    <div className="flex h-full">
+                                                        <input 
+                                                            type="text"
+                                                            className="flex-1 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                            value={r.data?.[col.key] || ''}
+                                                            onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                            onBlur={() => handleBlur(r)}
+                                                            readOnly={activeTab === 'scanned'} 
+                                                        />
+                                                        {activeTab === 'all' && (
+                                                            <button 
+                                                                onClick={() => handleGetBookNumber(r)}
+                                                                className="px-2 bg-gray-100 hover:bg-blue-100 text-blue-600 border-l border-gray-200 transition-colors"
+                                                                title="Lấy số vào sổ tiếp theo"
+                                                            >
+                                                                <Hash size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ) : (col.key === 'ten_chuyen_quyen' || col.key === 'ten_chu_su_dung') ? (
                                                     <textarea
                                                         className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
                                                         value={r.data?.[col.key] || ''}
@@ -617,6 +690,41 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 records={records}
                 wards={wards}
             />
+
+            {/* Settings Modal */}
+            {showSettingsModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm animate-fade-in-up">
+                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-gray-800 text-lg">Cài đặt số vào sổ</h3>
+                            <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+                        </div>
+                        <div className="p-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Số vào sổ hiện tại</label>
+                            <input 
+                                type="number" 
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                                value={currentBookNumber}
+                                onChange={(e) => setCurrentBookNumber(parseInt(e.target.value) || 0)}
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                                Hệ thống sẽ tự động tăng số này khi bạn bấm nút "Lấy số" trên từng dòng.
+                            </p>
+                        </div>
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                            <button 
+                                onClick={() => {
+                                    localStorage.setItem('vaoso_current_book_number', currentBookNumber.toString());
+                                    setShowSettingsModal(false);
+                                }} 
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm"
+                            >
+                                Lưu cài đặt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -876,13 +984,6 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         ws['A1'].v = "DANH SÁCH BÀN GIAO GCNQSD ĐẤT TỪ VPĐKĐĐ SANG\nBỘ PHẬN TIẾP NHẬN VÀ TRẢ KẾT QUẢ";
 
         // Row 2: GCN Type (Right aligned or separate cell?)
-        // The user request shows GCN Type on the right of the second line of the title.
-        // But Excel cells are grid. Let's put it in a separate row or merge differently.
-        // User example:
-        // DANH SÁCH ...
-        // BỘ PHẬN ...                                                  GCN mới
-        // Let's put "GCN mới" in the last column of row 2.
-        
         XLSX.utils.sheet_add_aoa(ws, [[selectedGcnType]], { origin: "G2" });
         ws['G2'].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'right' } };
 

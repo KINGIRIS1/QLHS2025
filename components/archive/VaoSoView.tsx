@@ -807,7 +807,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ isOpen, onClose, onConfirm, rec
                 const datePart = r.data.scan_date.split('T')[0];
                 const key = `${datePart}_${r.data.scan_batch_id}`;
                 if (!batches[key]) {
-                    batches[key] = { date: datePart, batch: r.data.scan_batch_id, count: 0, fullDate: r.data.scan_date };
+                    batches[key] = { date: datePart, batch: parseInt(r.data.scan_batch_id), count: 0, fullDate: r.data.scan_date };
                 }
                 batches[key].count++;
             }
@@ -954,7 +954,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                 const datePart = r.data.scan_date.split('T')[0];
                 const key = `${datePart}_${r.data.scan_batch_id}`;
                 if (!batches[key]) {
-                    batches[key] = { date: datePart, batch: r.data.scan_batch_id, count: 0, fullDate: r.data.scan_date };
+                    batches[key] = { date: datePart, batch: parseInt(r.data.scan_batch_id), count: 0, fullDate: r.data.scan_date };
                 }
                 batches[key].count++;
             }
@@ -990,10 +990,15 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         // Filter records
         const filtered = records.filter(r => {
+            const rBatchId = String(r.data?.scan_batch_id || '');
             const isBatchMatch = r.data?.is_scanned && 
-                                 r.data?.scan_batch_id === batchNumStr && 
+                                 rBatchId === batchNumStr && 
                                  r.data?.scan_date?.startsWith(datePart);
-            const isTypeMatch = r.data?.loai_gcn === selectedGcnType;
+            
+            // Default to 'GCN mới' if undefined
+            const rType = r.data?.loai_gcn || 'GCN mới';
+            const isTypeMatch = rType === selectedGcnType;
+            
             const isWardMatch = selectedWard === 'all' || r.data?.dia_danh?.toLowerCase().includes(selectedWard.toLowerCase());
             
             return isBatchMatch && isTypeMatch && isWardMatch;

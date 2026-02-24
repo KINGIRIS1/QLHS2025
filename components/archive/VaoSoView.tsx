@@ -19,7 +19,6 @@ const COLUMNS = [
     { key: 'ten_chu_su_dung', label: 'TÊN CHỦ SỬ DỤNG', width: '250px' },
     { key: 'loai_bien_dong', label: 'Loại biến động', width: '200px' },
     { key: 'ngay_nhan', label: 'Ngày nhận hồ sơ', width: '140px', type: 'date' },
-    { key: 'ngay_tra_kq_1', label: 'Ngày trả kết quả (lần 1)', width: '140px', type: 'date' },
     { key: 'so_to', label: 'Số tờ', width: '80px' },
     { key: 'so_thua', label: 'Số thửa', width: '80px' },
     { key: 'tong_dien_tich', label: 'Tổng diện tích', width: '120px' },
@@ -39,6 +38,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
     const [activeTab, setActiveTab] = useState<'pending' | 'scanned'>('pending');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
 
     useEffect(() => { loadData(); }, []);
 
@@ -64,18 +66,31 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
             filtered = records.filter(r => r.data?.is_scanned);
         }
 
-        if (!searchTerm) return filtered;
-        
-        const lower = searchTerm.toLowerCase();
-        return filtered.filter(r => {
-            const d = r.data || {};
-            return (
-                (d.ma_ho_so || '').toLowerCase().includes(lower) ||
-                (d.ten_chu_su_dung || '').toLowerCase().includes(lower) ||
-                (d.ten_chuyen_quyen || '').toLowerCase().includes(lower)
-            );
-        });
+        if (searchTerm) {
+            const lower = searchTerm.toLowerCase();
+            filtered = filtered.filter(r => {
+                const d = r.data || {};
+                return (
+                    (d.ma_ho_so || '').toLowerCase().includes(lower) ||
+                    (d.ten_chu_su_dung || '').toLowerCase().includes(lower) ||
+                    (d.ten_chuyen_quyen || '').toLowerCase().includes(lower)
+                );
+            });
+        }
+        return filtered;
     }, [records, searchTerm, activeTab]);
+
+    // Pagination
+    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+    const paginatedRecords = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredRecords.slice(start, start + itemsPerPage);
+    }, [filteredRecords, currentPage]);
+
+    // Reset page when tab or search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm]);
 
     const handleAddNew = async () => {
         const newRecord: Partial<ArchiveRecord> = {
@@ -92,7 +107,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 ten_chu_su_dung: '',
                 loai_bien_dong: '',
                 ngay_nhan: new Date().toISOString().split('T')[0],
-                ngay_tra_kq_1: '',
+                // ngay_tra_kq_1 removed
                 so_to: '',
                 so_thua: '',
                 tong_dien_tich: '',
@@ -176,8 +191,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                     return;
                 }
 
-                // Fix lỗi TypeError: Cannot read properties of undefined (reading 'includes')
-                // Bằng cách đảm bảo mảng headers không có phần tử empty/undefined
                 const rawHeaderRow = data[headerRowIdx] || [];
                 const headers = Array.from(rawHeaderRow).map((h: any) => String(h || '').trim().toLowerCase());
                 
@@ -185,16 +198,18 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 
                 const newRecords: Partial<ArchiveRecord>[] = [];
 
-                // Helper tìm index cột
-                const findCol = (keywords: string[]) => headers.findIndex(h => h && keywords.some(k => h.includes(k)));
+                // Helper tìm index cột với loại trừ
+                const findCol = (keywords: string[], excludes: string[] = []) => 
+                    headers.findIndex(h => h && keywords.some(k => h.includes(k)) && !excludes.some(e => h.includes(e)));
 
                 const colMap = {
                     ma_ho_so: findCol(['mã hồ sơ', 'mã hs']),
                     ten_chuyen_quyen: findCol(['chuyển quyền', 'bên a']),
-                    ten_chu_su_dung: findCol(['tên chủ', 'bên b', 'người sử dụng']),
+                    // Loại trừ 'chuyển quyền' để tránh nhầm với cột Tên chủ sử dụng chuyển quyền
+                    ten_chu_su_dung: findCol(['tên chủ', 'bên b', 'người sử dụng'], ['chuyển quyền']),
                     loai_bien_dong: findCol(['biến động', 'loại hồ sơ']),
                     ngay_nhan: findCol(['ngày nhận']),
-                    ngay_tra_kq_1: findCol(['trả kết quả', 'hẹn trả']),
+                    // ngay_tra_kq_1 removed
                     so_to: findCol(['tờ', 'số tờ']),
                     so_thua: findCol(['thửa', 'số thửa']),
                     tong_dien_tich: findCol(['tổng diện tích', 'dt']),
@@ -208,7 +223,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
 
                 rows.forEach(row => {
                     if (!row || row.length === 0) return;
-                    // Bỏ qua dòng trống
                     if (!row[colMap.ma_ho_so] && !row[colMap.ten_chu_su_dung]) return;
 
                     const getValue = (idx: number) => {
@@ -216,8 +230,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         let val = row[idx];
                         if (val === undefined || val === null) return '';
                         
-                        // Xử lý ngày tháng Excel (số serial -> date string)
-                        if (typeof val === 'number' && val > 20000 && val < 60000) { // Check if likely excel date
+                        if (typeof val === 'number' && val > 20000 && val < 60000) {
                              try {
                                  const date = XLSX.SSF.parse_date_code(val);
                                  return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;
@@ -232,7 +245,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         ten_chu_su_dung: getValue(colMap.ten_chu_su_dung),
                         loai_bien_dong: getValue(colMap.loai_bien_dong),
                         ngay_nhan: getValue(colMap.ngay_nhan),
-                        ngay_tra_kq_1: getValue(colMap.ngay_tra_kq_1),
+                        // ngay_tra_kq_1 removed
                         so_to: getValue(colMap.so_to),
                         so_thua: getValue(colMap.so_thua),
                         tong_dien_tich: getValue(colMap.tong_dien_tich),
@@ -279,6 +292,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
     // --- CHUYỂN SCAN ---
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
+            // Select all in current view (filtered)
             const allIds = new Set(filteredRecords.map(r => r.id));
             setSelectedIds(allIds);
         } else {
@@ -295,6 +309,30 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
         });
     };
 
+    const performTransfer = async (ids: string[]) => {
+        setLoading(true);
+        const batchId = `SCAN_${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}`;
+        const scanDate = new Date().toISOString();
+
+        const updates: Partial<ArchiveRecord> = {
+            data: {
+                is_scanned: true,
+                scan_batch_id: batchId,
+                scan_date: scanDate
+            }
+        };
+
+        const success = await updateArchiveRecordsBatch(ids, updates);
+        if (success) {
+            await loadData();
+            setSelectedIds(new Set());
+            alert("Đã chuyển danh sách Scan thành công!");
+        } else {
+            alert("Có lỗi xảy ra khi chuyển Scan.");
+        }
+        setLoading(false);
+    };
+
     const handleTransferScan = async () => {
         if (selectedIds.size === 0) {
             alert("Vui lòng chọn ít nhất một hồ sơ để chuyển Scan.");
@@ -302,27 +340,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
         }
 
         if (await confirmAction(`Bạn có chắc muốn chuyển ${selectedIds.size} hồ sơ sang danh sách Scan?`)) {
-            setLoading(true);
-            const batchId = `SCAN_${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}`;
-            const scanDate = new Date().toISOString();
+            await performTransfer(Array.from(selectedIds));
+        }
+    };
 
-            const updates: Partial<ArchiveRecord> = {
-                data: {
-                    is_scanned: true,
-                    scan_batch_id: batchId,
-                    scan_date: scanDate
-                }
-            };
-
-            const success = await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
-            if (success) {
-                await loadData();
-                setSelectedIds(new Set());
-                alert("Đã chuyển danh sách Scan thành công!");
-            } else {
-                alert("Có lỗi xảy ra khi chuyển Scan.");
-            }
-            setLoading(false);
+    const handleTransferSingle = async (id: string) => {
+        if (await confirmAction(`Chuyển hồ sơ này sang danh sách Scan?`)) {
+            await performTransfer([id]);
         }
     };
 
@@ -434,13 +458,14 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
             </div>
 
             {/* Table Container */}
-            <div className="flex-1 overflow-auto relative">
+            <div className="flex-1 overflow-auto relative flex flex-col">
                 {loading ? (
                     <div className="flex items-center justify-center h-full text-gray-500 gap-2">
                         <Loader2 className="animate-spin" /> Đang xử lý...
                     </div>
                 ) : (
-                    <div className="inline-block min-w-full align-middle">
+                    <>
+                    <div className="inline-block min-w-full align-middle flex-1 overflow-auto">
                         <table className="min-w-full border-collapse">
                             <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                 <tr>
@@ -459,29 +484,41 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                                             <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase">Đợt Scan</th>
                                         </>
                                     )}
-                                    <th className="p-2 border-b border-gray-200 w-16 text-center bg-gray-100 sticky right-0 z-20">Xóa</th>
+                                    <th className="p-2 border-b border-gray-200 w-24 text-center bg-gray-100 sticky right-0 z-20">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredRecords.length > 0 ? filteredRecords.map((r, idx) => (
+                                {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => (
                                     <tr key={r.id} className={`hover:bg-teal-50/30 group ${selectedIds.has(r.id) ? 'bg-blue-50' : ''}`}>
                                         <td className="p-2 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-teal-50/30">
                                             <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                         </td>
                                         <td className="p-2 border-r border-gray-200 text-center text-gray-500 text-xs bg-white sticky left-10 z-10 group-hover:bg-teal-50/30">
-                                            {idx + 1}
+                                            {(currentPage - 1) * itemsPerPage + idx + 1}
                                             {savingId === r.id && <span className="block text-[9px] text-teal-600 animate-pulse">Lưu...</span>}
                                         </td>
                                         {COLUMNS.map(col => (
                                             <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
-                                                <input 
-                                                    type={col.type || 'text'}
-                                                    className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
-                                                    value={r.data?.[col.key] || ''}
-                                                    onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
-                                                    onBlur={() => handleBlur(r)}
-                                                    readOnly={activeTab === 'scanned'} // Đã scan thì không sửa trực tiếp (hoặc tùy nhu cầu)
-                                                />
+                                                {(col.key === 'ten_chuyen_quyen' || col.key === 'ten_chu_su_dung') ? (
+                                                    <textarea
+                                                        className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
+                                                        value={r.data?.[col.key] || ''}
+                                                        onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                        onBlur={() => handleBlur(r)}
+                                                        readOnly={activeTab === 'scanned'}
+                                                        rows={2}
+                                                        style={{ minHeight: '40px' }}
+                                                    />
+                                                ) : (
+                                                    <input 
+                                                        type={col.type || 'text'}
+                                                        className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                        value={r.data?.[col.key] || ''}
+                                                        onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                        onBlur={() => handleBlur(r)}
+                                                        readOnly={activeTab === 'scanned'} 
+                                                    />
+                                                )}
                                             </td>
                                         ))}
                                         {activeTab === 'scanned' && (
@@ -494,7 +531,16 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                                                 </td>
                                             </>
                                         )}
-                                        <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200">
+                                        <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200 flex gap-1 justify-center">
+                                            {activeTab === 'pending' && (
+                                                <button 
+                                                    onClick={() => handleTransferSingle(r.id)} 
+                                                    className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition-colors" 
+                                                    title="Chuyển Scan"
+                                                >
+                                                    <Send size={14}/>
+                                                </button>
+                                            )}
                                             <button 
                                                 onClick={() => handleDelete(r.id)} 
                                                 className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" 
@@ -514,6 +560,32 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                             </tbody>
                         </table>
                     </div>
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="p-2 border-t border-gray-200 bg-gray-50 flex justify-between items-center sticky bottom-0 z-20">
+                            <div className="text-xs text-gray-500">
+                                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} trong tổng số {filteredRecords.length} dòng
+                            </div>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-xs disabled:opacity-50 hover:bg-gray-100"
+                                >
+                                    Trước
+                                </button>
+                                <span className="px-2 py-1 text-xs font-medium">Trang {currentPage} / {totalPages}</span>
+                                <button 
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-xs disabled:opacity-50 hover:bg-gray-100"
+                                >
+                                    Sau
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    </>
                 )}
             </div>
         </div>

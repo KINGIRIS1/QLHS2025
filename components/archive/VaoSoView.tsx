@@ -1009,7 +1009,6 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         const ws = XLSX.utils.aoa_to_sheet([]);
 
         // Styles
-        const styleCenterBold = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
         const styleTitle = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
         const styleItalicCenter = { font: { italic: true, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' } };
         const styleHeader = { font: { bold: true }, border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, fill: { fgColor: { rgb: "E0E0E0" } } };
@@ -1018,53 +1017,93 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         const exportDate = formatDate(datePart);
 
+        // Define Headers and Data Mapping based on GCN Type
+        let headers: string[] = [];
+        let dataRows: any[][] = [];
+        let colWidths: any[] = [];
+
+        if (selectedGcnType === 'GCN trang 4') {
+            headers = [
+                "STT", "Tên Chủ sử dụng", "Địa danh", "Số phát hành", "Ngày ký GCN", 
+                "Mã hồ sơ giao dịch", "Loại hồ sơ", "Ngày chủ SD nhận GCN", 
+                "Người nhận GCN ký, ghi họ tên", "Ghi chú"
+            ];
+            colWidths = [
+                { wch: 5 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, 
+                { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
+            ];
+            dataRows = filtered.map((r, idx) => [
+                idx + 1,
+                r.data?.ten_chu_su_dung || '',
+                r.data?.dia_danh || '',
+                r.data?.so_phat_hanh || '',
+                r.data?.ngay_ky_gcn ? new Date(r.data.ngay_ky_gcn).toLocaleDateString('vi-VN') : '',
+                r.data?.ma_ho_so || '',
+                r.data?.loai_bien_dong || '',
+                '', // Ngày chủ SD nhận GCN
+                '', // Người nhận GCN ký
+                r.data?.ghi_chu || ''
+            ]);
+        } else {
+            // GCN mới
+            headers = [
+                "STT", "Số vào sổ", "Tên chủ sử dụng đất", "Số phát hành", "Ngày ký GCN",
+                "Mã hồ sơ giao dịch", "Địa danh", "Ngày nhận GCN", 
+                "Người nhận GCN ký, ghi rõ họ tên", "Ghi chú"
+            ];
+            colWidths = [
+                { wch: 5 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 12 },
+                { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
+            ];
+            dataRows = filtered.map((r, idx) => [
+                idx + 1,
+                r.data?.so_vao_so || '',
+                r.data?.ten_chu_su_dung || '',
+                r.data?.so_phat_hanh || '',
+                r.data?.ngay_ky_gcn ? new Date(r.data.ngay_ky_gcn).toLocaleDateString('vi-VN') : '',
+                r.data?.ma_ho_so || '',
+                r.data?.dia_danh || '',
+                '', // Ngày nhận GCN
+                '', // Người nhận GCN ký
+                r.data?.ghi_chu || ''
+            ]);
+        }
+
         // Row 1: Title
         XLSX.utils.sheet_add_aoa(ws, [[
             "DANH SÁCH BÀN GIAO GCNQSD ĐẤT TỪ VPĐKĐĐ SANG\nBỘ PHẬN TIẾP NHẬN VÀ TRẢ KẾT QUẢ"
         ]], { origin: "A1" });
         
-        // Merge A1:G1 (assuming 7 columns)
+        // Merge Title
         if(!ws['!merges']) ws['!merges'] = [];
-        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } });
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } });
         ws['A1'].s = styleTitle;
-        ws['A1'].v = "DANH SÁCH BÀN GIAO GCNQSD ĐẤT TỪ VPĐKĐĐ SANG\nBỘ PHẬN TIẾP NHẬN VÀ TRẢ KẾT QUẢ";
 
-        // Row 2: GCN Type (Right aligned or separate cell?)
-        XLSX.utils.sheet_add_aoa(ws, [[selectedGcnType]], { origin: "G2" });
-        ws['G2'].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'right' } };
+        // Row 2: GCN Type
+        const typeCellRef = XLSX.utils.encode_cell({ r: 1, c: headers.length - 1 });
+        XLSX.utils.sheet_add_aoa(ws, [[selectedGcnType]], { origin: typeCellRef });
+        ws[typeCellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'right' } };
 
         // Row 3: Date - Batch
         XLSX.utils.sheet_add_aoa(ws, [[`Ngày ${exportDate} - Danh sách số ${batchNum}`]], { origin: "A3" });
-        ws['!merges'].push({ s: { r: 2, c: 0 }, e: { r: 2, c: 6 } });
+        ws['!merges'].push({ s: { r: 2, c: 0 }, e: { r: 2, c: headers.length - 1 } });
         ws['A3'].s = styleItalicCenter;
 
         // Table Header (Row 5)
-        const headers = ["STT", "Mã hồ sơ", "Tên chủ sử dụng", "Địa chỉ (Địa danh)", "Số tờ", "Số thửa", "Ghi chú"];
         XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A5" });
-        
         headers.forEach((_, i) => {
             const cellRef = XLSX.utils.encode_cell({ r: 4, c: i });
             ws[cellRef].s = styleHeader;
         });
 
         // Data Rows
-        const dataRows = filtered.map((r, idx) => [
-            idx + 1,
-            r.data?.ma_ho_so || '',
-            r.data?.ten_chu_su_dung || '',
-            r.data?.dia_danh || '',
-            r.data?.so_to || '',
-            r.data?.so_thua || '',
-            r.data?.ghi_chu || ''
-        ]);
-
         XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A6" });
 
         // Apply styles to data
         dataRows.forEach((row, rIdx) => {
             row.forEach((_, cIdx) => {
                 const cellRef = XLSX.utils.encode_cell({ r: 5 + rIdx, c: cIdx });
-                if (cIdx === 0 || cIdx === 4 || cIdx === 5) { // STT, To, Thua centered
+                if (cIdx === 0) { // STT centered
                     ws[cellRef].s = styleCellCenter;
                 } else {
                     ws[cellRef].s = styleCell;
@@ -1072,16 +1111,30 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             });
         });
 
+        // Signature Section
+        const lastRowIdx = 5 + dataRows.length;
+        const sigRowIdx = lastRowIdx + 2; // Leave 1 empty row
+
+        // Người giao (Left)
+        XLSX.utils.sheet_add_aoa(ws, [["Người giao"]], { origin: { r: sigRowIdx, c: 0 } });
+        ws['!merges'].push({ s: { r: sigRowIdx, c: 0 }, e: { r: sigRowIdx, c: 2 } }); // Merge A-C
+        const sigLeftRef = XLSX.utils.encode_cell({ r: sigRowIdx, c: 0 });
+        ws[sigLeftRef].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
+        // Người nhận (Center)
+        XLSX.utils.sheet_add_aoa(ws, [["Người nhận"]], { origin: { r: sigRowIdx, c: 3 } });
+        ws['!merges'].push({ s: { r: sigRowIdx, c: 3 }, e: { r: sigRowIdx, c: 5 } }); // Merge D-F
+        const sigCenterRef = XLSX.utils.encode_cell({ r: sigRowIdx, c: 3 });
+        ws[sigCenterRef].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
+        // Giao nhận 1 cửa (Right)
+        XLSX.utils.sheet_add_aoa(ws, [["Giao nhận 1 cửa"]], { origin: { r: sigRowIdx, c: 6 } });
+        ws['!merges'].push({ s: { r: sigRowIdx, c: 6 }, e: { r: sigRowIdx, c: headers.length - 1 } }); // Merge G-End
+        const sigRightRef = XLSX.utils.encode_cell({ r: sigRowIdx, c: 6 });
+        ws[sigRightRef].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
         // Column Widths
-        ws['!cols'] = [
-            { wch: 5 },  // STT
-            { wch: 15 }, // Ma HS
-            { wch: 30 }, // Ten chu
-            { wch: 25 }, // Dia chi
-            { wch: 8 },  // To
-            { wch: 8 },  // Thua
-            { wch: 20 }  // Ghi chu
-        ];
+        ws['!cols'] = colWidths;
 
         // Row Heights
         ws['!rows'] = [

@@ -12,7 +12,7 @@ interface ArchiveRecordsProps {
 }
 
 const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) => {
-    const [activeTab, setActiveTab] = useState<'saoluc' | 'vaoso' | 'congvan'>('saoluc');
+    const [activeTab, setActiveTab] = useState<'saoluc' | 'vaoso' | 'congvan'>('vaoso');
 
     return (
         <div className="flex flex-col h-full bg-[#f1f5f9] animate-fade-in">
@@ -20,16 +20,16 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) =
             <div className="bg-white border-b border-gray-200 px-4 pt-2 shadow-sm shrink-0 z-20">
                 <div className="flex items-end gap-1">
                     <button 
+                        onClick={() => setActiveTab('vaoso')}
+                        className={`px-6 py-3 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'vaoso' ? 'bg-teal-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        <BookOpen size={18}/> Vào Số GCN
+                    </button>
+                    <button 
                         onClick={() => setActiveTab('saoluc')}
                         className={`px-6 py-3 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'saoluc' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
                     >
                         <Copy size={18}/> Sao Lục
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('vaoso')}
-                        className={`px-6 py-3 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'vaoso' ? 'bg-teal-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <BookOpen size={18}/> Vào Số
                     </button>
                     <button 
                         onClick={() => setActiveTab('congvan')}

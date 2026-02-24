@@ -24,9 +24,8 @@ const COLUMNS = [
     { key: 'so_thua', label: 'Số thửa', width: '80px' },
     { key: 'tong_dien_tich', label: 'Tổng diện tích', width: '120px' },
     { key: 'dien_tich_tho_cu', label: 'Diện tích thổ cư', width: '120px' },
-    { key: 'dia_danh_so_phat_hanh', label: 'Địa danh Số phát hành', width: '200px' },
-    { key: 'chuyen_thue', label: 'Chuyển thuế', width: '150px' },
-    { key: 'ghi_chu_sau_thue', label: 'Ghi chú sau chuyển thuế', width: '250px' },
+    { key: 'dia_danh', label: 'Địa danh', width: '150px' },
+    { key: 'so_phat_hanh', label: 'Số phát hành', width: '150px' },
     { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '140px', type: 'date' },
     { key: 'ngay_ky_phieu_tk', label: 'Ngày ký phiếu TK/Chuyển Scan', width: '140px', type: 'date' },
     { key: 'ghi_chu', label: 'GHI CHÚ', width: '250px' }
@@ -98,9 +97,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                 so_thua: '',
                 tong_dien_tich: '',
                 dien_tich_tho_cu: '',
-                dia_danh_so_phat_hanh: '',
-                chuyen_thue: '',
-                ghi_chu_sau_thue: '',
+                dia_danh: '',
+                so_phat_hanh: '',
                 ngay_ky_gcn: '',
                 ngay_ky_phieu_tk: '',
                 ghi_chu: ''
@@ -178,13 +176,17 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                     return;
                 }
 
-                const headers = data[headerRowIdx].map((h: any) => String(h).trim().toLowerCase());
+                // Fix lỗi TypeError: Cannot read properties of undefined (reading 'includes')
+                // Bằng cách đảm bảo mảng headers không có phần tử empty/undefined
+                const rawHeaderRow = data[headerRowIdx] || [];
+                const headers = Array.from(rawHeaderRow).map((h: any) => String(h || '').trim().toLowerCase());
+                
                 const rows = data.slice(headerRowIdx + 1);
                 
                 const newRecords: Partial<ArchiveRecord>[] = [];
 
                 // Helper tìm index cột
-                const findCol = (keywords: string[]) => headers.findIndex(h => keywords.some(k => h.includes(k)));
+                const findCol = (keywords: string[]) => headers.findIndex(h => h && keywords.some(k => h.includes(k)));
 
                 const colMap = {
                     ma_ho_so: findCol(['mã hồ sơ', 'mã hs']),
@@ -197,9 +199,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                     so_thua: findCol(['thửa', 'số thửa']),
                     tong_dien_tich: findCol(['tổng diện tích', 'dt']),
                     dien_tich_tho_cu: findCol(['thổ cư', 'ont', 'odt']),
-                    dia_danh_so_phat_hanh: findCol(['địa danh', 'số phát hành']),
-                    chuyen_thue: findCol(['chuyển thuế']),
-                    ghi_chu_sau_thue: findCol(['ghi chú sau thuế']),
+                    dia_danh: findCol(['địa danh']),
+                    so_phat_hanh: findCol(['số phát hành']),
                     ngay_ky_gcn: findCol(['ký gcn', 'ngày ký giấy']),
                     ngay_ky_phieu_tk: findCol(['phiếu tk', 'chuyển scan']),
                     ghi_chu: findCol(['ghi chú'])
@@ -236,9 +237,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser }) => {
                         so_thua: getValue(colMap.so_thua),
                         tong_dien_tich: getValue(colMap.tong_dien_tich),
                         dien_tich_tho_cu: getValue(colMap.dien_tich_tho_cu),
-                        dia_danh_so_phat_hanh: getValue(colMap.dia_danh_so_phat_hanh),
-                        chuyen_thue: getValue(colMap.chuyen_thue),
-                        ghi_chu_sau_thue: getValue(colMap.ghi_chu_sau_thue),
+                        dia_danh: getValue(colMap.dia_danh),
+                        so_phat_hanh: getValue(colMap.so_phat_hanh),
                         ngay_ky_gcn: getValue(colMap.ngay_ky_gcn),
                         ngay_ky_phieu_tk: getValue(colMap.ngay_ky_phieu_tk),
                         ghi_chu: getValue(colMap.ghi_chu)

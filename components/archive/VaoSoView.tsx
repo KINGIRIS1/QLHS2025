@@ -1,24 +1,27 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 
 // Định nghĩa các cột
 const COLUMNS = [
-    { key: 'so_vao_so', label: 'Số vào sổ', width: '100px' },
-    { key: 'ma_ho_so', label: 'Mã hồ sơ giao dịch', width: '150px' },
-    { key: 'ten_chuyen_quyen', label: 'TÊN CHỦ SỬ DỤNG CHUYỂN QUYỀN', width: '250px' },
-    { key: 'ten_chu_su_dung', label: 'TÊN CHỦ SỬ DỤNG', width: '250px' },
-    { key: 'loai_bien_dong', label: 'Loại biến động', width: '200px' },
+    // Nhóm thông tin hồ sơ (Read-only by default)
+    { key: 'ma_ho_so', label: 'Mã hồ sơ giao dịch', width: '150px', readOnly: true },
+    { key: 'ten_chuyen_quyen', label: 'TÊN CHỦ SỬ DỤNG CHUYỂN QUYỀN', width: '250px', readOnly: true },
+    { key: 'ten_chu_su_dung', label: 'TÊN CHỦ SỬ DỤNG', width: '250px', readOnly: true },
+    { key: 'loai_bien_dong', label: 'Loại biến động', width: '200px', readOnly: true },
+    { key: 'ngay_nhan', label: 'Ngày nhận hồ sơ', width: '140px', type: 'date', readOnly: true },
+    { key: 'so_to', label: 'Số tờ', width: '80px', readOnly: true },
+    { key: 'so_thua', label: 'Số thửa', width: '80px', readOnly: true },
+    { key: 'tong_dien_tich', label: 'Tổng diện tích', width: '120px', readOnly: true },
+    { key: 'dien_tich_tho_cu', label: 'Diện tích thổ cư', width: '120px', readOnly: true },
+    { key: 'dia_danh', label: 'Địa danh', width: '150px', readOnly: true },
+    
+    // Nhóm kết quả (Always editable or specific logic)
     { key: 'loai_gcn', label: 'Loại GCN', width: '150px' },
-    { key: 'ngay_nhan', label: 'Ngày nhận hồ sơ', width: '140px', type: 'date' },
-    { key: 'so_to', label: 'Số tờ', width: '80px' },
-    { key: 'so_thua', label: 'Số thửa', width: '80px' },
-    { key: 'tong_dien_tich', label: 'Tổng diện tích', width: '120px' },
-    { key: 'dien_tich_tho_cu', label: 'Diện tích thổ cư', width: '120px' },
-    { key: 'dia_danh', label: 'Địa danh', width: '150px' },
+    { key: 'so_vao_so', label: 'Số vào sổ', width: '160px' },
     { key: 'so_phat_hanh', label: 'Số phát hành', width: '150px' },
     { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '140px', type: 'date' },
     { key: 'ngay_ky_phieu_tk', label: 'Ngày ký phiếu TK/Chuyển Scan', width: '140px', type: 'date' },
@@ -37,6 +40,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Pagination State
@@ -65,9 +69,19 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         // Calculate max book number from existing records
         let maxNum = 0;
         data.forEach(r => {
-            const num = parseInt(r.data?.so_vao_so || '0');
-            if (!isNaN(num) && num > maxNum) {
-                maxNum = num;
+            const val = r.data?.so_vao_so || '';
+            if (val.startsWith('CN ')) {
+                const numPart = val.replace('CN ', '');
+                const num = parseInt(numPart);
+                if (!isNaN(num) && num > maxNum) {
+                    maxNum = num;
+                }
+            } else {
+                 // Fallback for old format if just number
+                 const num = parseInt(val);
+                 if (!isNaN(num) && num > maxNum) {
+                    maxNum = num;
+                }
             }
         });
         
@@ -154,8 +168,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             }
         };
         
-        await saveArchiveRecord(newRecord);
-        loadData();
+        const saved = await saveArchiveRecord(newRecord);
+        if (saved) {
+            setEditingId(saved.id);
+            loadData();
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -180,11 +197,21 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         setSavingId(null);
     };
 
+    const toggleEdit = (id: string) => {
+        if (editingId === id) {
+            setEditingId(null);
+        } else {
+            setEditingId(id);
+        }
+    };
+
     const handleGetBookNumber = async (record: ArchiveRecord) => {
         const nextNum = currentBookNumber + 1;
+        const formattedNum = `CN ${nextNum.toString().padStart(6, '0')}`;
+        
         const updatedRecord = {
             ...record,
-            data: { ...record.data, so_vao_so: nextNum.toString() }
+            data: { ...record.data, so_vao_so: formattedNum }
         };
         
         // Optimistic update
@@ -547,63 +574,72 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             {(currentPage - 1) * itemsPerPage + idx + 1}
                                             {savingId === r.id && <span className="block text-[9px] text-teal-600 animate-pulse">Lưu...</span>}
                                         </td>
-                                        {COLUMNS.map(col => (
-                                            <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
-                                                {col.key === 'so_vao_so' ? (
-                                                    <div className="flex h-full">
+                                        {COLUMNS.map(col => {
+                                            const isEditing = editingId === r.id;
+                                            const isReadOnly = col.readOnly && !isEditing;
+
+                                            return (
+                                                <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
+                                                    {isReadOnly ? (
+                                                        <div className="w-full h-full px-2 py-2 text-sm text-gray-700 whitespace-pre-wrap min-h-[40px] flex items-center">
+                                                            {r.data?.[col.key] || ''}
+                                                        </div>
+                                                    ) : col.key === 'so_vao_so' ? (
+                                                        <div className="flex h-full">
+                                                            <input 
+                                                                type="text"
+                                                                className="flex-1 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                value={r.data?.[col.key] || ''}
+                                                                onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                                onBlur={() => handleBlur(r)}
+                                                                readOnly={activeTab === 'scanned'} 
+                                                            />
+                                                            {activeTab === 'all' && (
+                                                                <button 
+                                                                    onClick={() => handleGetBookNumber(r)}
+                                                                    className="px-2 bg-gray-100 hover:bg-blue-100 text-blue-600 border-l border-gray-200 transition-colors"
+                                                                    title="Lấy số vào sổ tiếp theo"
+                                                                >
+                                                                    <Hash size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ) : (col.key === 'ten_chuyen_quyen' || col.key === 'ten_chu_su_dung') ? (
+                                                        <textarea
+                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
+                                                            value={r.data?.[col.key] || ''}
+                                                            onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                            onBlur={() => handleBlur(r)}
+                                                            readOnly={activeTab === 'scanned'}
+                                                            rows={2}
+                                                            style={{ minHeight: '40px' }}
+                                                        />
+                                                    ) : col.key === 'loai_gcn' ? (
+                                                        <select
+                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                            value={r.data?.[col.key] || 'GCN mới'}
+                                                            onChange={(e) => {
+                                                                handleCellChange(r.id, col.key, e.target.value);
+                                                                handleBlur({ ...r, data: { ...r.data, [col.key]: e.target.value } });
+                                                            }}
+                                                            disabled={activeTab === 'scanned'}
+                                                        >
+                                                            <option value="GCN mới">GCN mới</option>
+                                                            <option value="GCN trang 4">GCN trang 4</option>
+                                                        </select>
+                                                    ) : (
                                                         <input 
-                                                            type="text"
-                                                            className="flex-1 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                            type={col.type || 'text'}
+                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
                                                             value={r.data?.[col.key] || ''}
                                                             onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                             onBlur={() => handleBlur(r)}
                                                             readOnly={activeTab === 'scanned'} 
                                                         />
-                                                        {activeTab === 'all' && (
-                                                            <button 
-                                                                onClick={() => handleGetBookNumber(r)}
-                                                                className="px-2 bg-gray-100 hover:bg-blue-100 text-blue-600 border-l border-gray-200 transition-colors"
-                                                                title="Lấy số vào sổ tiếp theo"
-                                                            >
-                                                                <Hash size={14} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ) : (col.key === 'ten_chuyen_quyen' || col.key === 'ten_chu_su_dung') ? (
-                                                    <textarea
-                                                        className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
-                                                        value={r.data?.[col.key] || ''}
-                                                        onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
-                                                        onBlur={() => handleBlur(r)}
-                                                        readOnly={activeTab === 'scanned'}
-                                                        rows={2}
-                                                        style={{ minHeight: '40px' }}
-                                                    />
-                                                ) : col.key === 'loai_gcn' ? (
-                                                    <select
-                                                        className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
-                                                        value={r.data?.[col.key] || 'GCN mới'}
-                                                        onChange={(e) => {
-                                                            handleCellChange(r.id, col.key, e.target.value);
-                                                            handleBlur({ ...r, data: { ...r.data, [col.key]: e.target.value } });
-                                                        }}
-                                                        disabled={activeTab === 'scanned'}
-                                                    >
-                                                        <option value="GCN mới">GCN mới</option>
-                                                        <option value="GCN trang 4">GCN trang 4</option>
-                                                    </select>
-                                                ) : (
-                                                    <input 
-                                                        type={col.type || 'text'}
-                                                        className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
-                                                        value={r.data?.[col.key] || ''}
-                                                        onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
-                                                        onBlur={() => handleBlur(r)}
-                                                        readOnly={activeTab === 'scanned'} 
-                                                    />
-                                                )}
-                                            </td>
-                                        ))}
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
                                         {activeTab === 'scanned' && (
                                             <>
                                                 <td className="p-2 border-r border-gray-200 text-xs text-gray-600">
@@ -616,13 +652,22 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         )}
                                         <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200 flex gap-1 justify-center">
                                             {activeTab === 'all' && (
-                                                <button 
-                                                    onClick={() => handleMoveToPendingSingle(r.id)} 
-                                                    className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition-colors" 
-                                                    title="Chuyển Scan"
-                                                >
-                                                    <Send size={14}/>
-                                                </button>
+                                                <>
+                                                    <button 
+                                                        onClick={() => toggleEdit(r.id)} 
+                                                        className={`p-1.5 rounded transition-colors ${editingId === r.id ? 'text-green-600 bg-green-50 hover:bg-green-100' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
+                                                        title={editingId === r.id ? "Xong" : "Sửa"}
+                                                    >
+                                                        {editingId === r.id ? <CheckCircle2 size={14}/> : <Edit size={14}/>}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleMoveToPendingSingle(r.id)} 
+                                                        className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition-colors" 
+                                                        title="Chuyển Scan"
+                                                    >
+                                                        <Send size={14}/>
+                                                    </button>
+                                                </>
                                             )}
                                             <button 
                                                 onClick={() => handleDelete(r.id)} 
@@ -700,7 +745,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
                         </div>
                         <div className="p-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Số vào sổ hiện tại</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Số vào sổ hiện tại (phần số)</label>
                             <input 
                                 type="number" 
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
@@ -708,7 +753,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 onChange={(e) => setCurrentBookNumber(parseInt(e.target.value) || 0)}
                             />
                             <p className="text-xs text-gray-500 mt-2">
-                                Hệ thống sẽ tự động tăng số này khi bạn bấm nút "Lấy số" trên từng dòng.
+                                Hệ thống sẽ tự động tăng số này và thêm tiền tố "CN".<br/>
+                                Ví dụ: Nếu nhập <strong>{currentBookNumber}</strong>, số tiếp theo sẽ là <strong>CN {(currentBookNumber + 1).toString().padStart(6, '0')}</strong>.
                             </p>
                         </div>
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">

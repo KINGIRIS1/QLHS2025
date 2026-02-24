@@ -44,11 +44,15 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
     }
 };
 
-export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<boolean> => {
+export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<ArchiveRecord | null> => {
     if (!isConfigured) {
         if (record.id) {
             const idx = MOCK_ARCHIVE.findIndex(r => r.id === record.id);
-            if (idx !== -1) MOCK_ARCHIVE[idx] = { ...MOCK_ARCHIVE[idx], ...record } as ArchiveRecord;
+            if (idx !== -1) {
+                MOCK_ARCHIVE[idx] = { ...MOCK_ARCHIVE[idx], ...record } as ArchiveRecord;
+                saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+                return MOCK_ARCHIVE[idx];
+            }
         } else {
             const newRec = { 
                 ...record, 
@@ -56,9 +60,10 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 created_at: new Date().toISOString() 
             } as ArchiveRecord;
             MOCK_ARCHIVE.unshift(newRec);
+            saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+            return newRec;
         }
-        saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
-        return true;
+        return null;
     }
     try {
         // Chuẩn hóa dữ liệu
@@ -68,24 +73,26 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         if (payload.ngay_thang === '') payload.ngay_thang = null;
 
         if (record.id) {
-            const { error } = await supabase.from('archive_records').update({ 
+            const { data, error } = await supabase.from('archive_records').update({ 
                 status: payload.status,
                 so_hieu: payload.so_hieu,
                 trich_yeu: payload.trich_yeu,
                 ngay_thang: payload.ngay_thang,
                 noi_nhan_gui: payload.noi_nhan_gui,
                 data: payload.data
-            }).eq('id', record.id);
+            }).eq('id', record.id).select().single();
+            
             if (error) throw error;
+            return data as ArchiveRecord;
         } else {
             // Khi Insert: KHÔNG tự sinh ID bằng Math.random() vì DB dùng UUID.
             // Để Supabase/Postgres tự sinh ID.
             delete payload.id; 
             
-            const { error } = await supabase.from('archive_records').insert([payload]);
+            const { data, error } = await supabase.from('archive_records').insert([payload]).select().single();
             if (error) throw error;
+            return data as ArchiveRecord;
         }
-        return true;
     } catch (error: any) {
         // Xử lý thông báo lỗi cụ thể cho 22P02 (Sai kiểu dữ liệu, ví dụ text vào trường UUID hoặc Date sai format)
         if (error.code === '22P02') {
@@ -94,7 +101,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         } else {
             logError("saveArchiveRecord", error);
         }
-        return false;
+        return null;
     }
 };
 

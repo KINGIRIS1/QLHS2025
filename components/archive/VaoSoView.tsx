@@ -268,22 +268,31 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 const findCol = (keywords: string[], excludes: string[] = []) => 
                     headers.findIndex(h => h && keywords.some(k => h.includes(k)) && !excludes.some(e => h.includes(e)));
 
+                // Logic tìm cột Tên chủ sử dụng (Ưu tiên các từ khóa rõ ràng trước)
+                let tenChuSuDungIdx = findCol(['bên nhận', 'người nhận', 'bên b', 'người được cấp', 'chủ mới']);
+                if (tenChuSuDungIdx === -1) {
+                    // Nếu không thấy, tìm các từ khóa chung nhưng loại trừ từ khóa chuyển nhượng
+                    tenChuSuDungIdx = findCol(
+                        ['tên chủ', 'người sử dụng', 'chủ sử dụng', 'họ tên', 'tên nsd', 'chủ hộ', 'được cấp', 'tên người'], 
+                        ['chuyển quyền', 'chuyển nhượng', 'bên a', 'bên chuyển', 'người chuyển', 'chủ cũ']
+                    );
+                }
+
                 const colMap = {
-                    so_vao_so: findCol(['số vào sổ', 'svs']),
-                    ma_ho_so: findCol(['mã hồ sơ', 'mã hs']),
-                    ten_chuyen_quyen: findCol(['chuyển quyền', 'bên a']),
-                    // Update: Thêm 'chủ sử dụng' vào keywords
-                    ten_chu_su_dung: findCol(['tên chủ', 'bên b', 'người sử dụng', 'chủ sử dụng'], ['chuyển quyền']),
-                    loai_bien_dong: findCol(['biến động', 'loại hồ sơ']),
+                    so_vao_so: findCol(['số vào sổ', 'svs', 'số vào']),
+                    ma_ho_so: findCol(['mã hồ sơ', 'mã hs', 'số hồ sơ']),
+                    ten_chuyen_quyen: findCol(['chuyển quyền', 'chuyển nhượng', 'bên a', 'bên chuyển', 'người chuyển', 'chủ cũ']),
+                    ten_chu_su_dung: tenChuSuDungIdx,
+                    loai_bien_dong: findCol(['biến động', 'loại hồ sơ', 'nội dung']),
                     loai_gcn: findCol(['loại gcn', 'gcn']),
-                    ngay_nhan: findCol(['ngày nhận']),
+                    ngay_nhan: findCol(['ngày nhận', 'ngày nộp']),
                     so_to: findCol(['tờ', 'số tờ']),
                     so_thua: findCol(['thửa', 'số thửa']),
-                    tong_dien_tich: findCol(['tổng diện tích', 'dt']),
+                    tong_dien_tich: findCol(['tổng diện tích', 'dt', 'diện tích']),
                     dien_tich_tho_cu: findCol(['thổ cư', 'ont', 'odt']),
-                    dia_danh: findCol(['địa danh']),
-                    so_phat_hanh: findCol(['số phát hành']),
-                    ngay_ky_gcn: findCol(['ký gcn', 'ngày ký giấy']),
+                    dia_danh: findCol(['địa danh', 'địa chỉ', 'vị trí']),
+                    so_phat_hanh: findCol(['số phát hành', 'số seri', 'seri']),
+                    ngay_ky_gcn: findCol(['ký gcn', 'ngày ký giấy', 'ngày cấp']),
                     ngay_ky_phieu_tk: findCol(['phiếu tk', 'chuyển scan']),
                     ghi_chu: findCol(['ghi chú'])
                 };

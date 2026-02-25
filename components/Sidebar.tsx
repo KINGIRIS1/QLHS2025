@@ -68,22 +68,64 @@ const Sidebar: React.FC<SidebarProps> = ({
     setMobileOpen(false); // Luôn đóng sidebar khi click trên mobile
   };
 
-  const [hoveredItem, setHoveredItem] = React.useState<{ top: number; label: string; badge?: number; badgeColor?: string } | null>(null);
+  const [hoveredItem, setHoveredItem] = React.useState<{ 
+    top: number; 
+    label: string; 
+    badge?: number; 
+    badgeColor?: string;
+    subItems?: { label: string; icon: React.ElementType; onClick: () => void; active?: boolean }[]
+  } | null>(null);
 
-  const handleMouseEnter = (e: React.MouseEvent, label: string, badge?: number, badgeColor?: string) => {
+  const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+
+  const handleMouseEnter = (e: React.MouseEvent, label: string, badge?: number, badgeColor?: string, subItems?: any[]) => {
     if (mobileOpen) return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    
     const rect = e.currentTarget.getBoundingClientRect();
     setHoveredItem({
       top: rect.top,
       label,
       badge,
-      badgeColor
+      badgeColor,
+      subItems
     });
   };
 
   const handleMouseLeave = () => {
-    setHoveredItem(null);
+    if (mobileOpen) return;
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredItem(null);
+    }, 100);
   };
+
+  const handleTooltipEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+  };
+
+  const settingsSubItems = [
+    ...(isAdmin ? [{
+      label: 'Tài khoản',
+      icon: Users,
+      onClick: () => handleMenuClick('user_management'),
+      active: currentView === 'user_management'
+    }] : []),
+    {
+      label: 'Nhân sự',
+      icon: UserCog,
+      onClick: () => handleMenuClick('employee_management'),
+      active: currentView === 'employee_management'
+    },
+    ...(isAdmin ? [{
+      label: 'Cấu hình',
+      icon: ShieldAlert,
+      onClick: () => { onOpenSystemSettings(); setMobileOpen(false); },
+      active: false
+    }] : [])
+  ];
+
+  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management';
 
   return (
     <>
@@ -193,46 +235,38 @@ const Sidebar: React.FC<SidebarProps> = ({
           {!isTeamLeader && !isEmployee && (isAdmin || isSubadmin) && (
             <div className="pt-2 mt-2 border-t border-slate-800 space-y-1">
               <div className="text-[10px] font-bold text-slate-600 uppercase text-center mb-1">SYS</div>
-              {isAdmin && (
-                  <button 
-                    onClick={() => handleMenuClick('user_management')} 
-                    onMouseEnter={(e) => handleMouseEnter(e, 'Tài khoản')}
-                    onMouseLeave={handleMouseLeave}
-                    className="group relative w-full h-9 flex items-center justify-center"
-                  >
-                    <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-8 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${currentView === 'user_management' ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
-                        <div className="min-w-[40px] h-full shrink-0"></div>
-                        <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Tài khoản</span>
-                    </div>
-                    <Users size={18} className={`z-20 relative pointer-events-none ${currentView === 'user_management' ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
-                  </button>
-              )}
-              <button 
-                onClick={() => handleMenuClick('employee_management')} 
-                onMouseEnter={(e) => handleMouseEnter(e, 'Nhân sự')}
-                onMouseLeave={handleMouseLeave}
-                className="group relative w-full h-9 flex items-center justify-center"
-              >
-                <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-8 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${currentView === 'employee_management' ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
-                    <div className="min-w-[40px] h-full shrink-0"></div>
-                    <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Nhân sự</span>
-                </div>
-                <Settings size={18} className={`z-20 relative pointer-events-none ${currentView === 'employee_management' ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
-              </button>
-              {isAdmin && (
+              
+              {/* Settings Group Button */}
+              <div className="relative">
                 <button 
-                    onClick={() => { onOpenSystemSettings(); setMobileOpen(false); }} 
-                    onMouseEnter={(e) => handleMouseEnter(e, 'Cấu hình')}
-                    onMouseLeave={handleMouseLeave}
-                    className="group relative w-full h-9 flex items-center justify-center"
+                  onClick={() => mobileOpen ? setIsSettingsOpen(!isSettingsOpen) : undefined}
+                  onMouseEnter={(e) => handleMouseEnter(e, 'Cài đặt', undefined, undefined, settingsSubItems)}
+                  onMouseLeave={handleMouseLeave}
+                  className="group relative w-full h-9 flex items-center justify-center"
                 >
-                  <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-8 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-slate-700 ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
+                  <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-8 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${isSettingsActive ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
                       <div className="min-w-[40px] h-full shrink-0"></div>
-                      <span className={`text-sm font-medium text-red-400 whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Cấu hình</span>
+                      <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Cài đặt</span>
                   </div>
-                  <ShieldAlert size={18} className="z-20 relative pointer-events-none text-slate-500 group-hover:text-red-400" />
+                  <Settings size={18} className={`z-20 relative pointer-events-none ${isSettingsActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
                 </button>
-              )}
+
+                {/* Mobile Accordion */}
+                {mobileOpen && isSettingsOpen && (
+                  <div className="bg-slate-900/50 mt-1 py-1 space-y-1">
+                    {settingsSubItems.map((sub, idx) => (
+                      <button
+                        key={idx}
+                        onClick={sub.onClick}
+                        className={`w-full flex items-center gap-3 px-8 py-2 text-sm ${sub.active ? 'text-blue-400 font-medium' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        <sub.icon size={16} />
+                        <span>{sub.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </nav>
@@ -253,17 +287,41 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Floating Tooltip (Fixed Position) */}
+      {/* Floating Tooltip / Flyout Menu */}
       {hoveredItem && !mobileOpen && (
         <div 
-            className="fixed left-20 z-[60] bg-slate-800 text-white px-4 py-3 rounded-r-lg shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-left-1 duration-150 border-y border-r border-slate-700/50 pointer-events-none"
-            style={{ top: hoveredItem.top, height: '36px' }}
+            className={`fixed left-20 z-[60] bg-slate-800 text-white rounded-r-lg shadow-xl animate-in fade-in slide-in-from-left-1 duration-150 border-y border-r border-slate-700/50 ${hoveredItem.subItems ? 'pointer-events-auto' : 'pointer-events-none'}`}
+            style={{ top: hoveredItem.top, minHeight: '36px' }}
+            onMouseEnter={handleTooltipEnter}
+            onMouseLeave={handleMouseLeave}
         >
-            <span className="text-sm font-medium whitespace-nowrap">{hoveredItem.label}</span>
-            {hoveredItem.badge !== undefined && hoveredItem.badge > 0 && (
-                <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm ${hoveredItem.badgeColor || 'bg-red-500'}`}>
-                    {hoveredItem.badge > 99 ? '99+' : hoveredItem.badge}
-                </span>
+            {hoveredItem.subItems ? (
+                <div className="flex flex-col py-1 min-w-[160px]">
+                    <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase border-b border-slate-700/50 mb-1 tracking-wider">{hoveredItem.label}</div>
+                    {hoveredItem.subItems.map((sub, idx) => (
+                        <button 
+                            key={idx}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                sub.onClick();
+                                setHoveredItem(null);
+                            }}
+                            className={`flex items-center gap-3 px-3 py-2 text-sm hover:bg-slate-700/80 transition-colors text-left ${sub.active ? 'text-blue-400 font-medium bg-slate-700/30' : 'text-slate-300'}`}
+                        >
+                            <sub.icon size={16} className={sub.active ? 'text-blue-400' : 'text-slate-500'} />
+                            <span>{sub.label}</span>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="flex items-center gap-3 px-4 h-9">
+                    <span className="text-sm font-medium whitespace-nowrap">{hoveredItem.label}</span>
+                    {hoveredItem.badge !== undefined && hoveredItem.badge > 0 && (
+                        <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm ${hoveredItem.badgeColor || 'bg-red-500'}`}>
+                            {hoveredItem.badge > 99 ? '99+' : hoveredItem.badge}
+                        </span>
+                    )}
+                </div>
             )}
         </div>
       )}

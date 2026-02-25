@@ -41,6 +41,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   // Define menu structure
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
+    
     // "Hồ sơ" dropdown group
     { 
       id: 'records_group', 
@@ -49,14 +50,32 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       visible: true,
       isDropdown: true,
       subItems: [
-        { id: 'all_records', label: 'Tất cả hồ sơ', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
-        { id: 'archive_records', label: 'Hồ sơ lưu trữ', icon: FolderArchive, visible: true },
-        { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
+        { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
+        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },
-    { id: 'receive_record', label: 'Tiếp nhận', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
-    { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
+
+    // "Tiếp nhận" dropdown group
+    {
+      id: 'receive_group',
+      label: 'Tiếp nhận',
+      icon: FolderInput,
+      visible: !isTeamLeader && !isEmployee,
+      isDropdown: true,
+      subItems: [
+        { id: 'receive_record', label: 'Hồ sơ', icon: FolderInput, visible: true },
+        { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: true },
+      ]
+    },
+
+    // Top level items moved from groups
+    { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
+    { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
+    { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true },
+    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
+
     { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: !isOneDoor },
+
     // "Hệ thống" dropdown group (Settings)
     {
       id: 'system_group',
@@ -66,10 +85,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: true,
       subItems: [
         { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: true },
-        { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: true, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
-        { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
-        { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true },
-        { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
+        // Chat nội bộ hidden
+        { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
         ...(isAdmin ? [{ id: 'user_management', label: 'Quản lý tài khoản', icon: Users, visible: true }] : []),
         { id: 'employee_management', label: 'Quản lý nhân sự', icon: UserCog, visible: true },
         ...(isAdmin ? [{ id: 'system_settings', label: 'Cấu hình hệ thống', icon: ShieldAlert, visible: true }] : []),

@@ -19,6 +19,7 @@ import ReportSection from './ReportSection';
 import RecordRow from './RecordRow';
 import WorkScheduleView from './WorkScheduleView';
 import ArchiveRecords from './ArchiveRecords';
+import SystemSettingsView from './SystemSettingsView';
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send } from 'lucide-react';
@@ -50,6 +51,8 @@ interface AppRoutesProps {
     handleDeleteUser: (username: string) => void;
     handleSaveEmployee: (emp: Employee) => void;
     handleDeleteEmployee: (id: string) => void;
+    handleDeleteAllData: () => Promise<boolean>;
+    onRefreshData: () => void;
     setWards: React.Dispatch<React.SetStateAction<string[]>>;
     onResetWards: () => void;
     handleQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
@@ -508,6 +511,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onUpdate={props.handleUpdateCurrentAccount}
                     notificationEnabled={props.notificationEnabled}
                     setNotificationEnabled={props.setNotificationEnabled}
+                />
+            );
+        case 'system_settings':
+            if (!isAdmin) return null;
+            return (
+                <SystemSettingsView
+                    onDeleteAllData={props.handleDeleteAllData}
+                    onHolidaysChanged={props.onRefreshData}
                 />
             );
         case 'reports':

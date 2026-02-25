@@ -45,7 +45,6 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isSystemSettingsOpen, setIsSystemSettingsOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignTargetRecords, setAssignTargetRecords] = useState<RecordFile[]>([]);
   const [viewingRecord, setViewingRecord] = useState<RecordFile | null>(null);
@@ -464,7 +463,6 @@ function App() {
         onLogout={() => setCurrentUser(null)}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setIsSystemSettingsOpen={setIsSystemSettingsOpen}
         isGeneratingReport={isGeneratingReport}
         isUpdateAvailable={false} 
         latestVersion={latestVersion}
@@ -506,6 +504,8 @@ function App() {
             handleDeleteUser={handleDeleteUser}
             handleSaveEmployee={handleSaveEmployee}
             handleDeleteEmployee={handleDeleteEmployee}
+            handleDeleteAllData={handleDeleteAllData}
+            onRefreshData={loadData}
             setWards={setWards}
             onResetWards={() => setWards(STATIC_WARDS)}
             handleQuickUpdate={handleQuickUpdate}
@@ -545,7 +545,6 @@ function App() {
             isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen}
             isImportModalOpen={isImportModalOpen} setIsImportModalOpen={setIsImportModalOpen}
             isSettingsOpen={false} setIsSettingsOpen={() => {}} 
-            isSystemSettingsOpen={isSystemSettingsOpen} setIsSystemSettingsOpen={setIsSystemSettingsOpen}
             isAssignModalOpen={isAssignModalOpen} setIsAssignModalOpen={setIsAssignModalOpen}
             isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}
             isExportModalOpen={isExportModalOpen} setIsExportModalOpen={setIsExportModalOpen}

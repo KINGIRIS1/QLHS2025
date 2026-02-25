@@ -2,7 +2,6 @@ import React from 'react';
 import { RecordFile, Employee, User, RecordStatus } from '../types';
 import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
-import SystemSettingsModal from './SystemSettingsModal';
 import AssignModal from './AssignModal';
 import { DetailModal } from './DetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -18,7 +17,6 @@ interface AppModalsProps {
     isModalOpen: boolean;
     isImportModalOpen: boolean;
     isSettingsOpen: boolean; // Kept for prop compatibility but unused
-    isSystemSettingsOpen: boolean;
     isAssignModalOpen: boolean;
     isDeleteModalOpen: boolean;
     isExportModalOpen: boolean;
@@ -43,7 +41,6 @@ interface AppModalsProps {
     setIsModalOpen: (v: boolean) => void;
     setIsImportModalOpen: (v: boolean) => void;
     setIsSettingsOpen: (v: boolean) => void;
-    setIsSystemSettingsOpen: (v: boolean) => void;
     setIsAssignModalOpen: (v: boolean) => void;
     setIsDeleteModalOpen: (v: boolean) => void;
     setIsExportModalOpen: (v: boolean) => void;
@@ -107,13 +104,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees} 
             />
             
-            <SystemSettingsModal 
-                isOpen={props.isSystemSettingsOpen} 
-                onClose={() => props.setIsSystemSettingsOpen(false)} 
-                onDeleteAllData={props.handleDeleteAllData}
-                onHolidaysChanged={props.onRefreshData} // Wiring callback
-            />
-
             <AssignModal 
                 isOpen={props.isAssignModalOpen} 
                 onClose={() => props.setIsAssignModalOpen(false)} 

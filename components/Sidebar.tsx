@@ -8,7 +8,6 @@ interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
   onOpenSettings: () => void; // Deprecated
-  onOpenSystemSettings: () => void;
   currentUser: User;
   onLogout: () => void;
   mobileOpen: boolean;
@@ -24,7 +23,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentView, 
   setCurrentView, 
   onOpenSettings, 
-  onOpenSystemSettings, 
   currentUser, 
   onLogout,
   mobileOpen,
@@ -120,12 +118,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     ...(isAdmin ? [{
       label: 'Cấu hình',
       icon: ShieldAlert,
-      onClick: () => { onOpenSystemSettings(); setMobileOpen(false); },
-      active: false
+      onClick: () => handleMenuClick('system_settings'),
+      active: currentView === 'system_settings'
     }] : [])
   ];
 
-  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management';
+  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management' || currentView === 'system_settings';
 
   return (
     <>

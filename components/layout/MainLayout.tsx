@@ -15,7 +15,6 @@ interface MainLayoutProps {
     // Sidebar specific props
     isMobileMenuOpen: boolean;
     setIsMobileMenuOpen: (open: boolean) => void;
-    setIsSystemSettingsOpen: (open: boolean) => void;
     isGeneratingReport: boolean;
     isUpdateAvailable: boolean;
     latestVersion: string;
@@ -45,7 +44,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     onLogout,
     isMobileMenuOpen,
     setIsMobileMenuOpen,
-    setIsSystemSettingsOpen,
     isGeneratingReport,
     isUpdateAvailable,
     latestVersion,
@@ -82,7 +80,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 currentView={currentView}
                 setCurrentView={setCurrentView}
                 onOpenSettings={() => {}} // Deprecated
-                onOpenSystemSettings={() => setIsSystemSettingsOpen(true)}
                 currentUser={currentUser}
                 onLogout={onLogout}
                 mobileOpen={isMobileMenuOpen}

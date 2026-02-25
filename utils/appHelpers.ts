@@ -25,6 +25,38 @@ export function toTitleCase(str: string | null | undefined): string {
     return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+// Hàm format ngày tháng (dd/mm/yy)
+export const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
+};
+
+// Hàm chuẩn hóa tên Xã/Phường (Bỏ chữ 'Xã', 'Thị trấn')
+export const getNormalizedWard = (ward?: string | null) => {
+    if (!ward) return '';
+    return ward.replace(/^(Xã|Thị trấn|Phường)\s+/i, '');
+};
+
+// Hàm viết tắt loại hồ sơ
+export const getShortRecordType = (type?: string | null) => {
+    if (!type) return '';
+    const map: Record<string, string> = {
+        'Cấp đổi': 'Cấp đổi',
+        'Cấp mới': 'Cấp mới',
+        'Chuyển nhượng': 'CN',
+        'Tặng cho': 'Tặng cho',
+        'Thừa kế': 'Thừa kế',
+        'Đăng ký biến động': 'ĐKBĐ',
+        'Tách thửa': 'Tách thửa',
+        'Hợp thửa': 'Hợp thửa',
+        'Chuyển mục đích': 'CMĐ',
+        'Cấp lại': 'Cấp lại',
+        'Đính chính': 'Đính chính'
+    };
+    return map[type] || type;
+};
+
 // --- CONFIRM ACTION WRAPPER ---
 // Sử dụng Native Dialog của Electron nếu có, ngược lại dùng window.confirm
 export const confirmAction = async (message: string, title: string = 'Xác nhận'): Promise<boolean> => {

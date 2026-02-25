@@ -170,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* MENU */}
-        <nav className="flex-1 py-2 space-y-1 overflow-y-auto custom-scrollbar overflow-x-visible">
+        <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto custom-scrollbar overflow-x-visible">
           {menuItems.filter(item => {
              if (isOneDoor && !oneDoorAllowedViews.includes(item.id)) return false;
              if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
@@ -186,12 +186,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => handleMenuClick(item.id)}
                 onMouseEnter={(e) => handleMouseEnter(e, item.label, item.badge, item.badgeColor)}
                 onMouseLeave={handleMouseLeave}
-                className="group relative w-full h-9 flex items-center justify-center"
+                className="group relative w-full h-8 flex items-center justify-center"
               >
                  {/* Button Background */}
                  <div className={`
                     absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0
-                    h-8 rounded-lg transition-all duration-200 ease-out
+                    h-7 rounded-lg transition-all duration-200 ease-out
                     flex items-center overflow-hidden shadow-sm
                     ${isActive ? 'bg-blue-600' : 'group-hover:bg-slate-700'}
                     ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'}
@@ -220,7 +220,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                  </div>
 
                  {/* Icon */}
-                 <item.icon size={18} className={`z-20 relative pointer-events-none ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'}`} />
+                 <item.icon size={16} className={`z-20 relative pointer-events-none ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'}`} />
                  
                  {/* Badge dot for collapsed state */}
                  {!mobileOpen && item.badge !== undefined && item.badge > 0 && (
@@ -231,7 +231,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           })}
           
           {!isTeamLeader && !isEmployee && (isAdmin || isSubadmin) && (
-            <div className="pt-2 mt-2 border-t border-slate-800 space-y-1">
+            <div className="pt-2 mt-2 border-t border-slate-800 space-y-0.5">
               <div className="text-[10px] font-bold text-slate-600 uppercase text-center mb-1">SYS</div>
               
               {/* Settings Group Button */}
@@ -240,13 +240,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => mobileOpen ? setIsSettingsOpen(!isSettingsOpen) : undefined}
                   onMouseEnter={(e) => handleMouseEnter(e, 'Cài đặt', undefined, undefined, settingsSubItems)}
                   onMouseLeave={handleMouseLeave}
-                  className="group relative w-full h-9 flex items-center justify-center"
+                  className="group relative w-full h-8 flex items-center justify-center"
                 >
-                  <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-8 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${isSettingsActive ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
+                  <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-7 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${isSettingsActive ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
                       <div className="min-w-[40px] h-full shrink-0"></div>
                       <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Cài đặt</span>
                   </div>
-                  <Settings size={18} className={`z-20 relative pointer-events-none ${isSettingsActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
+                  <Settings size={16} className={`z-20 relative pointer-events-none ${isSettingsActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
                 </button>
 
                 {/* Mobile Accordion */}
@@ -274,13 +274,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={onLogout} 
             onMouseEnter={(e) => handleMouseEnter(e, 'Đăng xuất')}
             onMouseLeave={handleMouseLeave}
-            className="group relative w-full h-9 flex items-center justify-center"
+            className="group relative w-full h-8 flex items-center justify-center"
           >
-               <div className={`absolute left-1/2 -translate-x-1/2 md:left-1 md:translate-x-0 h-8 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-red-600/90 ${mobileOpen ? 'w-full' : 'w-10'} z-10`}>
+               <div className={`absolute left-1/2 -translate-x-1/2 md:left-1 md:translate-x-0 h-7 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-red-600/90 ${mobileOpen ? 'w-full' : 'w-10'} z-10`}>
                     <div className="min-w-[40px] h-full shrink-0"></div>
                     <span className={`text-sm font-bold text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Đăng xuất</span>
                </div>
-              <LogOut size={18} className="z-20 relative pointer-events-none text-red-400 group-hover:text-white" />
+              <LogOut size={16} className="z-20 relative pointer-events-none text-red-400 group-hover:text-white" />
           </button>
         </div>
       </div>
@@ -288,7 +288,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Floating Tooltip / Flyout Menu */}
       {hoveredItem && !mobileOpen && (
         <div 
-            className={`fixed left-20 z-[60] bg-slate-800 text-white rounded-r-lg shadow-xl animate-in fade-in slide-in-from-left-1 duration-150 border-y border-r border-slate-700/50 ${hoveredItem.subItems ? 'pointer-events-auto' : 'pointer-events-none'}`}
+            className={`fixed left-20 z-[9999] bg-slate-800 text-white rounded-r-lg shadow-xl animate-in fade-in slide-in-from-left-1 duration-150 border-y border-r border-slate-700/50 ${hoveredItem.subItems ? 'pointer-events-auto' : 'pointer-events-none'}`}
             style={{ top: hoveredItem.top, minHeight: '36px' }}
             onMouseEnter={handleTooltipEnter}
             onMouseLeave={handleMouseLeave}

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import Sidebar from '../Sidebar';
+import TopNavigation from '../TopNavigation';
 import { Menu, WifiOff } from 'lucide-react';
 import { User } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
@@ -64,7 +64,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     if (!currentUser) return <>{children}</>;
 
     return (
-        <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
             {/* Modal Cập nhật Bắt buộc */}
             <UpdateRequiredModal 
                 visible={showUpdateModal}
@@ -76,29 +76,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 onUpdateLater={onUpdateLater}
             />
 
-            <Sidebar
+            <TopNavigation
                 currentView={currentView}
                 setCurrentView={setCurrentView}
-                onOpenSettings={() => {}} // Deprecated
                 currentUser={currentUser}
                 onLogout={onLogout}
                 mobileOpen={isMobileMenuOpen}
                 setMobileOpen={setIsMobileMenuOpen}
                 isGeneratingReport={isGeneratingReport}
-                // Sidebar doesn't need to know about updates anymore as we use Modal
                 onOpenAccountSettings={() => setCurrentView('account_settings')}
                 unreadMessagesCount={unreadMessages}
                 warningRecordsCount={warningCount.overdue + warningCount.approaching}
                 reminderCount={activeRemindersCount}
             />
 
-            <div className="flex-1 flex flex-col min-w-0">
-                <header className="md:hidden bg-[#0f172a] text-white p-4 flex justify-between items-center shadow-md z-20">
-                    <h1 className="font-bold text-sm truncate">QLHS Đo Đạc</h1>
-                    <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-                        <Menu size={24} />
-                    </button>
-                </header>
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* Mobile Header is now redundant if TopNavigation handles mobile, 
+                    but TopNavigation might need adjustments for mobile. 
+                    For now, let's keep TopNavigation as the main header. 
+                */}
 
                 {connectionStatus === 'offline' && (
                     <div className="bg-red-600 text-white text-xs py-1 px-4 text-center font-bold flex items-center justify-center gap-2 shadow-sm z-30">

@@ -11,16 +11,15 @@ interface RecordRowProps {
   employees: Employee[];
   visibleColumns: Record<string, boolean>;
   isSelected: boolean;
-  isActive?: boolean; // New prop for Master-Detail selection
   canPerformAction: boolean;
   onToggleSelect: (id: string) => void;
-  onSelect: (record: RecordFile) => void; // Changed from onView/onDoubleClick to onSelect/onClick
-  onEdit: (record: RecordFile) => void; // Keep for double click or context menu if needed, but actions are moved
+  onView: (record: RecordFile) => void;
+  onEdit: (record: RecordFile) => void;
   onDelete: (record: RecordFile) => void;
   onAdvanceStatus: (record: RecordFile) => void;
   onQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
   onReturnResult?: (record: RecordFile) => void;
-  onMapCorrection?: (record: RecordFile) => void;
+  onMapCorrection?: (record: RecordFile) => void; // New Handler
 }
 
 const formatDate = (dateStr?: string | null) => {
@@ -34,10 +33,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
   employees,
   visibleColumns,
   isSelected,
-  isActive,
   canPerformAction,
   onToggleSelect,
-  onSelect,
+  onView,
   onEdit,
   onDelete,
   onAdvanceStatus,
@@ -55,6 +53,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
 
+  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
+  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút), coi như là Đã giao 1 cửa
   const getDisplayStatus = (r: RecordFile) => {
       if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED) {
           return RecordStatus.HANDOVER;
@@ -64,25 +64,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
   
   const displayStatus = getDisplayStatus(record);
 
+  // Class chung cho các ô: Căn trên (align-top)
   const cellClass = "p-3 align-top";
 
   return (
-    <tr 
-        className={`transition-all duration-200 group border-l-4 cursor-pointer ${
-            isActive 
-            ? 'bg-blue-100 border-l-blue-600 shadow-inner' 
-            : isOverdue 
-                ? 'bg-red-50 border-l-red-500 hover:bg-red-100' 
-                : isApproaching 
-                    ? 'bg-orange-50 border-l-orange-500 hover:bg-orange-100' 
-                    : isSelected 
-                        ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100' 
-                        : 'border-l-transparent hover:bg-blue-50/60 hover:shadow-sm'
-        }`} 
-        onClick={() => onSelect(record)}
-    >
+    <tr className={`transition-all duration-200 group border-l-4 ${isOverdue ? 'bg-red-50 border-l-red-500 hover:bg-red-100' : isApproaching ? 'bg-orange-50 border-l-orange-500 hover:bg-orange-100' : isSelected ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100' : 'border-l-transparent hover:bg-blue-50/60 hover:shadow-sm'}`} onDoubleClick={() => onView(record)}>
       <td className={`${cellClass} text-center`}>
-        <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-1">
             {canPerformAction ? (
             <button onClick={() => onToggleSelect(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
                 {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
@@ -94,7 +82,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
       </td>
       
       {visibleColumns.code && (
-        <td className={`${cellClass} font-medium text-blue-600`}>
+        <td className={`${cellClass} font-medium text-blue-600 cursor-pointer`} onClick={() => { if(canPerformAction) onEdit(record); else onView(record); }}>
           <div className="flex flex-col items-center gap-1">
               <div className="break-words font-bold leading-normal text-sm" title={record.code}>
                   {record.code}
@@ -237,6 +225,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 <div className="transform origin-top pt-1"><StatusBadge status={displayStatus} /></div> 
             )}
             
+            {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}
             {onMapCorrection && (
                 <div className="mt-2 flex justify-center">
                     <button 
@@ -256,7 +245,25 @@ const RecordRow: React.FC<RecordRowProps> = ({
         </td>
       )}
       
-      {/* Removed Action Buttons Column */}
+      {canPerformAction && (
+        <td className={`${cellClass} sticky right-0 shadow-l text-center ${isOverdue ? 'bg-red-50 group-hover:bg-red-100' : isApproaching ? 'bg-orange-50 group-hover:bg-orange-100' : 'bg-white group-hover:bg-blue-50/60'}`}>
+          <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
+            <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Xem chi tiết"><Eye size={16} /></button>
+            
+            {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+                <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded transition-colors" title="Trả kết quả">
+                    <FileCheck size={16} />
+                </button>
+            )}
+
+            {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && (
+              <button onClick={() => onAdvanceStatus(record)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Chuyển bước"><ArrowRight size={16} /></button>
+            )}
+            <button onClick={() => onEdit(record)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa"><Pencil size={16} /></button>
+            <button onClick={() => onDelete(record)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa"><Trash2 size={16} /></button>
+          </div>
+        </td>
+      )}
     </tr>
   );
 };

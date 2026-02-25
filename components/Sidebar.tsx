@@ -68,6 +68,23 @@ const Sidebar: React.FC<SidebarProps> = ({
     setMobileOpen(false); // Luôn đóng sidebar khi click trên mobile
   };
 
+  const [hoveredItem, setHoveredItem] = React.useState<{ top: number; label: string; badge?: number; badgeColor?: string } | null>(null);
+
+  const handleMouseEnter = (e: React.MouseEvent, label: string, badge?: number, badgeColor?: string) => {
+    if (mobileOpen) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoveredItem({
+      top: rect.top,
+      label,
+      badge,
+      badgeColor
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredItem(null);
+  };
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -127,27 +144,28 @@ const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleMenuClick(item.id)}
+                onMouseEnter={(e) => handleMouseEnter(e, item.label, item.badge, item.badgeColor)}
+                onMouseLeave={handleMouseLeave}
                 className="group relative w-full h-12 flex items-center justify-center"
               >
-                 {/* Expanding Background & Container */}
+                 {/* Button Background */}
                  <div className={`
                     absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0
                     h-10 rounded-lg transition-all duration-200 ease-out
                     flex items-center overflow-hidden shadow-sm
                     ${isActive ? 'bg-blue-600' : 'group-hover:bg-slate-700'}
-                    ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10 group-hover:w-64'}
+                    ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'}
                     z-10
                  `}>
-                    {/* Spacer for Icon (matches w-10 of collapsed state) */}
+                    {/* Spacer/Icon Container */}
                     <div className="min-w-[40px] h-full shrink-0"></div>
 
-                    {/* Text Label */}
-                    <div className={`flex-1 flex items-center justify-between pr-3 overflow-hidden ${mobileOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-75'}`}>
+                    {/* Text Label (Only visible on Mobile) */}
+                    <div className={`flex-1 flex items-center justify-between pr-3 overflow-hidden ${mobileOpen ? 'opacity-100' : 'hidden'}`}>
                         <span className="text-sm font-medium text-white whitespace-nowrap pl-2">
                           {item.label}
                         </span>
 
-                        {/* Badge inside expanded */}
                         <div className="flex items-center gap-2">
                             {item.id === 'reports' && isGeneratingReport && (
                               <Loader2 size={14} className="animate-spin text-amber-400" />
@@ -161,12 +179,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                  </div>
 
-                 {/* Icon (Fixed Position) */}
+                 {/* Icon */}
                  <item.icon size={20} className={`z-20 relative pointer-events-none ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'}`} />
                  
-                 {/* Badge dot for collapsed state (when not hovering) */}
+                 {/* Badge dot for collapsed state */}
                  {!mobileOpen && item.badge !== undefined && item.badge > 0 && (
-                    <div className="absolute top-2 right-5 w-2 h-2 rounded-full bg-red-500 z-30 group-hover:hidden pointer-events-none"></div>
+                    <div className="absolute top-2 right-5 w-2 h-2 rounded-full bg-red-500 z-30 pointer-events-none"></div>
                  )}
               </button>
             );
@@ -176,26 +194,41 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="pt-4 mt-4 border-t border-slate-800 space-y-2">
               <div className="text-[10px] font-bold text-slate-600 uppercase text-center mb-1">SYS</div>
               {isAdmin && (
-                  <button onClick={() => handleMenuClick('user_management')} className="group relative w-full h-12 flex items-center justify-center">
-                    <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${currentView === 'user_management' ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10 group-hover:w-48'} z-10`}>
+                  <button 
+                    onClick={() => handleMenuClick('user_management')} 
+                    onMouseEnter={(e) => handleMouseEnter(e, 'Tài khoản')}
+                    onMouseLeave={handleMouseLeave}
+                    className="group relative w-full h-12 flex items-center justify-center"
+                  >
+                    <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${currentView === 'user_management' ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
                         <div className="min-w-[40px] h-full shrink-0"></div>
-                        <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200'}`}>Tài khoản</span>
+                        <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Tài khoản</span>
                     </div>
                     <Users size={20} className={`z-20 relative pointer-events-none ${currentView === 'user_management' ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
                   </button>
               )}
-              <button onClick={() => handleMenuClick('employee_management')} className="group relative w-full h-12 flex items-center justify-center">
-                <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${currentView === 'employee_management' ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10 group-hover:w-48'} z-10`}>
+              <button 
+                onClick={() => handleMenuClick('employee_management')} 
+                onMouseEnter={(e) => handleMouseEnter(e, 'Nhân sự')}
+                onMouseLeave={handleMouseLeave}
+                className="group relative w-full h-12 flex items-center justify-center"
+              >
+                <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm ${currentView === 'employee_management' ? 'bg-blue-600' : 'group-hover:bg-slate-700'} ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
                     <div className="min-w-[40px] h-full shrink-0"></div>
-                    <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200'}`}>Nhân sự</span>
+                    <span className={`text-sm font-medium text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Nhân sự</span>
                 </div>
                 <Settings size={20} className={`z-20 relative pointer-events-none ${currentView === 'employee_management' ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
               </button>
               {isAdmin && (
-                <button onClick={() => { onOpenSystemSettings(); setMobileOpen(false); }} className="group relative w-full h-12 flex items-center justify-center">
-                  <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-slate-700 ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10 group-hover:w-48'} z-10`}>
+                <button 
+                    onClick={() => { onOpenSystemSettings(); setMobileOpen(false); }} 
+                    onMouseEnter={(e) => handleMouseEnter(e, 'Cấu hình')}
+                    onMouseLeave={handleMouseLeave}
+                    className="group relative w-full h-12 flex items-center justify-center"
+                >
+                  <div className={`absolute left-1/2 -translate-x-1/2 md:left-5 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-slate-700 ${mobileOpen ? 'w-[90%] left-1/2' : 'w-10'} z-10`}>
                       <div className="min-w-[40px] h-full shrink-0"></div>
-                      <span className={`text-sm font-medium text-red-400 whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200'}`}>Cấu hình</span>
+                      <span className={`text-sm font-medium text-red-400 whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Cấu hình</span>
                   </div>
                   <ShieldAlert size={20} className="z-20 relative pointer-events-none text-slate-500 group-hover:text-red-400" />
                 </button>
@@ -205,15 +238,35 @@ const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         <div className="p-4 border-t border-slate-800 bg-[#0f172a] shrink-0 flex justify-center">
-          <button onClick={onLogout} className="group relative w-full h-10 flex items-center justify-center">
-               <div className={`absolute left-1/2 -translate-x-1/2 md:left-1 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-red-600/90 ${mobileOpen ? 'w-full' : 'w-10 group-hover:w-40'} z-10`}>
+          <button 
+            onClick={onLogout} 
+            onMouseEnter={(e) => handleMouseEnter(e, 'Đăng xuất')}
+            onMouseLeave={handleMouseLeave}
+            className="group relative w-full h-10 flex items-center justify-center"
+          >
+               <div className={`absolute left-1/2 -translate-x-1/2 md:left-1 md:translate-x-0 h-10 rounded-lg transition-all duration-200 ease-out flex items-center overflow-hidden shadow-sm group-hover:bg-red-600/90 ${mobileOpen ? 'w-full' : 'w-10'} z-10`}>
                     <div className="min-w-[40px] h-full shrink-0"></div>
-                    <span className={`text-sm font-bold text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200'}`}>Đăng xuất</span>
+                    <span className={`text-sm font-bold text-white whitespace-nowrap pl-2 ${mobileOpen ? 'opacity-100' : 'hidden'}`}>Đăng xuất</span>
                </div>
               <LogOut size={20} className="z-20 relative pointer-events-none text-red-400 group-hover:text-white" />
           </button>
         </div>
       </div>
+
+      {/* Floating Tooltip (Fixed Position) */}
+      {hoveredItem && !mobileOpen && (
+        <div 
+            className="fixed left-20 z-[60] bg-slate-800 text-white px-4 py-3 rounded-r-lg shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-left-1 duration-150 border-y border-r border-slate-700/50 pointer-events-none"
+            style={{ top: hoveredItem.top, height: '48px' }}
+        >
+            <span className="text-sm font-medium whitespace-nowrap">{hoveredItem.label}</span>
+            {hoveredItem.badge !== undefined && hoveredItem.badge > 0 && (
+                <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm ${hoveredItem.badgeColor || 'bg-red-500'}`}>
+                    {hoveredItem.badge > 99 ? '99+' : hoveredItem.badge}
+                </span>
+            )}
+        </div>
+      )}
     </>
   );
 };

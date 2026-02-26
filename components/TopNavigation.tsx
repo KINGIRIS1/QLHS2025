@@ -117,7 +117,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   };
 
   return (
-    <div className="bg-[#1e3a8a] text-white h-14 flex items-center justify-between px-4 shadow-md shrink-0 z-50 relative">
+    <div className="bg-[#1e3a8a] text-white min-h-[64px] py-1 flex items-center justify-between px-4 shadow-md shrink-0 z-50 relative">
       {/* LEFT: BRAND */}
       <div className="flex items-center gap-3 shrink-0">
         <div className="bg-white/10 p-1.5 rounded-lg">
@@ -145,10 +145,10 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           // Render Tab Group
           if ((item as any).isTabGroup) {
             return (
-              <div key={item.id} className="flex items-center gap-1 mx-2 bg-blue-800/40 rounded-lg p-1 border border-blue-700/50">
-                <div className="flex items-center gap-1 px-2 text-blue-200 border-r border-blue-700/50 mr-1">
-                  <item.icon size={14} />
-                  <span className="text-xs font-bold uppercase tracking-wider">{item.label}</span>
+              <div key={item.id} className="flex items-stretch gap-1 mx-2 bg-blue-800/40 rounded-lg p-1 border border-blue-700/50 h-full">
+                <div className="flex flex-col items-center justify-center gap-0.5 px-2 text-blue-200 border-r border-blue-700/50 mr-1 min-w-[60px]">
+                  <item.icon size={16} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-center leading-tight">{item.label}</span>
                 </div>
                 {item.subItems?.map(sub => {
                    if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
@@ -161,14 +161,14 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                       key={sub.id}
                       onClick={() => handleMenuClick(sub.id)}
                       className={`
-                        flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all
+                        flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded text-[11px] font-medium transition-all h-full min-w-[60px] text-center
                         ${isSubActive ? 'bg-white text-blue-900 shadow-sm' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
                       `}
                     >
-                      {/* <sub.icon size={14} /> */}
-                      <span>{sub.label}</span>
+                      <sub.icon size={16} />
+                      <span className="leading-tight">{sub.label}</span>
                       {sub.badge !== undefined && sub.badge > 0 && (
-                        <span className={`ml-1 px-1 py-0.5 rounded-full text-[9px] font-bold text-white ${sub.badgeColor || 'bg-red-500'}`}>
+                        <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${sub.badgeColor || 'bg-red-500'} shadow-sm`}>
                           {sub.badge > 99 ? '99+' : sub.badge}
                         </span>
                       )}
@@ -189,15 +189,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
               >
                 <button 
                   className={`
-                    flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                    flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors h-full min-w-[60px] text-center
                     ${isActive ? 'bg-white/20 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
                   `}
                 >
-                  <item.icon size={16} />
-                  <span>{item.label}</span>
+                  <item.icon size={20} />
+                  <span className="leading-tight">{item.label}</span>
                   {/* Badge for group if needed */}
                   {item.subItems?.some(sub => sub.badge && sub.badge > 0) && (
-                     <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500"></span>
                   )}
                 </button>
 
@@ -239,17 +239,17 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
               key={item.id}
               onClick={() => handleMenuClick(item.id)}
               className={`
-                flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors mx-1 relative
+                flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors mx-1 relative h-full min-w-[60px] text-center
                 ${isActive ? 'bg-white/20 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
               `}
             >
-              <item.icon size={16} />
-              <span>{item.label}</span>
+              <item.icon size={20} />
+              <span className="leading-tight">{item.label}</span>
               {item.id === 'reports' && isGeneratingReport && (
-                <Loader2 size={14} className="animate-spin text-amber-400" />
+                <Loader2 size={14} className="animate-spin text-amber-400 absolute top-1 right-1" />
               )}
               {item.badge !== undefined && item.badge > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${item.badgeColor || 'bg-red-500'}`}>
+                <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${item.badgeColor || 'bg-red-500'} shadow-sm`}>
                   {item.badge > 99 ? '99+' : item.badge}
                 </span>
               )}

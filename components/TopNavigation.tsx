@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight } from 'lucide-react';
 import { User, UserRole } from '../types';
 
 interface TopNavigationProps {
@@ -35,8 +35,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'records_group'];
 
   // Define menu structure
   const menuItems = [
@@ -96,132 +96,89 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
     }
   ];
 
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['system_group']));
 
-  const handleMouseEnter = (itemId: string) => {
-    if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
-    setActiveDropdown(itemId);
-  };
-
-  const handleMouseLeave = () => {
-    dropdownTimeoutRef.current = setTimeout(() => {
-      setActiveDropdown(null);
-    }, 200);
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) newSet.delete(groupId);
+      else newSet.add(groupId);
+      return newSet;
+    });
   };
 
   const handleMenuClick = (viewId: string) => {
     setCurrentView(viewId);
-    setActiveDropdown(null);
     setMobileOpen(false);
   };
 
   return (
-    <div className="bg-[#1e3a8a] text-white min-h-[64px] py-1 flex items-center justify-between px-4 shadow-md shrink-0 z-50 relative">
-      {/* LEFT: BRAND */}
-      <div className="flex items-center gap-3 shrink-0">
-        <div className="bg-white/10 p-1.5 rounded-lg">
-          <ShieldCheck size={24} className="text-white" />
-        </div>
-        <div className="flex flex-col leading-tight">
-          <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và</h1>
-          <span className="font-bold text-sm uppercase tracking-wide">quản lý hồ sơ</span>
-          <span className="text-[10px] text-blue-200 font-normal">Chi nhánh Chơn Thành</span>
-        </div>
-      </div>
+    <>
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
 
-      {/* CENTER: NAVIGATION */}
-      <nav className="hidden md:flex items-center gap-1 h-full px-4 overflow-visible">
-        {menuItems.map((item) => {
-          // Check visibility
-          if (isOneDoor && !oneDoorAllowedViews.includes(item.id) && !item.isDropdown) return null;
-          if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id) && !item.isDropdown) return null;
-          if (!item.visible) return null;
+      {/* Sidebar Container */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-[90px] bg-[#1e3a8a] text-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col pt-14 md:pt-0
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:relative md:translate-x-0
+      `}>
+        
+        {/* NAVIGATION */}
+        <nav className="flex-1 overflow-y-auto py-2 px-1 space-y-1 custom-scrollbar">
+          {menuItems.map((item) => {
+            // Check visibility
+            if (isOneDoor && !oneDoorAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
+            if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
+            if (!item.visible) return null;
 
-          // Check if any sub-item is active
-          const isGroupActive = item.subItems?.some(sub => currentView === sub.id) || currentView === item.id;
-          const isActive = currentView === item.id || isGroupActive;
+            // Check if any sub-item is active
+            const isGroupActive = item.subItems?.some(sub => currentView === sub.id) || currentView === item.id;
+            const isActive = currentView === item.id;
 
-          // Render Tab Group
-          if ((item as any).isTabGroup) {
-            return (
-              <div key={item.id} className="flex items-stretch gap-1 mx-2 bg-blue-800/40 rounded-lg p-1 border border-blue-700/50 h-full">
-                <div className="flex flex-col items-center justify-center gap-0.5 px-2 text-blue-200 border-r border-blue-700/50 mr-1 min-w-[60px]">
-                  <item.icon size={16} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-center leading-tight">{item.label}</span>
-                </div>
-                {item.subItems?.map(sub => {
-                   if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
-                   if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
-                   if (!sub.visible) return null;
+            // Render Tab Group (Section Header + Items)
+            if ((item as any).isTabGroup) {
+              // Check if group has visible items for current user
+              const hasVisibleItems = item.subItems?.some(sub => {
+                 if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return false;
+                 if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return false;
+                 return sub.visible;
+              });
+              
+              if (!hasVisibleItems) return null;
 
-                   const isSubActive = currentView === sub.id;
-                   return (
-                    <button
-                      key={sub.id}
-                      onClick={() => handleMenuClick(sub.id)}
-                      className={`
-                        flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded text-[11px] font-medium transition-all h-full min-w-[60px] text-center
-                        ${isSubActive ? 'bg-white text-blue-900 shadow-sm' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
-                      `}
-                    >
-                      <sub.icon size={16} />
-                      <span className="leading-tight">{sub.label}</span>
-                      {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
-                        <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'} shadow-sm`}>
-                          {(sub as any).badge > 99 ? '99+' : (sub as any).badge}
-                        </span>
-                      )}
-                    </button>
-                   );
-                })}
-              </div>
-            );
-          }
-
-          if (item.isDropdown) {
-            return (
-              <div 
-                key={item.id}
-                className="relative h-full flex items-center"
-                onMouseEnter={() => handleMouseEnter(item.id)}
-                onMouseLeave={handleMouseLeave}
-              >
-                <button 
-                  className={`
-                    flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors h-full min-w-[60px] text-center
-                    ${isActive ? 'bg-white/20 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
-                  `}
-                >
-                  <item.icon size={20} />
-                  <span className="leading-tight">{item.label}</span>
-                  {/* Badge for group if needed */}
-                  {item.subItems?.some(sub => (sub as any).badge && (sub as any).badge > 0) && (
-                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500"></span>
-                  )}
-                </button>
-
-                {/* Dropdown Menu */}
-                {activeDropdown === item.id && (
-                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-md shadow-xl border border-gray-200 py-1 text-gray-800 animate-in fade-in slide-in-from-top-2 duration-150">
+              return (
+                <div key={item.id} className="mb-2 pb-2 border-b border-blue-800/50 last:border-0">
+                  <div className="px-1 mb-1 text-[10px] font-bold text-blue-300 uppercase tracking-wider text-center flex flex-col items-center justify-center">
+                    {/* <item.icon size={14} className="mb-0.5 opacity-70" /> */}
+                    <span>{item.label}</span>
+                  </div>
+                  <div className="space-y-1">
                     {item.subItems?.map(sub => {
                        if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
                        if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
                        if (!sub.visible) return null;
-
+    
+                       const isSubActive = currentView === sub.id;
                        return (
                         <button
                           key={sub.id}
                           onClick={() => handleMenuClick(sub.id)}
                           className={`
-                            w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors text-left
-                            ${currentView === sub.id ? 'text-blue-700 font-bold bg-blue-50' : 'text-gray-600'}
+                            w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all relative group
+                            ${isSubActive ? 'bg-white text-blue-900 shadow-md' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
                           `}
+                          title={sub.label}
                         >
-                          <sub.icon size={16} className={currentView === sub.id ? 'text-blue-600' : 'text-gray-400'} />
-                          <span className="flex-1">{sub.label}</span>
+                          <sub.icon size={20} />
+                          <span className="text-[10px] font-medium text-center leading-tight line-clamp-2 w-full">{sub.label}</span>
                           {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'}`}>
+                            <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'} shadow-sm z-10`}>
                               {(sub as any).badge > 99 ? '99+' : (sub as any).badge}
                             </span>
                           )}
@@ -229,62 +186,84 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                        );
                     })}
                   </div>
+                </div>
+              );
+            }
+
+            // Render Dropdown (Collapsible) - For "Hệ thống"
+            if (item.isDropdown) {
+              const isExpanded = expandedGroups.has(item.id);
+              return (
+                <div key={item.id} className="mb-2 pb-2 border-b border-blue-800/50 last:border-0">
+                   <button
+                    onClick={() => toggleGroup(item.id)}
+                    className={`
+                      w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-colors relative
+                      ${isGroupActive ? 'text-white bg-white/10' : 'text-blue-100 hover:bg-white/5 hover:text-white'}
+                    `}
+                  >
+                    <item.icon size={20} />
+                    <span className="text-[10px] font-medium text-center leading-tight">{item.label}</span>
+                    <ChevronDown size={12} className={`transition-transform duration-200 absolute bottom-1 right-1 opacity-50 ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="mt-1 space-y-1 animate-in slide-in-from-top-2 duration-200 bg-black/20 rounded-lg p-1">
+                      {item.subItems?.map(sub => {
+                         if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
+                         if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
+                         if (!sub.visible) return null;
+  
+                         return (
+                          <button
+                            key={sub.id}
+                            onClick={() => handleMenuClick(sub.id)}
+                            className={`
+                              w-full flex flex-col items-center justify-center gap-1 p-1.5 rounded transition-colors
+                              ${currentView === sub.id ? 'text-blue-900 bg-white font-bold shadow-sm' : 'text-blue-200 hover:text-white hover:bg-white/5'}
+                            `}
+                            title={sub.label}
+                          >
+                            <sub.icon size={16} />
+                            {/* <span className="text-[9px] text-center leading-tight">{sub.label}</span> */}
+                            {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
+                              <span className={`absolute top-0 right-0 w-2 h-2 rounded-full ${(sub as any).badgeColor || 'bg-red-500'}`}></span>
+                            )}
+                          </button>
+                         );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Render Standard Item
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleMenuClick(item.id)}
+                className={`
+                  w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-colors relative mb-1
+                  ${isActive ? 'bg-white text-blue-900 shadow-md' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
+                `}
+              >
+                <item.icon size={20} />
+                <span className="text-[10px] font-medium text-center leading-tight line-clamp-2 w-full">{item.label}</span>
+                {item.id === 'reports' && isGeneratingReport && (
+                  <Loader2 size={12} className="animate-spin text-amber-400 absolute top-1 right-1" />
                 )}
-              </div>
+                {(item as any).badge !== undefined && (item as any).badge > 0 && (
+                  <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(item as any).badgeColor || 'bg-red-500'} shadow-sm`}>
+                    {(item as any).badge > 99 ? '99+' : (item as any).badge}
+                  </span>
+                )}
+              </button>
             );
-          }
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleMenuClick(item.id)}
-              className={`
-                flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors mx-1 relative h-full min-w-[60px] text-center
-                ${isActive ? 'bg-white/20 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
-              `}
-            >
-              <item.icon size={20} />
-              <span className="leading-tight">{item.label}</span>
-              {item.id === 'reports' && isGeneratingReport && (
-                <Loader2 size={14} className="animate-spin text-amber-400 absolute top-1 right-1" />
-              )}
-              {(item as any).badge !== undefined && (item as any).badge > 0 && (
-                <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(item as any).badgeColor || 'bg-red-500'} shadow-sm`}>
-                  {(item as any).badge > 99 ? '99+' : (item as any).badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* RIGHT: USER INFO */}
-      <div className="flex items-center gap-4 shrink-0">
-        
-        <div className="h-8 w-[1px] bg-blue-700/50"></div>
-
-        <div className="flex items-center gap-3 group relative cursor-pointer">
-           <div className="w-9 h-9 rounded-full bg-blue-700 flex items-center justify-center text-white ring-2 ring-blue-600/50">
-              <UserCircle size={20} />
-           </div>
-           <div className="hidden md:flex flex-col items-end">
-              <span className="text-sm font-bold leading-none">{currentUser.name}</span>
-              <span className="text-[10px] text-blue-300 uppercase font-semibold tracking-wider mt-0.5">
-                {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
-              </span>
-           </div>
-           
-           {/* Logout Button */}
-           <button 
-             onClick={onLogout}
-             className="ml-2 p-2 text-blue-200 hover:text-red-400 hover:bg-white/10 rounded-full transition-all"
-             title="Đăng xuất"
-           >
-             <LogOut size={18} />
-           </button>
-        </div>
+          })}
+        </nav>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -2,7 +2,14 @@
 const jsonServer = require('json-server');
 const path = require('path');
 const fs = require('fs');
-const express = require('express'); // Sử dụng express tĩnh có sẵn trong json-server
+let express;
+try {
+  express = require('express');
+} catch (error) {
+  console.error("Error: Cannot find module 'express'.");
+  console.error("Please run 'cd server && npm install' to install dependencies.");
+  process.exit(1);
+}
 
 // Lấy đường dẫn DB từ biến môi trường (do Electron truyền vào) hoặc mặc định tại thư mục hiện tại
 // DB_PATH được Electron set vào thư mục AppData của người dùng để có quyền Ghi

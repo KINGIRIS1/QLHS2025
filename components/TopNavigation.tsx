@@ -65,7 +65,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
+        { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },
@@ -167,9 +167,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                     >
                       <sub.icon size={16} />
                       <span className="leading-tight">{sub.label}</span>
-                      {sub.badge !== undefined && sub.badge > 0 && (
-                        <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${sub.badgeColor || 'bg-red-500'} shadow-sm`}>
-                          {sub.badge > 99 ? '99+' : sub.badge}
+                      {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
+                        <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'} shadow-sm`}>
+                          {(sub as any).badge > 99 ? '99+' : (sub as any).badge}
                         </span>
                       )}
                     </button>
@@ -196,7 +196,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                   <item.icon size={20} />
                   <span className="leading-tight">{item.label}</span>
                   {/* Badge for group if needed */}
-                  {item.subItems?.some(sub => sub.badge && sub.badge > 0) && (
+                  {item.subItems?.some(sub => (sub as any).badge && (sub as any).badge > 0) && (
                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500"></span>
                   )}
                 </button>
@@ -220,9 +220,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                         >
                           <sub.icon size={16} className={currentView === sub.id ? 'text-blue-600' : 'text-gray-400'} />
                           <span className="flex-1">{sub.label}</span>
-                          {sub.badge !== undefined && sub.badge > 0 && (
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${sub.badgeColor || 'bg-red-500'}`}>
-                              {sub.badge > 99 ? '99+' : sub.badge}
+                          {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'}`}>
+                              {(sub as any).badge > 99 ? '99+' : (sub as any).badge}
                             </span>
                           )}
                         </button>
@@ -248,9 +248,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
               {item.id === 'reports' && isGeneratingReport && (
                 <Loader2 size={14} className="animate-spin text-amber-400 absolute top-1 right-1" />
               )}
-              {item.badge !== undefined && item.badge > 0 && (
-                <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${item.badgeColor || 'bg-red-500'} shadow-sm`}>
-                  {item.badge > 99 ? '99+' : item.badge}
+              {(item as any).badge !== undefined && (item as any).badge > 0 && (
+                <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(item as any).badgeColor || 'bg-red-500'} shadow-sm`}>
+                  {(item as any).badge > 99 ? '99+' : (item as any).badge}
                 </span>
               )}
             </button>
@@ -260,14 +260,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
 
       {/* RIGHT: USER INFO */}
       <div className="flex items-center gap-4 shrink-0">
-        {/* Notification Bell */}
-        <button className="relative p-2 text-blue-200 hover:text-white transition-colors">
-          <Bell size={20} />
-          {unreadMessagesCount > 0 && (
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#1e3a8a]"></span>
-          )}
-        </button>
-
+        
         <div className="h-8 w-[1px] bg-blue-700/50"></div>
 
         <div className="flex items-center gap-3 group relative cursor-pointer">

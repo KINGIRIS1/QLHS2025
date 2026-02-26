@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler } from 'lucide-react';
 import { User, UserRole } from '../types';
 
 interface TopNavigationProps {
@@ -51,7 +51,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'receive_record', label: 'Hồ sơ', icon: FolderInput, visible: true },
+        { id: 'receive_record', label: 'Hồ sơ', icon: FilePlus, visible: true },
         { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: true },
       ]
     },
@@ -65,7 +65,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true },
+        { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },
@@ -125,7 +125,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
         </div>
         <div className="flex flex-col leading-tight">
           <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và</h1>
-          <span className="font-bold text-sm uppercase tracking-wide">quản lý hồ sơ đo đạc</span>
+          <span className="font-bold text-sm uppercase tracking-wide">quản lý hồ sơ</span>
           <span className="text-[10px] text-blue-200 font-normal">Chi nhánh Chơn Thành</span>
         </div>
       </div>

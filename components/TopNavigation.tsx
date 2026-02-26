@@ -42,26 +42,28 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
     
-    // "Tiếp nhận" dropdown group
+    // "Tiếp nhận" tab group
     {
       id: 'receive_group',
       label: 'Tiếp nhận',
       icon: FolderInput,
       visible: !isTeamLeader && !isEmployee,
-      isDropdown: true,
+      isDropdown: false,
+      isTabGroup: true,
       subItems: [
         { id: 'receive_record', label: 'Hồ sơ', icon: FolderInput, visible: true },
         { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: true },
       ]
     },
 
-    // "Hồ sơ" dropdown group
+    // "Hồ sơ" tab group
     { 
       id: 'records_group', 
       label: 'Hồ sơ', 
       icon: FileText, 
       visible: true,
-      isDropdown: true,
+      isDropdown: false,
+      isTabGroup: true,
       subItems: [
         { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
@@ -139,6 +141,43 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           // Check if any sub-item is active
           const isGroupActive = item.subItems?.some(sub => currentView === sub.id) || currentView === item.id;
           const isActive = currentView === item.id || isGroupActive;
+
+          // Render Tab Group
+          if ((item as any).isTabGroup) {
+            return (
+              <div key={item.id} className="flex items-center gap-1 mx-2 bg-blue-800/40 rounded-lg p-1 border border-blue-700/50">
+                <div className="flex items-center gap-1 px-2 text-blue-200 border-r border-blue-700/50 mr-1">
+                  <item.icon size={14} />
+                  <span className="text-xs font-bold uppercase tracking-wider">{item.label}</span>
+                </div>
+                {item.subItems?.map(sub => {
+                   if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
+                   if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
+                   if (!sub.visible) return null;
+
+                   const isSubActive = currentView === sub.id;
+                   return (
+                    <button
+                      key={sub.id}
+                      onClick={() => handleMenuClick(sub.id)}
+                      className={`
+                        flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all
+                        ${isSubActive ? 'bg-white text-blue-900 shadow-sm' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
+                      `}
+                    >
+                      {/* <sub.icon size={14} /> */}
+                      <span>{sub.label}</span>
+                      {sub.badge !== undefined && sub.badge > 0 && (
+                        <span className={`ml-1 px-1 py-0.5 rounded-full text-[9px] font-bold text-white ${sub.badgeColor || 'bg-red-500'}`}>
+                          {sub.badge > 99 ? '99+' : sub.badge}
+                        </span>
+                      )}
+                    </button>
+                   );
+                })}
+              </div>
+            );
+          }
 
           if (item.isDropdown) {
             return (

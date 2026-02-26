@@ -162,23 +162,27 @@ server.post('/custom/counters', (req: Request, res: Response) => {
 });
 
 // Vite middleware setup
-if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
+const startServer = async () => {
+    if (process.env.NODE_ENV !== 'production') {
+        const vite = await createViteServer({
+            server: { middlewareMode: true },
+            appType: 'spa',
+        });
+        server.use(vite.middlewares);
+    } else {
+        const distPath = path.join(__dirname, 'dist');
+        server.use(express.static(distPath));
+    }
+
+    // Use router AFTER custom routes and Vite middleware (for API fallback)
+    // Ideally, API should be under /api prefix, but current frontend expects root.
+    // json-server router handles requests matching db.json keys.
+    server.use(router);
+
+    const PORT = 3000;
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
-    server.use(vite.middlewares);
-} else {
-    const distPath = path.join(__dirname, 'dist');
-    server.use(express.static(distPath));
-}
+};
 
-// Use router AFTER custom routes and Vite middleware (for API fallback)
-// Ideally, API should be under /api prefix, but current frontend expects root.
-// json-server router handles requests matching db.json keys.
-server.use(router);
-
-const PORT = 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+startServer();

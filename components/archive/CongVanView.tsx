@@ -91,31 +91,54 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            {/* TOOLBAR */}
-            <div className="p-4 border-b border-gray-200 flex flex-wrap gap-4 items-center bg-gray-50">
-                <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                    <button onClick={() => setSubTab('list')} className={`px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 ${subTab === 'list' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                        <ListChecks size={16}/> Danh sách
-                    </button>
-                    <button onClick={() => setSubTab('sign')} className={`px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 ${subTab === 'sign' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                        <Send size={16}/> Trình ký
-                    </button>
-                    <button onClick={() => setSubTab('result')} className={`px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 ${subTab === 'result' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                        <FileCheck size={16}/> Kết quả
-                    </button>
+        <div className="flex flex-col h-full bg-white">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        QUẢN LÝ CÔNG VĂN
+                    </h2>
+                    <div className="relative flex-1 sm:w-64 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input 
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                            placeholder="Tìm công văn..." 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)} 
+                        />
+                    </div>
                 </div>
 
-                <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Tìm công văn..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                </div>
+                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
+                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+                        <button 
+                            onClick={() => setSubTab('list')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'list' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <ListChecks size={16}/> Danh sách
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('sign')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'sign' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <Send size={16}/> Trình ký
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('result')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <FileCheck size={16}/> Kết quả
+                        </button>
+                    </div>
 
-                {subTab === 'list' && (
-                    <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-sm">
-                        <Plus size={16}/> Tạo mới
-                    </button>
-                )}
+                    <div className="ml-auto flex gap-2">
+                        {subTab === 'list' && (
+                            <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm">
+                                <Plus size={16}/> Tạo mới
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* CONTENT */}

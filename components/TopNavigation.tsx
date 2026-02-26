@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight } from 'lucide-react';
-import { User, UserRole } from '../types';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight, User, Shield, Settings2 } from 'lucide-react';
+import { User as UserType, UserRole } from '../types';
 
 interface TopNavigationProps {
   currentView: string;
   setCurrentView: (view: string) => void;
-  currentUser: User;
+  currentUser: UserType;
   onLogout: () => void;
   isGeneratingReport?: boolean;
   onOpenAccountSettings: () => void;
@@ -86,12 +86,12 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       visible: true,
       isDropdown: true,
       subItems: [
-        { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: true },
+        { id: 'account_settings', label: 'Cá nhân', icon: User, visible: true },
         // Chat nội bộ hidden
         { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
-        ...(isAdmin ? [{ id: 'user_management', label: 'Quản lý tài khoản', icon: Users, visible: true }] : []),
-        { id: 'employee_management', label: 'Quản lý nhân sự', icon: UserCog, visible: true },
-        ...(isAdmin ? [{ id: 'system_settings', label: 'Cấu hình hệ thống', icon: ShieldAlert, visible: true }] : []),
+        ...(isAdmin ? [{ id: 'user_management', label: 'TK Hệ thống', icon: Shield, visible: true }] : []),
+        { id: 'employee_management', label: 'DS Nhân sự', icon: Users, visible: true },
+        ...(isAdmin ? [{ id: 'system_settings', label: 'Cấu hình', icon: Settings2, visible: true }] : []),
       ]
     }
   ];
@@ -153,12 +153,11 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
               if (!hasVisibleItems) return null;
 
               return (
-                <div key={item.id} className="mb-2 pb-2 border-b border-blue-800/50 last:border-0">
-                  <div className="px-1 mb-1 text-[10px] font-bold text-blue-300 uppercase tracking-wider text-center flex flex-col items-center justify-center">
-                    {/* <item.icon size={14} className="mb-0.5 opacity-70" /> */}
+                <div key={item.id} className="mb-3 pb-3 border-b border-blue-500/30 last:border-0">
+                  <div className="px-1 mb-2 text-[11px] font-extrabold text-blue-200 uppercase tracking-wider text-center flex flex-col items-center justify-center shadow-sm">
                     <span>{item.label}</span>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {item.subItems?.map(sub => {
                        if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
                        if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
@@ -170,15 +169,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                           key={sub.id}
                           onClick={() => handleMenuClick(sub.id)}
                           className={`
-                            w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all relative group
-                            ${isSubActive ? 'bg-white text-blue-900 shadow-md' : 'text-blue-100 hover:bg-white/10 hover:text-white'}
+                            w-full flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl transition-all relative group
+                            ${isSubActive ? 'bg-white text-blue-900 shadow-lg ring-1 ring-blue-900/10 scale-105 z-10' : 'text-blue-100 hover:bg-white/10 hover:text-white hover:scale-105'}
                           `}
                           title={sub.label}
                         >
-                          <sub.icon size={20} />
-                          <span className="text-[10px] font-medium text-center leading-tight line-clamp-2 w-full">{sub.label}</span>
+                          <sub.icon size={22} strokeWidth={isSubActive ? 2.5 : 2} />
+                          <span className={`text-[10px] text-center leading-tight line-clamp-2 w-full ${isSubActive ? 'font-bold' : 'font-medium'}`}>{sub.label}</span>
                           {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
-                            <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'} shadow-sm z-10`}>
+                            <span className={`absolute top-0 right-0 -mt-1 -mr-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(sub as any).badgeColor || 'bg-red-500'} shadow-sm z-20 border border-[#1e3a8a]`}>
                               {(sub as any).badge > 99 ? '99+' : (sub as any).badge}
                             </span>
                           )}
@@ -194,21 +193,21 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             if (item.isDropdown) {
               const isExpanded = expandedGroups.has(item.id);
               return (
-                <div key={item.id} className="mb-2 pb-2 border-b border-blue-800/50 last:border-0">
+                <div key={item.id} className="mb-3 pb-3 border-b border-blue-500/30 last:border-0">
                    <button
                     onClick={() => toggleGroup(item.id)}
                     className={`
-                      w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-colors relative
-                      ${isGroupActive ? 'text-white bg-white/10' : 'text-blue-100 hover:bg-white/5 hover:text-white'}
+                      w-full flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors relative
+                      ${isGroupActive ? 'text-white bg-white/10 shadow-inner' : 'text-blue-100 hover:bg-white/5 hover:text-white'}
                     `}
                   >
-                    <item.icon size={20} />
-                    <span className="text-[10px] font-medium text-center leading-tight">{item.label}</span>
-                    <ChevronDown size={12} className={`transition-transform duration-200 absolute bottom-1 right-1 opacity-50 ${isExpanded ? 'rotate-180' : ''}`} />
+                    <item.icon size={22} />
+                    <span className="text-[11px] font-extrabold text-center leading-tight uppercase tracking-wide">{item.label}</span>
+                    <ChevronDown size={14} className={`transition-transform duration-200 absolute bottom-1 right-1 opacity-70 ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
                   
                   {isExpanded && (
-                    <div className="mt-1 space-y-1 animate-in slide-in-from-top-2 duration-200 bg-black/20 rounded-lg p-1">
+                    <div className="mt-2 space-y-2 animate-in slide-in-from-top-2 duration-200 bg-black/20 rounded-xl p-1.5 shadow-inner">
                       {item.subItems?.map(sub => {
                          if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
                          if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
@@ -219,15 +218,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                             key={sub.id}
                             onClick={() => handleMenuClick(sub.id)}
                             className={`
-                              w-full flex flex-col items-center justify-center gap-1 p-1.5 rounded transition-colors
-                              ${currentView === sub.id ? 'text-blue-900 bg-white font-bold shadow-sm' : 'text-blue-200 hover:text-white hover:bg-white/5'}
+                              w-full flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg transition-all
+                              ${currentView === sub.id ? 'text-blue-900 bg-white font-bold shadow-md scale-105' : 'text-blue-200 hover:text-white hover:bg-white/10'}
                             `}
                             title={sub.label}
                           >
-                            <sub.icon size={16} />
-                            {/* <span className="text-[9px] text-center leading-tight">{sub.label}</span> */}
+                            <sub.icon size={18} strokeWidth={currentView === sub.id ? 2.5 : 2} />
+                            <span className="text-[10px] text-center leading-tight">{sub.label}</span>
                             {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
-                              <span className={`absolute top-0 right-0 w-2 h-2 rounded-full ${(sub as any).badgeColor || 'bg-red-500'}`}></span>
+                              <span className={`absolute top-0 right-0 w-2 h-2 rounded-full ${(sub as any).badgeColor || 'bg-red-500'} ring-1 ring-white`}></span>
                             )}
                           </button>
                          );
@@ -239,6 +238,30 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             }
 
             // Render Standard Item
+            if (item.id === 'dashboard') {
+               return (
+                 <div key={item.id} className="mb-4 pb-4 border-b-2 border-blue-400/20 mx-1">
+                   <button
+                     onClick={() => handleMenuClick(item.id)}
+                     className={`
+                       w-full flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl transition-all relative duration-300 group
+                       ${isActive 
+                         ? 'bg-white text-blue-900 shadow-[0_0_15px_rgba(255,255,255,0.3)] scale-105 font-extrabold z-20 ring-2 ring-blue-400' 
+                         : 'bg-blue-800/30 text-blue-100 hover:bg-blue-700 hover:text-white hover:scale-105 hover:shadow-lg border border-blue-700/30'}
+                     `}
+                   >
+                     <item.icon size={28} strokeWidth={isActive ? 2.5 : 1.5} className={isActive ? "drop-shadow-sm" : "group-hover:drop-shadow-md"} />
+                     <span className="text-[11px] uppercase tracking-widest text-center leading-tight">{item.label}</span>
+                     {(item as any).badge !== undefined && (item as any).badge > 0 && (
+                       <span className={`absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${(item as any).badgeColor || 'bg-red-500'} shadow-sm border border-white`}>
+                         {(item as any).badge > 99 ? '99+' : (item as any).badge}
+                       </span>
+                     )}
+                   </button>
+                 </div>
+               );
+            }
+
             return (
               <button
                 key={item.id}

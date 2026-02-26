@@ -463,83 +463,87 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="flex flex-col h-full bg-white">
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-bold text-gray-800 uppercase">Sổ Vào Số</h2>
-                    <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
-                        <button 
-                            onClick={() => setActiveTab('all')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                        >
-                            Danh sách
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('pending')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                        >
-                            Chờ chuyển Scan/1 Cửa
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('scanned')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                        >
-                            Đã chuyển Scan/1 Cửa
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        SỔ VÀO SỐ
+                    </h2>
+                    <div className="relative flex-1 sm:w-64 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 
-                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" 
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" 
                             placeholder="Tìm kiếm..." 
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
                     </div>
-                    
-                    {activeTab === 'all' && (
-                        <>
-                            <button 
-                                onClick={() => setShowSettingsModal(true)} 
-                                className="flex items-center gap-2 bg-gray-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-gray-700 shadow-sm"
-                                title="Cài đặt số vào sổ"
-                            >
-                                <Settings size={16}/>
-                            </button>
-                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
-                            <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 shadow-sm">
-                                <Upload size={16}/> Import Excel
-                            </button>
-                            <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-teal-700 shadow-sm">
-                                <Plus size={16}/> Thêm mới
-                            </button>
-                            {selectedIds.size > 0 && (
-                                <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
-                                    <Send size={16}/> Chuyển Scan ({selectedIds.size})
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
+                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+                        <button 
+                            onClick={() => setActiveTab('all')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Danh sách
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('pending')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Chờ chuyển Scan/1 Cửa
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('scanned')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Đã chuyển Scan/1 Cửa
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-auto">
+                        {activeTab === 'all' && (
+                            <>
+                                <button 
+                                    onClick={() => setShowSettingsModal(true)} 
+                                    className="flex items-center gap-2 bg-gray-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-gray-700 shadow-sm"
+                                    title="Cài đặt số vào sổ"
+                                >
+                                    <Settings size={16}/>
                                 </button>
-                            )}
-                        </>
-                    )}
+                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
+                                <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
+                                    <Upload size={16}/> Import Excel
+                                </button>
+                                <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm">
+                                    <Plus size={16}/> Thêm mới
+                                </button>
+                                {selectedIds.size > 0 && (
+                                    <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
+                                        <Send size={16}/> Chuyển Scan ({selectedIds.size})
+                                    </button>
+                                )}
+                            </>
+                        )}
 
-                    {activeTab === 'pending' && selectedIds.size > 0 && (
-                        <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
-                            <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
+                        {activeTab === 'pending' && selectedIds.size > 0 && (
+                            <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
+                                <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
+                            </button>
+                        )}
+
+                        {activeTab === 'scanned' && (
+                            <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-purple-700 shadow-sm">
+                                <FileOutput size={16}/> Xuất danh sách
+                            </button>
+                        )}
+
+                        <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
+                            <FileSpreadsheet size={16}/> Xuất Excel
                         </button>
-                    )}
-
-                    {activeTab === 'scanned' && (
-                        <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-purple-700 shadow-sm">
-                            <FileOutput size={16}/> Xuất danh sách
-                        </button>
-                    )}
-
-                    <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm">
-                        <FileSpreadsheet size={16}/> Xuất Excel
-                    </button>
+                    </div>
                 </div>
             </div>
 

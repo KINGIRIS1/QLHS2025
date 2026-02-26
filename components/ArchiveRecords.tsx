@@ -15,33 +15,31 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) =
     const [activeTab, setActiveTab] = useState<'saoluc' | 'vaoso' | 'congvan'>('vaoso');
 
     return (
-        <div className="flex flex-col h-full bg-[#f1f5f9] animate-fade-in">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
             {/* MAIN HEADER TABS */}
-            <div className="bg-white border-b border-gray-200 px-4 pt-2 shadow-sm shrink-0 z-20">
-                <div className="flex items-end gap-1">
-                    <button 
-                        onClick={() => setActiveTab('vaoso')}
-                        className={`px-6 py-3 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'vaoso' ? 'bg-teal-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <BookOpen size={18}/> Vào Số GCN
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('saoluc')}
-                        className={`px-6 py-3 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'saoluc' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <Copy size={18}/> Sao Lục
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('congvan')}
-                        className={`px-6 py-3 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'congvan' ? 'bg-orange-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <FileText size={18}/> Công Văn
-                    </button>
-                </div>
+            <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
+                <button 
+                    onClick={() => setActiveTab('vaoso')}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'vaoso' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <BookOpen size={16}/> Vào Số GCN
+                </button>
+                <button 
+                    onClick={() => setActiveTab('saoluc')}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'saoluc' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Copy size={16}/> Sao Lục
+                </button>
+                <button 
+                    onClick={() => setActiveTab('congvan')}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'congvan' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <FileText size={16}/> Công Văn
+                </button>
             </div>
 
             {/* CONTENT AREA */}
-            <div className="flex-1 overflow-hidden p-4">
+            <div className="flex-1 overflow-hidden flex flex-col">
                 {activeTab === 'saoluc' && <SaoLucView currentUser={currentUser} />}
                 {activeTab === 'vaoso' && <VaoSoView currentUser={currentUser} wards={wards} />}
                 {activeTab === 'congvan' && <CongVanView currentUser={currentUser} />}

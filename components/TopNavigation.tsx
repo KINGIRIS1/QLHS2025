@@ -42,19 +42,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
     
-    // "Hồ sơ" dropdown group
-    { 
-      id: 'records_group', 
-      label: 'Hồ sơ', 
-      icon: FileText, 
-      visible: true,
-      isDropdown: true,
-      subItems: [
-        { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
-        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
-      ]
-    },
-
     // "Tiếp nhận" dropdown group
     {
       id: 'receive_group',
@@ -65,6 +52,19 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       subItems: [
         { id: 'receive_record', label: 'Hồ sơ', icon: FolderInput, visible: true },
         { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: true },
+      ]
+    },
+
+    // "Hồ sơ" dropdown group
+    { 
+      id: 'records_group', 
+      label: 'Hồ sơ', 
+      icon: FileText, 
+      visible: true,
+      isDropdown: true,
+      subItems: [
+        { id: 'all_records', label: 'Đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
+        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },
 

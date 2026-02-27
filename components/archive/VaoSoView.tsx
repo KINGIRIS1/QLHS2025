@@ -16,8 +16,8 @@ const COLUMNS = [
     
     // Nhóm kết quả (Always editable or specific logic)
     { key: 'loai_gcn', label: 'Loại GCN', width: '120px' },
-    { key: 'so_vao_so', label: 'Số vào sổ', width: '70px' },
-    { key: 'so_phat_hanh', label: 'Số phát hành', width: '100px' },
+    { key: 'so_vao_so', label: 'Số vào sổ', width: '60px' },
+    { key: 'so_phat_hanh', label: 'Số phát hành', width: '90px' },
     { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '120px', type: 'date' },
     { key: 'ngay_ky_phieu_tk', label: 'Chuyển Scan/1 Cửa', width: '120px', type: 'date' },
     { key: 'ghi_chu', label: 'GHI CHÚ', width: '200px' }
@@ -687,7 +687,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                             <option value="GCN trang 4">GCN trang 4</option>
                                                         </select>
                                                     ) : col.key === 'so_phat_hanh' ? (
-                                                        <div className="flex flex-col p-1 gap-1 min-w-[140px]">
+                                                        <div className="flex flex-col p-1 gap-1 min-w-[100px]">
                                                             {(r.data?.[col.key] || '').split('\n').map((val: string, idx: number, arr: string[]) => (
                                                                 <div key={idx} className="flex items-center gap-1 group/input">
                                                                     <input 

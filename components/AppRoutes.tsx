@@ -10,8 +10,6 @@ import InternalChat from './InternalChat';
 import PersonalProfile from './PersonalProfile';
 import ReceiveRecord from './ReceiveRecord';
 import ReceiveContract from './ReceiveContract';
-import UserManagement from './UserManagement';
-import EmployeeManagement from './EmployeeManagement';
 import ExcerptManagement from './ExcerptManagement';
 import UtilitiesView from './UtilitiesView';
 import AccountSettingsView from './AccountSettingsView';
@@ -19,7 +17,7 @@ import ReportSection from './ReportSection';
 import RecordRow from './RecordRow';
 import WorkScheduleView from './WorkScheduleView';
 import ArchiveRecords from './ArchiveRecords';
-import SystemSettingsView from './SystemSettingsView';
+import SystemView from './SystemView';
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send } from 'lucide-react';
@@ -459,27 +457,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onClearRecordToLiquidate={() => props.setRecordToLiquidate(null)}
                 />
             );
-        case 'user_management':
-            if (!isAdmin) return null;
-            return (
-                <UserManagement
-                    users={users}
-                    employees={employees}
-                    onAddUser={(u) => props.handleUpdateUser(u, false)}
-                    onUpdateUser={(u) => props.handleUpdateUser(u, true)}
-                    onDeleteUser={props.handleDeleteUser}
-                />
-            );
-        case 'employee_management':
-            return (
-                <EmployeeManagement
-                    employees={employees}
-                    onSaveEmployee={props.handleSaveEmployee}
-                    onDeleteEmployee={props.handleDeleteEmployee}
-                    wards={wards}
-                    currentUser={currentUser}
-                />
-            );
+
+
         case 'excerpt_management':
             return (
                 <ExcerptManagement
@@ -513,10 +492,18 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     setNotificationEnabled={props.setNotificationEnabled}
                 />
             );
-        case 'system_settings':
-            if (!isAdmin) return null;
+        case 'system_dashboard':
             return (
-                <SystemSettingsView
+                <SystemView
+                    currentUser={currentUser}
+                    users={users}
+                    employees={employees}
+                    onAddUser={(u) => props.handleUpdateUser(u, false)}
+                    onUpdateUser={(u) => props.handleUpdateUser(u, true)}
+                    onDeleteUser={props.handleDeleteUser}
+                    onSaveEmployee={props.handleSaveEmployee}
+                    onDeleteEmployee={props.handleDeleteEmployee}
+                    wards={wards}
                     onDeleteAllData={props.handleDeleteAllData}
                     onHolidaysChanged={props.onRefreshData}
                 />

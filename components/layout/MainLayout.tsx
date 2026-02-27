@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut } from 'lucide-react';
+import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown } from 'lucide-react';
 import { User, UserRole } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 
@@ -61,6 +61,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     onUpdateNow = () => {},
     onUpdateLater = () => {}
 }) => {
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
     if (!currentUser) return <>{children}</>;
 
     return (
@@ -91,27 +93,65 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 </div>
 
                 {/* RIGHT: USER INFO */}
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3 group relative cursor-pointer">
-                        <div className="w-9 h-9 rounded-full bg-blue-700 flex items-center justify-center text-white ring-2 ring-blue-600/50">
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                        className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
+                    >
+                        <div className="w-9 h-9 rounded-full bg-blue-700 flex items-center justify-center text-white ring-2 ring-blue-600/50 shadow-sm">
                             <UserCircle size={20} />
                         </div>
-                        <div className="hidden md:flex flex-col items-end">
+                        <div className="hidden md:flex flex-col items-end text-right mr-1">
                             <span className="text-sm font-bold leading-none">{currentUser.name}</span>
                             <span className="text-[10px] text-blue-300 uppercase font-semibold tracking-wider mt-0.5">
                                 {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
                             </span>
                         </div>
-                        
-                        {/* Logout Button */}
-                        <button 
-                            onClick={onLogout}
-                            className="ml-2 p-2 text-blue-200 hover:text-red-400 hover:bg-white/10 rounded-full transition-all"
-                            title="Đăng xuất"
-                        >
-                            <LogOut size={18} />
-                        </button>
-                    </div>
+                        <ChevronDown size={16} className={`text-blue-300 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {isUserMenuOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                                    <p className="text-sm font-bold text-gray-800 truncate">{currentUser.name}</p>
+                                    <p className="text-xs text-gray-500 truncate mt-0.5">@{currentUser.username}</p>
+                                    <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block border border-blue-100">
+                                        {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
+                                    </div>
+                                </div>
+                                <div className="p-2 space-y-1">
+                                    <button 
+                                        onClick={() => {
+                                            setCurrentView('account_settings');
+                                            setIsUserMenuOpen(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                    >
+                                        <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
+                                            <UserCog size={16} />
+                                        </div>
+                                        Cài đặt tài khoản
+                                    </button>
+                                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                                    <button 
+                                        onClick={() => {
+                                            onLogout();
+                                            setIsUserMenuOpen(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-3 transition-colors group"
+                                    >
+                                        <div className="bg-red-50 p-1.5 rounded-md group-hover:bg-red-100 transition-colors text-red-500 group-hover:text-red-600">
+                                            <LogOut size={16} />
+                                        </div>
+                                        Đăng xuất
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </header>
 

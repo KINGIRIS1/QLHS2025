@@ -70,30 +70,37 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       ]
     },
 
-    // Top level items moved from groups
-    { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
-    { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
-    { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true },
-    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
-
-    { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: !isOneDoor },
-
-    // "Hệ thống" dropdown group (Settings)
+    // "Quản lý" tab group
     {
-      id: 'system_group',
-      label: 'Hệ thống',
-      icon: Settings,
+      id: 'management_group',
+      label: 'Quản lý',
+      icon: Briefcase,
       visible: true,
-      isDropdown: true,
+      isDropdown: false,
+      isTabGroup: true,
       subItems: [
-        { id: 'account_settings', label: 'Cá nhân', icon: User, visible: true },
-        // Chat nội bộ hidden
-        { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
-        ...(isAdmin ? [{ id: 'user_management', label: 'TK Hệ thống', icon: Shield, visible: true }] : []),
-        { id: 'employee_management', label: 'DS Nhân sự', icon: Users, visible: true },
-        ...(isAdmin ? [{ id: 'system_settings', label: 'Cấu hình', icon: Settings2, visible: true }] : []),
+        { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
+        { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: true },
       ]
-    }
+    },
+
+    // "Công cụ" tab group
+    {
+      id: 'tools_group',
+      label: 'Công cụ',
+      icon: PenTool,
+      visible: true,
+      isDropdown: false,
+      isTabGroup: true,
+      subItems: [
+        { id: 'excerpt_management', label: 'Số trích lục', icon: BookOpen, visible: !isOneDoor },
+        { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
+        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: !isOneDoor },
+      ]
+    },
+
+    // "Hệ thống" single item
+    { id: 'system_dashboard', label: 'Hệ thống', icon: Settings, visible: true }
   ];
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['system_group']));

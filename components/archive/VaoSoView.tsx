@@ -8,24 +8,19 @@ import { confirmAction } from '../../utils/appHelpers';
 // Định nghĩa các cột
 const COLUMNS = [
     // Nhóm thông tin hồ sơ (Read-only by default)
-    { key: 'ma_ho_so', label: 'Mã hồ sơ giao dịch', width: '150px', readOnly: true },
-    { key: 'ten_chuyen_quyen', label: 'TÊN CHỦ SỬ DỤNG CHUYỂN QUYỀN', width: '250px', readOnly: true },
-    { key: 'ten_chu_su_dung', label: 'TÊN CHỦ SỬ DỤNG', width: '250px', readOnly: true },
-    { key: 'loai_bien_dong', label: 'Loại biến động', width: '200px', readOnly: true },
-    { key: 'ngay_nhan', label: 'Ngày nhận hồ sơ', width: '140px', type: 'date', readOnly: true },
-    { key: 'so_to', label: 'Số tờ', width: '80px', readOnly: true },
-    { key: 'so_thua', label: 'Số thửa', width: '80px', readOnly: true },
-    { key: 'tong_dien_tich', label: 'Tổng diện tích', width: '120px', readOnly: true },
-    { key: 'dien_tich_tho_cu', label: 'Diện tích thổ cư', width: '120px', readOnly: true },
+    { key: 'ma_ho_so', label: 'Mã hồ sơ', width: '120px', readOnly: true },
+    { key: 'group_chu_su_dung', label: 'Thông tin chủ sử dụng', width: '250px', readOnly: true },
+    { key: 'group_thong_tin_ho_so', label: 'Thông tin hồ sơ', width: '200px', readOnly: true },
+    { key: 'group_thua_dat', label: 'Thông tin thửa đất', width: '180px', readOnly: true },
     { key: 'dia_danh', label: 'Địa danh', width: '150px', readOnly: true },
     
     // Nhóm kết quả (Always editable or specific logic)
-    { key: 'loai_gcn', label: 'Loại GCN', width: '150px' },
-    { key: 'so_vao_so', label: 'Số vào sổ', width: '160px' },
-    { key: 'so_phat_hanh', label: 'Số phát hành', width: '150px' },
-    { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '140px', type: 'date' },
-    { key: 'ngay_ky_phieu_tk', label: 'Ngày ký phiếu TK/Chuyển Scan', width: '140px', type: 'date' },
-    { key: 'ghi_chu', label: 'GHI CHÚ', width: '250px' }
+    { key: 'loai_gcn', label: 'Loại GCN', width: '120px' },
+    { key: 'so_vao_so', label: 'Số vào sổ', width: '85px' },
+    { key: 'so_phat_hanh', label: 'Số phát hành', width: '140px' },
+    { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '120px', type: 'date' },
+    { key: 'ngay_ky_phieu_tk', label: 'Chuyển Scan/1 Cửa', width: '120px', type: 'date' },
+    { key: 'ghi_chu', label: 'GHI CHÚ', width: '200px' }
 ];
 
 interface VaoSoViewProps {
@@ -55,7 +50,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
-    const [currentBookNumber, setCurrentBookNumber] = useState<number>(0);
+    const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
 
     useEffect(() => {
         loadData();
@@ -88,12 +83,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         // If local storage has a higher number, use it
         const stored = localStorage.getItem('vaoso_current_book_number');
         if (stored) {
-            const storedNum = parseInt(stored);
-            if (!isNaN(storedNum) && storedNum > maxNum) {
-                maxNum = storedNum;
-            }
+            setCurrentBookNumber(stored);
+        } else {
+            setCurrentBookNumber(maxNum.toString().padStart(6, '0'));
         }
-        setCurrentBookNumber(maxNum);
         
         setLoading(false);
     };
@@ -205,9 +198,20 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }
     };
 
+    const incrementString = (str: string): string => {
+        const num = parseInt(str);
+        if (isNaN(num)) return str;
+        const nextNum = num + 1;
+        // Preserve length if original had leading zeros
+        if (str.length > nextNum.toString().length) {
+            return nextNum.toString().padStart(str.length, '0');
+        }
+        return nextNum.toString();
+    };
+
     const handleGetBookNumber = async (record: ArchiveRecord) => {
-        const nextNum = currentBookNumber + 1;
-        const formattedNum = `CN ${nextNum.toString().padStart(6, '0')}`;
+        const nextNumStr = incrementString(currentBookNumber);
+        const formattedNum = `CN ${nextNumStr}`;
         
         const updatedRecord = {
             ...record,
@@ -216,8 +220,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         
         // Optimistic update
         setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-        setCurrentBookNumber(nextNum);
-        localStorage.setItem('vaoso_current_book_number', nextNum.toString());
+        setCurrentBookNumber(nextNumStr);
+        localStorage.setItem('vaoso_current_book_number', nextNumStr);
 
         setSavingId(record.id);
         await saveArchiveRecord(updatedRecord);
@@ -591,6 +595,46 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             const isEditing = editingId === r.id;
                                             const isReadOnly = col.readOnly && !isEditing;
 
+                                            if (col.key === 'group_chu_su_dung') {
+                                                return (
+                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="text-xs text-gray-500">Chuyển quyền:</div>
+                                                            <div className="text-sm font-medium text-gray-800 mb-2 whitespace-pre-wrap">{r.data?.ten_chuyen_quyen}</div>
+                                                            <div className="text-xs text-teal-600 font-bold border-t border-gray-100 pt-1">Chủ sử dụng:</div>
+                                                            <div className="text-sm font-bold text-teal-800 whitespace-pre-wrap">{r.data?.ten_chu_su_dung}</div>
+                                                        </div>
+                                                    </td>
+                                                );
+                                            }
+                                            if (col.key === 'group_thong_tin_ho_so') {
+                                                return (
+                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                        <div className="text-sm font-medium text-blue-700 mb-1 whitespace-pre-wrap">{r.data?.loai_bien_dong}</div>
+                                                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-2">
+                                                            <Calendar size={12} />
+                                                            {r.data?.ngay_nhan ? new Date(r.data.ngay_nhan).toLocaleDateString('vi-VN') : ''}
+                                                        </div>
+                                                    </td>
+                                                );
+                                            }
+                                            if (col.key === 'group_thua_dat') {
+                                                return (
+                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Tờ: <b>{r.data?.so_to}</b></span>
+                                                            <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Thửa: <b>{r.data?.so_thua}</b></span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-600 mb-1">
+                                                            DT: <b>{r.data?.tong_dien_tich}</b>
+                                                        </div>
+                                                        <div className="text-xs text-gray-600">
+                                                            Đất ở: <b>{r.data?.dien_tich_tho_cu}</b>
+                                                        </div>
+                                                    </td>
+                                                );
+                                            }
+
                                             return (
                                                 <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
                                                     {isReadOnly ? (
@@ -640,6 +684,50 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                             <option value="GCN mới">GCN mới</option>
                                                             <option value="GCN trang 4">GCN trang 4</option>
                                                         </select>
+                                                    ) : col.key === 'so_phat_hanh' ? (
+                                                        <div className="flex flex-col p-1 gap-1 min-w-[140px]">
+                                                            {(r.data?.[col.key] || '').split('\n').map((val: string, idx: number, arr: string[]) => (
+                                                                <div key={idx} className="flex items-center gap-1 group/input">
+                                                                    <input 
+                                                                        type="text"
+                                                                        className="flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-b border-gray-200 focus:border-teal-500 outline-none"
+                                                                        value={val}
+                                                                        onChange={(e) => {
+                                                                            const newArr = [...arr];
+                                                                            newArr[idx] = e.target.value;
+                                                                            handleCellChange(r.id, col.key, newArr.join('\n'));
+                                                                        }}
+                                                                        onBlur={() => handleBlur(r)}
+                                                                        placeholder="Số phát hành..."
+                                                                    />
+                                                                    {arr.length > 1 && (
+                                                                        <button 
+                                                                            onClick={() => {
+                                                                                const newArr = arr.filter((_, i) => i !== idx);
+                                                                                const newVal = newArr.join('\n');
+                                                                                handleCellChange(r.id, col.key, newVal);
+                                                                                handleBlur({ ...r, data: { ...r.data, [col.key]: newVal } });
+                                                                            }}
+                                                                            className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover/input:opacity-100 transition-opacity"
+                                                                            tabIndex={-1}
+                                                                            title="Xóa dòng này"
+                                                                        >
+                                                                            <X size={12} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const current = r.data?.[col.key] || '';
+                                                                    const newVal = current === '' ? '\n' : current + '\n';
+                                                                    handleCellChange(r.id, col.key, newVal);
+                                                                }}
+                                                                className="flex items-center justify-center gap-1 text-[10px] bg-blue-50 text-blue-600 py-1.5 rounded hover:bg-blue-100 mt-1 font-bold transition-colors w-full"
+                                                            >
+                                                                <Plus size={12} /> Thêm số
+                                                            </button>
+                                                        </div>
                                                     ) : (
                                                         <input 
                                                             type={col.type || 'text'}
@@ -760,20 +848,20 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         <div className="p-6">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Số vào sổ hiện tại (phần số)</label>
                             <input 
-                                type="number" 
+                                type="text" 
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                                 value={currentBookNumber}
-                                onChange={(e) => setCurrentBookNumber(parseInt(e.target.value) || 0)}
+                                onChange={(e) => setCurrentBookNumber(e.target.value)}
                             />
                             <p className="text-xs text-gray-500 mt-2">
                                 Hệ thống sẽ tự động tăng số này và thêm tiền tố "CN".<br/>
-                                Ví dụ: Nếu nhập <strong>{currentBookNumber}</strong>, số tiếp theo sẽ là <strong>CN {(currentBookNumber + 1).toString().padStart(6, '0')}</strong>.
+                                Ví dụ: Nếu nhập <strong>{currentBookNumber}</strong>, số tiếp theo sẽ là <strong>CN {incrementString(currentBookNumber)}</strong>.
                             </p>
                         </div>
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
                             <button 
                                 onClick={() => {
-                                    localStorage.setItem('vaoso_current_book_number', currentBookNumber.toString());
+                                    localStorage.setItem('vaoso_current_book_number', currentBookNumber);
                                     setShowSettingsModal(false);
                                 }} 
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm"

@@ -2,7 +2,9 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase } from 'lucide-react';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
+import { STATUS_LABELS } from '../../constants';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -123,6 +125,56 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         setIsGenerating(false);
     };
 
+    const handleExportEmployeeRecords = () => {
+        if (!selectedEmpId) return;
+        
+        const emp = employees.find(e => e.id === selectedEmpId);
+        const empName = emp ? emp.name : "NhanVien";
+        
+        const targetRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId);
+        
+        if (targetRecords.length === 0) {
+            alert("Không có hồ sơ nào trong khoảng thời gian này.");
+            return;
+        }
+
+        const dataToExport = targetRecords.map((r, idx) => ({
+            'STT': idx + 1,
+            'Mã hồ sơ': r.code,
+            'Tên khách hàng': r.customerName,
+            'Địa chỉ': r.address,
+            'Xã/Phường': r.ward,
+            'Ngày nhận': r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '',
+            'Hẹn trả': r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
+            'Ngày xong': r.completedDate ? new Date(r.completedDate).toLocaleDateString('vi-VN') : '',
+            'Trạng thái': STATUS_LABELS[r.status] || r.status,
+            'Ghi chú': r.notes || r.content
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        
+        // Auto-width columns
+        const wscols = [
+            { wch: 5 }, // STT
+            { wch: 15 }, // Ma HS
+            { wch: 25 }, // Ten KH
+            { wch: 30 }, // Dia chi
+            { wch: 15 }, // Xa
+            { wch: 12 }, // Ngay nhan
+            { wch: 12 }, // Hen tra
+            { wch: 12 }, // Ngay xong
+            { wch: 15 }, // Trang thai
+            { wch: 30 }  // Ghi chu
+        ];
+        ws['!cols'] = wscols;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "DanhSachHoSo");
+        
+        const fileName = `DS_HoSo_${empName}_${fromDate}_${toDate}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    };
+
     return (
         <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
@@ -138,8 +190,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     </div>
                 </div>
                 
-                <div className="flex-1 w-full">
-                    <div className="relative">
+                <div className="flex-1 w-full flex gap-2">
+                    <div className="relative flex-1">
                         <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <select 
                             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300"
@@ -152,6 +204,15 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             ))}
                         </select>
                     </div>
+                    {selectedEmpId && (
+                        <button 
+                            onClick={handleExportEmployeeRecords}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm flex items-center gap-2 whitespace-nowrap"
+                            title="Xuất danh sách hồ sơ của nhân viên này"
+                        >
+                            <FileSpreadsheet size={18} /> Xuất DS
+                        </button>
+                    )}
                 </div>
             </div>
 

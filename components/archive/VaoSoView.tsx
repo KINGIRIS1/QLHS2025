@@ -16,8 +16,8 @@ const COLUMNS = [
     
     // Nhóm kết quả (Always editable or specific logic)
     { key: 'loai_gcn', label: 'Loại GCN', width: '120px' },
-    { key: 'so_vao_so', label: 'Số vào sổ', width: '50px' },
-    { key: 'so_phat_hanh', label: 'Số phát hành', width: '80px' },
+    { key: 'so_vao_so', label: 'Số vào sổ', width: '120px' }, // Thay vì 50px
+    { key: 'so_phat_hanh', label: 'Số phát hành', width: '130px' }, // Thay vì 80px
     { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '120px', type: 'date' },
     { key: 'ngay_ky_phieu_tk', label: 'Chuyển Scan/1 Cửa', width: '120px', type: 'date' },
     { key: 'ghi_chu', label: 'GHI CHÚ', width: '200px' }
@@ -560,7 +560,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 ) : (
                     <>
                     <div className="inline-block min-w-full align-middle flex-1 overflow-auto">
-                        <table className="min-w-full border-collapse">
+                        <table className="min-w-full table-fixed border-collapse">
                             <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="p-2 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
@@ -568,7 +568,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     </th>
                                     <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-100 sticky left-10 z-20">#</th>
                                     {COLUMNS.map(col => (
-                                        <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap" style={{ minWidth: col.width }}>
+                                        <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap" style={{ width: col.width, minWidth: col.width }}>
                                             {col.label}
                                         </th>
                                     ))}
@@ -647,7 +647,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                         <div className="flex h-full">
                                                             <input 
                                                                 type="text"
-                                                                className="flex-1 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                className="flex-1 min-w-0 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
                                                                 value={r.data?.[col.key] || ''}
                                                                 onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                                 onBlur={() => handleBlur(r)}

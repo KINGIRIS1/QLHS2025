@@ -753,32 +753,34 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                 </td>
                                             </>
                                         )}
-                                        <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200 flex gap-1 justify-center">
-                                            {activeTab === 'all' && (
-                                                <>
-                                                    <button 
-                                                        onClick={() => toggleEdit(r.id)} 
-                                                        className={`p-1.5 rounded transition-colors ${editingId === r.id ? 'text-green-600 bg-green-50 hover:bg-green-100' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
-                                                        title={editingId === r.id ? "Xong" : "Sửa"}
-                                                    >
-                                                        {editingId === r.id ? <CheckCircle2 size={14}/> : <Edit size={14}/>}
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleMoveToPendingSingle(r.id)} 
-                                                        className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition-colors" 
-                                                        title="Chuyển Scan"
-                                                    >
-                                                        <Send size={14}/>
-                                                    </button>
-                                                </>
-                                            )}
-                                            <button 
-                                                onClick={() => handleDelete(r.id)} 
-                                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" 
-                                                title="Xóa dòng này"
-                                            >
-                                                <Trash2 size={14}/>
-                                            </button>
+                                        <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200">
+                                            <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
+                                                {activeTab === 'all' && (
+                                                    <>
+                                                        <button 
+                                                            onClick={() => toggleEdit(r.id)} 
+                                                            className={`p-2 rounded-lg transition-colors shadow-sm border ${editingId === r.id ? 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100' : 'text-gray-500 bg-white border-gray-200 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50'}`}
+                                                            title={editingId === r.id ? "Xong" : "Sửa"}
+                                                        >
+                                                            {editingId === r.id ? <CheckCircle2 size={18}/> : <Edit size={18}/>}
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleMoveToPendingSingle(r.id)} 
+                                                            className="p-2 text-indigo-600 bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 rounded-lg transition-colors shadow-sm" 
+                                                            title="Chuyển Scan"
+                                                        >
+                                                            <Send size={18}/>
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button 
+                                                    onClick={() => handleDelete(r.id)} 
+                                                    className="p-2 text-gray-500 bg-white border border-gray-200 hover:text-red-600 hover:bg-red-50 hover:border-red-300 rounded-lg transition-colors shadow-sm" 
+                                                    title="Xóa dòng này"
+                                                >
+                                                    <Trash2 size={18}/>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 )) : (

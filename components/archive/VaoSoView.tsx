@@ -12,12 +12,12 @@ const COLUMNS = [
     { key: 'group_chu_su_dung', label: 'Thông tin chủ sử dụng', width: '250px', readOnly: true },
     { key: 'group_thong_tin_ho_so', label: 'Thông tin hồ sơ', width: '200px', readOnly: true },
     { key: 'group_thua_dat', label: 'Thông tin thửa đất', width: '180px', readOnly: true },
-    { key: 'dia_danh', label: 'Địa danh', width: '150px', readOnly: true },
+    { key: 'dia_danh', label: 'Địa danh', width: '100px', readOnly: true },
     
     // Nhóm kết quả (Always editable or specific logic)
     { key: 'loai_gcn', label: 'Loại GCN', width: '120px' },
-    { key: 'so_vao_so', label: 'Số vào sổ', width: '85px' },
-    { key: 'so_phat_hanh', label: 'Số phát hành', width: '140px' },
+    { key: 'so_vao_so', label: 'Số vào sổ', width: '70px' },
+    { key: 'so_phat_hanh', label: 'Số phát hành', width: '100px' },
     { key: 'ngay_ky_gcn', label: 'Ngày ký GCN', width: '120px', type: 'date' },
     { key: 'ngay_ky_phieu_tk', label: 'Chuyển Scan/1 Cửa', width: '120px', type: 'date' },
     { key: 'ghi_chu', label: 'GHI CHÚ', width: '200px' }
@@ -568,7 +568,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     </th>
                                     <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-100 sticky left-10 z-20">#</th>
                                     {COLUMNS.map(col => (
-                                        <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-left whitespace-nowrap" style={{ minWidth: col.width }}>
+                                        <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap" style={{ minWidth: col.width }}>
                                             {col.label}
                                         </th>
                                     ))}
@@ -610,9 +610,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             if (col.key === 'group_thong_tin_ho_so') {
                                                 return (
                                                     <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
-                                                        <div className="text-sm font-medium text-blue-700 mb-1 whitespace-pre-wrap">{r.data?.loai_bien_dong}</div>
-                                                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-2">
-                                                            <Calendar size={12} />
+                                                        <div className="text-xs text-gray-500 mb-0.5">Loại hồ sơ:</div>
+                                                        <div className="text-sm font-medium text-blue-700 mb-2 whitespace-pre-wrap leading-tight">{r.data?.loai_bien_dong}</div>
+                                                        <div className="text-xs text-gray-500 mb-0.5">Ngày nhận:</div>
+                                                        <div className="text-sm font-bold text-gray-800 flex items-center gap-1">
+                                                            <Calendar size={14} className="text-gray-400" />
                                                             {r.data?.ngay_nhan ? new Date(r.data.ngay_nhan).toLocaleDateString('vi-VN') : ''}
                                                         </div>
                                                     </td>
@@ -626,10 +628,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                             <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Thửa: <b>{r.data?.so_thua}</b></span>
                                                         </div>
                                                         <div className="text-xs text-gray-600 mb-1">
-                                                            DT: <b>{r.data?.tong_dien_tich}</b>
+                                                            DT: <b>{r.data?.tong_dien_tich ? `${r.data.tong_dien_tich} m²` : ''}</b>
                                                         </div>
                                                         <div className="text-xs text-gray-600">
-                                                            Đất ở: <b>{r.data?.dien_tich_tho_cu}</b>
+                                                            Đất ở: <b>{r.data?.dien_tich_tho_cu ? `${r.data.dien_tich_tho_cu} m²` : ''}</b>
                                                         </div>
                                                     </td>
                                                 );

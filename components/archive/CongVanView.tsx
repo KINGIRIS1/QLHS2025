@@ -315,7 +315,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Số hiệu</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số CV..." /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Ngày tháng</label><input type="date" className="w-full border rounded px-3 py-2 text-sm" value={formData.ngay_thang} onChange={e => setFormData({...formData, ngay_thang: e.target.value})} /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Trích yếu</label><textarea rows={3} className="w-full border rounded px-3 py-2 text-sm" value={formData.trich_yeu} onChange={e => setFormData({...formData, trich_yeu: e.target.value})} placeholder="Nội dung..." /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Nơi nhận / Gửi</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: e.target.value})} placeholder="Đơn vị..." /></div>
+                            <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: e.target.value})} placeholder="Đơn vị..." /></div>
                             
                             <div className="pt-4 flex gap-2 justify-end">
                                 <button type="button" onClick={() => setIsFormOpen(false)} className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded text-sm">Hủy</button>
@@ -333,12 +333,12 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
                                 </th>
                                 <th className="p-3 w-10 text-center">#</th>
-                                <th className="p-3 w-32">Số hiệu</th>
-                                <th className="p-3 w-28">Ngày</th>
-                                <th className="p-3">Trích yếu</th>
-                                <th className="p-3 w-40">Nơi nhận/Gửi</th>
+                                <th className="p-3 w-32 text-center">Số hiệu</th>
+                                <th className="p-3 w-28 text-center">Ngày</th>
+                                <th className="p-3 w-64 text-center">Trích yếu</th>
+                                <th className="p-3 w-40 text-center">Cơ quan phát hành</th>
                                 {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
-                                {(subTab !== 'draft') && <th className="p-3 w-32">Người thực hiện</th>}
+                                {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
                                 <th className="p-3 w-32 text-center">Thao tác</th>
                             </tr>
                         </thead>

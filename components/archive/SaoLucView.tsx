@@ -450,15 +450,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                         <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
                                     </th>
                                     <th className="p-3 w-10 text-center">#</th>
-                                    <th className="p-3 w-32">Mã HS</th>
-                                    <th className="p-3 w-48">Chủ sử dụng</th>
-                                    <th className="p-3 w-32">Xã/Phường</th>
+                                    <th className="p-3 w-32 text-center">Mã HS</th>
+                                    <th className="p-3 w-48 text-center">Chủ sử dụng</th>
+                                    <th className="p-3 w-32 text-center">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
-                                    <th className="p-3 w-24">Ngày nhận</th>
+                                    <th className="p-3 w-24 text-center">Ngày nhận</th>
                                     {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
-                                    {(subTab !== 'draft') && <th className="p-3 w-32">Người thực hiện</th>}
-                                    <th className="p-3 w-24">Hẹn trả</th>
-                                    <th className="p-3">Nội dung</th>
+                                    {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
+                                    <th className="p-3 w-24 text-center">Hẹn trả</th>
+                                    <th className="p-3 w-64 text-center">Nội dung</th>
                                     <th className="p-3 w-28 text-center">Thao tác</th>
                                 </tr>
                             </thead>

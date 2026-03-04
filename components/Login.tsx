@@ -5,8 +5,6 @@ import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2 } from 'lucide
 
 import { APP_VERSION } from '../constants';
 
-import { APP_VERSION } from '../constants';
-
 interface LoginProps {
   onLogin: (user: User) => void;
   users: User[]; 

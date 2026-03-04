@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, RecordFile, RecordStatus } from '../../types';
+import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2 } from 'lucide-react';
+import { fetchEmployees } from '../../services/apiPeople';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
-import { MOCK_EMPLOYEES } from '../../constants';
 
 interface SaoLucViewProps {
     currentUser: User;
@@ -28,8 +28,9 @@ interface SaoLucFormData {
 const WARDS = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'];
 
 const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
-    const [subTab, setSubTab] = useState<'list' | 'assigned' | 'sign' | 'result'>('list');
+    const [subTab, setSubTab] = useState<'all' | 'draft' | 'sign' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     
@@ -52,21 +53,29 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
     
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => {
+        loadData();
+        loadEmployees();
+    }, []);
 
     const loadData = async () => {
         const data = await fetchArchiveRecords('saoluc');
         setRecords(data);
     };
 
+    const loadEmployees = async () => {
+        const data = await fetchEmployees();
+        setEmployees(data);
+    };
+
     const filteredRecords = useMemo(() => {
         let list = records;
         
         // Filter by Tab
-        if (subTab === 'list') list = list.filter(r => r.status === 'draft');
-        if (subTab === 'assigned') list = list.filter(r => r.status === 'assigned');
+        if (subTab === 'draft') list = list.filter(r => r.status === 'draft');
         if (subTab === 'sign') list = list.filter(r => r.status === 'pending_sign');
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
+        // 'all' shows everything
 
         // Filter by Search
         if (searchTerm) {
@@ -123,7 +132,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
     // Helper để lấy tên nhân viên từ ID
     const getEmployeeName = (id?: string) => {
         if (!id) return '-';
-        const emp = MOCK_EMPLOYEES.find(e => e.id === id);
+        const emp = employees.find(e => e.id === id);
         return emp ? emp.name : id;
     };
 
@@ -240,16 +249,16 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                 <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
                     <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
                         <button 
-                            onClick={() => setSubTab('list')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'list' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            onClick={() => setSubTab('all')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'all' ? 'bg-gray-100 text-gray-800 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <ListChecks size={16}/> Chưa giao
+                            <LayoutGrid size={16}/> Tất cả
                         </button>
                         <button 
-                            onClick={() => setSubTab('assigned')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'assigned' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            onClick={() => setSubTab('draft')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'draft' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <Users size={16}/> Đã giao
+                            <ListChecks size={16}/> Chưa giao
                         </button>
                         <button 
                             onClick={() => setSubTab('sign')} 
@@ -266,7 +275,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                     </div>
 
                     <div className="ml-auto flex gap-2">
-                        {subTab === 'list' && (
+                        {(subTab === 'draft' || subTab === 'all') && (
                             <>
                                 {selectedIds.size > 0 && (
                                     <button onClick={handleAssign} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
@@ -289,7 +298,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                     isOpen={showAssignModal}
                     onClose={() => setShowAssignModal(false)}
                     onConfirm={handleConfirmAssign}
-                    employees={MOCK_EMPLOYEES}
+                    employees={employees}
                     selectedRecords={records.filter(r => selectedIds.has(r.id)).map(r => ({
                         id: r.id,
                         code: r.so_hieu,
@@ -373,7 +382,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                     <th className="p-3 w-32">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
                                     <th className="p-3 w-24">Ngày nhận</th>
-                                    {subTab === 'assigned' && <th className="p-3 w-32">Người thực hiện</th>}
+                                    {(subTab === 'all' || subTab === 'sign' || subTab === 'result') && <th className="p-3 w-32">Người thực hiện</th>}
                                     <th className="p-3 w-24">Hẹn trả</th>
                                     <th className="p-3">Nội dung</th>
                                     <th className="p-3 w-28 text-center">Thao tác</th>
@@ -391,11 +400,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>
                                         <td className="p-3 text-gray-600">{formatDate(r.ngay_thang)}</td>
-                                        {subTab === 'assigned' && (
+                                        {(subTab === 'all' || subTab === 'sign' || subTab === 'result') && (
                                             <td className="p-3 text-indigo-600 font-medium">
-                                                <div className="flex items-center gap-1">
-                                                    <UserIcon size={14}/> {getEmployeeName(r.data?.assigned_to)}
-                                                </div>
+                                                {r.data?.assigned_to ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <UserIcon size={14}/> {getEmployeeName(r.data?.assigned_to)}
+                                                    </div>
+                                                ) : <span className="text-gray-400 text-xs italic">Chưa giao</span>}
                                             </td>
                                         )}
                                         <td className="p-3 text-purple-600 font-medium">{formatDate(r.data?.hen_tra)}</td>
@@ -424,7 +435,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                         </td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={subTab === 'assigned' ? 11 : 10} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
+                                    <tr><td colSpan={(subTab === 'all' || subTab === 'sign' || subTab === 'result') ? 11 : 10} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
                                 )}
                             </tbody>
                         </table>

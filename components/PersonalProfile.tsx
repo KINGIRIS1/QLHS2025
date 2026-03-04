@@ -150,7 +150,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
 
   // 2. Chuyển sang CHỜ KÝ (Từ tab Đã thực hiện)
   const handleForwardToSign = async (record: RecordFile) => {
-    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký kiểm tra"?`)) {
+    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
       onUpdateStatus(record, RecordStatus.PENDING_SIGN);
     }
   };
@@ -329,13 +329,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
         
         <div className="flex-1 overflow-y-auto">
             {displayRecords.length > 0 ? (
-                <table className="w-full text-left table-fixed min-w-[900px]">
+                <table className="w-full text-left table-fixed min-w-[1050px]">
                     <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                         <tr>
                             <th className="p-3 w-10 text-center">#</th>
                             <th className="p-3 w-[120px]">{renderSortHeader('Mã HS', 'code')}</th>
                             <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
                             <th className="p-3 w-[130px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
+                            <th className="p-3 w-[110px]">{renderSortHeader('Ngày trình', 'submissionDate')}</th>
                             
                             <th className="p-3 w-[150px]">
                                 {activeTab === 'reminder' 
@@ -360,6 +361,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                     <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code || ''}>{r.code}</div></td>
                                     <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName || ''}>{r.customerName}</div></td>
                                     <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType || ''}>{getShortRecordType(r.recordType || undefined)}</div></td>
+                                    <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.submissionDate || undefined)}</td>
                                     
                                     <td className="p-3 align-middle">
                                         {activeTab === 'reminder' ? (

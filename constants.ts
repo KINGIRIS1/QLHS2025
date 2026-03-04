@@ -14,7 +14,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.ASSIGNED]: 'Đã giao việc',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
   [RecordStatus.COMPLETED_WORK]: 'Đã thực hiện', // MỚI: Đã bổ sung
-  [RecordStatus.PENDING_SIGN]: 'Chờ ký kiểm tra',
+  [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
   [RecordStatus.SIGNED]: 'Đã ký duyệt',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',

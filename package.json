@@ -1,12 +1,12 @@
 {
   "name": "he-thong-quan-ly-ho-so",
   "private": true,
-  "version": "1.9.6",
+  "version": "2.1.0",
   "main": "electron/main.js",
   "author": "DonViHanhChinh",
   "description": "Phan mem quan ly ho so dia chinh",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "concurrently \"vite\" \"npm run electron:dev\"",
     "server": "node server/index.js",
     "build": "tsc && vite build",
     "preview": "vite preview",

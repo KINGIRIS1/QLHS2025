@@ -8,7 +8,7 @@ export interface ArchiveRecord {
     created_at: string;
     created_by: string;
     type: 'saoluc' | 'vaoso' | 'congvan';
-    status: 'draft' | 'pending_sign' | 'completed'; // Nháp/Danh sách | Trình ký | Kết quả
+    status: 'draft' | 'assigned' | 'pending_sign' | 'completed'; // Nháp/Danh sách | Đã giao | Trình ký | Kết quả
     so_hieu: string; // Số hiệu/Số hồ sơ
     trich_yeu: string; // Nội dung/Trích yếu
     ngay_thang: string;

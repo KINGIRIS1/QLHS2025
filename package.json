@@ -9,6 +9,7 @@
     "dev": "concurrently \"vite\" \"npm run electron:dev\"",
     "server": "node server/index.js",
     "build": "tsc && vite build",
+    "lint": "tsc --noEmit",
     "preview": "vite preview",
     "electron:dev": "wait-on tcp:5173 && electron .",
     "electron:build": "npm run build && electron-builder --win --x64 -p never"

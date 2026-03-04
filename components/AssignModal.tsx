@@ -9,6 +9,7 @@ interface AssignModalProps {
   onConfirm: (employeeId: string) => void;
   employees: Employee[];
   selectedRecords: RecordFile[];
+  filterDepartment?: string; // MỚI: Lọc theo phòng ban (VD: "Thông tin lưu trữ")
 }
 
 interface EmployeeItemProps {
@@ -72,7 +73,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isRecommended, isSelec
     </div>
 );
 
-const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords }) => {
+const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment }) => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -97,10 +98,19 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   // Logic chia nhóm nhân viên: Đề xuất (Trái) & Khác (Phải)
   const { recommended, others } = useMemo(() => {
     // 1. Lọc theo từ khóa tìm kiếm trước
-    const filteredEmployees = employees.filter(e => 
+    let filteredEmployees = employees.filter(e => 
         e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.department.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // 2. Nếu có filterDepartment, lọc cứng theo phòng ban và trả về hết vào recommended
+    if (filterDepartment) {
+        const deptKeyword = removeVietnameseTones(filterDepartment).toLowerCase();
+        const rec = filteredEmployees.filter(e => 
+            removeVietnameseTones(e.department).toLowerCase().includes(deptKeyword)
+        );
+        return { recommended: rec, others: [] };
+    }
 
     const rec: Employee[] = [];
     const oth: Employee[] = [];
@@ -158,7 +168,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
     });
 
     return { recommended: rec, others: oth };
-  }, [employees, targetWardName, searchTerm]);
+  }, [employees, targetWardName, searchTerm, filterDepartment]);
 
   // Helper check lại để truyền prop vào UI component con (hiển thị icon briefcase)
   const isSurveyTeamMember = (emp: Employee) => {
@@ -209,21 +219,32 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         {/* Body - Flex Layout */}
         <div className="flex-1 flex overflow-hidden">
              
-             {/* LEFT SIDE: RECOMMENDED (30-35%) - CHỈ HIỆN KỸ THUẬT ĐÚNG TUYẾN */}
+             {/* LEFT SIDE: RECOMMENDED (30-35%) - CHỈ HIỆN KỸ THUẬT ĐÚNG TUYẾN HOẶC LỌC THEO PHÒNG BAN */}
              <div className="w-[320px] bg-blue-50/50 border-r border-blue-100 flex flex-col shrink-0">
                  <div className="p-4 border-b border-blue-100 bg-blue-50/80 sticky top-0 backdrop-blur-sm z-10">
                      <div className="flex items-center gap-2 text-sm font-bold text-blue-800 uppercase tracking-wide">
-                        <MapPin size={16} />
-                        Tổ Đo đạc (Đúng tuyến)
+                        {filterDepartment ? (
+                            <>
+                                <Users size={16} />
+                                Nhân viên {filterDepartment}
+                            </>
+                        ) : (
+                            <>
+                                <MapPin size={16} />
+                                Tổ Đo đạc (Đúng tuyến)
+                            </>
+                        )}
                      </div>
-                     {targetWardName ? (
-                        <div className="text-xs text-blue-600 mt-1 font-medium bg-white px-2 py-1 rounded border border-blue-200 inline-block">
-                            Địa bàn: {targetWardName}
-                        </div>
-                     ) : (
-                        <div className="text-xs text-gray-500 mt-1 italic">
-                            (Nhiều địa bàn khác nhau)
-                        </div>
+                     {!filterDepartment && (
+                        targetWardName ? (
+                            <div className="text-xs text-blue-600 mt-1 font-medium bg-white px-2 py-1 rounded border border-blue-200 inline-block">
+                                Địa bàn: {targetWardName}
+                            </div>
+                        ) : (
+                            <div className="text-xs text-gray-500 mt-1 italic">
+                                (Nhiều địa bàn khác nhau)
+                            </div>
+                        )
                      )}
                  </div>
                  
@@ -237,7 +258,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                                     isRecommended={true} 
                                     isSelected={selectedEmpId === emp.id}
                                     onSelect={setSelectedEmpId}
-                                    isSurveyTeam={true}
+                                    isSurveyTeam={filterDepartment ? true : true} // Nếu lọc theo phòng ban thì coi như đúng team
                                 />
                             ))}
                          </div>
@@ -245,9 +266,12 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                          <div className="h-full flex flex-col items-center justify-center text-center p-4 text-gray-400 border-2 border-dashed border-blue-200 rounded-xl m-2">
                             <MapPin size={32} className="mb-2 opacity-50" />
                             <p className="text-sm">
-                                {targetWardName 
-                                    ? "Không tìm thấy nhân viên Tổ Đo đạc/Kỹ thuật phụ trách địa bàn này." 
-                                    : "Vui lòng chọn các hồ sơ cùng 1 địa bàn để nhận đề xuất chính xác."
+                                {filterDepartment 
+                                    ? `Không tìm thấy nhân viên thuộc ${filterDepartment}.`
+                                    : (targetWardName 
+                                        ? "Không tìm thấy nhân viên Tổ Đo đạc/Kỹ thuật phụ trách địa bàn này." 
+                                        : "Vui lòng chọn các hồ sơ cùng 1 địa bàn để nhận đề xuất chính xác."
+                                    )
                                 }
                             </p>
                          </div>

@@ -574,7 +574,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     ))}
                                     {activeTab === 'scanned' && (
                                         <>
-                                            <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase">Ngày Scan</th>
                                             <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase">Đợt Scan</th>
                                         </>
                                     )}
@@ -745,9 +744,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         })}
                                         {activeTab === 'scanned' && (
                                             <>
-                                                <td className="p-2 border-r border-gray-200 text-xs text-gray-600">
-                                                    {r.data?.scan_date ? new Date(r.data.scan_date).toLocaleDateString('vi-VN') : ''}
-                                                </td>
                                                 <td className="p-2 border-r border-gray-200 text-xs text-gray-600">
                                                     {r.data?.scan_batch_id}
                                                 </td>

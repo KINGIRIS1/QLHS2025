@@ -67,11 +67,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                 </div>
                 
                 <h1 className="text-3xl lg:text-4xl font-extrabold leading-snug mb-6 tracking-tight text-white">
-                    Hệ thống tiếp nhận và quản lý hồ sơ đo đạc
+                    Hệ thống tiếp nhận và quản lý hồ sơ
                 </h1>
                 
                 <p className="text-slate-400 text-base leading-relaxed border-l-2 border-blue-500/50 pl-5 max-w-sm">
-                    Hỗ trợ tiếp nhận và quản lý hiệu quả hồ sơ đo đạc cho Chi nhánh Văn phòng Đăng ký Đất đai
+                    Hỗ trợ tiếp nhận và quản lý hiệu quả hồ sơ cho Chi nhánh Văn phòng Đăng ký Đất đai
                 </p>
             </div>
 

@@ -3,9 +3,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
+import ArchiveDetailModal from './ArchiveDetailModal';
+import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 
 interface CongVanViewProps {
     currentUser: User;
@@ -18,6 +20,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     
+    // Detail Modal State
+    const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
+
     // Assign Modal State
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -79,11 +84,20 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleConfirmAssign = async (employeeId: string) => {
+        const historyEntry = {
+            action: 'Giao việc',
+            status: 'assigned',
+            timestamp: new Date().toISOString(),
+            user: currentUser.name,
+            note: `Giao cho nhân viên: ${getEmployeeName(employeeId)}`
+        };
+
         const updates = {
             status: 'assigned' as any,
             data: {
                 assigned_to: employeeId,
-                assigned_date: new Date().toISOString()
+                assigned_date: new Date().toISOString(),
+                history: [historyEntry] // Will be appended by updateArchiveRecordsBatch
             }
         };
         
@@ -137,17 +151,32 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     const handleStatusChange = async (record: ArchiveRecord, newStatus: ArchiveRecord['status']) => {
         let confirmMsg = '';
+        let actionName = '';
         switch (newStatus) {
-            case 'draft': confirmMsg = 'Thu hồi công văn về trạng thái Nháp?'; break;
-            case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; break;
-            case 'pending_sign': confirmMsg = 'Trình ký công văn này?'; break;
-            case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; break;
-            case 'completed': confirmMsg = 'Xác nhận hoàn thành công văn?'; break;
-            default: confirmMsg = 'Chuyển trạng thái?';
+            case 'draft': confirmMsg = 'Thu hồi công văn về trạng thái Nháp?'; actionName = 'Thu hồi'; break;
+            case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
+            case 'pending_sign': confirmMsg = 'Trình ký công văn này?'; actionName = 'Trình ký'; break;
+            case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
+            case 'completed': confirmMsg = 'Xác nhận hoàn thành công văn?'; actionName = 'Hoàn thành'; break;
+            default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 
         if (await confirmAction(confirmMsg)) {
-            await saveArchiveRecord({ ...record, status: newStatus });
+            const historyEntry = {
+                action: actionName,
+                status: newStatus,
+                timestamp: new Date().toISOString(),
+                user: currentUser.name
+            };
+            
+            const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
+            const newHistory = [...oldHistory, historyEntry];
+
+            await saveArchiveRecord({ 
+                ...record, 
+                status: newStatus,
+                data: { ...record.data, history: newHistory }
+            });
             loadData();
         }
     };
@@ -163,6 +192,18 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         setFormData(r);
         setEditingId(r.id);
         setIsFormOpen(true);
+    };
+
+    const mapStatusToEnum = (s: string): RecordStatus => {
+        switch(s) {
+            case 'draft': return RecordStatus.RECEIVED;
+            case 'assigned': return RecordStatus.ASSIGNED;
+            case 'executed': return RecordStatus.COMPLETED_WORK;
+            case 'pending_sign': return RecordStatus.PENDING_SIGN;
+            case 'signed': return RecordStatus.SIGNED;
+            case 'completed': return RecordStatus.RETURNED;
+            default: return RecordStatus.RECEIVED;
+        }
     };
 
     return (
@@ -243,6 +284,14 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
             {/* CONTENT */}
             <div className="flex-1 overflow-auto p-4 flex gap-4 relative">
+                {/* Detail Modal */}
+                <ArchiveDetailModal 
+                    isOpen={!!detailRecord}
+                    onClose={() => setDetailRecord(null)}
+                    record={detailRecord}
+                    getEmployeeName={getEmployeeName}
+                />
+
                 {/* Assign Modal */}
                 <AssignModal 
                     isOpen={showAssignModal}
@@ -288,6 +337,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 <th className="p-3 w-28">Ngày</th>
                                 <th className="p-3">Trích yếu</th>
                                 <th className="p-3 w-40">Nơi nhận/Gửi</th>
+                                {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
                                 {(subTab !== 'draft') && <th className="p-3 w-32">Người thực hiện</th>}
                                 <th className="p-3 w-32 text-center">Thao tác</th>
                             </tr>
@@ -299,10 +349,17 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                         <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                     </td>
                                     <td className="p-3 text-center text-gray-500">{idx + 1}</td>
-                                    <td className="p-3 font-bold text-orange-600">{r.so_hieu}</td>
+                                    <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
                                     <td className="p-3 text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
                                     <td className="p-3 text-gray-800">{r.trich_yeu}</td>
                                     <td className="p-3 text-gray-600">{r.noi_nhan_gui}</td>
+                                    {(subTab === 'all') && (
+                                        <td className="p-3 text-center">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>
+                                                {STATUS_LABELS[mapStatusToEnum(r.status)]}
+                                            </span>
+                                        </td>
+                                    )}
                                     {(subTab !== 'draft') && (
                                         <td className="p-3 text-indigo-600 font-medium">
                                             {r.data?.assigned_to ? (
@@ -314,6 +371,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     )}
                                     <td className="p-3 text-center">
                                         <div className="flex justify-center gap-1">
+                                            <button onClick={() => setDetailRecord(r)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Xem chi tiết"><Eye size={14}/></button>
                                             {r.status === 'draft' && (
                                                 <button onClick={() => { setSelectedIds(new Set([r.id])); setShowAssignModal(true); }} className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100" title="Giao việc"><Users size={14}/></button>
                                             )}
@@ -348,7 +406,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={(subTab !== 'draft') ? 8 : 7} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
+                                <tr><td colSpan={(subTab !== 'draft') ? 9 : 8} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
                             )}
                         </tbody>
                     </table>

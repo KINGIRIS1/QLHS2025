@@ -185,7 +185,15 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         if (fetchError) throw fetchError;
 
         const promises = currentRecords.map(r => {
-            const mergedData = { ...r.data, ...(updates.data || {}) };
+            let mergedData = { ...r.data, ...(updates.data || {}) };
+
+            // Special handling for history: append instead of replace if updates.data.history exists
+            if (updates.data && updates.data.history && Array.isArray(updates.data.history)) {
+                const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                // Assuming updates.data.history contains NEW items to append
+                mergedData.history = [...oldHistory, ...updates.data.history];
+            }
+
             const payload = { ...updates, data: mergedData };
             return supabase.from('archive_records').update(payload).eq('id', r.id);
         });

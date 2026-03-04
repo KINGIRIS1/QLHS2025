@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 
@@ -22,13 +22,13 @@ interface SaoLucFormData {
     ngay_nhan: string;      // Ngày nhận (Map vào ngay_thang)
     hen_tra: string;        // Hẹn trả (Lưu trong data)
     noi_dung: string;       // Nội dung yêu cầu (Map vào trich_yeu)
-    status: 'draft' | 'assigned' | 'pending_sign' | 'completed';
+    status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed';
 }
 
 const WARDS = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'];
 
 const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
-    const [subTab, setSubTab] = useState<'all' | 'draft' | 'sign' | 'result'>('all');
+    const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'sign' | 'signed' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -73,7 +73,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
         
         // Filter by Tab
         if (subTab === 'draft') list = list.filter(r => r.status === 'draft');
+        if (subTab === 'assigned') list = list.filter(r => r.status === 'assigned' || r.status === 'executed');
         if (subTab === 'sign') list = list.filter(r => r.status === 'pending_sign');
+        if (subTab === 'signed') list = list.filter(r => r.status === 'signed');
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
         // 'all' shows everything
 
@@ -188,7 +190,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
     };
 
     const handleStatusChange = async (record: ArchiveRecord, newStatus: ArchiveRecord['status']) => {
-        if (await confirmAction(`Chuyển trạng thái hồ sơ ${record.so_hieu}?`)) {
+        let confirmMsg = '';
+        switch (newStatus) {
+            case 'draft': confirmMsg = 'Thu hồi hồ sơ về trạng thái Nháp?'; break;
+            case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; break;
+            case 'pending_sign': confirmMsg = 'Trình ký hồ sơ này?'; break;
+            case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; break;
+            case 'completed': confirmMsg = 'Xác nhận hoàn thành hồ sơ?'; break;
+            default: confirmMsg = 'Chuyển trạng thái?';
+        }
+
+        if (await confirmAction(confirmMsg)) {
             await saveArchiveRecord({ ...record, status: newStatus });
             loadData();
         }
@@ -256,9 +268,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                         </button>
                         <button 
                             onClick={() => setSubTab('draft')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'draft' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'draft' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <ListChecks size={16}/> Chưa giao
+                            <ListChecks size={16}/> Giao nhân viên
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('assigned')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'assigned' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <Users size={16}/> Đã thực hiện
                         </button>
                         <button 
                             onClick={() => setSubTab('sign')} 
@@ -267,10 +285,16 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                             <Send size={16}/> Trình ký
                         </button>
                         <button 
+                            onClick={() => setSubTab('signed')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'signed' ? 'bg-teal-100 text-teal-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <PenTool size={16}/> Ký duyệt
+                        </button>
+                        <button 
                             onClick={() => setSubTab('result')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <FileCheck size={16}/> Kết quả
+                            <FileCheck size={16}/> Hoàn thành
                         </button>
                     </div>
 
@@ -382,7 +406,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                     <th className="p-3 w-32">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
                                     <th className="p-3 w-24">Ngày nhận</th>
-                                    {(subTab === 'all' || subTab === 'sign' || subTab === 'result') && <th className="p-3 w-32">Người thực hiện</th>}
+                                    {(subTab !== 'draft') && <th className="p-3 w-32">Người thực hiện</th>}
                                     <th className="p-3 w-24">Hẹn trả</th>
                                     <th className="p-3">Nội dung</th>
                                     <th className="p-3 w-28 text-center">Thao tác</th>
@@ -400,7 +424,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>
                                         <td className="p-3 text-gray-600">{formatDate(r.ngay_thang)}</td>
-                                        {(subTab === 'all' || subTab === 'sign' || subTab === 'result') && (
+                                        {(subTab !== 'draft') && (
                                             <td className="p-3 text-indigo-600 font-medium">
                                                 {r.data?.assigned_to ? (
                                                     <div className="flex items-center gap-1">
@@ -416,15 +440,31 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                                 {r.status === 'draft' && (
                                                     <button onClick={() => { setSelectedIds(new Set([r.id])); setShowAssignModal(true); }} className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100" title="Giao việc"><Users size={14}/></button>
                                                 )}
+                                                
                                                 {r.status === 'assigned' && (
                                                     <>
                                                         <button onClick={() => handleStatusChange(r, 'draft')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Thu hồi"><RotateCcw size={14}/></button>
+                                                        <button onClick={() => handleStatusChange(r, 'executed')} className="p-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100" title="Đã thực hiện"><CheckCircle size={14}/></button>
+                                                    </>
+                                                )}
+
+                                                {r.status === 'executed' && (
+                                                    <>
+                                                        <button onClick={() => handleStatusChange(r, 'assigned')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Quay lại"><RotateCcw size={14}/></button>
                                                         <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-purple-600 bg-purple-50 rounded hover:bg-purple-100" title="Trình ký"><Send size={14}/></button>
                                                     </>
                                                 )}
+
                                                 {r.status === 'pending_sign' && (
                                                     <>
-                                                        <button onClick={() => handleStatusChange(r, 'assigned')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
+                                                        <button onClick={() => handleStatusChange(r, 'executed')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
+                                                        <button onClick={() => handleStatusChange(r, 'signed')} className="p-1.5 text-teal-600 bg-teal-50 rounded hover:bg-teal-100" title="Ký duyệt"><PenTool size={14}/></button>
+                                                    </>
+                                                )}
+
+                                                {r.status === 'signed' && (
+                                                    <>
+                                                        <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
                                                         <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Hoàn thành"><FileCheck size={14}/></button>
                                                     </>
                                                 )}
@@ -435,7 +475,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                         </td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={(subTab === 'all' || subTab === 'sign' || subTab === 'result') ? 11 : 10} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
+                                    <tr><td colSpan={(subTab !== 'draft') ? 11 : 10} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
                                 )}
                             </tbody>
                         </table>

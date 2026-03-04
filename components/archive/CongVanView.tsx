@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 
@@ -12,7 +12,7 @@ interface CongVanViewProps {
 }
 
 const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
-    const [subTab, setSubTab] = useState<'all' | 'draft' | 'sign' | 'result'>('all');
+    const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'sign' | 'signed' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -51,7 +51,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         let list = records;
         
         if (subTab === 'draft') list = list.filter(r => r.status === 'draft');
+        if (subTab === 'assigned') list = list.filter(r => r.status === 'assigned' || r.status === 'executed');
         if (subTab === 'sign') list = list.filter(r => r.status === 'pending_sign');
+        if (subTab === 'signed') list = list.filter(r => r.status === 'signed');
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
         // 'all' shows everything
 
@@ -134,7 +136,17 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleStatusChange = async (record: ArchiveRecord, newStatus: ArchiveRecord['status']) => {
-        if (await confirmAction(`Chuyển trạng thái công văn ${record.so_hieu}?`)) {
+        let confirmMsg = '';
+        switch (newStatus) {
+            case 'draft': confirmMsg = 'Thu hồi công văn về trạng thái Nháp?'; break;
+            case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; break;
+            case 'pending_sign': confirmMsg = 'Trình ký công văn này?'; break;
+            case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; break;
+            case 'completed': confirmMsg = 'Xác nhận hoàn thành công văn?'; break;
+            default: confirmMsg = 'Chuyển trạng thái?';
+        }
+
+        if (await confirmAction(confirmMsg)) {
             await saveArchiveRecord({ ...record, status: newStatus });
             loadData();
         }
@@ -184,7 +196,13 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             onClick={() => setSubTab('draft')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'draft' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <ListChecks size={16}/> Chưa giao
+                            <ListChecks size={16}/> Giao nhân viên
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('assigned')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'assigned' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <Users size={16}/> Đã thực hiện
                         </button>
                         <button 
                             onClick={() => setSubTab('sign')} 
@@ -193,10 +211,16 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             <Send size={16}/> Trình ký
                         </button>
                         <button 
+                            onClick={() => setSubTab('signed')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'signed' ? 'bg-teal-100 text-teal-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <PenTool size={16}/> Ký duyệt
+                        </button>
+                        <button 
                             onClick={() => setSubTab('result')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <FileCheck size={16}/> Kết quả
+                            <FileCheck size={16}/> Hoàn thành
                         </button>
                     </div>
 
@@ -264,7 +288,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 <th className="p-3 w-28">Ngày</th>
                                 <th className="p-3">Trích yếu</th>
                                 <th className="p-3 w-40">Nơi nhận/Gửi</th>
-                                {(subTab === 'all' || subTab === 'sign' || subTab === 'result') && <th className="p-3 w-32">Người thực hiện</th>}
+                                {(subTab !== 'draft') && <th className="p-3 w-32">Người thực hiện</th>}
                                 <th className="p-3 w-32 text-center">Thao tác</th>
                             </tr>
                         </thead>
@@ -279,7 +303,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
                                     <td className="p-3 text-gray-800">{r.trich_yeu}</td>
                                     <td className="p-3 text-gray-600">{r.noi_nhan_gui}</td>
-                                    {(subTab === 'all' || subTab === 'sign' || subTab === 'result') && (
+                                    {(subTab !== 'draft') && (
                                         <td className="p-3 text-indigo-600 font-medium">
                                             {r.data?.assigned_to ? (
                                                 <div className="flex items-center gap-1">
@@ -296,14 +320,26 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                             {r.status === 'assigned' && (
                                                 <>
                                                     <button onClick={() => handleStatusChange(r, 'draft')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Thu hồi"><RotateCcw size={14}/></button>
+                                                    <button onClick={() => handleStatusChange(r, 'executed')} className="p-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100" title="Đã thực hiện"><CheckCircle size={14}/></button>
+                                                </>
+                                            )}
+                                            {r.status === 'executed' && (
+                                                <>
+                                                    <button onClick={() => handleStatusChange(r, 'assigned')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Quay lại"><RotateCcw size={14}/></button>
                                                     <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-purple-600 bg-purple-50 rounded hover:bg-purple-100" title="Trình ký"><Send size={14}/></button>
                                                 </>
                                             )}
                                             {r.status === 'pending_sign' && (
-                                                <div className="flex gap-1">
-                                                    <button onClick={() => handleStatusChange(r, 'assigned')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
+                                                <>
+                                                    <button onClick={() => handleStatusChange(r, 'executed')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
+                                                    <button onClick={() => handleStatusChange(r, 'signed')} className="p-1.5 text-teal-600 bg-teal-50 rounded hover:bg-teal-100" title="Ký duyệt"><PenTool size={14}/></button>
+                                                </>
+                                            )}
+                                            {r.status === 'signed' && (
+                                                <>
+                                                    <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
                                                     <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Hoàn thành"><FileCheck size={14}/></button>
-                                                </div>
+                                                </>
                                             )}
                                             
                                             <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
@@ -312,7 +348,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={(subTab === 'all' || subTab === 'sign' || subTab === 'result') ? 8 : 7} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
+                                <tr><td colSpan={(subTab !== 'draft') ? 8 : 7} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
                             )}
                         </tbody>
                     </table>

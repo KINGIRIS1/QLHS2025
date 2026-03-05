@@ -1,11 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import StatusBadge from './StatusBadge';
 import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
+import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../services/apiArchive';
 
 interface PersonalProfileProps {
   user: User;
@@ -45,9 +46,75 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
     direction: 'desc' 
   });
 
+  const [archiveRecords, setArchiveRecords] = useState<ArchiveRecord[]>([]);
+
+  useEffect(() => {
+    const loadArchive = async () => {
+        const saoluc = await fetchArchiveRecords('saoluc');
+        const congvan = await fetchArchiveRecords('congvan');
+        setArchiveRecords([...saoluc, ...congvan]);
+    };
+    loadArchive();
+  }, []);
+
   const myRecords = useMemo(() => {
-    return records.filter(r => user.employeeId && r.assignedTo === user.employeeId);
-  }, [records, user.employeeId]);
+    const mainRecords = records.filter(r => user.employeeId && r.assignedTo === user.employeeId);
+    
+    const mappedArchives = archiveRecords
+        .filter(r => r.data?.assigned_to === user.employeeId)
+        .map(r => {
+            // Map status
+            let status = RecordStatus.RECEIVED;
+            if (r.status === 'assigned') status = RecordStatus.ASSIGNED;
+            else if (r.status === 'executed') status = RecordStatus.COMPLETED_WORK;
+            else if (r.status === 'pending_sign') status = RecordStatus.PENDING_SIGN;
+            else if (r.status === 'signed') status = RecordStatus.SIGNED;
+            else if (r.status === 'completed') status = RecordStatus.RETURNED;
+
+            return {
+                id: r.id,
+                code: r.so_hieu,
+                customerName: r.noi_nhan_gui, // Sao lục: Chủ sử dụng, Công văn: Cơ quan phát hành
+                recordType: r.type === 'saoluc' ? 'Sao lục' : 'Công văn',
+                content: r.trich_yeu,
+                receivedDate: r.ngay_thang,
+                deadline: r.data?.hen_tra,
+                status: status,
+                assignedTo: r.data?.assigned_to,
+                ward: r.data?.xa_phuong,
+                submissionDate: r.type === 'congvan' ? r.ngay_thang : undefined, // Example mapping
+                // Fill other required fields with defaults or null
+                phoneNumber: null,
+                cccd: null,
+                landPlot: r.data?.thua_dat,
+                mapSheet: r.data?.to_ban_do,
+                area: null,
+                address: null,
+                group: null,
+                assignedDate: r.data?.assigned_date,
+                approvalDate: null,
+                completedDate: null,
+                notes: null,
+                privateNotes: null,
+                personalNotes: null,
+                authorizedBy: null,
+                authDocType: null,
+                otherDocs: null,
+                exportBatch: null,
+                exportDate: null,
+                measurementNumber: null,
+                excerptNumber: null,
+                reminderDate: null,
+                lastRemindedAt: null,
+                receiptNumber: null,
+                receiverName: null,
+                resultReturnedDate: null,
+                needsMapCorrection: false
+            } as RecordFile;
+        });
+
+    return [...mainRecords, ...mappedArchives];
+  }, [records, archiveRecords, user.employeeId]);
   
   // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS)
   const pendingRecords = useMemo(() => {
@@ -140,18 +207,78 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   };
 
   // --- ACTIONS ---
-  
-  // 1. Chuyển sang ĐÃ THỰC HIỆN (Từ tab Đang thực hiện)
+
   const handleMarkAsDone = async (record: RecordFile) => {
     if (await confirmAction(`Xác nhận đã hoàn thành công việc cho hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã thực hiện".`)) {
-      onUpdateStatus(record, RecordStatus.COMPLETED_WORK);
+        if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
+            // Handle Archive Record
+            const archiveType = record.recordType === 'Sao lục' ? 'saoluc' : 'congvan';
+            // Find original record to get full data if needed, or just update status
+            // We need to append history as well.
+            
+            const historyEntry = {
+                action: 'Thực hiện xong',
+                status: 'executed',
+                timestamp: new Date().toISOString(),
+                user: user.name
+            };
+
+            // We need to fetch the current record to get its data.history
+            // Or we can just use the one from archiveRecords state
+            const currentArchive = archiveRecords.find(r => r.id === record.id);
+            if (currentArchive) {
+                 const oldHistory = Array.isArray(currentArchive.data?.history) ? currentArchive.data.history : [];
+                 const newHistory = [...oldHistory, historyEntry];
+                 
+                 await saveArchiveRecord({
+                     id: record.id,
+                     status: 'executed',
+                     data: { ...currentArchive.data, history: newHistory }
+                 });
+                 
+                 // Refresh data
+                 const saoluc = await fetchArchiveRecords('saoluc');
+                 const congvan = await fetchArchiveRecords('congvan');
+                 setArchiveRecords([...saoluc, ...congvan]);
+            }
+        } else {
+            // Normal Record
+            onUpdateStatus(record, RecordStatus.COMPLETED_WORK);
+        }
     }
   };
 
-  // 2. Chuyển sang CHỜ KÝ (Từ tab Đã thực hiện)
   const handleForwardToSign = async (record: RecordFile) => {
     if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
-      onUpdateStatus(record, RecordStatus.PENDING_SIGN);
+        if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
+             // Handle Archive Record
+            const historyEntry = {
+                action: 'Trình ký',
+                status: 'pending_sign',
+                timestamp: new Date().toISOString(),
+                user: user.name
+            };
+
+            const currentArchive = archiveRecords.find(r => r.id === record.id);
+            if (currentArchive) {
+                 const oldHistory = Array.isArray(currentArchive.data?.history) ? currentArchive.data.history : [];
+                 const newHistory = [...oldHistory, historyEntry];
+                 
+                 await saveArchiveRecord({
+                     id: record.id,
+                     status: 'pending_sign',
+                     data: { ...currentArchive.data, history: newHistory }
+                 });
+                 
+                 // Refresh data
+                 const saoluc = await fetchArchiveRecords('saoluc');
+                 const congvan = await fetchArchiveRecords('congvan');
+                 setArchiveRecords([...saoluc, ...congvan]);
+            }
+        } else {
+            // Normal Record
+            onUpdateStatus(record, RecordStatus.PENDING_SIGN);
+        }
     }
   };
 

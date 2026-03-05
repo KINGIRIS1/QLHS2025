@@ -445,7 +445,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
                             <UserIcon size={16}/> Thông tin chủ hồ sơ
                         </h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Chủ sử dụng</label>
                                 <p className="text-base font-bold text-gray-800">{record.customerName}</p>
@@ -493,6 +493,53 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             </div>
                             <span className="font-bold text-sm text-gray-700">{getEmployeeName(record.assignedTo)}</span>
                         </div>
+                    </div>
+
+                    {/* REMINDER */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
+                                <Bell size={16} /> Hẹn giờ nhắc việc
+                            </h4>
+                            <button 
+                                onClick={handleSaveReminder} 
+                                disabled={isSavingReminder}
+                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
+                            >
+                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
+                            </button>
+                        </div>
+                        <input 
+                            type="datetime-local" 
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                            value={reminderDate}
+                            onChange={(e) => setReminderDate(e.target.value)}
+                        />
+                    </div>
+
+                    {/* PERSONAL NOTE */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 text-blue-600 font-bold text-xs uppercase">
+                                <StickyNote size={16} />
+                                <span>Ghi chú cá nhân</span>
+                            </div>
+                            <button 
+                                onClick={handleSavePersonalNote} 
+                                disabled={isSavingNote}
+                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
+                            >
+                                {isSavingNote ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+                                Lưu
+                            </button>
+                        </div>
+                        <textarea
+                            rows={3}
+                            className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            placeholder="Nhập ghi chú riêng của bạn..."
+                            value={personalNote}
+                            onChange={(e) => setPersonalNote(e.target.value)}
+                        />
                     </div>
                 </div>
 
@@ -628,6 +675,20 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             />
                             
                             <TimelineItem 
+                                date={record.approvalDate} 
+                                label="KÝ DUYỆT" 
+                                icon={FileSignature}
+                                colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                            />
+                            
+                            <TimelineItem 
+                                date={record.completedDate} 
+                                label="HOÀN THÀNH" 
+                                icon={CheckSquare}
+                                colorClass={{text: 'text-green-700', border: 'border-green-600', bg: 'bg-green-600'}}
+                            />
+                            
+                            <TimelineItem 
                                 date={record.resultReturnedDate} 
                                 label="TRẢ KẾT QUẢ" 
                                 icon={FileCheck}
@@ -647,53 +708,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             <p className="text-xs text-green-600 mt-1">Ngày: {formatDate(record.exportDate)}</p>
                          </div>
                     )}
-
-                    {/* REMINDER */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex justify-between items-center mb-3">
-                            <h4 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                                <Bell size={16} /> Hẹn giờ nhắc việc
-                            </h4>
-                            <button 
-                                onClick={handleSaveReminder} 
-                                disabled={isSavingReminder}
-                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
-                            >
-                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
-                            </button>
-                        </div>
-                        <input 
-                            type="datetime-local" 
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                            value={reminderDate}
-                            onChange={(e) => setReminderDate(e.target.value)}
-                        />
-                    </div>
-
-                    {/* PERSONAL NOTE */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 text-blue-600 font-bold text-xs uppercase">
-                                <StickyNote size={16} />
-                                <span>Ghi chú cá nhân</span>
-                            </div>
-                            <button 
-                                onClick={handleSavePersonalNote} 
-                                disabled={isSavingNote}
-                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
-                            >
-                                {isSavingNote ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
-                                Lưu
-                            </button>
-                        </div>
-                        <textarea
-                            rows={3}
-                            className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                            placeholder="Nhập ghi chú riêng của bạn..."
-                            value={personalNote}
-                            onChange={(e) => setPersonalNote(e.target.value)}
-                        />
-                    </div>
                 </div>
 
             </div>

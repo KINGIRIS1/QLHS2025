@@ -36,7 +36,7 @@ function removeVietnameseTones(str: string): string {
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   // Thêm tab 'completed_work' và 'pending_sign'
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'reminder'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -134,12 +134,24 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
       return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
-  // 4. Hồ sơ Có hẹn nhắc việc
+  // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, WITHDRAWN)
+  const finishedRecords = useMemo(() => {
+      let list = myRecords.filter(r => 
+          r.status === RecordStatus.SIGNED || 
+          r.status === RecordStatus.HANDOVER || 
+          r.status === RecordStatus.RETURNED ||
+          r.status === RecordStatus.WITHDRAWN
+      );
+      return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
+  // 5. Hồ sơ Có hẹn nhắc việc
   const reminderRecords = useMemo(() => {
       let list = myRecords.filter(r => 
           r.reminderDate && 
           r.status !== RecordStatus.HANDOVER && 
-          r.status !== RecordStatus.WITHDRAWN
+          r.status !== RecordStatus.WITHDRAWN &&
+          r.status !== RecordStatus.RETURNED
       );
       // Logic search & sort riêng cho reminder
       if (searchTerm) {
@@ -182,13 +194,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   }
 
   // Tổng hợp các chỉ số
-  const completedTotal = myRecords.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER).length;
+  const completedTotal = finishedRecords.length;
 
   // Xác định danh sách hiển thị dựa trên Tab đang chọn
   const displayRecords = 
       activeTab === 'pending' ? pendingRecords : 
       activeTab === 'completed_work' ? completedWorkRecords :
       activeTab === 'pending_sign' ? reviewRecords :
+      activeTab === 'finished' ? finishedRecords :
       reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
@@ -396,7 +409,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                 <div className="text-xs text-purple-600 uppercase font-semibold">Chờ ký</div>
              </div>
              <div className="flex-1 md:flex-none text-center px-4 py-2 bg-green-50 rounded-lg border border-green-100 min-w-[100px]">
-                <div className="text-2xl font-bold text-green-700">{completedTotal}</div>
+                <div className="text-2xl font-bold text-green-700">{finishedRecords.length}</div>
                 <div className="text-xs text-green-600 uppercase font-semibold">Hoàn thành</div>
              </div>
         </div>
@@ -431,6 +444,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                     }`}
                 >
                     <Send size={16} /> Chờ ký ({reviewRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('finished'); setCurrentPage(1); setSearchTerm(''); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'finished' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <FileCheck size={16} /> Hoàn thành ({finishedRecords.length})
                 </button>
                 <button 
                     onClick={() => { setActiveTab('reminder'); setCurrentPage(1); setSearchTerm(''); }}

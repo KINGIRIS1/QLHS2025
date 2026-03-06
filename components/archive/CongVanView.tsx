@@ -241,17 +241,17 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                    <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm">
-                        <Calendar size={18} className="text-gray-500"/>
-                        <input type="date" className="text-sm font-medium border-none outline-none text-gray-700 w-32" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-                        <span className="text-gray-400 font-bold">-</span>
-                        <input type="date" className="text-sm font-medium border-none outline-none text-gray-700 w-32" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Calendar size={16} className="text-gray-500"/>
+                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                        <span className="text-gray-400">-</span>
+                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
                     </div>
 
-                    <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm">
-                        <Users size={18} className="text-gray-500"/>
-                        <select className="text-sm font-medium border-none outline-none text-gray-700 bg-transparent min-w-[140px] cursor-pointer" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Users size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
                             <option value="">Tất cả Nhân viên</option>
                             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>

@@ -503,25 +503,25 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                    <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm">
-                        <Calendar size={18} className="text-gray-500"/>
-                        <input type="date" className="text-sm font-medium border-none outline-none text-gray-700 w-32" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-                        <span className="text-gray-400 font-bold">-</span>
-                        <input type="date" className="text-sm font-medium border-none outline-none text-gray-700 w-32" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Calendar size={16} className="text-gray-500"/>
+                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                        <span className="text-gray-400">-</span>
+                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
                     </div>
 
-                    <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm">
-                        <Settings size={18} className="text-gray-500"/>
-                        <select className="text-sm font-medium border-none outline-none text-gray-700 bg-transparent min-w-[140px] cursor-pointer" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Settings size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
                             <option value="">Tất cả Địa danh</option>
                             {wards.map(w => <option key={w} value={w}>{w}</option>)}
                         </select>
                     </div>
 
-                    <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm">
-                        <CheckCircle2 size={18} className="text-gray-500"/>
-                        <select className="text-sm font-medium border-none outline-none text-gray-700 bg-transparent min-w-[140px] cursor-pointer" value={activeTab} onChange={e => setActiveTab(e.target.value as any)}>
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <CheckCircle2 size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={activeTab} onChange={e => setActiveTab(e.target.value as any)}>
                             <option value="all">Tất cả Trạng thái</option>
                             <option value="pending">Chờ chuyển Scan</option>
                             <option value="scanned">Đã chuyển Scan</option>

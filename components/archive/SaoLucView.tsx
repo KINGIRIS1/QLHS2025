@@ -30,7 +30,7 @@ interface SaoLucFormData {
 const WARDS = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'];
 
 const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
-    const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'sign' | 'signed' | 'result'>('all');
+    const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'executed' | 'sign' | 'signed' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -78,7 +78,8 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
         
         // Filter by Tab
         if (subTab === 'draft') list = list.filter(r => r.status === 'draft');
-        if (subTab === 'assigned') list = list.filter(r => r.status === 'assigned' || r.status === 'executed');
+        if (subTab === 'assigned') list = list.filter(r => r.status === 'assigned');
+        if (subTab === 'executed') list = list.filter(r => r.status === 'executed');
         if (subTab === 'sign') list = list.filter(r => r.status === 'pending_sign');
         if (subTab === 'signed') list = list.filter(r => r.status === 'signed');
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
@@ -317,7 +318,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                             onClick={() => setSubTab('assigned')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'assigned' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <Users size={16}/> Đã thực hiện
+                            <Users size={16}/> Đang thực hiện
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('executed')} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'executed' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <CheckCircle2 size={16}/> Đã thực hiện
                         </button>
                         <button 
                             onClick={() => setSubTab('sign')} 

@@ -59,7 +59,7 @@ interface AppRoutesProps {
     // Report Props
     globalReportContent: string;
     isGeneratingReport: boolean;
-    handleGlobalGenerateReport: (from: string, to: string) => void;
+    handleGlobalGenerateReport: (fromDate: string, toDate: string, title?: string, data?: RecordFile[]) => void;
     handleExportReportExcel: (from: string, to: string, ward: string) => void;
 
     // List Logic Props

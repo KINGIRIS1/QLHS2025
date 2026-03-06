@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Employee } from '../types';
-import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, Briefcase, Download, FileSpreadsheet, Upload } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, Briefcase, Download, FileSpreadsheet, Upload, Search } from 'lucide-react';
 import { confirmAction } from '../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -33,6 +33,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   const [formData, setFormData] = useState<User>(initialFormState);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (editingUser) {
@@ -41,6 +42,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
       setFormData(initialFormState);
     }
   }, [editingUser, isModalOpen]);
+
+  const filteredUsers = users.filter(user => 
+    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,7 +172,17 @@ const UserManagement: React.FC<UserManagementProps> = ({
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <Shield className="text-blue-600" /> Quản Lý Tài Khoản
             </h2>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+                <div className="relative mr-2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Tìm tài khoản..." 
+                        className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
                 <input 
                     type="file" 
                     ref={fileInputRef}
@@ -207,49 +223,57 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
-                    {users.map(user => (
-                        <tr key={user.username} className="hover:bg-blue-50/50 transition-colors">
-                            <td className="p-4 font-medium text-gray-900">{user.username}</td>
-                            <td className="p-4">{user.name}</td>
-                            <td className="p-4">
-                                <span className={`px-2 py-1 rounded text-xs font-bold border ${
-                                    user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
-                                    user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                    user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                    user.role === UserRole.ONEDOOR ? 'bg-green-50 text-green-700 border-green-200' :
-                                    'bg-blue-50 text-blue-700 border-blue-200'
-                                }`}>
-                                    {user.role}
-                                </span>
-                            </td>
-                            <td className="p-4 text-gray-600">
-                                <div className="flex items-center gap-2">
-                                    <Briefcase size={14} className="text-gray-400" />
-                                    {getEmployeeName(user.employeeId)}
-                                </div>
-                            </td>
-                            <td className="p-4 text-center">
-                                <div className="flex justify-center gap-2">
-                                    <button
-                                        onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
-                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                        title="Sửa"
-                                    >
-                                        <Edit size={16} />
-                                    </button>
-                                    {user.role !== UserRole.ADMIN && (
+                    {filteredUsers.length > 0 ? (
+                        filteredUsers.map(user => (
+                            <tr key={user.username} className="hover:bg-blue-50/50 transition-colors">
+                                <td className="p-4 font-medium text-gray-900">{user.username}</td>
+                                <td className="p-4">{user.name}</td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                                        user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
+                                        user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                        user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                        user.role === UserRole.ONEDOOR ? 'bg-green-50 text-green-700 border-green-200' :
+                                        'bg-blue-50 text-blue-700 border-blue-200'
+                                    }`}>
+                                        {user.role}
+                                    </span>
+                                </td>
+                                <td className="p-4 text-gray-600">
+                                    <div className="flex items-center gap-2">
+                                        <Briefcase size={14} className="text-gray-400" />
+                                        {getEmployeeName(user.employeeId)}
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <div className="flex justify-center gap-2">
                                         <button
-                                            onClick={() => handleDelete(user.username)}
-                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                            title="Xóa"
+                                            onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                            title="Sửa"
                                         >
-                                            <Trash2 size={16} />
+                                            <Edit size={16} />
                                         </button>
-                                    )}
-                                </div>
+                                        {user.role !== UserRole.ADMIN && (
+                                            <button
+                                                onClick={() => handleDelete(user.username)}
+                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                title="Xóa"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan={5} className="p-8 text-center text-gray-400 italic">
+                                Không tìm thấy tài khoản nào phù hợp.
                             </td>
                         </tr>
-                    ))}
+                    )}
                 </tbody>
             </table>
         </div>

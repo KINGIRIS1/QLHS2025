@@ -207,17 +207,22 @@ function App() {
       return true;
   };
 
-  const handleGlobalGenerateReport = async (fromDateStr: string, toDateStr: string, title?: string) => {
+  const handleGlobalGenerateReport = async (fromDateStr: string, toDateStr: string, title?: string, data?: RecordFile[]) => {
       if (!currentUser) return;
       setIsGeneratingReport(true);
       setGlobalReportContent(''); 
       const from = new Date(fromDateStr); from.setHours(0, 0, 0, 0); 
       const to = new Date(toDateStr); to.setHours(23, 59, 59, 999); 
-      const filtered = records.filter(r => { if(!r.receivedDate) return false; const rDate = new Date(r.receivedDate); return rDate >= from && rDate <= to; });
+      
+      let filtered = data;
+      if (!filtered) {
+          filtered = records.filter(r => { if(!r.receivedDate) return false; const rDate = new Date(r.receivedDate); return rDate >= from && rDate <= to; });
+      }
+
       const formatDateVN = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
       try {
           const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
-          const result = await generateReport(filtered, `Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}`, scope, currentUser.name, title);
+          const result = await generateReport(filtered!, `Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}`, scope, currentUser.name, title);
           setGlobalReportContent(result);
       } catch (error) { setGlobalReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key."); } 
       finally { setIsGeneratingReport(false); }

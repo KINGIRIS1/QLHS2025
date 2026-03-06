@@ -1,17 +1,18 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Database, Archive } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
+import { fetchArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 
 interface ReportSectionProps {
     reportContent: string;
     isGenerating: boolean;
-    onGenerate: (fromDate: string, toDate: string, title?: string) => void;
+    onGenerate: (fromDate: string, toDate: string, title?: string, data?: RecordFile[]) => void;
     onExportExcel: (fromDate: string, toDate: string, ward: string) => void;
     records: RecordFile[];
     wards: string[]; 
@@ -46,6 +47,67 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
+    // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
+    const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
+    const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
+
+    useEffect(() => {
+        if (mainTab === 'archive' && archiveRecords.length === 0) {
+            const loadArchive = async () => {
+                try {
+                    const [saoluc, vaoso, congvan] = await Promise.all([
+                        fetchArchiveRecords('saoluc'),
+                        fetchArchiveRecords('vaoso'),
+                        fetchArchiveRecords('congvan')
+                    ]);
+                    const all = [...saoluc, ...vaoso, ...congvan];
+                    
+                    const mapStatus = (s: string): RecordStatus => {
+                        switch(s) {
+                            case 'draft': return RecordStatus.RECEIVED;
+                            case 'assigned': return RecordStatus.ASSIGNED;
+                            case 'executed': return RecordStatus.COMPLETED_WORK;
+                            case 'pending_sign': return RecordStatus.PENDING_SIGN;
+                            case 'signed': return RecordStatus.SIGNED;
+                            case 'completed': return RecordStatus.RETURNED;
+                            default: return RecordStatus.RECEIVED;
+                        }
+                    };
+
+                    const mapped: RecordFile[] = all.map(r => ({
+                        id: r.id,
+                        code: r.so_hieu,
+                        customerName: r.noi_nhan_gui,
+                        ward: r.data?.xa_phuong,
+                        receivedDate: r.ngay_thang,
+                        deadline: r.data?.hen_tra,
+                        status: mapStatus(r.status),
+                        assignedTo: r.data?.assigned_to,
+                        notes: r.trich_yeu,
+                        recordType: r.type === 'saoluc' ? 'Sao lục' : r.type === 'vaoso' ? 'Vào sổ' : 'Công văn',
+                        address: r.data?.xa_phuong,
+                        phoneNumber: '',
+                        content: r.trich_yeu
+                    } as RecordFile));
+                    setArchiveRecords(mapped);
+                } catch (e) {
+                    console.error("Error loading archive records for report", e);
+                }
+            };
+            loadArchive();
+        }
+    }, [mainTab]);
+
+    const activeRecords = mainTab === 'measurement' ? records : archiveRecords;
+
+    const activeEmployees = useMemo(() => {
+        if (mainTab === 'measurement') {
+            return employees.filter(e => !e.department?.toLowerCase().includes('lưu trữ'));
+        } else {
+            return employees.filter(e => e.department?.toLowerCase().includes('lưu trữ'));
+        }
+    }, [employees, mainTab]);
+
     useEffect(() => {
         if (isKeyModalOpen) {
             setApiKey(getGeminiKey());
@@ -63,7 +125,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const start = new Date(fromDate); start.setHours(0,0,0,0);
         const end = new Date(toDate); end.setHours(23,59,59,999);
 
-        return records.filter(r => {
+        return activeRecords.filter(r => {
             if (!r.receivedDate) return false;
             const rDate = new Date(r.receivedDate);
             const matchDate = rDate >= start && rDate <= end;
@@ -77,7 +139,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
             return matchDate && matchWard;
         });
-    }, [records, fromDate, toDate, selectedWard]);
+    }, [activeRecords, fromDate, toDate, selectedWard]);
 
     // Reset pagination when data changes
     useEffect(() => {
@@ -171,7 +233,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         if (reportType === 'week') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC TUẦN";
         if (reportType === 'month') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC THÁNG";
 
-        onGenerate(fromDate, toDate, title);
+        // Pass filteredData to onGenerate
+        onGenerate(fromDate, toDate, title, filteredData);
     };
 
     const handleExportExcelClick = () => {
@@ -221,16 +284,36 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     return (
         <div className="flex flex-col h-full overflow-hidden relative bg-slate-50">
+            {/* MAIN TAB SWITCHER */}
+            <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0">
+                <button 
+                    onClick={() => setMainTab('measurement')}
+                    className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                >
+                    <Database size={18} /> Báo cáo Đo đạc
+                </button>
+                <button 
+                    onClick={() => setMainTab('archive')}
+                    className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                >
+                    <Archive size={18} /> Báo cáo Lưu trữ
+                </button>
+            </div>
+
             {/* Toolbar */}
-            <div className="bg-white p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10">
+            <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : 'bg-orange-50'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 p-2.5 rounded-xl text-blue-600">
+                        <div className={`p-2.5 rounded-xl ${mainTab === 'measurement' ? 'bg-blue-200 text-blue-700' : 'bg-orange-200 text-orange-700'}`}>
                             <BarChart3 size={24} />
                         </div>
                         <div>
-                            <h2 className="font-bold text-gray-800 text-lg">Báo cáo & Thống kê</h2>
-                            <p className="text-xs text-gray-500">Lập danh sách kết quả, báo cáo tuần/tháng</p>
+                            <h2 className={`font-bold text-lg ${mainTab === 'measurement' ? 'text-blue-900' : 'text-orange-900'}`}>
+                                {mainTab === 'measurement' ? 'Thống kê Hồ sơ Đo đạc' : 'Thống kê Hồ sơ Lưu trữ'}
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                                {mainTab === 'measurement' ? 'Dữ liệu từ Tổ đo đạc & Kỹ thuật' : 'Dữ liệu từ Tổ thông tin lưu trữ'}
+                            </p>
                         </div>
                     </div>
                     
@@ -477,8 +560,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
                 {activeTab === 'employee' && (
                     <EmployeeStatsView 
-                        records={records}
-                        employees={employees}
+                        records={activeRecords}
+                        employees={activeEmployees}
                         fromDate={fromDate}
                         toDate={toDate}
                         selectedEmpId={selectedEmpId}

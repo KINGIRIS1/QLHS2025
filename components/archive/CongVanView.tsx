@@ -207,6 +207,8 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         }
     };
 
+    const isManager = (currentUser.role as string) === 'ADMIN' || (currentUser.role as string) === 'SUBADMIN' || (currentUser.role as string) === 'admin' || (currentUser.role as string) === 'subadmin';
+
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
@@ -273,7 +275,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     </div>
 
                     <div className="ml-auto flex gap-2">
-                        {(subTab === 'draft' || subTab === 'all') && (
+                        {(subTab === 'draft' || subTab === 'all') && isManager && (
                             <>
                                 {selectedIds.size > 0 && (
                                     <button onClick={handleAssign} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
@@ -379,36 +381,40 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 text-center">
                                         <div className="flex justify-center gap-1">
                                             <button onClick={() => setDetailRecord(r)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Xem chi tiết"><Eye size={14}/></button>
-                                            {r.status === 'draft' && (
+                                            {r.status === 'draft' && isManager && (
                                                 <button onClick={() => { setSelectedIds(new Set([r.id])); setShowAssignModal(true); }} className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100" title="Giao việc"><Users size={14}/></button>
                                             )}
-                                            {r.status === 'assigned' && (
+                                            {r.status === 'assigned' && isManager && (
                                                 <>
                                                     <button onClick={() => handleStatusChange(r, 'draft')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Thu hồi"><RotateCcw size={14}/></button>
                                                     <button onClick={() => handleStatusChange(r, 'executed')} className="p-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100" title="Đã thực hiện"><CheckCircle size={14}/></button>
                                                 </>
                                             )}
-                                            {r.status === 'executed' && (
+                                            {r.status === 'executed' && isManager && (
                                                 <>
                                                     <button onClick={() => handleStatusChange(r, 'assigned')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Quay lại"><RotateCcw size={14}/></button>
                                                     <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-purple-600 bg-purple-50 rounded hover:bg-purple-100" title="Trình ký"><Send size={14}/></button>
                                                 </>
                                             )}
-                                            {r.status === 'pending_sign' && (
+                                            {r.status === 'pending_sign' && isManager && (
                                                 <>
                                                     <button onClick={() => handleStatusChange(r, 'executed')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
                                                     <button onClick={() => handleStatusChange(r, 'signed')} className="p-1.5 text-teal-600 bg-teal-50 rounded hover:bg-teal-100" title="Ký duyệt"><PenTool size={14}/></button>
                                                 </>
                                             )}
-                                            {r.status === 'signed' && (
+                                            {r.status === 'signed' && isManager && (
                                                 <>
                                                     <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
                                                     <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Hoàn thành"><FileCheck size={14}/></button>
                                                 </>
                                             )}
                                             
-                                            <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
-                                            <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>
+                                            {isManager && (
+                                                <>
+                                                    <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
+                                                    <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

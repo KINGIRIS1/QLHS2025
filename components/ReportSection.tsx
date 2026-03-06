@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Database, Archive } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching } from '../utils/appHelpers';
@@ -293,13 +293,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     onClick={() => setMainTab('measurement')}
                     className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                 >
-                    <Database size={18} /> Báo cáo Đo đạc
+                    <Ruler size={18} /> Báo cáo Đo đạc
                 </button>
                 <button 
                     onClick={() => setMainTab('archive')}
                     className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                 >
-                    <Archive size={18} /> Báo cáo Lưu trữ
+                    <FolderArchive size={18} /> Báo cáo Lưu trữ
                 </button>
             </div>
 

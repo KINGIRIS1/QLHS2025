@@ -11,6 +11,7 @@ import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 
 interface SaoLucViewProps {
     currentUser: User;
+    wards?: string[];
 }
 
 // Định nghĩa form state riêng để dễ quản lý các trường trong JSON data
@@ -27,14 +28,18 @@ interface SaoLucFormData {
     status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed';
 }
 
-const WARDS = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'];
-
-const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
+const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'] }) => {
     const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'executed' | 'sign' | 'signed' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
+    
+    // Filters
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [filterWard, setFilterWard] = useState('');
+    const [filterEmployee, setFilterEmployee] = useState('');
     
     // Detail Modal State
     const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
@@ -85,6 +90,16 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
         // 'all' shows everything
 
+        // Filter by Date
+        if (fromDate) list = list.filter(r => r.ngay_thang >= fromDate);
+        if (toDate) list = list.filter(r => r.ngay_thang <= toDate);
+
+        // Filter by Ward
+        if (filterWard) list = list.filter(r => r.data?.xa_phuong === filterWard);
+
+        // Filter by Employee
+        if (filterEmployee) list = list.filter(r => r.data?.assigned_to === filterEmployee);
+
         // Filter by Search
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
@@ -95,7 +110,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
             );
         }
         return list;
-    }, [records, subTab, searchTerm]);
+    }, [records, subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee]);
 
     // Reset selection when tab changes
     useEffect(() => {
@@ -302,6 +317,32 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                     </div>
                 </div>
 
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <Calendar size={14} className="text-gray-500"/>
+                        <input type="date" className="text-xs border-none outline-none text-gray-600 w-24" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                        <span className="text-gray-400">-</span>
+                        <input type="date" className="text-xs border-none outline-none text-gray-600 w-24" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <MapPin size={14} className="text-gray-500"/>
+                        <select className="text-xs border-none outline-none text-gray-600 bg-transparent min-w-[100px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
+                            <option value="">Tất cả Xã/Phường</option>
+                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <Users size={14} className="text-gray-500"/>
+                        <select className="text-xs border-none outline-none text-gray-600 bg-transparent min-w-[100px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                            <option value="">Tất cả Nhân viên</option>
+                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                        </select>
+                    </div>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
                     <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
                         <button 
@@ -413,7 +454,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                                 <label className="text-xs font-bold text-gray-500 uppercase mb-2 block flex items-center gap-1"><MapPin size={12}/> Vị trí đất</label>
                                 <div className="space-y-3">
                                     <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none" value={formData.xa_phuong} onChange={e => setFormData({...formData, xa_phuong: e.target.value})}>
-                                        {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
+                                        {wards.map(w => <option key={w} value={w}>{w}</option>)}
                                     </select>
                                     <div className="flex gap-2">
                                         <div>

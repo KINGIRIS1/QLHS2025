@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
@@ -20,6 +20,11 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     
+    // Filters
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [filterEmployee, setFilterEmployee] = useState('');
+
     // Detail Modal State
     const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
 
@@ -63,6 +68,13 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
         // 'all' shows everything
 
+        // Filter by Date
+        if (fromDate) list = list.filter(r => r.ngay_thang >= fromDate);
+        if (toDate) list = list.filter(r => r.ngay_thang <= toDate);
+
+        // Filter by Employee
+        if (filterEmployee) list = list.filter(r => r.data?.assigned_to === filterEmployee);
+
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
             list = list.filter(r => 
@@ -72,7 +84,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             );
         }
         return list;
-    }, [records, subTab, searchTerm]);
+    }, [records, subTab, searchTerm, fromDate, toDate, filterEmployee]);
 
     // Reset selection when tab changes
     useEffect(() => {
@@ -225,6 +237,24 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <Calendar size={14} className="text-gray-500"/>
+                        <input type="date" className="text-xs border-none outline-none text-gray-600 w-24" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                        <span className="text-gray-400">-</span>
+                        <input type="date" className="text-xs border-none outline-none text-gray-600 w-24" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <Users size={14} className="text-gray-500"/>
+                        <select className="text-xs border-none outline-none text-gray-600 bg-transparent min-w-[100px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                            <option value="">Tất cả Nhân viên</option>
+                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                        </select>
                     </div>
                 </div>
 

@@ -40,7 +40,7 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) =
 
             {/* CONTENT AREA */}
             <div className="flex-1 overflow-hidden flex flex-col">
-                {activeTab === 'saoluc' && <SaoLucView currentUser={currentUser} />}
+                {activeTab === 'saoluc' && <SaoLucView currentUser={currentUser} wards={wards} />}
                 {activeTab === 'vaoso' && <VaoSoView currentUser={currentUser} wards={wards} />}
                 {activeTab === 'congvan' && <CongVanView currentUser={currentUser} />}
             </div>

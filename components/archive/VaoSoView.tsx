@@ -52,6 +52,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
 
+    // Filters
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [filterWard, setFilterWard] = useState('');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'scanned'>('all');
+
     useEffect(() => {
         loadData();
     }, []);
@@ -94,7 +100,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const filteredRecords = useMemo(() => {
         let filtered = records;
 
-        // Filter by Tab
+        // Filter by Tab (Status)
+        // If user selects status from dropdown, it overrides the tab logic or syncs with it.
+        // Let's make the dropdown control the activeTab state for consistency.
+        // But here we use activeTab directly.
+        
         if (activeTab === 'all') {
             // Danh sách tổng: Hiển thị tối đa 1000 dòng mới nhất
             filtered = records.slice(0, 1000);
@@ -105,6 +115,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             // Đã chuyển Scan: Đã có đợt scan
             filtered = records.filter(r => r.data?.is_scanned);
         }
+
+        // Filter by Date (Ngày nhận)
+        if (fromDate) filtered = filtered.filter(r => r.data?.ngay_nhan >= fromDate);
+        if (toDate) filtered = filtered.filter(r => r.data?.ngay_nhan <= toDate);
+
+        // Filter by Ward (Địa danh)
+        if (filterWard) filtered = filtered.filter(r => r.data?.dia_danh === filterWard);
 
         // Filter by Search
         if (searchTerm) {
@@ -117,7 +134,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }
 
         return filtered;
-    }, [records, searchTerm, activeTab]);
+    }, [records, searchTerm, activeTab, fromDate, toDate, filterWard]);
 
     // Pagination
     const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
@@ -482,6 +499,33 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <Calendar size={14} className="text-gray-500"/>
+                        <input type="date" className="text-xs border-none outline-none text-gray-600 w-24" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                        <span className="text-gray-400">-</span>
+                        <input type="date" className="text-xs border-none outline-none text-gray-600 w-24" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <Settings size={14} className="text-gray-500"/>
+                        <select className="text-xs border-none outline-none text-gray-600 bg-transparent min-w-[100px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
+                            <option value="">Tất cả Địa danh</option>
+                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded border border-gray-200">
+                        <CheckCircle2 size={14} className="text-gray-500"/>
+                        <select className="text-xs border-none outline-none text-gray-600 bg-transparent min-w-[100px]" value={activeTab} onChange={e => setActiveTab(e.target.value as any)}>
+                            <option value="all">Tất cả Trạng thái</option>
+                            <option value="pending">Chờ chuyển Scan</option>
+                            <option value="scanned">Đã chuyển Scan</option>
+                        </select>
                     </div>
                 </div>
 

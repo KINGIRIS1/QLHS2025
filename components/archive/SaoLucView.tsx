@@ -311,7 +311,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser }) => {
                             onClick={() => setSubTab('draft')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'draft' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <ListChecks size={16}/> Giao nhân viên
+                            <ListChecks size={16}/> Chưa giao việc
                         </button>
                         <button 
                             onClick={() => setSubTab('assigned')} 

@@ -18,6 +18,7 @@
     "@google/genai": "^1.0.0",
     "@supabase/supabase-js": "^2.39.7",
     "buffer": "^6.0.3",
+    "docx": "^9.6.0",
     "docx-preview": "^0.3.2",
     "docxtemplater": "^3.46.0",
     "electron-log": "^5.1.0",

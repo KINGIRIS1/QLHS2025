@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
+import { exportSoDiaChinh } from '../../utils/exportSoDiaChinh';
 
 // Định nghĩa các cột
 const COLUMNS = [
@@ -590,6 +591,16 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
                         <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
                             <FileSpreadsheet size={16}/> Xuất Excel
+                        </button>
+                        <button onClick={() => {
+                            if (selectedIds.size === 0) {
+                                alert('Vui lòng chọn ít nhất một hồ sơ để xuất Sổ địa chính.');
+                                return;
+                            }
+                            const selectedRecords = records.filter(r => selectedIds.has(r.id));
+                            selectedRecords.forEach(r => exportSoDiaChinh(r));
+                        }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
+                            <FileText size={16}/> Xuất Sổ địa chính
                         </button>
                     </div>
                 </div>

@@ -22,19 +22,19 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) =
                     onClick={() => setActiveTab('vaoso')}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'vaoso' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <BookOpen size={16}/> Vào Số GCN
+                    <BookOpen size={16}/> Vào số GCN
                 </button>
                 <button 
                     onClick={() => setActiveTab('saoluc')}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'saoluc' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <Copy size={16}/> Sao Lục
+                    <Copy size={16}/> Sao lục hồ sơ
                 </button>
                 <button 
                     onClick={() => setActiveTab('congvan')}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'congvan' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <FileText size={16}/> Công Văn
+                    <FileText size={16}/> Quản lý Công văn
                 </button>
             </div>
 

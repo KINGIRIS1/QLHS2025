@@ -215,7 +215,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        QUẢN LÝ CÔNG VĂN
+                        Quản lý Công văn
                     </h2>
                     <div className="relative flex-1 sm:w-64 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />

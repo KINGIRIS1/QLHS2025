@@ -63,6 +63,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     });
     
     const [editingId, setEditingId] = useState<string | null>(null);
+    
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 50;
 
     useEffect(() => {
         loadData();
@@ -113,10 +117,11 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         return list;
     }, [records, subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee]);
 
-    // Reset selection when tab changes
+    // Reset selection and page when tab/filters change
     useEffect(() => {
         setSelectedIds(new Set());
-    }, [subTab]);
+        setCurrentPage(1);
+    }, [subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee]);
 
     const handleAssign = () => {
         if (selectedIds.size === 0) return;
@@ -243,10 +248,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
+            const updateData: any = { ...record.data, history: newHistory };
+            if (newStatus === 'completed') {
+                updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
+            }
+
             await saveArchiveRecord({ 
                 ...record, 
                 status: newStatus,
-                data: { ...record.data, history: newHistory }
+                data: updateData
             });
             loadData();
         }
@@ -298,6 +308,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     };
 
     const isManager = (currentUser.role as string) === 'ADMIN' || (currentUser.role as string) === 'SUBADMIN' || (currentUser.role as string) === 'admin' || (currentUser.role as string) === 'subadmin';
+
+    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+    const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -633,12 +646,12 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 </tr>
                             </thead>
                             <tbody className="text-sm divide-y divide-gray-100">
-                                {filteredRecords.length > 0 ? filteredRecords.map((r, idx) => (
+                                {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => (
                                     <tr key={r.id} className={`hover:bg-blue-50/50 group ${selectedIds.has(r.id) ? 'bg-blue-50' : ''}`}>
                                         <td className="p-3 text-center">
                                             <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                         </td>
-                                        <td className="p-3 text-center text-gray-500">{idx + 1}</td>
+                                        <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                         <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
                                         <td className="p-3 font-medium text-gray-800">{r.noi_nhan_gui}</td>
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
@@ -718,6 +731,48 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                             </tbody>
                         </table>
                     </div>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="p-3 border-t border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
+                            <span className="text-xs text-gray-500 font-medium">
+                                Hiển thị {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} / {filteredRecords.length} hồ sơ
+                            </span>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 bg-white text-xs disabled:opacity-50 hover:bg-gray-100"
+                                >
+                                    Trước
+                                </button>
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let p = i + 1;
+                                    if (totalPages > 5) {
+                                        if (currentPage > 3) p = currentPage - 2 + i;
+                                        if (p > totalPages) p = totalPages - (4 - i);
+                                        // Adjust if p < 1
+                                        if (p < 1) p = i + 1;
+                                    }
+                                    return (
+                                        <button
+                                            key={p}
+                                            onClick={() => setCurrentPage(p)}
+                                            className={`px-2 py-1 rounded border text-xs font-medium min-w-[24px] ${currentPage === p ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 bg-white hover:bg-gray-100 text-gray-600'}`}
+                                        >
+                                            {p}
+                                        </button>
+                                    );
+                                })}
+                                <button 
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-2 py-1 rounded border border-gray-300 bg-white text-xs disabled:opacity-50 hover:bg-gray-100"
+                                >
+                                    Sau
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

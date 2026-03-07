@@ -334,16 +334,39 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                 // Parse dates (assuming DD/MM/YYYY or Excel serial date)
                 const parseExcelDate = (val: any) => {
                     if (!val) return '';
+                    
+                    let date: Date | null = null;
+
                     if (typeof val === 'number') {
                         // Excel serial date
-                        const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-                        return date.toISOString().split('T')[0];
+                        date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                    } else if (typeof val === 'string') {
+                        const cleanVal = val.trim();
+                        // Check for DD/MM/YYYY
+                        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanVal)) {
+                            const [d, m, y] = cleanVal.split('/');
+                            date = new Date(Number(y), Number(m) - 1, Number(d));
+                        }
+                        // Check for DD-MM-YYYY
+                        else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(cleanVal)) {
+                            const [d, m, y] = cleanVal.split('-');
+                            date = new Date(Number(y), Number(m) - 1, Number(d));
+                        }
+                        // Check for YYYY-MM-DD
+                        else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+                            date = new Date(cleanVal);
+                        }
                     }
-                    if (typeof val === 'string') {
-                        // Try DD/MM/YYYY
-                        const parts = val.split('/');
-                        if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                        return val; // Return as is if not matching format
+
+                    if (date && !isNaN(date.getTime())) {
+                        const y = date.getFullYear();
+                        // Validate year range to prevent typos like 20245
+                        if (y >= 1900 && y <= 2100) {
+                            // Adjust for timezone offset to ensure correct date string
+                            const offset = date.getTimezoneOffset() * 60000;
+                            const localDate = new Date(date.getTime() - offset);
+                            return localDate.toISOString().split('T')[0];
+                        }
                     }
                     return '';
                 };

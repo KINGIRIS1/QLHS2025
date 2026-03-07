@@ -107,7 +107,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 return dept.includes('đo đạc') || dept.includes('kỹ thuật');
             });
         } else {
-            return employees.filter(e => e.department?.toLowerCase().includes('lưu trữ'));
+            return employees.filter(e => {
+                const dept = e.department?.toLowerCase() || '';
+                return dept.includes('lưu trữ') || dept.includes('một cửa');
+            });
         }
     }, [employees, mainTab]);
 

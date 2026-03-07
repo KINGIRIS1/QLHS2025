@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
-import { fetchEmployees, saveEmployeeApi } from '../../services/apiPeople';
+import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
@@ -366,6 +366,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             const rows = data.slice(1);
             const newRecords: Partial<ArchiveRecord>[] = [];
             
+            // Get users to link
+            const users = await fetchUsers();
+
             // Helper to get or create employee
             const getOrCreateEmployee = async (name: string): Promise<string> => {
                 if (!name) return '';
@@ -385,6 +388,14 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     employees.push(newEmp);
                     emp = newEmp;
                 }
+
+                // Link to User if exists and not linked
+                const user = users.find(u => u.name.toLowerCase() === cleanName.toLowerCase());
+                if (user && !user.employeeId) {
+                    user.employeeId = emp.id;
+                    await saveUserApi(user, true);
+                }
+
                 return emp.id;
             };
 

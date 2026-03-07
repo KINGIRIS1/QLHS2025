@@ -222,3 +222,41 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         return false;
     }
 };
+
+export const fetchTodayLists = async (type: 'saoluc' | 'congvan'): Promise<string[]> => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!isConfigured) {
+        const lists = new Set<string>();
+        MOCK_ARCHIVE.forEach(r => {
+            if (r.type === type && r.data?.ngay_hoan_thanh === today && r.data?.danh_sach) {
+                lists.add(r.data.danh_sach);
+            }
+        });
+        return Array.from(lists).sort();
+    }
+
+    try {
+        // Fetch records completed today to extract lists
+        // Note: Querying JSONB in Supabase: .contains('data', { ngay_hoan_thanh: today })
+        const { data, error } = await supabase
+            .from('archive_records')
+            .select('data')
+            .eq('type', type)
+            .contains('data', { ngay_hoan_thanh: today });
+
+        if (error) throw error;
+
+        const lists = new Set<string>();
+        data?.forEach((r: any) => {
+            if (r.data?.danh_sach) {
+                lists.add(r.data.danh_sach);
+            }
+        });
+        
+        return Array.from(lists).sort();
+    } catch (error) {
+        logError(`fetchTodayLists-${type}`, error);
+        return [];
+    }
+};

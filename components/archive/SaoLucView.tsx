@@ -4,9 +4,10 @@ import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet } from 'lucide-react';
-import { confirmAction } from '../../utils/appHelpers';
+import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
+import HandoverListModal from './HandoverListModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
 
@@ -49,6 +50,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
+    // Handover Modal State
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
+    const [pendingCompletionRecord, setPendingCompletionRecord] = useState<ArchiveRecord | null>(null);
+
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
         so_hieu: '',
@@ -226,6 +231,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     };
 
     const handleStatusChange = async (record: ArchiveRecord, newStatus: ArchiveRecord['status']) => {
+        // If completing, show modal to select list
+        if (newStatus === 'completed') {
+            setPendingCompletionRecord(record);
+            setShowHandoverModal(true);
+            return;
+        }
+
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
@@ -233,7 +245,6 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
             case 'pending_sign': confirmMsg = 'Trình ký hồ sơ này?'; actionName = 'Trình ký'; break;
             case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
-            case 'completed': confirmMsg = 'Xác nhận hoàn thành hồ sơ?'; actionName = 'Hoàn thành'; break;
             default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 
@@ -248,18 +259,41 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
-            const updateData: any = { ...record.data, history: newHistory };
-            if (newStatus === 'completed') {
-                updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
-            }
-
             await saveArchiveRecord({ 
                 ...record, 
                 status: newStatus,
-                data: updateData
+                data: { ...record.data, history: newHistory }
             });
             loadData();
         }
+    };
+
+    const handleConfirmHandover = async (listName: string) => {
+        if (!pendingCompletionRecord) return;
+
+        const historyEntry = {
+            action: 'Hoàn thành',
+            status: 'completed',
+            timestamp: new Date().toISOString(),
+            user: currentUser.name,
+            note: `Đã chuyển vào danh sách: ${listName}`
+        };
+
+        const oldHistory = Array.isArray(pendingCompletionRecord.data?.history) ? pendingCompletionRecord.data.history : [];
+        const newHistory = [...oldHistory, historyEntry];
+
+        const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
+        updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
+        updateData.danh_sach = listName;
+
+        await saveArchiveRecord({ 
+            ...pendingCompletionRecord, 
+            status: 'completed',
+            data: updateData
+        });
+        
+        setPendingCompletionRecord(null);
+        loadData();
     };
 
     const handleDelete = async (id: string) => {
@@ -548,6 +582,14 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     getEmployeeName={getEmployeeName}
                 />
 
+                {/* Handover List Modal */}
+                <HandoverListModal 
+                    isOpen={showHandoverModal}
+                    onClose={() => { setShowHandoverModal(false); setPendingCompletionRecord(null); }}
+                    onConfirm={handleConfirmHandover}
+                    type="saoluc"
+                />
+
                 {/* Assign Modal */}
                 <AssignModal 
                     isOpen={showAssignModal}
@@ -579,7 +621,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block flex items-center gap-1"><UserIcon size={12}/> Chủ sử dụng <span className="text-red-500">*</span></label>
-                                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.chu_su_dung} onChange={e => setFormData({...formData, chu_su_dung: e.target.value})} placeholder="Nguyễn Văn A..." />
+                                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.chu_su_dung} onChange={e => setFormData({...formData, chu_su_dung: toTitleCase(e.target.value)})} placeholder="Nguyễn Văn A..." />
                             </div>
 
                             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
@@ -653,7 +695,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                         </td>
                                         <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                         <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
-                                        <td className="p-3 font-medium text-gray-800">{r.noi_nhan_gui}</td>
+                                        <td className="p-3 font-medium text-gray-800">{toTitleCase(r.noi_nhan_gui)}</td>
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>
                                         <td className="p-3 text-gray-600">{formatDate(r.ngay_thang)}</td>

@@ -4,9 +4,10 @@ import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar } from 'lucide-react';
-import { confirmAction } from '../../utils/appHelpers';
+import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
+import HandoverListModal from './HandoverListModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 
 interface CongVanViewProps {
@@ -31,6 +32,10 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     // Assign Modal State
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    // Handover Modal State
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
+    const [pendingCompletionRecord, setPendingCompletionRecord] = useState<ArchiveRecord | null>(null);
 
     const [formData, setFormData] = useState<Partial<ArchiveRecord>>({
         type: 'congvan',
@@ -168,6 +173,13 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleStatusChange = async (record: ArchiveRecord, newStatus: ArchiveRecord['status']) => {
+        // If completing, show modal to select list
+        if (newStatus === 'completed') {
+            setPendingCompletionRecord(record);
+            setShowHandoverModal(true);
+            return;
+        }
+
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
@@ -175,7 +187,6 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
             case 'pending_sign': confirmMsg = 'Trình ký công văn này?'; actionName = 'Trình ký'; break;
             case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
-            case 'completed': confirmMsg = 'Xác nhận hoàn thành công văn?'; actionName = 'Hoàn thành'; break;
             default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 
@@ -190,18 +201,41 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
-            const updateData: any = { ...record.data, history: newHistory };
-            if (newStatus === 'completed') {
-                updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
-            }
-
             await saveArchiveRecord({ 
                 ...record, 
                 status: newStatus,
-                data: updateData
+                data: { ...record.data, history: newHistory }
             });
             loadData();
         }
+    };
+
+    const handleConfirmHandover = async (listName: string) => {
+        if (!pendingCompletionRecord) return;
+
+        const historyEntry = {
+            action: 'Hoàn thành',
+            status: 'completed',
+            timestamp: new Date().toISOString(),
+            user: currentUser.name,
+            note: `Đã chuyển vào danh sách: ${listName}`
+        };
+
+        const oldHistory = Array.isArray(pendingCompletionRecord.data?.history) ? pendingCompletionRecord.data.history : [];
+        const newHistory = [...oldHistory, historyEntry];
+
+        const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
+        updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
+        updateData.danh_sach = listName;
+
+        await saveArchiveRecord({ 
+            ...pendingCompletionRecord, 
+            status: 'completed',
+            data: updateData
+        });
+        
+        setPendingCompletionRecord(null);
+        loadData();
     };
 
     const handleDelete = async (id: string) => {
@@ -344,6 +378,14 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     getEmployeeName={getEmployeeName}
                 />
 
+                {/* Handover List Modal */}
+                <HandoverListModal 
+                    isOpen={showHandoverModal}
+                    onClose={() => { setShowHandoverModal(false); setPendingCompletionRecord(null); }}
+                    onConfirm={handleConfirmHandover}
+                    type="congvan"
+                />
+
                 {/* Assign Modal */}
                 <AssignModal 
                     isOpen={showAssignModal}
@@ -367,7 +409,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Số hiệu</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số CV..." /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Ngày tháng</label><input type="date" className="w-full border rounded px-3 py-2 text-sm" value={formData.ngay_thang} onChange={e => setFormData({...formData, ngay_thang: e.target.value})} /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Trích yếu</label><textarea rows={3} className="w-full border rounded px-3 py-2 text-sm" value={formData.trich_yeu} onChange={e => setFormData({...formData, trich_yeu: e.target.value})} placeholder="Nội dung..." /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: e.target.value})} placeholder="Đơn vị..." /></div>
+                            <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: toTitleCase(e.target.value)})} placeholder="Đơn vị..." /></div>
                             
                             <div className="pt-4 flex gap-2 justify-end">
                                 <button type="button" onClick={() => setIsFormOpen(false)} className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded text-sm">Hủy</button>
@@ -405,7 +447,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
                                     <td className="p-3 text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
                                     <td className="p-3 text-gray-800">{r.trich_yeu}</td>
-                                    <td className="p-3 text-gray-600">{r.noi_nhan_gui}</td>
+                                    <td className="p-3 text-gray-600">{toTitleCase(r.noi_nhan_gui)}</td>
                                     {(subTab === 'all') && (
                                         <td className="p-3 text-center">
                                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>

@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
+import * as XLSX from 'xlsx-js-style';
 
 interface SaoLucViewProps {
     currentUser: User;
@@ -298,6 +299,97 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
     const isManager = (currentUser.role as string) === 'ADMIN' || (currentUser.role as string) === 'SUBADMIN' || (currentUser.role as string) === 'admin' || (currentUser.role as string) === 'subadmin';
 
+    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            const bstr = evt.target?.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            // Skip header row
+            const rows = data.slice(1);
+            const newRecords: Partial<ArchiveRecord>[] = [];
+
+            for (const row of rows as any[]) {
+                // Map columns: 
+                // 0: MÃ HS, 1: CHỦ SỬ DỤNG, 2: NGÀY NHẬN, 3: HẸN TRẢ, 4: XÃ PHƯỜNG
+                // 5: NGƯỜI THỰC HIỆN, 6: THỬA, 7: TỜ, 8: NGÀY HOÀN THÀNH, 9: DANH SÁCH
+
+                const so_hieu = row[0]?.toString() || '';
+                if (!so_hieu) continue;
+
+                // Find employee ID by name if provided
+                let assigned_to = '';
+                const employeeName = row[5]?.toString();
+                if (employeeName) {
+                    const emp = employees.find(e => e.name.toLowerCase() === employeeName.toLowerCase());
+                    if (emp) assigned_to = emp.id;
+                }
+
+                // Parse dates (assuming DD/MM/YYYY or Excel serial date)
+                const parseExcelDate = (val: any) => {
+                    if (!val) return '';
+                    if (typeof val === 'number') {
+                        // Excel serial date
+                        const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                        return date.toISOString().split('T')[0];
+                    }
+                    if (typeof val === 'string') {
+                        // Try DD/MM/YYYY
+                        const parts = val.split('/');
+                        if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        return val; // Return as is if not matching format
+                    }
+                    return '';
+                };
+
+                newRecords.push({
+                    type: 'saoluc',
+                    status: 'draft',
+                    so_hieu: so_hieu,
+                    noi_nhan_gui: row[1]?.toString() || '',
+                    ngay_thang: parseExcelDate(row[2]),
+                    trich_yeu: '', // Default empty
+                    data: {
+                        hen_tra: parseExcelDate(row[3]),
+                        xa_phuong: row[4]?.toString() || '',
+                        assigned_to: assigned_to,
+                        thua_dat: row[6]?.toString() || '',
+                        to_ban_do: row[7]?.toString() || '',
+                        ngay_hoan_thanh: parseExcelDate(row[8]),
+                        danh_sach: row[9]?.toString() || ''
+                    },
+                    created_by: currentUser.username,
+                    created_at: new Date().toISOString()
+                });
+            }
+
+            if (newRecords.length > 0) {
+                // Use importArchiveRecords service (need to ensure it's imported)
+                // Assuming importArchiveRecords is available in apiArchive
+                // If not, we might need to loop saveArchiveRecord or update apiArchive
+                // Based on previous context, importArchiveRecords exists.
+                const success = await importArchiveRecords(newRecords); // Ensure this is imported
+                if (success) {
+                    alert(`Đã import thành công ${newRecords.length} hồ sơ.`);
+                    loadData();
+                } else {
+                    alert('Có lỗi xảy ra khi import.');
+                }
+            } else {
+                alert('Không tìm thấy dữ liệu hợp lệ trong file.');
+            }
+        };
+        reader.readAsBinaryString(file);
+        // Reset input
+        e.target.value = '';
+    };
+
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
@@ -397,6 +489,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                         <Users size={16}/> Giao việc ({selectedIds.size})
                                     </button>
                                 )}
+                                <label className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm cursor-pointer">
+                                    <FileSpreadsheet size={16}/> Import Excel
+                                    <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
+                                </label>
                                 <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
                                     <Plus size={16}/> Thêm mới
                                 </button>
@@ -508,6 +604,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                     {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
                                     {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
                                     <th className="p-3 w-24 text-center">Hẹn trả</th>
+                                    {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày hoàn thành</th>}
                                     <th className="p-3 w-64 text-center">Nội dung</th>
                                     <th className="p-3 w-28 text-center">Thao tác</th>
                                 </tr>
@@ -541,6 +638,12 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                             </td>
                                         )}
                                         <td className="p-3 text-purple-600 font-medium">{formatDate(r.data?.hen_tra)}</td>
+                                        {(subTab === 'all') && (
+                                            <td className="p-3 text-center">
+                                                {r.data?.danh_sach && <div className="text-xs font-bold text-gray-700">{r.data.danh_sach}</div>}
+                                                <div className="text-gray-600 font-medium">{formatDate(r.data?.ngay_hoan_thanh)}</div>
+                                            </td>
+                                        )}
                                         <td className="p-3 text-gray-500 italic truncate max-w-xs">{r.trich_yeu}</td>
                                         <td className="p-3 text-center">
                                             <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

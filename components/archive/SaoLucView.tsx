@@ -3,11 +3,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
+import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
 
@@ -53,6 +54,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     // Handover Modal State
     const [showHandoverModal, setShowHandoverModal] = useState(false);
     const [pendingCompletionRecord, setPendingCompletionRecord] = useState<ArchiveRecord | null>(null);
+
+    // Export Modal State
+    const [showExportModal, setShowExportModal] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
@@ -568,6 +572,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 </button>
                             </>
                         )}
+                        <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
+                            <FileDown size={16}/> Xuất Bàn Giao
+                        </button>
                     </div>
                 </div>
             </div>
@@ -588,6 +595,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     onClose={() => { setShowHandoverModal(false); setPendingCompletionRecord(null); }}
                     onConfirm={handleConfirmHandover}
                     type="saoluc"
+                />
+
+                {/* Export Handover Modal */}
+                <ExportHandoverModal
+                    isOpen={showExportModal}
+                    onClose={() => setShowExportModal(false)}
+                    records={records}
+                    type="saoluc"
+                    wards={wards}
                 />
 
                 {/* Assign Modal */}

@@ -3,11 +3,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
+import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 
 interface CongVanViewProps {
@@ -36,6 +37,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     // Handover Modal State
     const [showHandoverModal, setShowHandoverModal] = useState(false);
     const [pendingCompletionRecord, setPendingCompletionRecord] = useState<ArchiveRecord | null>(null);
+
+    // Export Modal State
+    const [showExportModal, setShowExportModal] = useState(false);
 
     const [formData, setFormData] = useState<Partial<ArchiveRecord>>({
         type: 'congvan',
@@ -364,6 +368,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 </button>
                             </>
                         )}
+                        <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
+                            <FileDown size={16}/> Xuất Bàn Giao
+                        </button>
                     </div>
                 </div>
             </div>
@@ -383,6 +390,14 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     isOpen={showHandoverModal}
                     onClose={() => { setShowHandoverModal(false); setPendingCompletionRecord(null); }}
                     onConfirm={handleConfirmHandover}
+                    type="congvan"
+                />
+
+                {/* Export Handover Modal */}
+                <ExportHandoverModal
+                    isOpen={showExportModal}
+                    onClose={() => setShowExportModal(false)}
+                    records={records}
                     type="congvan"
                 />
 

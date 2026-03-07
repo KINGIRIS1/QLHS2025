@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
-import { fetchEmployees } from '../../services/apiPeople';
+import { fetchEmployees, saveEmployeeApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
@@ -365,6 +365,28 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             // Skip header row
             const rows = data.slice(1);
             const newRecords: Partial<ArchiveRecord>[] = [];
+            
+            // Helper to get or create employee
+            const getOrCreateEmployee = async (name: string): Promise<string> => {
+                if (!name) return '';
+                const cleanName = toTitleCase(name.trim());
+                let emp = employees.find(e => e.name.toLowerCase() === cleanName.toLowerCase());
+                
+                if (!emp) {
+                    // Create new employee
+                    const newEmp: Employee = {
+                        id: crypto.randomUUID(),
+                        name: cleanName,
+                        department: 'Bộ phận một cửa',
+                        managedWards: []
+                    };
+                    await saveEmployeeApi(newEmp, false);
+                    // Update local state to avoid duplicates in same loop
+                    employees.push(newEmp);
+                    emp = newEmp;
+                }
+                return emp.id;
+            };
 
             for (const row of rows as any[]) {
                 // Map columns: 
@@ -378,8 +400,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                 let assigned_to = '';
                 const employeeName = row[5]?.toString();
                 if (employeeName) {
-                    const emp = employees.find(e => e.name.toLowerCase() === employeeName.toLowerCase());
-                    if (emp) assigned_to = emp.id;
+                    assigned_to = await getOrCreateEmployee(employeeName);
                 }
 
                 // Parse dates (assuming DD/MM/YYYY or Excel serial date)
@@ -422,11 +443,37 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     return '';
                 };
 
+                const ngay_hoan_thanh = parseExcelDate(row[8]);
+                const danh_sach = row[9]?.toString() || '';
+                
+                let status: ArchiveRecord['status'] = 'draft';
+                let history: any[] = [];
+
+                // Determine status based on data
+                if (ngay_hoan_thanh && danh_sach) {
+                    status = 'completed';
+                    history.push({
+                        action: 'Hoàn thành (Import)',
+                        status: 'completed',
+                        timestamp: new Date().toISOString(),
+                        user: currentUser.name,
+                        note: `Đã chuyển vào danh sách: ${danh_sach}`
+                    });
+                } else if (assigned_to) {
+                    status = 'assigned';
+                    history.push({
+                        action: 'Giao việc (Import)',
+                        status: 'assigned',
+                        timestamp: new Date().toISOString(),
+                        user: currentUser.name
+                    });
+                }
+
                 newRecords.push({
                     type: 'saoluc',
-                    status: 'draft',
+                    status: status,
                     so_hieu: so_hieu,
-                    noi_nhan_gui: row[1]?.toString() || '',
+                    noi_nhan_gui: toTitleCase(row[1]?.toString() || ''),
                     ngay_thang: parseExcelDate(row[2]),
                     trich_yeu: '', // Default empty
                     data: {
@@ -435,8 +482,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                         assigned_to: assigned_to,
                         thua_dat: row[6]?.toString() || '',
                         to_ban_do: row[7]?.toString() || '',
-                        ngay_hoan_thanh: parseExcelDate(row[8]),
-                        danh_sach: row[9]?.toString() || ''
+                        ngay_hoan_thanh: ngay_hoan_thanh,
+                        danh_sach: danh_sach,
+                        loai_ho_so: 'Trích lục bản đồ địa chính', // Default
+                        history: history
                     },
                     created_by: currentUser.username,
                     created_at: new Date().toISOString()

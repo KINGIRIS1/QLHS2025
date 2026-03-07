@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
-import { fetchEmployees } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown } from 'lucide-react';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
+import { fetchEmployees, saveEmployeeApi } from '../../services/apiPeople';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
+import * as XLSX from 'xlsx-js-style';
 
 interface CongVanViewProps {
     currentUser: User;
@@ -104,6 +105,156 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         setSelectedIds(new Set());
         setCurrentPage(1);
     }, [subTab, searchTerm, fromDate, toDate, filterEmployee]);
+
+    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            const bstr = evt.target?.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            // Skip header row
+            const rows = data.slice(1);
+            const newRecords: Partial<ArchiveRecord>[] = [];
+            
+            // Helper to get or create employee
+            const getOrCreateEmployee = async (name: string): Promise<string> => {
+                if (!name) return '';
+                const cleanName = toTitleCase(name.trim());
+                let emp = employees.find(e => e.name.toLowerCase() === cleanName.toLowerCase());
+                
+                if (!emp) {
+                    // Create new employee
+                    const newEmp: Employee = {
+                        id: crypto.randomUUID(),
+                        name: cleanName,
+                        department: 'Bộ phận một cửa',
+                        managedWards: []
+                    };
+                    await saveEmployeeApi(newEmp, false);
+                    // Update local state to avoid duplicates in same loop
+                    employees.push(newEmp);
+                    emp = newEmp;
+                }
+                return emp.id;
+            };
+
+            for (const row of rows as any[]) {
+                // Map columns: 
+                // 0: SỐ HIỆU, 1: CƠ QUAN PHÁT HÀNH, 2: NGÀY THÁNG, 3: TRÍCH YẾU
+                // 4: NGƯỜI THỰC HIỆN, 5: NGÀY HOÀN THÀNH, 6: DANH SÁCH
+
+                const so_hieu = row[0]?.toString() || '';
+                if (!so_hieu) continue;
+
+                // Find employee ID by name if provided
+                let assigned_to = '';
+                const employeeName = row[4]?.toString();
+                if (employeeName) {
+                    assigned_to = await getOrCreateEmployee(employeeName);
+                }
+
+                // Parse dates (assuming DD/MM/YYYY or Excel serial date)
+                const parseExcelDate = (val: any) => {
+                    if (!val) return '';
+                    
+                    let date: Date | null = null;
+
+                    if (typeof val === 'number') {
+                        // Excel serial date
+                        date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                    } else if (typeof val === 'string') {
+                        const cleanVal = val.trim();
+                        // Check for DD/MM/YYYY
+                        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanVal)) {
+                            const [d, m, y] = cleanVal.split('/');
+                            date = new Date(Number(y), Number(m) - 1, Number(d));
+                        }
+                        // Check for DD-MM-YYYY
+                        else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(cleanVal)) {
+                            const [d, m, y] = cleanVal.split('-');
+                            date = new Date(Number(y), Number(m) - 1, Number(d));
+                        }
+                        // Check for YYYY-MM-DD
+                        else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+                            date = new Date(cleanVal);
+                        }
+                    }
+
+                    if (date && !isNaN(date.getTime())) {
+                        const y = date.getFullYear();
+                        if (y >= 1900 && y <= 2100) {
+                            const offset = date.getTimezoneOffset() * 60000;
+                            const localDate = new Date(date.getTime() - offset);
+                            return localDate.toISOString().split('T')[0];
+                        }
+                    }
+                    return '';
+                };
+
+                const ngay_hoan_thanh = parseExcelDate(row[5]);
+                const danh_sach = row[6]?.toString() || '';
+                
+                let status: ArchiveRecord['status'] = 'draft';
+                let history: any[] = [];
+
+                // Determine status based on data
+                if (ngay_hoan_thanh && danh_sach) {
+                    status = 'completed';
+                    history.push({
+                        action: 'Hoàn thành (Import)',
+                        status: 'completed',
+                        timestamp: new Date().toISOString(),
+                        user: currentUser.name,
+                        note: `Đã chuyển vào danh sách: ${danh_sach}`
+                    });
+                } else if (assigned_to) {
+                    status = 'assigned';
+                    history.push({
+                        action: 'Giao việc (Import)',
+                        status: 'assigned',
+                        timestamp: new Date().toISOString(),
+                        user: currentUser.name
+                    });
+                }
+
+                newRecords.push({
+                    type: 'congvan',
+                    status: status,
+                    so_hieu: so_hieu,
+                    noi_nhan_gui: toTitleCase(row[1]?.toString() || ''),
+                    ngay_thang: parseExcelDate(row[2]),
+                    trich_yeu: row[3]?.toString() || '',
+                    data: {
+                        assigned_to: assigned_to,
+                        ngay_hoan_thanh: ngay_hoan_thanh,
+                        danh_sach: danh_sach,
+                        history: history
+                    },
+                    created_by: currentUser.username,
+                    created_at: new Date().toISOString()
+                });
+            }
+
+            if (newRecords.length > 0) {
+                const success = await importArchiveRecords(newRecords);
+                if (success) {
+                    alert(`Đã import thành công ${newRecords.length} công văn.`);
+                    loadData();
+                } else {
+                    alert('Có lỗi xảy ra khi import.');
+                }
+            } else {
+                alert('Không tìm thấy dữ liệu hợp lệ trong file.');
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
 
     const handleAssign = () => {
         if (selectedIds.size === 0) return;
@@ -363,6 +514,10 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                         <Users size={16}/> Giao việc ({selectedIds.size})
                                     </button>
                                 )}
+                                <label className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm cursor-pointer">
+                                    <FileSpreadsheet size={16}/> Import Excel
+                                    <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
+                                </label>
                                 <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm">
                                     <Plus size={16}/> Tạo mới
                                 </button>

@@ -153,6 +153,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                 createCell("9", 13),
                                 createCell("10", 13),
                             ],
+                            height: { value: 450, rule: "exact" } // 30px
                         }),
                         // Data Row
                         new TableRow({
@@ -168,12 +169,12 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                 createCell(soPhatHanh, 13),
                                 createCell(soVaoSo, 13),
                             ],
-                            height: { value: 385, rule: "exact" }
+                            height: { value: 450, rule: "exact" } // 30px
                         }),
-                        // Empty rows to fill space (14 rows to make it 15 total)
-                        ...Array(14).fill(0).map(() => new TableRow({
+                        // Empty rows to fill space (15 rows to make it 17 total including numbers row)
+                        ...Array(15).fill(0).map(() => new TableRow({
                             children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
-                            height: { value: 385, rule: "exact" }
+                            height: { value: 450, rule: "exact" } // 30px
                         })),
 
                         // III - NHỮNG THAY ĐỔI
@@ -213,16 +214,16 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                     margins: { top: 100, bottom: 100, left: 100, right: 100 },
                                 }),
                             ],
-                            height: { value: 380, rule: "exact" }
+                            height: { value: 375, rule: "exact" } // 25px
                         }),
-                        // Empty rows to fill space (19 rows to make it 20 total)
-                        ...Array(19).fill(0).map(() => new TableRow({
+                        // Empty rows to fill space (20 rows to make it 21 total)
+                        ...Array(20).fill(0).map(() => new TableRow({
                             children: [
                                 createCell("", 10, false, AlignmentType.CENTER, 1),
                                 createCell("", 16, false, AlignmentType.CENTER, 2),
                                 createCell("", 74, false, AlignmentType.CENTER, 7),
                             ],
-                            height: { value: 380, rule: "exact" }
+                            height: { value: 375, rule: "exact" } // 25px
                         }))
                     ],
                 }),

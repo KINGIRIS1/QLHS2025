@@ -272,32 +272,86 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         }
     };
 
+    const handleBatchStatusChange = async (newStatus: ArchiveRecord['status']) => {
+        if (selectedIds.size === 0) return;
+
+        let confirmMsg = '';
+        let actionName = '';
+        switch (newStatus) {
+            case 'executed': confirmMsg = `Xác nhận đã thực hiện xong ${selectedIds.size} hồ sơ?`; actionName = 'Đã thực hiện'; break;
+            case 'pending_sign': confirmMsg = `Trình ký ${selectedIds.size} hồ sơ?`; actionName = 'Trình ký'; break;
+            case 'signed': confirmMsg = `Xác nhận đã ký duyệt ${selectedIds.size} hồ sơ?`; actionName = 'Ký duyệt'; break;
+            default: return;
+        }
+
+        if (await confirmAction(confirmMsg)) {
+            const historyEntry = {
+                action: actionName,
+                status: newStatus,
+                timestamp: new Date().toISOString(),
+                user: currentUser.name
+            };
+            
+            const updates = {
+                status: newStatus as any,
+                data: {
+                    history: [historyEntry]
+                }
+            };
+            
+            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            setSelectedIds(new Set());
+            loadData();
+        }
+    };
+
     const handleConfirmHandover = async (listName: string) => {
-        if (!pendingCompletionRecord) return;
+        if (pendingCompletionRecord) {
+            const historyEntry = {
+                action: 'Hoàn thành',
+                status: 'completed',
+                timestamp: new Date().toISOString(),
+                user: currentUser.name,
+                note: `Đã chuyển vào danh sách: ${listName}`
+            };
 
-        const historyEntry = {
-            action: 'Hoàn thành',
-            status: 'completed',
-            timestamp: new Date().toISOString(),
-            user: currentUser.name,
-            note: `Đã chuyển vào danh sách: ${listName}`
-        };
+            const oldHistory = Array.isArray(pendingCompletionRecord.data?.history) ? pendingCompletionRecord.data.history : [];
+            const newHistory = [...oldHistory, historyEntry];
 
-        const oldHistory = Array.isArray(pendingCompletionRecord.data?.history) ? pendingCompletionRecord.data.history : [];
-        const newHistory = [...oldHistory, historyEntry];
+            const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
+            updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
+            updateData.danh_sach = listName;
 
-        const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
-        updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
-        updateData.danh_sach = listName;
+            await saveArchiveRecord({ 
+                ...pendingCompletionRecord, 
+                status: 'completed',
+                data: updateData
+            });
+            
+            setPendingCompletionRecord(null);
+            loadData();
+        } else if (selectedIds.size > 0 && subTab === 'signed') {
+            const historyEntry = {
+                action: 'Hoàn thành',
+                status: 'completed',
+                timestamp: new Date().toISOString(),
+                user: currentUser.name,
+                note: `Đã chuyển vào danh sách: ${listName}`
+            };
 
-        await saveArchiveRecord({ 
-            ...pendingCompletionRecord, 
-            status: 'completed',
-            data: updateData
-        });
-        
-        setPendingCompletionRecord(null);
-        loadData();
+            const updates = {
+                status: 'completed' as any,
+                data: {
+                    ngay_hoan_thanh: new Date().toISOString().split('T')[0],
+                    danh_sach: listName,
+                    history: [historyEntry]
+                }
+            };
+            
+            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            setSelectedIds(new Set());
+            loadData();
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -616,6 +670,26 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     </div>
 
                     <div className="ml-auto flex gap-2">
+                        {subTab === 'assigned' && isManager && selectedIds.size > 0 && (
+                            <button onClick={() => handleBatchStatusChange('executed')} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
+                                <CheckCircle2 size={16}/> Đã thực hiện ({selectedIds.size})
+                            </button>
+                        )}
+                        {subTab === 'executed' && isManager && selectedIds.size > 0 && (
+                            <button onClick={() => handleBatchStatusChange('pending_sign')} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-purple-700 shadow-sm animate-pulse">
+                                <Send size={16}/> Trình ký ({selectedIds.size})
+                            </button>
+                        )}
+                        {subTab === 'sign' && isManager && selectedIds.size > 0 && (
+                            <button onClick={() => handleBatchStatusChange('signed')} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm animate-pulse">
+                                <PenTool size={16}/> Ký duyệt ({selectedIds.size})
+                            </button>
+                        )}
+                        {subTab === 'signed' && isManager && selectedIds.size > 0 && (
+                            <button onClick={() => setShowHandoverModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm animate-pulse">
+                                <FileCheck size={16}/> Hoàn thành ({selectedIds.size})
+                            </button>
+                        )}
                         {(subTab === 'draft' || subTab === 'all') && isManager && (
                             <>
                                 {selectedIds.size > 0 && (

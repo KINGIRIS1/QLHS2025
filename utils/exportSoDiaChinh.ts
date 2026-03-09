@@ -6,10 +6,11 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
     const data = record.data || {};
 
     // Helper to create a cell with specific text
-    const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1) => {
+    const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
         return new TableCell({
             width: { size: width, type: WidthType.PERCENTAGE },
             columnSpan: colSpan,
+            rowSpan: rowSpan,
             verticalAlign: VerticalAlign.CENTER,
             children: [
                 new Paragraph({
@@ -84,6 +85,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
+                            height: { value: 600, rule: "atLeast" }
                         }),
                         new TableRow({
                             children: [
@@ -109,34 +111,42 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
+                            height: { value: 600, rule: "atLeast" }
                         }),
                         // Header Row 1
                         new TableRow({
                             children: [
-                                createCell("Ngày tháng năm vào sổ", 10, true),
-                                createCell("Số thứ tự thửa đất", 8, true),
-                                createCell("Số thứ tự tờ bản đồ", 8, true),
+                                createCell("Ngày tháng năm vào sổ", 10, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Số thứ tự thửa đất", 8, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Số thứ tự tờ bản đồ", 8, true, AlignmentType.CENTER, 1, 2),
                                 new TableCell({
                                     width: { size: 16, type: WidthType.PERCENTAGE },
                                     children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Diện tích sử dụng (m2)", bold: true, size: 22, font: "Times New Roman" })] })],
                                     columnSpan: 2,
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
-                                createCell("Mục đích sử dụng", 10, true),
-                                createCell("Thời hạn sử dụng", 10, true),
-                                createCell("Nguồn gốc sử dụng", 12, true),
-                                createCell("Số phát hành GCNQSDĐ", 13, true),
-                                createCell("Số vào sổ cấp GCNQSDĐ", 13, true),
+                                createCell("Mục đích sử dụng", 10, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Thời hạn sử dụng", 10, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Nguồn gốc sử dụng", 12, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Số phát hành GCNQSDĐ", 13, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Số vào sổ cấp GCNQSDĐ", 13, true, AlignmentType.CENTER, 1, 2),
                             ],
                         }),
                         // Header Row 2 (Sub-headers for Area)
                         new TableRow({
                             children: [
+                                createCell("Riêng", 8),
+                                createCell("Chung", 8),
+                            ],
+                        }),
+                        // Header Row 3 (Numbers)
+                        new TableRow({
+                            children: [
                                 createCell("1", 10),
                                 createCell("2", 8),
                                 createCell("3", 8),
-                                createCell("Riêng", 8),
-                                createCell("Chung", 8),
+                                createCell("4", 8),
+                                createCell("5", 8),
                                 createCell("6", 10),
                                 createCell("7", 10),
                                 createCell("8", 12),
@@ -175,6 +185,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
+                            height: { value: 600, rule: "atLeast" }
                         }),
                         // Header
                         new TableRow({

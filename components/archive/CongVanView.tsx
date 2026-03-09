@@ -642,7 +642,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                                 <div className="flex items-center gap-1">
                                                     <UserIcon size={14}/> {getEmployeeName(r.data?.assigned_to)}
                                                 </div>
-                                            ) : <span className="text-gray-400 text-xs italic">Chưa giao</span>}
+                                            ) : null}
                                         </td>
                                     )}
                                     {(subTab === 'all') && (

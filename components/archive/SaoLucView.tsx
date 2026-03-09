@@ -788,7 +788,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                                     <div className="flex items-center gap-1">
                                                         <UserIcon size={14}/> {getEmployeeName(r.data?.assigned_to)}
                                                     </div>
-                                                ) : <span className="text-gray-400 text-xs italic">Chưa giao</span>}
+                                                ) : null}
                                             </td>
                                         )}
                                         <td className="p-3 text-purple-600 font-medium">{formatDate(r.data?.hen_tra)}</td>

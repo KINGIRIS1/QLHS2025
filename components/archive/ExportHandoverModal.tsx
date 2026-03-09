@@ -112,7 +112,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             'Địa Chỉ (Xã)', 
             'Thửa', 
             'Tờ', 
-            type === 'saoluc' ? 'Loại Hồ Sơ' : 'Trích yếu', 
+            'Loại Hồ Sơ', 
             'Hẹn Trả', 
             'Ngày nhận hồ sơ', 
             'Ký tên', 
@@ -129,7 +129,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                 r.data?.xa_phuong || '',
                 r.data?.thua_dat || '',
                 r.data?.to_ban_do || '',
-                type === 'saoluc' ? (r.data?.loai_ho_so || '') : (r.trich_yeu || ''),
+                type === 'saoluc' ? 'Sao lục' : 'Công văn',
                 r.data?.hen_tra ? r.data.hen_tra.split('-').reverse().join('/') : '',
                 '', // Ngày nhận hồ sơ (Empty)
                 '', // Ký tên (Empty)

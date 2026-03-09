@@ -45,9 +45,9 @@ const WardStatsView: React.FC<WardStatsViewProps> = ({ records }) => {
     }, [records]);
 
     return (
-        <div className="flex flex-col h-full bg-slate-100 p-4 gap-4 overflow-y-auto">
+        <div className="flex flex-col lg:flex-row h-full bg-slate-100 p-4 gap-4 overflow-y-auto lg:overflow-hidden">
             {/* 1. BIỂU ĐỒ */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-[400px] flex flex-col shrink-0">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col w-full lg:w-1/2 min-h-[400px] lg:min-h-0 shrink-0">
                 <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-4">
                     <BarChart3 size={20} className="text-blue-600" /> Biểu đồ phân bố hồ sơ theo địa bàn
                 </h3>
@@ -79,7 +79,7 @@ const WardStatsView: React.FC<WardStatsViewProps> = ({ records }) => {
             </div>
 
             {/* 2. BẢNG DỮ LIỆU CHI TIẾT */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 min-h-0">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col w-full lg:w-1/2 flex-1 min-h-[400px] lg:min-h-0">
                 <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-4 shrink-0">
                     <Table2 size={20} className="text-green-600" /> Bảng tổng hợp chi tiết
                 </h3>

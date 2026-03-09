@@ -6,9 +6,10 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
     const data = record.data || {};
 
     // Helper to create a cell with specific text
-    const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER) => {
+    const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1) => {
         return new TableCell({
             width: { size: width, type: WidthType.PERCENTAGE },
+            columnSpan: colSpan,
             verticalAlign: VerticalAlign.CENTER,
             children: [
                 new Paragraph({
@@ -51,10 +52,10 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                         orientation: "portrait",
                     },
                     margin: {
-                        top: 1134, // 2cm
-                        bottom: 1134,
+                        top: 567, // 1cm
+                        bottom: 567, // 1cm
                         left: 1701, // 3cm
-                        right: 1134,
+                        right: 1134, // 2cm
                     },
                 },
             },
@@ -70,21 +71,16 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                 }),
                 new Paragraph({ text: "", spacing: { after: 200 } }),
 
-                // I - NGƯỜI SỬ DỤNG ĐẤT
+                // Combined Table for all parts
                 new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
                     rows: [
+                        // I - NGƯỜI SỬ DỤNG ĐẤT
                         new TableRow({
                             children: [
                                 new TableCell({
                                     children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "I - NGƯỜI SỬ DỤNG ĐẤT", bold: true, size: 22, font: "Times New Roman" })] })],
-                                    columnSpan: 1,
-                                    borders: {
-                                        top: { style: BorderStyle.SINGLE, size: 1 },
-                                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                                        left: { style: BorderStyle.SINGLE, size: 1 },
-                                        right: { style: BorderStyle.SINGLE, size: 1 },
-                                    },
+                                    columnSpan: 10,
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
@@ -97,25 +93,20 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                         new Paragraph({ children: [new TextRun({ text: `CCCD: ${data.cccd || ""}`, size: 22, font: "Times New Roman" })] }),
                                         new Paragraph({ children: [new TextRun({ text: `Địa chỉ: ${data.dia_chi || ""}`, size: 22, font: "Times New Roman" })] }),
                                     ],
+                                    columnSpan: 10,
                                     margins: { top: 100, bottom: 100, left: 100, right: 100 },
                                 }),
                             ],
                             height: { value: 1500, rule: "atLeast" }, // Min height for user info
                         }),
-                    ],
-                }),
-                new Paragraph({ text: "", spacing: { after: 200 } }),
 
-                // II - THỬA ĐẤT Header
-                new Table({
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    rows: [
+                        // II - THỬA ĐẤT Header
                         new TableRow({
                             children: [
                                 new TableCell({
                                     children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "II - THỬA ĐẤT", bold: true, size: 22, font: "Times New Roman" })] })],
                                     columnSpan: 10,
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 }, left: { style: BorderStyle.SINGLE, size: 1 }, right: { style: BorderStyle.SINGLE, size: 1 } },
+                                    verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
                         }),
@@ -167,45 +158,40 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                 createCell(soPhatHanh, 13),
                                 createCell(soVaoSo, 13),
                             ],
-                            height: { value: 465, rule: "exact" } // ~0.82cm
+                            height: { value: 385, rule: "exact" }
                         }),
                         // Empty rows to fill space (14 rows to make it 15 total)
                         ...Array(14).fill(0).map(() => new TableRow({
                             children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
-                            height: { value: 465, rule: "exact" } // ~0.82cm
-                        }))
-                    ],
-                }),
-                new Paragraph({ text: "", spacing: { after: 200 } }),
+                            height: { value: 385, rule: "exact" }
+                        })),
 
-                // III - NHỮNG THAY ĐỔI
-                new Table({
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    rows: [
+                        // III - NHỮNG THAY ĐỔI
                         new TableRow({
                             children: [
                                 new TableCell({
                                     children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "III - NHỮNG THAY ĐỔI TRONG QUÁ TRÌNH SỬ DỤNG ĐẤT VÀ GHI CHÚ", bold: true, size: 22, font: "Times New Roman" })] })],
-                                    columnSpan: 3,
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 }, left: { style: BorderStyle.SINGLE, size: 1 }, right: { style: BorderStyle.SINGLE, size: 1 } },
+                                    columnSpan: 10,
+                                    verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
                         }),
                         // Header
                         new TableRow({
                             children: [
-                                createCell("Số thứ tự thửa đất", 10, true),
-                                createCell("Ngày tháng năm", 15, true),
-                                createCell("Nội dung ghi chú hoặc biến động và căn cứ pháp lý", 75, true),
+                                createCell("Số thứ tự thửa đất", 10, true, AlignmentType.CENTER, 1),
+                                createCell("Ngày tháng năm", 16, true, AlignmentType.CENTER, 2),
+                                createCell("Nội dung ghi chú hoặc biến động và căn cứ pháp lý", 74, true, AlignmentType.CENTER, 7),
                             ],
                         }),
                         // Data Row
                         new TableRow({
                             children: [
-                                createCell(data.so_thua || "", 10),
-                                createCell(ngayVaoSo, 15),
+                                createCell(data.so_thua || "", 10, false, AlignmentType.CENTER, 1),
+                                createCell(ngayVaoSo, 16, false, AlignmentType.CENTER, 2),
                                 new TableCell({
-                                    width: { size: 75, type: WidthType.PERCENTAGE },
+                                    width: { size: 74, type: WidthType.PERCENTAGE },
+                                    columnSpan: 7,
                                     verticalAlign: VerticalAlign.CENTER,
                                     children: [
                                         new Paragraph({
@@ -216,16 +202,16 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                     margins: { top: 100, bottom: 100, left: 100, right: 100 },
                                 }),
                             ],
-                            height: { value: 454, rule: "exact" } // ~0.80cm
+                            height: { value: 380, rule: "exact" }
                         }),
                         // Empty rows to fill space (19 rows to make it 20 total)
                         ...Array(19).fill(0).map(() => new TableRow({
                             children: [
-                                createCell("", 10),
-                                createCell("", 15),
-                                createCell("", 75),
+                                createCell("", 10, false, AlignmentType.CENTER, 1),
+                                createCell("", 16, false, AlignmentType.CENTER, 2),
+                                createCell("", 74, false, AlignmentType.CENTER, 7),
                             ],
-                            height: { value: 454, rule: "exact" } // ~0.80cm
+                            height: { value: 380, rule: "exact" }
                         }))
                     ],
                 }),

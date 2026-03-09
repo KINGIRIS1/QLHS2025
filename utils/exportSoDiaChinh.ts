@@ -34,7 +34,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
     
     // Determine land use purpose
     let mucDichSuDung = "";
-    if (data.muc_dich_su_dung?.toLowerCase().includes("ont") || data.muc_dich_su_dung?.toLowerCase().includes("odt")) {
+    if (data.dien_tich_tho_cu && parseFloat(data.dien_tich_tho_cu) > 0) {
         mucDichSuDung = "ODT+CLN";
     } else {
         mucDichSuDung = "CLN";
@@ -46,8 +46,8 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
             properties: {
                 page: {
                     size: {
-                        width: 16535, // A3 width in twips (297mm)
-                        height: 23390, // A3 height in twips (420mm)
+                        width: 16838, // A3 width in twips (297mm)
+                        height: 23811, // A3 height in twips (420mm)
                         orientation: "portrait",
                     },
                     margin: {
@@ -93,7 +93,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                             children: [
                                 new TableCell({
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: `Ông: ${data.chu_su_dung || ""}`, bold: true, size: 22, font: "Times New Roman" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: `Ông: ${data.ten_chu_su_dung || record.noi_nhan_gui || ""}`, bold: true, size: 22, font: "Times New Roman" })] }),
                                         new Paragraph({ children: [new TextRun({ text: `CCCD: ${data.cccd || ""}`, size: 22, font: "Times New Roman" })] }),
                                         new Paragraph({ children: [new TextRun({ text: `Địa chỉ: ${data.dia_chi || ""}`, size: 22, font: "Times New Roman" })] }),
                                     ],
@@ -157,9 +157,9 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                         new TableRow({
                             children: [
                                 createCell(ngayVaoSo, 10),
-                                createCell(data.thua_dat || "", 8),
-                                createCell(data.to_ban_do || "", 8),
-                                createCell(data.dien_tich || "", 8),
+                                createCell(data.so_thua || "", 8),
+                                createCell(data.so_to || "", 8),
+                                createCell(data.tong_dien_tich || "", 8),
                                 createCell("", 8), // Chung (Empty for now)
                                 createCell(mucDichSuDung, 10),
                                 createCell("Lâu dài", 10), // Default per request/image
@@ -167,11 +167,12 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                 createCell(soPhatHanh, 13),
                                 createCell(soVaoSo, 13),
                             ],
+                            height: { value: 465, rule: "exact" } // ~0.82cm
                         }),
-                        // Empty rows to fill space (approx 10 rows)
-                        ...Array(10).fill(0).map(() => new TableRow({
+                        // Empty rows to fill space (14 rows to make it 15 total)
+                        ...Array(14).fill(0).map(() => new TableRow({
                             children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
-                            height: { value: 500, rule: "atLeast" }
+                            height: { value: 465, rule: "exact" } // ~0.82cm
                         }))
                     ],
                 }),
@@ -201,29 +202,30 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                         // Data Row
                         new TableRow({
                             children: [
-                                createCell(data.thua_dat || "", 10),
+                                createCell(data.so_thua || "", 10),
                                 createCell(ngayVaoSo, 15),
                                 new TableCell({
                                     width: { size: 75, type: WidthType.PERCENTAGE },
                                     verticalAlign: VerticalAlign.CENTER,
                                     children: [
                                         new Paragraph({
-                                            children: [new TextRun({ text: `Nhận ${data.loai_ho_so || "chuyển nhượng"} của ${data.chuyen_quyen || ""}`, size: 22, font: "Times New Roman" })],
+                                            children: [new TextRun({ text: `Nhận ${data.loai_ho_so || "chuyển nhượng"} của ${data.ten_chuyen_quyen || ""}`, size: 22, font: "Times New Roman" })],
                                             alignment: AlignmentType.LEFT,
                                         }),
                                     ],
                                     margins: { top: 100, bottom: 100, left: 100, right: 100 },
                                 }),
                             ],
+                            height: { value: 454, rule: "exact" } // ~0.80cm
                         }),
-                        // Empty rows to fill space (approx 15 rows)
-                        ...Array(15).fill(0).map(() => new TableRow({
+                        // Empty rows to fill space (19 rows to make it 20 total)
+                        ...Array(19).fill(0).map(() => new TableRow({
                             children: [
                                 createCell("", 10),
                                 createCell("", 15),
                                 createCell("", 75),
                             ],
-                            height: { value: 500, rule: "atLeast" }
+                            height: { value: 454, rule: "exact" } // ~0.80cm
                         }))
                     ],
                 }),

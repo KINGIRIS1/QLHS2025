@@ -94,7 +94,14 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         wsData.push([`NGÀY ${day < 10 ? '0' + day : day} THÁNG ${month < 10 ? '0' + month : month} NĂM ${year}`]);
         
         const batchText = selectedBatch !== 'all' ? `ĐỢT: ${selectedBatch.replace(/Đợt /i, '')}` : 'TẤT CẢ CÁC ĐỢT';
-        wsData.push([`${batchText} - TỔNG SỐ HỒ SƠ: ${data.length}`]);
+        
+        // Add Ward name to title if selected
+        let fullBatchTitle = `${batchText} - TỔNG SỐ HỒ SƠ: ${data.length}`;
+        if (type === 'saoluc' && selectedWard !== 'all') {
+            fullBatchTitle = `${selectedWard.toUpperCase()} - ${fullBatchTitle}`;
+        }
+
+        wsData.push([fullBatchTitle]);
         wsData.push(['']); // Empty row
 
         // 2. Header Row
@@ -105,7 +112,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             'Địa Chỉ (Xã)', 
             'Thửa', 
             'Tờ', 
-            'Loại Hồ Sơ', 
+            type === 'saoluc' ? 'Loại Hồ Sơ' : 'Trích yếu', 
             'Hẹn Trả', 
             'Ngày nhận hồ sơ', 
             'Ký tên', 
@@ -122,7 +129,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                 r.data?.xa_phuong || '',
                 r.data?.thua_dat || '',
                 r.data?.to_ban_do || '',
-                r.data?.loai_ho_so || (type === 'congvan' ? r.trich_yeu : ''),
+                type === 'saoluc' ? (r.data?.loai_ho_so || '') : (r.trich_yeu || ''),
                 r.data?.hen_tra ? r.data.hen_tra.split('-').reverse().join('/') : '',
                 '', // Ngày nhận hồ sơ (Empty)
                 '', // Ký tên (Empty)

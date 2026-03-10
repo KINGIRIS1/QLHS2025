@@ -282,7 +282,7 @@ export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
                             height: { value: 375, rule: "exact" } // 25px
                         }),
                         // Empty rows to fill space (20 rows to make it 21 total)
-                        ...Array(18).fill(0).map(() => new TableRow({
+                        ...Array(17).fill(0).map(() => new TableRow({
                             children: [
                                 createCell("", 10, false, AlignmentType.CENTER, 1),
                                 createCell("", 16, false, AlignmentType.CENTER, 2),

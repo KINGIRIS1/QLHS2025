@@ -33,13 +33,88 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
     const soPhatHanh = data.so_phat_hanh || "";
     const soVaoSo = data.so_vao_so || "";
     
-    // Determine land use purpose
+    // Determine land use purpose and generate data rows
+    const tongDienTich = parseFloat(data.tong_dien_tich || "0");
+    const dienTichThoCu = parseFloat(data.dien_tich_tho_cu || "0");
+    const dienTichCLN = tongDienTich - dienTichThoCu;
+
     let mucDichSuDung = "";
-    if (data.dien_tich_tho_cu && parseFloat(data.dien_tich_tho_cu) > 0) {
-        mucDichSuDung = "ODT+CLN";
+    if (dienTichThoCu > 0 && dienTichCLN > 0) {
+        mucDichSuDung = "";
+    } else if (dienTichThoCu > 0) {
+        mucDichSuDung = "ODT";
     } else {
         mucDichSuDung = "CLN";
     }
+
+    const dataRows = [];
+    
+    // Hàng 1: Tổng diện tích
+    dataRows.push(
+        new TableRow({
+            children: [
+                createCell(ngayVaoSo, 10),
+                createCell(data.so_thua || "", 8),
+                createCell(data.so_to || "", 8),
+                createCell(data.tong_dien_tich || "", 8),
+                createCell("", 8), // Chung
+                createCell(mucDichSuDung, 10),
+                createCell("Lâu dài", 10), // Default per request/image
+                createCell("", 12), // Nguồn gốc
+                createCell(soPhatHanh, 13),
+                createCell(soVaoSo, 13),
+            ],
+            height: { value: 375, rule: "exact" } // 30px
+        })
+    );
+
+    // Hàng 2: ODT (nếu có)
+    if (dienTichThoCu > 0) {
+        dataRows.push(
+            new TableRow({
+                children: [
+                    createCell("", 10),
+                    createCell("", 8),
+                    createCell("", 8),
+                    createCell(dienTichThoCu.toString(), 8),
+                    createCell("", 8),
+                    createCell("ODT", 10),
+                    createCell("Lâu dài", 10),
+                    createCell("", 12),
+                    createCell("", 13),
+                    createCell("", 13),
+                ],
+                height: { value: 375, rule: "exact" }
+            })
+        );
+    }
+
+    // Hàng 3: CLN (nếu có)
+    if (dienTichCLN > 0) {
+        dataRows.push(
+            new TableRow({
+                children: [
+                    createCell("", 10),
+                    createCell("", 8),
+                    createCell("", 8),
+                    createCell(dienTichCLN.toString(), 8),
+                    createCell("", 8),
+                    createCell("CLN", 10),
+                    createCell("", 10),
+                    createCell("", 12),
+                    createCell("", 13),
+                    createCell("", 13),
+                ],
+                height: { value: 375, rule: "exact" }
+            })
+        );
+    }
+
+    const emptyRowsCount = 16 - dataRows.length; // 1 numbers + 16 data/empty = 17 total
+    const emptyRows = Array(Math.max(0, emptyRowsCount)).fill(0).map(() => new TableRow({
+        children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
+        height: { value: 375, rule: "exact" } // 30px
+    }));
 
     // Create the document
     const doc = new Document({
@@ -154,27 +229,10 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                             ],
                             height: { value: 375, rule: "exact" } // 30px
                         }),
-                        // Data Row
-                        new TableRow({
-                            children: [
-                                createCell(ngayVaoSo, 10),
-                                createCell(data.so_thua || "", 8),
-                                createCell(data.so_to || "", 8),
-                                createCell(data.tong_dien_tich || "", 8),
-                                createCell("", 8), // Chung (Empty for now)
-                                createCell(mucDichSuDung, 10),
-                                createCell("Lâu dài", 10), // Default per request/image
-                                createCell("", 12), // Nguồn gốc (Empty)
-                                createCell(soPhatHanh, 13),
-                                createCell(soVaoSo, 13),
-                            ],
-                            height: { value: 375, rule: "exact" } // 30px
-                        }),
-                        // Empty rows to fill space (15 rows to make it 17 total including numbers row)
-                        ...Array(14).fill(0).map(() => new TableRow({
-                            children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
-                            height: { value: 375, rule: "exact" } // 30px
-                        })),
+                        // Data Rows
+                        ...dataRows,
+                        // Empty rows to fill space
+                        ...emptyRows,
 
                         // III - NHỮNG THAY ĐỔI
                         new TableRow({

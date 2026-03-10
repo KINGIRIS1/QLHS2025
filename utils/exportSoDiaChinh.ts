@@ -7,17 +7,16 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
 
     // Helper to create a cell with specific text
     const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
+        const lines = text.split('\n');
         return new TableCell({
             width: { size: width, type: WidthType.PERCENTAGE },
             columnSpan: colSpan,
             rowSpan: rowSpan,
             verticalAlign: VerticalAlign.CENTER,
-            children: [
-                new Paragraph({
-                    alignment: align,
-                    children: [new TextRun({ text, bold, size: 22, font: "Times New Roman" })], // Size 22 = 11pt
-                }),
-            ],
+            children: lines.map(line => new Paragraph({
+                alignment: align,
+                children: [new TextRun({ text: line, bold, size: 22, font: "Arial" })], // Size 22 = 11pt
+            })),
             margins: { top: 100, bottom: 100, left: 100, right: 100 },
         });
     };
@@ -65,9 +64,9 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                 new Paragraph({
                     alignment: AlignmentType.RIGHT,
                     children: [
-                        new TextRun({ text: "(Tiếp theo trang số: ............)", size: 22, font: "Times New Roman" }),
+                        new TextRun({ text: "(Tiếp theo trang số: ............)", size: 22, font: "Arial" }),
                         new TextRun({ text: "\t\t\t\t\t\t\t\t", size: 22 }), // Tabs for spacing
-                        new TextRun({ text: "Trang số: ............", size: 22, font: "Times New Roman" }),
+                        new TextRun({ text: "Trang số: ............", size: 22, font: "Arial" }),
                     ],
                 }),
                 new Paragraph({ text: "", spacing: { after: 200 } }),
@@ -80,56 +79,56 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "I - NGƯỜI SỬ DỤNG ĐẤT", bold: true, size: 22, font: "Times New Roman" })] })],
+                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "I - NGƯỜI SỬ DỤNG ĐẤT", bold: true, size: 22, font: "Arial" })] })],
                                     columnSpan: 10,
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
-                            height: { value: 600, rule: "atLeast" }
+                            height: { value: 585, rule: "atLeast" }
                         }),
                         new TableRow({
                             children: [
                                 new TableCell({
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: `Ông: ${data.ten_chu_su_dung || record.noi_nhan_gui || ""}`, bold: true, size: 22, font: "Times New Roman" })] }),
-                                        new Paragraph({ children: [new TextRun({ text: `CCCD: ${data.cccd || ""}`, size: 22, font: "Times New Roman" })] }),
-                                        new Paragraph({ children: [new TextRun({ text: `Địa chỉ: ${data.dia_chi || ""}`, size: 22, font: "Times New Roman" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: `Ông: ${data.ten_chu_su_dung || record.noi_nhan_gui || ""}`, bold: true, size: 22, font: "Arial" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: `CCCD: ${data.cccd || ""}`, size: 22, font: "Arial" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: `Địa chỉ: ${data.dia_chi || ""}`, size: 22, font: "Arial" })] }),
                                     ],
                                     columnSpan: 10,
                                     margins: { top: 100, bottom: 100, left: 100, right: 100 },
                                 }),
                             ],
-                            height: { value: 1500, rule: "atLeast" }, // Min height for user info
+                            height: { value: 860, rule: "atLeast" }, // Min height for user info
                         }),
 
                         // II - THỬA ĐẤT Header
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "II - THỬA ĐẤT", bold: true, size: 22, font: "Times New Roman" })] })],
+                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "II - THỬA ĐẤT", bold: true, size: 22, font: "Arial" })] })],
                                     columnSpan: 10,
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
-                            height: { value: 600, rule: "atLeast" }
+                            height: { value: 585, rule: "atLeast" }
                         }),
                         // Header Row 1
                         new TableRow({
                             children: [
-                                createCell("Ngày tháng năm vào sổ", 10, true, AlignmentType.CENTER, 1, 2),
-                                createCell("Số thứ tự thửa đất", 8, true, AlignmentType.CENTER, 1, 2),
-                                createCell("Số thứ tự tờ bản đồ", 8, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Ngày\ntháng năm\nvào sổ", 10, false, AlignmentType.CENTER, 1, 2),
+                                createCell("Số thứ tự\nthửa đất", 8, false, AlignmentType.CENTER, 1, 2),
+                                createCell("Số thứ\ntự tờ\nbản đồ", 8, false, AlignmentType.CENTER, 1, 2),
                                 new TableCell({
-                                    width: { size: 16, type: WidthType.PERCENTAGE },
-                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Diện tích sử dụng (m2)", bold: true, size: 22, font: "Times New Roman" })] })],
+                                    width: { size: 20, type: WidthType.PERCENTAGE },
+                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Diện tích sử dụng (m2)", bold: false, size: 22, font: "Arial" })] })],
                                     columnSpan: 2,
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
-                                createCell("Mục đích sử dụng", 10, true, AlignmentType.CENTER, 1, 2),
-                                createCell("Thời hạn sử dụng", 10, true, AlignmentType.CENTER, 1, 2),
-                                createCell("Nguồn gốc sử dụng", 12, true, AlignmentType.CENTER, 1, 2),
-                                createCell("Số phát hành GCNQSDĐ", 13, true, AlignmentType.CENTER, 1, 2),
-                                createCell("Số vào sổ cấp GCNQSDĐ", 13, true, AlignmentType.CENTER, 1, 2),
+                                createCell("Mục đích\nsử dụng", 10, false, AlignmentType.CENTER, 1, 2),
+                                createCell("Thời hạn\nsử dụng", 10, false, AlignmentType.CENTER, 1, 2),
+                                createCell("Nguồn gốc\nsử dụng", 12, false, AlignmentType.CENTER, 1, 2),
+                                createCell("Số phát hành\nGCNQSDĐ", 13, false, AlignmentType.CENTER, 1, 2),
+                                createCell("Số vào sổ cấp\nGCNQSDĐ", 13, false, AlignmentType.CENTER, 1, 2),
                             ],
                         }),
                         // Header Row 2 (Sub-headers for Area)
@@ -153,7 +152,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                 createCell("9", 13),
                                 createCell("10", 13),
                             ],
-                            height: { value: 450, rule: "exact" } // 30px
+                            height: { value: 375, rule: "exact" } // 30px
                         }),
                         // Data Row
                         new TableRow({
@@ -169,31 +168,31 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                 createCell(soPhatHanh, 13),
                                 createCell(soVaoSo, 13),
                             ],
-                            height: { value: 450, rule: "exact" } // 30px
+                            height: { value: 375, rule: "exact" } // 30px
                         }),
                         // Empty rows to fill space (15 rows to make it 17 total including numbers row)
-                        ...Array(15).fill(0).map(() => new TableRow({
+                        ...Array(14).fill(0).map(() => new TableRow({
                             children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
-                            height: { value: 450, rule: "exact" } // 30px
+                            height: { value: 375, rule: "exact" } // 30px
                         })),
 
                         // III - NHỮNG THAY ĐỔI
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "III - NHỮNG THAY ĐỔI TRONG QUÁ TRÌNH SỬ DỤNG ĐẤT VÀ GHI CHÚ", bold: true, size: 22, font: "Times New Roman" })] })],
+                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "III - NHỮNG THAY ĐỔI TRONG QUÁ TRÌNH SỬ DỤNG ĐẤT VÀ GHI CHÚ", bold: true, size: 22, font: "Arial" })] })],
                                     columnSpan: 10,
                                     verticalAlign: VerticalAlign.CENTER,
                                 }),
                             ],
-                            height: { value: 600, rule: "atLeast" }
+                            height: { value: 585, rule: "atLeast" }
                         }),
                         // Header
                         new TableRow({
                             children: [
-                                createCell("Số thứ tự thửa đất", 10, true, AlignmentType.CENTER, 1),
-                                createCell("Ngày tháng năm", 16, true, AlignmentType.CENTER, 2),
-                                createCell("Nội dung ghi chú hoặc biến động và căn cứ pháp lý", 74, true, AlignmentType.CENTER, 7),
+                                createCell("Số thứ tự thửa đất", 10, false, AlignmentType.CENTER, 1),
+                                createCell("Ngày tháng năm", 16, false, AlignmentType.CENTER, 2),
+                                createCell("Nội dung ghi chú hoặc biến động và căn cứ pháp lý", 74, false, AlignmentType.CENTER, 7),
                             ],
                         }),
                         // Data Row
@@ -207,7 +206,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                                     verticalAlign: VerticalAlign.CENTER,
                                     children: [
                                         new Paragraph({
-                                            children: [new TextRun({ text: `Nhận ${data.loai_ho_so || "chuyển nhượng"} của ${data.ten_chuyen_quyen || ""}`, size: 22, font: "Times New Roman" })],
+                                            children: [new TextRun({ text: `Nhận ${data.loai_ho_so || "chuyển nhượng"} của ${data.ten_chuyen_quyen || ""}`, size: 22, font: "Arial" })],
                                             alignment: AlignmentType.LEFT,
                                         }),
                                     ],
@@ -217,7 +216,7 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                             height: { value: 375, rule: "exact" } // 25px
                         }),
                         // Empty rows to fill space (20 rows to make it 21 total)
-                        ...Array(20).fill(0).map(() => new TableRow({
+                        ...Array(18).fill(0).map(() => new TableRow({
                             children: [
                                 createCell("", 10, false, AlignmentType.CENTER, 1),
                                 createCell("", 16, false, AlignmentType.CENTER, 2),
@@ -231,9 +230,9 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                 // Footer
                 new Paragraph({
                     alignment: AlignmentType.RIGHT,
-                    spacing: { before: 400 },
+                    spacing: { before: 300 },
                     children: [
-                        new TextRun({ text: "Chuyển tiếp trang số: ............", size: 22, font: "Times New Roman" }),
+                        new TextRun({ text: "Chuyển tiếp trang số: ............", size: 22, font: "Arial" }),
                     ],
                 }),
             ],

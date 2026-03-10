@@ -2,8 +2,8 @@ import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, Width
 import { saveAs } from "file-saver";
 import { ArchiveRecord } from "../services/apiArchive";
 
-export const exportSoDiaChinh = async (record: ArchiveRecord) => {
-    const data = record.data || {};
+export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
+    if (!records || records.length === 0) return;
 
     // Helper to create a cell with specific text
     const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
@@ -29,96 +29,104 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
-    const ngayVaoSo = formatDate(data.ngay_nhan);
-    const soPhatHanh = data.so_phat_hanh || "";
-    const soVaoSo = data.so_vao_so || "";
-    
-    // Determine land use purpose and generate data rows
-    const tongDienTich = parseFloat(data.tong_dien_tich || "0");
-    const dienTichThoCu = parseFloat(data.dien_tich_tho_cu || "0");
-    const dienTichCLN = tongDienTich - dienTichThoCu;
+    const sections = records.map(record => {
+        const data = record.data || {};
+        const ngayVaoSo = formatDate(data.ngay_nhan);
+        const soPhatHanh = data.so_phat_hanh || "";
+        const soVaoSo = data.so_vao_so || "";
+        
+        // Determine land use purpose and generate data rows
+        const tongDienTich = parseFloat(data.tong_dien_tich || "0");
+        const dienTichThoCu = parseFloat(data.dien_tich_tho_cu || "0");
+        const dienTichCLN = tongDienTich - dienTichThoCu;
 
-    let mucDichSuDung = "";
-    if (dienTichThoCu > 0 && dienTichCLN > 0) {
-        mucDichSuDung = "";
-    } else if (dienTichThoCu > 0) {
-        mucDichSuDung = "ODT";
-    } else {
-        mucDichSuDung = "CLN";
-    }
+        const hasODT = dienTichThoCu > 0;
+        const hasCLN = dienTichCLN > 0;
+        const isMultiple = hasODT && hasCLN;
 
-    const dataRows = [];
-    
-    // Hàng 1: Tổng diện tích
-    dataRows.push(
-        new TableRow({
-            children: [
-                createCell(ngayVaoSo, 10),
-                createCell(data.so_thua || "", 8),
-                createCell(data.so_to || "", 8),
-                createCell(data.tong_dien_tich || "", 8),
-                createCell("", 8), // Chung
-                createCell(mucDichSuDung, 10),
-                createCell("Lâu dài", 10), // Default per request/image
-                createCell("", 12), // Nguồn gốc
-                createCell(soPhatHanh, 13),
-                createCell(soVaoSo, 13),
-            ],
+        let mucDichSuDung = "";
+        let thoiHanSuDung = "";
+        
+        if (isMultiple) {
+            mucDichSuDung = "";
+            thoiHanSuDung = "";
+        } else if (hasODT) {
+            mucDichSuDung = "ODT";
+            thoiHanSuDung = "Lâu dài";
+        } else {
+            mucDichSuDung = "CLN";
+            thoiHanSuDung = ""; // CLN không phải đất ở nên để trống
+        }
+
+        const dataRows = [];
+        
+        // Hàng 1: Tổng diện tích
+        dataRows.push(
+            new TableRow({
+                children: [
+                    createCell(ngayVaoSo, 10),
+                    createCell(data.so_thua || "", 8),
+                    createCell(data.so_to || "", 8),
+                    createCell(data.tong_dien_tich || "", 8),
+                    createCell("", 8), // Chung
+                    createCell(mucDichSuDung, 10),
+                    createCell(thoiHanSuDung, 10),
+                    createCell("", 12), // Nguồn gốc
+                    createCell(soPhatHanh, 13),
+                    createCell(soVaoSo, 13),
+                ],
+                height: { value: 375, rule: "exact" } // 30px
+            })
+        );
+
+        // Chỉ thêm hàng 2 và 3 nếu có TỪ 2 LOẠI ĐẤT TRỞ LÊN
+        if (isMultiple) {
+            // Hàng 2: ODT
+            dataRows.push(
+                new TableRow({
+                    children: [
+                        createCell("", 10),
+                        createCell("", 8),
+                        createCell("", 8),
+                        createCell(dienTichThoCu.toString(), 8),
+                        createCell("", 8),
+                        createCell("ODT", 10),
+                        createCell("Lâu dài", 10),
+                        createCell("", 12),
+                        createCell("", 13),
+                        createCell("", 13),
+                    ],
+                    height: { value: 375, rule: "exact" }
+                })
+            );
+
+            // Hàng 3: CLN
+            dataRows.push(
+                new TableRow({
+                    children: [
+                        createCell("", 10),
+                        createCell("", 8),
+                        createCell("", 8),
+                        createCell(dienTichCLN.toString(), 8),
+                        createCell("", 8),
+                        createCell("CLN", 10),
+                        createCell("", 10), // CLN không ghi thời hạn
+                        createCell("", 12),
+                        createCell("", 13),
+                        createCell("", 13),
+                    ],
+                    height: { value: 375, rule: "exact" }
+                })
+            );
+        }
+
+        const emptyRowsCount = 16 - dataRows.length; // 1 numbers + 16 data/empty = 17 total
+        const emptyRows = Array(Math.max(0, emptyRowsCount)).fill(0).map(() => new TableRow({
+            children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
             height: { value: 375, rule: "exact" } // 30px
-        })
-    );
+        }));
 
-    // Hàng 2: ODT (nếu có)
-    if (dienTichThoCu > 0) {
-        dataRows.push(
-            new TableRow({
-                children: [
-                    createCell("", 10),
-                    createCell("", 8),
-                    createCell("", 8),
-                    createCell(dienTichThoCu.toString(), 8),
-                    createCell("", 8),
-                    createCell("ODT", 10),
-                    createCell("Lâu dài", 10),
-                    createCell("", 12),
-                    createCell("", 13),
-                    createCell("", 13),
-                ],
-                height: { value: 375, rule: "exact" }
-            })
-        );
-    }
-
-    // Hàng 3: CLN (nếu có)
-    if (dienTichCLN > 0) {
-        dataRows.push(
-            new TableRow({
-                children: [
-                    createCell("", 10),
-                    createCell("", 8),
-                    createCell("", 8),
-                    createCell(dienTichCLN.toString(), 8),
-                    createCell("", 8),
-                    createCell("CLN", 10),
-                    createCell("", 10),
-                    createCell("", 12),
-                    createCell("", 13),
-                    createCell("", 13),
-                ],
-                height: { value: 375, rule: "exact" }
-            })
-        );
-    }
-
-    const emptyRowsCount = 16 - dataRows.length; // 1 numbers + 16 data/empty = 17 total
-    const emptyRows = Array(Math.max(0, emptyRowsCount)).fill(0).map(() => new TableRow({
-        children: Array(10).fill(0).map((_, i) => createCell("", i === 3 || i === 4 ? 8 : (i === 0 ? 10 : (i === 1 || i === 2 ? 8 : (i === 5 || i === 6 ? 10 : (i === 7 ? 12 : 13)))))),
-        height: { value: 375, rule: "exact" } // 30px
-    }));
-
-    // Create the document
-    const doc = new Document({
-        sections: [{
+        return {
             properties: {
                 page: {
                     size: {
@@ -294,11 +302,19 @@ export const exportSoDiaChinh = async (record: ArchiveRecord) => {
                     ],
                 }),
             ],
-        }],
+        };
+    });
+
+    // Create the document
+    const doc = new Document({
+        sections: sections as any,
     });
 
     // Generate and save
     Packer.toBlob(doc).then((blob) => {
-        saveAs(blob, `SoDiaChinh_${data.so_vao_so || "new"}.docx`);
+        const fileName = records.length === 1 
+            ? `SoDiaChinh_${records[0].data?.so_vao_so || "new"}.docx`
+            : `SoDiaChinh_Multiple_${records.length}_records.docx`;
+        saveAs(blob, fileName);
     });
 };

@@ -49,6 +49,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Export Handover Modal State
     const [showExportHandoverModal, setShowExportHandoverModal] = useState(false);
 
+    // Export So Dia Chinh Modal State
+    const [showExportSoDiaChinhModal, setShowExportSoDiaChinhModal] = useState(false);
+    const [exportSoDiaChinhRange, setExportSoDiaChinhRange] = useState({ from: '', to: '' });
+
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
@@ -593,12 +597,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             <FileSpreadsheet size={16}/> Xuất Excel
                         </button>
                         <button onClick={() => {
-                            if (selectedIds.size === 0) {
-                                alert('Vui lòng chọn ít nhất một hồ sơ để xuất Sổ địa chính.');
-                                return;
+                            if (selectedIds.size > 0) {
+                                const selectedRecords = records.filter(r => selectedIds.has(r.id));
+                                exportSoDiaChinh(selectedRecords);
+                            } else {
+                                setShowExportSoDiaChinhModal(true);
                             }
-                            const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                            selectedRecords.forEach(r => exportSoDiaChinh(r));
                         }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
                             <FileText size={16}/> Xuất Sổ địa chính
                         </button>
@@ -891,6 +895,96 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 records={records}
                 wards={wards}
             />
+
+            {/* Export So Dia Chinh Modal */}
+            {showExportSoDiaChinhModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm animate-fade-in-up">
+                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-gray-800 text-lg">Xuất Sổ địa chính</h3>
+                            <button onClick={() => setShowExportSoDiaChinhModal(false)} className="text-gray-500 hover:text-red-500 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-gray-600">
+                                Nhập khoảng số vào sổ cần xuất (chỉ nhập số).
+                            </p>
+                            <div className="flex gap-4 items-center">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Từ số</label>
+                                    <input 
+                                        type="number" 
+                                        value={exportSoDiaChinhRange.from}
+                                        onChange={(e) => setExportSoDiaChinhRange(prev => ({ ...prev, from: e.target.value }))}
+                                        className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        placeholder="Ví dụ: 1"
+                                    />
+                                </div>
+                                <span className="text-gray-400 font-bold mt-5">-</span>
+                                <div className="flex-1">
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Đến số</label>
+                                    <input 
+                                        type="number" 
+                                        value={exportSoDiaChinhRange.to}
+                                        onChange={(e) => setExportSoDiaChinhRange(prev => ({ ...prev, to: e.target.value }))}
+                                        className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        placeholder="Ví dụ: 100"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-xl">
+                            <button 
+                                onClick={() => setShowExportSoDiaChinhModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                            >
+                                Hủy
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const fromNum = parseInt(exportSoDiaChinhRange.from);
+                                    const toNum = parseInt(exportSoDiaChinhRange.to);
+                                    
+                                    if (isNaN(fromNum) || isNaN(toNum) || fromNum > toNum) {
+                                        alert("Vui lòng nhập khoảng số hợp lệ.");
+                                        return;
+                                    }
+
+                                    const recordsToExport = records.filter(r => {
+                                        const val = r.data?.so_vao_so || '';
+                                        let num = NaN;
+                                        if (val.startsWith('CN ')) {
+                                            num = parseInt(val.replace('CN ', ''));
+                                        } else {
+                                            num = parseInt(val);
+                                        }
+                                        return !isNaN(num) && num >= fromNum && num <= toNum;
+                                    });
+
+                                    if (recordsToExport.length === 0) {
+                                        alert("Không tìm thấy hồ sơ nào trong khoảng số này.");
+                                        return;
+                                    }
+
+                                    // Sort by number
+                                    recordsToExport.sort((a, b) => {
+                                        const numA = parseInt((a.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                        const numB = parseInt((b.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                        return numA - numB;
+                                    });
+
+                                    exportSoDiaChinh(recordsToExport);
+                                    setShowExportSoDiaChinhModal(false);
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                            >
+                                Xuất file
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Settings Modal */}
             {showSettingsModal && (

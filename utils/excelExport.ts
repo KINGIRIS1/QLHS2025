@@ -110,6 +110,8 @@ export const exportReportToExcel = async (
         "Mã Hồ Sơ", 
         "Chủ Sử Dụng", 
         "Địa Chỉ (Xã)", 
+        "Tờ",
+        "Thửa",
         "Loại Hồ Sơ", 
         "Loại HĐ/TL", // Yêu cầu 2: Loại hồ sơ thanh lý (Trích lục, đo đạc...)
         "NV Xử Lý",
@@ -131,6 +133,8 @@ export const exportReportToExcel = async (
             r.code,
             r.customerName,
             getNormalizedWard(r.ward || undefined),
+            r.mapSheet || '',
+            r.landPlot || '',
             getShortRecordType(r.recordType || undefined),
             contractInfo.type, // Loại HĐ/TL
             getEmployeeName(r.assignedTo || undefined),
@@ -202,6 +206,8 @@ export const exportReportToExcel = async (
         { wch: 15 }, // Mã HS
         { wch: 25 }, // Chủ SD
         { wch: 18 }, // Địa Chỉ
+        { wch: 7 },  // Tờ
+        { wch: 7 },  // Thửa
         { wch: 15 }, // Loại HS
         { wch: 15 }, // Loại HĐ/TL (New)
         { wch: 20 }, // NV Xử Lý
@@ -236,10 +242,10 @@ export const exportReportToExcel = async (
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Căn giữa: STT, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
-            // Index: 0(STT), 6(NV), 7(BL), 8(HĐ), 9(TL), 10(NgayNhan), 11(Hen), 12(Xong), 13(TraKQ), 14(Status)
-            if ([0, 6, 7, 10, 11, 12, 13, 14].includes(c)) ws[cellRef].s = centerStyle;
-            else if (c === 8 || c === 9) ws[cellRef].s = rightStyle;
+            // Căn giữa: STT, Tờ, Thửa, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
+            // Index: 0(STT), 4(Tờ), 5(Thửa), 8(NV), 9(BL), 10(HĐ), 11(TL), 12(NgayNhan), 13(Hen), 14(Xong), 15(TraKQ), 16(Status)
+            if ([0, 4, 5, 8, 9, 12, 13, 14, 15, 16].includes(c)) ws[cellRef].s = centerStyle;
+            else if (c === 10 || c === 11) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }
     }

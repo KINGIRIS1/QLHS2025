@@ -79,6 +79,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         code: r.so_hieu,
                         customerName: r.noi_nhan_gui,
                         ward: r.data?.xa_phuong,
+                        mapSheet: r.data?.so_to,
+                        landPlot: r.data?.so_thua,
                         receivedDate: r.ngay_thang,
                         deadline: r.data?.hen_tra,
                         status: mapStatus(r.status),
@@ -433,6 +435,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                         <th className="p-3 w-32">Mã HS</th>
                                         <th className="p-3 w-48">Chủ sử dụng</th>
                                         <th className="p-3 w-32">Xã/Phường</th>
+                                        <th className="p-3 w-16 text-center">Tờ</th>
+                                        <th className="p-3 w-16 text-center">Thửa</th>
                                         <th className="p-3 w-24">Ngày nhận</th>
                                         <th className="p-3 w-24">Hẹn trả</th>
                                         <th className="p-3 w-24">Hoàn thành</th>
@@ -462,6 +466,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                             <td className="p-3 font-medium text-blue-600">{r.code}</td>
                                             <td className="p-3 font-medium">{r.customerName}</td>
                                             <td className="p-3 text-gray-600">{getNormalizedWard(r.ward)}</td>
+                                            <td className="p-3 text-center text-gray-600">{r.mapSheet || '-'}</td>
+                                            <td className="p-3 text-center text-gray-600">{r.landPlot || '-'}</td>
                                             <td className="p-3 text-gray-600">{formatDate(r.receivedDate)}</td>
                                             <td className={`p-3 font-medium ${isOverdue ? 'text-red-600' : 'text-gray-600'}`}>{formatDate(r.deadline)}</td>
                                             <td className={`p-3 font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>

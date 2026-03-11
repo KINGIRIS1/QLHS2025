@@ -5,6 +5,8 @@ import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCirc
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 import { exportSoDiaChinh } from '../../utils/exportSoDiaChinh';
+import { exportSoMucKe } from '../../utils/exportSoMucKe';
+import { getSystemSetting, saveSystemSetting } from '../../services/apiSystem';
 
 // Định nghĩa các cột
 const COLUMNS = [
@@ -53,6 +55,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [showExportSoDiaChinhModal, setShowExportSoDiaChinhModal] = useState(false);
     const [exportSoDiaChinhRange, setExportSoDiaChinhRange] = useState({ from: '', to: '' });
 
+    // Export So Muc Ke State
+    const [showExportSoMucKeModal, setShowExportSoMucKeModal] = useState(false);
+    const [exportSoMucKeParams, setExportSoMucKeParams] = useState({ ward: '', fromDate: '', toDate: '' });
+
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
@@ -92,7 +98,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         });
         
         // If local storage has a higher number, use it
-        const stored = localStorage.getItem('vaoso_current_book_number');
+        const stored = await getSystemSetting('vaoso_current_book_number');
         if (stored) {
             setCurrentBookNumber(stored);
         } else {
@@ -232,7 +238,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleGetBookNumber = async (record: ArchiveRecord) => {
-        const nextNumStr = incrementString(currentBookNumber);
+        // Fetch latest to avoid conflicts if possible
+        const latestStored = await getSystemSetting('vaoso_current_book_number');
+        const baseNum = latestStored || currentBookNumber;
+        const nextNumStr = incrementString(baseNum);
         const formattedNum = `CN ${nextNumStr}`;
         
         const updatedRecord = {
@@ -243,7 +252,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         // Optimistic update
         setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
         setCurrentBookNumber(nextNumStr);
-        localStorage.setItem('vaoso_current_book_number', nextNumStr);
+        await saveSystemSetting('vaoso_current_book_number', nextNumStr);
 
         setSavingId(record.id);
         await saveArchiveRecord(updatedRecord);
@@ -606,6 +615,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
                             <FileText size={16}/> Xuất Sổ địa chính
                         </button>
+                        <button onClick={() => setShowExportSoMucKeModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm">
+                            <FileText size={16}/> Xuất Sổ mục kê
+                        </button>
                     </div>
                 </div>
             </div>
@@ -896,6 +908,101 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 wards={wards}
             />
 
+            {/* Export So Muc Ke Modal */}
+            {showExportSoMucKeModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up">
+                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center rounded-t-xl">
+                            <h3 className="font-bold text-gray-800 text-lg">Xuất Sổ mục kê</h3>
+                            <button onClick={() => setShowExportSoMucKeModal(false)} className="text-gray-500 hover:text-red-500 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-600 mb-1">Xã/Phường</label>
+                                <select 
+                                    className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                    value={exportSoMucKeParams.ward}
+                                    onChange={(e) => setExportSoMucKeParams(prev => ({ ...prev, ward: e.target.value }))}
+                                >
+                                    <option value="">Tất cả</option>
+                                    {wards.map(w => (
+                                        <option key={w} value={w}>{w}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="block text-sm font-semibold text-gray-600 mb-1">Từ ngày (Ký GCN)</label>
+                                    <input 
+                                        type="date" 
+                                        value={exportSoMucKeParams.fromDate}
+                                        onChange={(e) => setExportSoMucKeParams(prev => ({ ...prev, fromDate: e.target.value }))}
+                                        className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-sm font-semibold text-gray-600 mb-1">Đến ngày</label>
+                                    <input 
+                                        type="date" 
+                                        value={exportSoMucKeParams.toDate}
+                                        onChange={(e) => setExportSoMucKeParams(prev => ({ ...prev, toDate: e.target.value }))}
+                                        className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-xl">
+                            <button 
+                                onClick={() => setShowExportSoMucKeModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                            >
+                                Hủy
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    let recordsToExport = [...records];
+                                    
+                                    // Filter by ward
+                                    if (exportSoMucKeParams.ward) {
+                                        recordsToExport = recordsToExport.filter(r => r.data?.dia_danh === exportSoMucKeParams.ward);
+                                    }
+                                    
+                                    // Filter by date
+                                    if (exportSoMucKeParams.fromDate) {
+                                        const fromTime = new Date(exportSoMucKeParams.fromDate).getTime();
+                                        recordsToExport = recordsToExport.filter(r => {
+                                            if (!r.data?.ngay_ky_gcn) return false;
+                                            return new Date(r.data.ngay_ky_gcn).getTime() >= fromTime;
+                                        });
+                                    }
+                                    
+                                    if (exportSoMucKeParams.toDate) {
+                                        const toTime = new Date(exportSoMucKeParams.toDate).getTime();
+                                        recordsToExport = recordsToExport.filter(r => {
+                                            if (!r.data?.ngay_ky_gcn) return false;
+                                            return new Date(r.data.ngay_ky_gcn).getTime() <= toTime;
+                                        });
+                                    }
+
+                                    if (recordsToExport.length === 0) {
+                                        alert("Không có hồ sơ nào thỏa mãn điều kiện.");
+                                        return;
+                                    }
+
+                                    exportSoMucKe(recordsToExport, exportSoMucKeParams.ward, exportSoMucKeParams.fromDate, exportSoMucKeParams.toDate);
+                                    setShowExportSoMucKeModal(false);
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                            >
+                                Xuất file
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Export So Dia Chinh Modal */}
             {showExportSoDiaChinhModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
@@ -1009,8 +1116,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         </div>
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
                             <button 
-                                onClick={() => {
-                                    localStorage.setItem('vaoso_current_book_number', currentBookNumber);
+                                onClick={async () => {
+                                    await saveSystemSetting('vaoso_current_book_number', currentBookNumber);
                                     setShowSettingsModal(false);
                                 }} 
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm"

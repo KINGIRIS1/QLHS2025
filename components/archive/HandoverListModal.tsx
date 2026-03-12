@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, ListPlus, List } from 'lucide-react';
-import { fetchTodayLists } from '../../services/apiArchive';
+import { fetchListsByDate } from '../../services/apiArchive';
 
 interface HandoverListModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (listName: string) => void;
+    onConfirm: (listName: string, handoverDate: string) => void;
     type: 'saoluc' | 'congvan';
 }
 
@@ -14,15 +14,16 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
     const [existingLists, setExistingLists] = useState<string[]>([]);
     const [newListName, setNewListName] = useState('');
     const [selectedList, setSelectedList] = useState('');
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     useEffect(() => {
         if (isOpen) {
-            loadLists();
+            loadLists(selectedDate);
         }
-    }, [isOpen]);
+    }, [isOpen, selectedDate]);
 
-    const loadLists = async () => {
-        const lists = await fetchTodayLists(type);
+    const loadLists = async (date: string) => {
+        const lists = await fetchListsByDate(type, date);
         setExistingLists(lists);
         
         // Auto-generate next list name
@@ -51,13 +52,13 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
                 alert('Vui lòng nhập tên danh sách mới');
                 return;
             }
-            onConfirm(newListName.trim());
+            onConfirm(newListName.trim(), selectedDate);
         } else {
             if (!selectedList) {
                 alert('Vui lòng chọn danh sách');
                 return;
             }
-            onConfirm(selectedList);
+            onConfirm(selectedList, selectedDate);
         }
         onClose();
     };
@@ -78,8 +79,18 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
                 
                 <div className="p-6 space-y-4">
                     <p className="text-sm text-gray-600 mb-2">
-                        Hồ sơ đã hoàn thành. Vui lòng chọn danh sách bàn giao cho ngày hôm nay.
+                        Hồ sơ đã hoàn thành. Vui lòng chọn ngày và danh sách bàn giao.
                     </p>
+
+                    <div className="mb-4">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Ngày giao</label>
+                        <input 
+                            type="date" 
+                            value={selectedDate} 
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                    </div>
 
                     <div className="flex gap-4 mb-4">
                         <label className={`flex-1 border rounded-lg p-3 cursor-pointer transition-all ${mode === 'new' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>

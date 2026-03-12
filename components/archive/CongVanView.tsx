@@ -409,10 +409,10 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         }
     };
 
-    const handleConfirmHandover = async (listName: string) => {
+    const handleConfirmHandover = async (listName: string, handoverDate: string) => {
         if (pendingCompletionRecord) {
             const historyEntry = {
-                action: 'Hoàn thành',
+                action: 'Đã giao 1 cửa',
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 user: currentUser.name,
@@ -423,7 +423,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             const newHistory = [...oldHistory, historyEntry];
 
             const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
-            updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
+            updateData.ngay_hoan_thanh = handoverDate;
             updateData.danh_sach = listName;
 
             await saveArchiveRecord({ 
@@ -436,7 +436,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             loadData();
         } else if (selectedIds.size > 0 && subTab === 'signed') {
             const historyEntry = {
-                action: 'Hoàn thành',
+                action: 'Đã giao 1 cửa',
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 user: currentUser.name,
@@ -446,7 +446,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             const updates = {
                 status: 'completed' as any,
                 data: {
-                    ngay_hoan_thanh: new Date().toISOString().split('T')[0],
+                    ngay_hoan_thanh: handoverDate,
                     danh_sach: listName,
                     history: [historyEntry]
                 }
@@ -567,7 +567,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             onClick={() => setSubTab('result')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <FileCheck size={16}/> Hoàn thành
+                            <FileCheck size={16}/> Đã giao 1 cửa
                         </button>
                     </div>
 
@@ -589,7 +589,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                         )}
                         {subTab === 'signed' && isManager && selectedIds.size > 0 && (
                             <button onClick={() => setShowHandoverModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm animate-pulse">
-                                <FileCheck size={16}/> Hoàn thành ({selectedIds.size})
+                                <FileCheck size={16}/> Đã giao 1 cửa ({selectedIds.size})
                             </button>
                         )}
                         {(subTab === 'draft' || subTab === 'all') && isManager && (
@@ -666,6 +666,19 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Trích yếu</label><textarea rows={3} className="w-full border rounded px-3 py-2 text-sm" value={formData.trich_yeu} onChange={e => setFormData({...formData, trich_yeu: e.target.value})} placeholder="Nội dung..." /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: toTitleCase(e.target.value)})} placeholder="Đơn vị..." /></div>
                             
+                            {formData.status === 'completed' && (
+                                <div className="grid grid-cols-2 gap-3 bg-green-50 p-3 rounded-lg border border-green-200">
+                                    <div>
+                                        <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Ngày giao</label>
+                                        <input type="date" className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.data?.ngay_hoan_thanh || ''} onChange={e => setFormData({...formData, data: { ...formData.data, ngay_hoan_thanh: e.target.value }})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Đợt giao</label>
+                                        <input type="text" className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.data?.danh_sach || ''} onChange={e => setFormData({...formData, data: { ...formData.data, danh_sach: e.target.value }})} placeholder="VD: Đợt 1" />
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="pt-4 flex gap-2 justify-end">
                                 <button type="button" onClick={() => setIsFormOpen(false)} className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded text-sm">Hủy</button>
                                 <button type="submit" className="px-4 py-2 bg-orange-600 text-white rounded font-bold text-sm hover:bg-orange-700 flex items-center gap-1"><Save size={16}/> Lưu</button>
@@ -688,7 +701,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 <th className="p-3 w-40 text-center">Cơ quan phát hành</th>
                                 {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
                                 {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
-                                {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày hoàn thành</th>}
+                                {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày giao</th>}
                                 <th className="p-3 w-32 text-center">Thao tác</th>
                             </tr>
                         </thead>
@@ -751,7 +764,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                             {r.status === 'signed' && isManager && (
                                                 <>
                                                     <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
-                                                    <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Hoàn thành"><FileCheck size={14}/></button>
+                                                    <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Đã giao 1 cửa"><FileCheck size={14}/></button>
                                                 </>
                                             )}
                                             

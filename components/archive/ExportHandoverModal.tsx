@@ -257,7 +257,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                     {/* Date Selection */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                            <Calendar size={14}/> Ngày hoàn thành
+                            <Calendar size={14}/> Ngày giao
                         </label>
                         <input 
                             type="date" 

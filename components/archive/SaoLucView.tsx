@@ -29,6 +29,8 @@ interface SaoLucFormData {
     hen_tra: string;        // Hẹn trả (Lưu trong data)
     noi_dung: string;       // Nội dung yêu cầu (Map vào trich_yeu)
     status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed';
+    ngay_hoan_thanh?: string;
+    danh_sach?: string;
 }
 
 const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'] }) => {
@@ -68,7 +70,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         ngay_nhan: new Date().toISOString().split('T')[0],
         hen_tra: '',
         noi_dung: '',
-        status: 'draft'
+        status: 'draft',
+        ngay_hoan_thanh: '',
+        danh_sach: ''
     });
     
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -203,7 +207,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                 xa_phuong: formData.xa_phuong,
                 to_ban_do: formData.to_ban_do,
                 thua_dat: formData.thua_dat,
-                hen_tra: formData.hen_tra
+                hen_tra: formData.hen_tra,
+                ngay_hoan_thanh: formData.ngay_hoan_thanh,
+                danh_sach: formData.danh_sach
             },
             created_by: currentUser.username
         };
@@ -230,7 +236,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             ngay_nhan: new Date().toISOString().split('T')[0],
             hen_tra: '',
             noi_dung: '',
-            status: 'draft'
+            status: 'draft',
+            ngay_hoan_thanh: '',
+            danh_sach: ''
         });
     };
 
@@ -305,10 +313,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         }
     };
 
-    const handleConfirmHandover = async (listName: string) => {
+    const handleConfirmHandover = async (listName: string, handoverDate: string) => {
         if (pendingCompletionRecord) {
             const historyEntry = {
-                action: 'Hoàn thành',
+                action: 'Đã giao 1 cửa',
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 user: currentUser.name,
@@ -319,7 +327,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             const newHistory = [...oldHistory, historyEntry];
 
             const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
-            updateData.ngay_hoan_thanh = new Date().toISOString().split('T')[0];
+            updateData.ngay_hoan_thanh = handoverDate;
             updateData.danh_sach = listName;
 
             await saveArchiveRecord({ 
@@ -332,7 +340,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             loadData();
         } else if (selectedIds.size > 0 && subTab === 'signed') {
             const historyEntry = {
-                action: 'Hoàn thành',
+                action: 'Đã giao 1 cửa',
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 user: currentUser.name,
@@ -342,7 +350,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             const updates = {
                 status: 'completed' as any,
                 data: {
-                    ngay_hoan_thanh: new Date().toISOString().split('T')[0],
+                    ngay_hoan_thanh: handoverDate,
                     danh_sach: listName,
                     history: [historyEntry]
                 }
@@ -374,7 +382,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             xa_phuong: r.data?.xa_phuong || 'Chơn Thành',
             to_ban_do: r.data?.to_ban_do || '',
             thua_dat: r.data?.thua_dat || '',
-            hen_tra: r.data?.hen_tra || ''
+            hen_tra: r.data?.hen_tra || '',
+            ngay_hoan_thanh: r.data?.ngay_hoan_thanh || '',
+            danh_sach: r.data?.danh_sach || ''
         });
         setIsFormOpen(true);
     };
@@ -665,7 +675,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                             onClick={() => setSubTab('result')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <FileCheck size={16}/> Hoàn thành
+                            <FileCheck size={16}/> Đã giao 1 cửa
                         </button>
                     </div>
 
@@ -687,7 +697,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                         )}
                         {subTab === 'signed' && isManager && selectedIds.size > 0 && (
                             <button onClick={() => setShowHandoverModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm animate-pulse">
-                                <FileCheck size={16}/> Hoàn thành ({selectedIds.size})
+                                <FileCheck size={16}/> Đã giao 1 cửa ({selectedIds.size})
                             </button>
                         )}
                         {(subTab === 'draft' || subTab === 'all') && isManager && (
@@ -802,6 +812,19 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 </div>
                             </div>
 
+                            {formData.status === 'completed' && (
+                                <div className="grid grid-cols-2 gap-3 bg-green-50 p-3 rounded-lg border border-green-200">
+                                    <div>
+                                        <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Ngày giao</label>
+                                        <input type="date" className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.ngay_hoan_thanh || ''} onChange={e => setFormData({...formData, ngay_hoan_thanh: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Đợt giao</label>
+                                        <input type="text" className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.danh_sach || ''} onChange={e => setFormData({...formData, danh_sach: e.target.value})} placeholder="VD: Đợt 1" />
+                                    </div>
+                                </div>
+                            )}
+
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Nội dung yêu cầu</label>
                                 <textarea rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" value={formData.noi_dung} onChange={e => setFormData({...formData, noi_dung: e.target.value})} placeholder="Nhập nội dung..." />
@@ -832,7 +855,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                     {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
                                     {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
                                     <th className="p-3 w-24 text-center">Hẹn trả</th>
-                                    {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày hoàn thành</th>}
+                                    {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày giao</th>}
                                     <th className="p-3 w-64 text-center">Nội dung</th>
                                     <th className="p-3 w-28 text-center">Thao tác</th>
                                 </tr>
@@ -904,7 +927,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                                 {r.status === 'signed' && isManager && (
                                                     <>
                                                         <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
-                                                        <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Hoàn thành"><FileCheck size={14}/></button>
+                                                        <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Đã giao 1 cửa"><FileCheck size={14}/></button>
                                                     </>
                                                 )}
                                                 

@@ -12,7 +12,8 @@ const ChuyenDoiToBanDoTab: React.FC<Props> = ({ notify }) => {
     const [data, setData] = useState<MapSheetConversion[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchXaPhuong, setSearchXaPhuong] = useState('');
+    const [searchSoTo, setSearchSoTo] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -131,12 +132,9 @@ const ChuyenDoiToBanDoTab: React.FC<Props> = ({ notify }) => {
     };
 
     const filteredData = data.filter(item => {
-        if (!searchTerm) return true;
-        const term = searchTerm.toLowerCase();
-        return item.xa_phuong_cu.toLowerCase().includes(term) ||
-               item.so_to_cu.toLowerCase().includes(term) ||
-               item.xa_phuong_moi.toLowerCase().includes(term) ||
-               item.so_to_moi.toLowerCase().includes(term);
+        const matchXaPhuong = searchXaPhuong ? item.xa_phuong_cu.toLowerCase().includes(searchXaPhuong.toLowerCase()) : true;
+        const matchSoTo = searchSoTo ? item.so_to_cu.toLowerCase().includes(searchSoTo.toLowerCase()) : true;
+        return matchXaPhuong && matchSoTo;
     });
 
     return (
@@ -175,14 +173,24 @@ const ChuyenDoiToBanDoTab: React.FC<Props> = ({ notify }) => {
                 </div>
             </div>
 
-            <div className="p-4 border-b bg-white">
-                <div className="relative max-w-md">
+            <div className="p-4 border-b bg-white flex gap-4">
+                <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input 
                         type="text" 
-                        placeholder="Tìm kiếm xã phường, số tờ..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Tìm xã phường cũ..." 
+                        value={searchXaPhuong}
+                        onChange={(e) => setSearchXaPhuong(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                </div>
+                <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                        type="text" 
+                        placeholder="Tìm số tờ cũ..." 
+                        value={searchSoTo}
+                        onChange={(e) => setSearchSoTo(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                 </div>

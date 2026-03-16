@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../../types';
 import { RECORD_TYPES } from '../../constants';
-import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check } from 'lucide-react';
+import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
 interface BulkImportProps {
@@ -21,6 +21,30 @@ interface BulkRecordItem extends Partial<RecordFile> {
 const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calculateNextCode, onPreview }) => {
   const [bulkRecords, setBulkRecords] = useState<BulkRecordItem[]>([]);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDownloadTemplate = () => {
+      const wb = XLSX.utils.book_new();
+      
+      const headers = [
+          "CHỦ SỬ DỤNG", "SĐT", "XÃ", "THỬA", "TỜ", "DIỆN TÍCH", "ĐỊA CHỈ", "LOẠI HỒ SƠ", "NỘI DUNG", "NGƯỜI ỦY QUYỀN", "LOẠI ỦY QUYỀN"
+      ];
+      
+      const sampleData = [
+          ["Nguyễn Văn A", "0901234567", "Minh Hưng", "123", "45", "100.5", "Tổ 1, KP 2", "Trích lục", "Xin trích lục bản đồ", "", ""],
+          ["Trần Thị B", "0987654321", "Chơn Thành", "456", "78", "250.0", "KP 3", "Đo đạc", "Đo đạc cắm mốc", "Lê Văn C", "Giấy ủy quyền"]
+      ];
+      
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+      
+      const wscols = [
+          {wch: 25}, {wch: 15}, {wch: 20}, {wch: 10}, {wch: 10}, 
+          {wch: 15}, {wch: 30}, {wch: 25}, {wch: 30}, {wch: 25}, {wch: 20}
+      ];
+      ws['!cols'] = wscols;
+      
+      XLSX.utils.book_append_sheet(wb, ws, "Mau_Nhap_Lieu");
+      XLSX.writeFile(wb, "Mau_Nhap_Lieu_Ho_So.xlsx");
+  };
 
   const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -185,6 +209,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                 <p className="text-sm text-blue-600 mt-1">Chọn file Excel để nhập danh sách. Mã hồ sơ sẽ được để trống và tạo sau.</p>
             </div>
             <div className="flex gap-2">
+                <button onClick={handleDownloadTemplate} className="bg-white text-green-700 border border-green-300 px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-100 flex items-center gap-2">
+                    <Download size={16} /> Tải mẫu Excel
+                </button>
                 <button onClick={() => bulkFileInputRef.current?.click()} className="bg-white text-blue-700 border border-blue-300 px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-100 flex items-center gap-2">
                     <FileSpreadsheet size={16} /> Chọn File Excel
                 </button>

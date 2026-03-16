@@ -31,12 +31,22 @@ export interface TachThuaRecord extends GenericRecord {
     // data chứa các trường tách thửa (cấu trúc giống ChinhLyRecord)
 }
 
+export interface MapSheetConversion {
+    id: string;
+    created_at: string;
+    xa_phuong_cu: string;
+    so_to_cu: string;
+    xa_phuong_moi: string;
+    so_to_moi: string;
+}
+
 // Mock Data Stores
 const MOCK_VPHC: VphcRecord[] = [];
 const MOCK_BIENBAN: BienBanRecord[] = [];
 const MOCK_THONGTIN: ThongTinRecord[] = [];
 const MOCK_CHINHLY: ChinhLyRecord[] = [];
 const MOCK_TACHTHUA: TachThuaRecord[] = [];
+let MOCK_MAP_CONVERSIONS: MapSheetConversion[] = [];
 
 // Helper sinh ID ngẫu nhiên
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -374,6 +384,69 @@ export const deleteTachThuaRecord = async (id: string): Promise<boolean> => {
         return true;
     } catch (error) {
         logError("deleteTachThuaRecord", error);
+        return false;
+    }
+};
+
+// ============================================================================
+// 6. CHUYỂN ĐỔI TỜ BẢN ĐỒ
+// ============================================================================
+
+export const fetchMapSheetConversions = async (): Promise<MapSheetConversion[]> => {
+    if (!isConfigured) return MOCK_MAP_CONVERSIONS;
+    try {
+        const { data, error } = await supabase
+            .from('map_sheet_conversions')
+            .select('*')
+            .order('xa_phuong_cu', { ascending: true });
+        if (error) throw error;
+        return data as MapSheetConversion[];
+    } catch (error) {
+        logError("fetchMapSheetConversions", error);
+        return MOCK_MAP_CONVERSIONS;
+    }
+};
+
+export const saveMapSheetConversions = async (records: Partial<MapSheetConversion>[]): Promise<boolean> => {
+    if (!isConfigured) {
+        const newRecords = records.map(r => ({
+            ...r,
+            id: generateId(),
+            created_at: new Date().toISOString()
+        })) as MapSheetConversion[];
+        MOCK_MAP_CONVERSIONS = [...MOCK_MAP_CONVERSIONS, ...newRecords];
+        return true;
+    }
+    try {
+        // Prepare records for insertion
+        const newRecords = records.map(r => ({
+            xa_phuong_cu: r.xa_phuong_cu,
+            so_to_cu: r.so_to_cu,
+            xa_phuong_moi: r.xa_phuong_moi,
+            so_to_moi: r.so_to_moi
+        }));
+
+        const { error } = await supabase.from('map_sheet_conversions').insert(newRecords);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("saveMapSheetConversions", error);
+        return false;
+    }
+};
+
+export const deleteAllMapSheetConversions = async (): Promise<boolean> => {
+    if (!isConfigured) {
+        MOCK_MAP_CONVERSIONS = [];
+        return true;
+    }
+    try {
+        // Supabase requires a filter for delete. We can delete where id is not null.
+        const { error } = await supabase.from('map_sheet_conversions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteAllMapSheetConversions", error);
         return false;
     }
 };

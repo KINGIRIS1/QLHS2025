@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid } from 'lucide-react';
+import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
@@ -8,6 +8,7 @@ import VPHCTab from './utilities/VPHCTab';
 import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
+import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -15,7 +16,7 @@ interface UtilitiesViewProps {
 }
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -126,9 +127,15 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
               >
                   <Calculator size={16} /> Tính sai số
               </button>
+              <button 
+                  onClick={() => setActiveTab('chuyendoi')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chuyendoi' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <FileSpreadsheet size={16} /> Chuyển đổi tờ bản đồ
+              </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -177,6 +184,11 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
           {/* TAB 6: TÍNH SAI SỐ */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'saiso' ? 'block' : 'hidden'}`}>
               <SaiSoTab />
+          </div>
+
+          {/* TAB 7: CHUYỂN ĐỔI TỜ BẢN ĐỒ */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'chuyendoi' ? 'block' : 'hidden'}`}>
+              <ChuyenDoiToBanDoTab notify={notify} />
           </div>
       </div>
     </div>

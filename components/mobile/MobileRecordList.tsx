@@ -32,6 +32,13 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterWard, setFilterWard] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset page when filtering
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterWard]);
 
   const filtered = records.filter(r => {
     const matchesSearch = 
@@ -41,6 +48,17 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     const matchesWard = filterWard === 'all' || r.ward === filterWard;
     return matchesSearch && matchesWard;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedRecords = filtered.slice(0, currentPage * itemsPerPage);
+  const hasMore = currentPage < totalPages;
+
+  const handleLoadMore = () => {
+    if (hasMore) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
 
   const getStatusColor = (status: RecordStatus) => {
     switch (status) {
@@ -80,59 +98,87 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
 
       {/* Record List */}
       <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-        {filtered.length > 0 ? filtered.map((record) => (
-          <div 
-            key={record.id} 
-            className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 active:scale-[0.98] transition-all"
-            onClick={() => onViewRecord(record)}
-          >
-            <div className="flex justify-between items-start mb-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-slate-800 text-base truncate">{record.customerName}</h3>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">{record.code}</p>
-              </div>
-              <span className={`px-2 py-1 rounded-lg text-[10px] font-bold border uppercase tracking-wider ${getStatusColor(record.status)}`}>
-                {STATUS_LABELS[record.status]}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-4">
-              <div className="flex items-center gap-2 text-slate-500">
-                <MapPin size={14} className="shrink-0" />
-                <span className="text-xs truncate">{record.ward || 'Chưa rõ'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-500">
-                <Phone size={14} className="shrink-0" />
-                <span className="text-xs">{record.phoneNumber || 'N/A'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-500">
-                <Calendar size={14} className="shrink-0" />
-                <span className="text-xs">{record.receivedDate || 'N/A'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-500">
-                <User size={14} className="shrink-0" />
-                <span className="text-xs truncate">
-                  {record.assignedTo ? (employees.find(e => e.id === record.assignedTo)?.name || 'N/A') : 'Chưa giao'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-              <div className="flex -space-x-2">
-                {/* Visual indicator of progress or something */}
-                <div className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-blue-600">
-                  {record.mapSheet || '?'}
+        {paginatedRecords.length > 0 ? (
+          <>
+            {paginatedRecords.map((record) => (
+              <div 
+                key={record.id} 
+                className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 active:scale-[0.98] transition-all"
+                onClick={() => onViewRecord(record)}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-800 text-base truncate">{record.customerName}</h3>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">{record.code}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold border uppercase tracking-wider ${getStatusColor(record.status)}`}>
+                    {STATUS_LABELS[record.status]}
+                  </span>
                 </div>
-                <div className="w-6 h-6 rounded-full bg-green-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-green-600">
-                  {record.landPlot || '?'}
+
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-4">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <MapPin size={14} className="shrink-0" />
+                    <span className="text-xs truncate">{record.ward || 'Chưa rõ'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <Phone size={14} className="shrink-0" />
+                    <span className="text-xs">{record.phoneNumber || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <Calendar size={14} className="shrink-0" />
+                    <span className="text-xs">{record.receivedDate || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <User size={14} className="shrink-0" />
+                    <span className="text-xs truncate">
+                      {record.assignedTo ? (employees.find(e => e.id === record.assignedTo)?.name || 'N/A') : 'Chưa giao'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                  <div className="flex -space-x-2">
+                    {/* Visual indicator of progress or something */}
+                    <div className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-blue-600">
+                      {record.mapSheet || '?'}
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-green-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-green-600">
+                      {record.landPlot || '?'}
+                    </div>
+                  </div>
+                  <button className="text-blue-600 flex items-center gap-1 text-xs font-bold">
+                    Chi tiết <ChevronRight size={14} />
+                  </button>
                 </div>
               </div>
-              <button className="text-blue-600 flex items-center gap-1 text-xs font-bold">
-                Chi tiết <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        )) : (
+            ))}
+
+            {/* Pagination Controls */}
+            {hasMore && (
+              <div className="pt-4 pb-8 flex flex-col items-center gap-3">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleLoadMore(); }}
+                  className="w-full py-3 bg-white border border-blue-200 text-blue-600 rounded-xl font-bold text-sm shadow-sm active:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  Xem thêm hồ sơ
+                  <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded-full">
+                    {filtered.length - paginatedRecords.length} còn lại
+                  </span>
+                </button>
+                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">
+                  Trang {currentPage} / {totalPages}
+                </p>
+              </div>
+            )}
+
+            {!hasMore && filtered.length > itemsPerPage && (
+              <div className="py-8 text-center">
+                <p className="text-xs text-slate-400 font-medium italic">Bạn đã xem hết danh sách ({filtered.length} hồ sơ)</p>
+              </div>
+            )}
+          </>
+        ) : (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <Search size={48} className="mb-4 opacity-20" />
             <p className="text-sm font-medium">Không tìm thấy hồ sơ nào</p>

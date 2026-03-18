@@ -98,11 +98,19 @@ body {
   100% { transform: rotate(0.0deg) }
 }
 
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out;
 }
 .animate-fade-in-up {
   animation: fadeInUp 0.5s ease-out;
+}
+.animate-slide-in-right {
+  animation: slideInFromRight 0.3s ease-out;
 }
 .animate-wave {
   animation: wave 2s infinite;

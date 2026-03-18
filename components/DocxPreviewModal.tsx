@@ -196,9 +196,10 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
             suppressContentEditableWarning={true}
             onKeyDown={handleKeyDown}
             spellCheck={false}
-            className="bg-white shadow-lg p-10 text-left transition-opacity duration-300 docx-viewer-container outline-none ring-0 focus:ring-4 focus:ring-blue-100/50 cursor-text border border-gray-200"
+            className="bg-white shadow-lg p-4 md:p-10 text-left transition-opacity duration-300 docx-viewer-container outline-none ring-0 focus:ring-4 focus:ring-blue-100/50 cursor-text border border-gray-200"
             style={{
-              width: '210mm',
+              width: '100%',
+              maxWidth: '210mm',
               minHeight: '297mm',
               margin: '0 auto',
               opacity: loading ? 0 : 1,

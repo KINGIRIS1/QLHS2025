@@ -4,6 +4,8 @@ import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
 import { DetailModal } from './DetailModal';
+import { MobileDetailModal } from './mobile/MobileDetailModal';
+import { useIsMobile } from '../hooks/useIsMobile';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
@@ -84,6 +86,7 @@ interface AppModalsProps {
 const AppModals: React.FC<AppModalsProps> = (props) => {
     // Xác định danh sách hồ sơ cần chốt để truyền vào modal (cho tính năng cảnh báo)
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
+    const isMobile = useIsMobile();
 
     return (
         <>
@@ -112,16 +115,29 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 selectedRecords={props.assignTargetRecords} 
             />
             
-            <DetailModal 
-                isOpen={!!props.viewingRecord} 
-                onClose={() => props.setViewingRecord(null)} 
-                record={props.viewingRecord} 
-                employees={props.employees} 
-                currentUser={props.currentUser} 
-                onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                onDelete={props.canPerformAction ? props.confirmDelete : undefined}
-                onCreateLiquidation={props.onCreateLiquidation}
-            />
+            {isMobile ? (
+                <MobileDetailModal 
+                    isOpen={!!props.viewingRecord} 
+                    onClose={() => props.setViewingRecord(null)} 
+                    record={props.viewingRecord} 
+                    employees={props.employees} 
+                    currentUser={props.currentUser} 
+                    onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
+                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onCreateLiquidation={props.onCreateLiquidation}
+                />
+            ) : (
+                <DetailModal 
+                    isOpen={!!props.viewingRecord} 
+                    onClose={() => props.setViewingRecord(null)} 
+                    record={props.viewingRecord} 
+                    employees={props.employees} 
+                    currentUser={props.currentUser} 
+                    onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
+                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onCreateLiquidation={props.onCreateLiquidation}
+                />
+            )}
             
             <DeleteConfirmModal 
                 isOpen={props.isDeleteModalOpen} 

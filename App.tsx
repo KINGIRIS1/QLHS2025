@@ -493,6 +493,14 @@ function App() {
           notificationEnabled={notificationEnabled}
           setNotificationEnabled={setNotificationEnabled}
           setUnreadMessages={setUnreadMessages}
+          onLogout={() => setCurrentUser(null)}
+          onAddUser={(u) => { saveUserApi(u, false).then(res => { if(res) { setUsers(prev => [...prev, res]); loadData(); } }); }}
+          onUpdateUser={(u) => handleUpdateUser(u, true)}
+          onDeleteUser={handleDeleteUser}
+          onSaveEmployee={handleSaveEmployee}
+          onDeleteEmployee={handleDeleteEmployee}
+          onDeleteAllData={handleDeleteAllData}
+          onHolidaysChanged={loadData}
         />
         
         <AppModals 

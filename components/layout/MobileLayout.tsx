@@ -34,7 +34,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'all_records', label: 'Hồ sơ', icon: FileText },
-    { id: 'internal_chat', label: 'Trao đổi', icon: MessageSquare, badge: unreadMessages },
     { id: 'account_settings', label: 'Cài đặt', icon: Settings },
   ];
 
@@ -84,11 +83,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
             >
               <div className="relative">
                 <Icon size={22} className={isActive ? 'scale-110' : ''} />
-                {item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full">
-                    {item.badge > 9 ? '9+' : item.badge}
-                  </span>
-                )}
               </div>
               <span className={`text-[10px] font-medium ${isActive ? 'text-blue-600' : 'text-slate-500'}`}>
                 {item.label}

@@ -2,8 +2,7 @@ import React from 'react';
 import { RecordFile, Employee, User, UserRole, Holiday } from '../../types';
 import MobileDashboard from './MobileDashboard';
 import MobileRecordList from './MobileRecordList';
-import InternalChat from '../InternalChat';
-import AccountSettingsView from '../AccountSettingsView';
+import MobileSettingsView from './MobileSettingsView';
 
 interface MobileRoutesProps {
   currentView: string;
@@ -25,6 +24,14 @@ interface MobileRoutesProps {
   notificationEnabled: boolean;
   setNotificationEnabled: (enabled: boolean) => void;
   setUnreadMessages: (n: number) => void;
+  onLogout: () => void;
+  onAddUser: (user: Omit<User, 'id'>) => void;
+  onUpdateUser: (user: User) => void;
+  onDeleteUser: (username: string) => void;
+  onSaveEmployee: (employee: Employee) => void;
+  onDeleteEmployee: (id: string) => void;
+  onDeleteAllData: () => Promise<boolean>;
+  onHolidaysChanged: () => void;
 }
 
 const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
@@ -54,31 +61,25 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
         />
       );
 
-    case 'internal_chat':
-      return (
-        <div className="h-full flex flex-col bg-white">
-          <InternalChat
-            currentUser={currentUser}
-            wards={wards}
-            employees={employees}
-            users={users}
-            onResetUnread={() => props.setUnreadMessages(0)}
-            notificationEnabled={props.notificationEnabled}
-          />
-        </div>
-      );
-
     case 'account_settings':
       return (
-        <div className="p-4 bg-white h-full overflow-y-auto">
-          <AccountSettingsView
-            currentUser={currentUser}
-            linkedEmployee={employees.find(e => e.id === currentUser.employeeId)}
-            onUpdate={props.handleUpdateCurrentAccount}
-            notificationEnabled={props.notificationEnabled}
-            setNotificationEnabled={props.setNotificationEnabled}
-          />
-        </div>
+        <MobileSettingsView
+          currentUser={currentUser}
+          employees={employees}
+          users={users}
+          wards={wards}
+          onUpdateAccount={props.handleUpdateCurrentAccount}
+          onAddUser={props.onAddUser}
+          onUpdateUser={props.onUpdateUser}
+          onDeleteUser={props.onDeleteUser}
+          onSaveEmployee={props.onSaveEmployee}
+          onDeleteEmployee={props.onDeleteEmployee}
+          onDeleteAllData={props.onDeleteAllData}
+          onHolidaysChanged={props.onHolidaysChanged}
+          notificationEnabled={props.notificationEnabled}
+          setNotificationEnabled={props.setNotificationEnabled}
+          onLogout={props.onLogout}
+        />
       );
 
     default:

@@ -20,7 +20,12 @@ import { useRecordFilter } from './hooks/useRecordFilter';
 import { useReminderSystem } from './hooks/useReminderSystem';
 import { useGlobalChatListener } from './hooks/useGlobalChatListener';
 
+import { useIsMobile } from './hooks/useIsMobile';
+import MobileLayout from './components/layout/MobileLayout';
+import MobileRoutes from './components/mobile/MobileRoutes';
+
 function App() {
+  const isMobile = useIsMobile(768);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -459,6 +464,92 @@ function App() {
   };
 
   if (!currentUser) return <Login onLogin={setCurrentUser} users={users} />;
+
+  if (isMobile) {
+    return (
+      <MobileLayout
+        currentUser={currentUser}
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        onLogout={() => setCurrentUser(null)}
+        unreadMessages={unreadMessages}
+        activeRemindersCount={activeRemindersCount}
+      >
+        <MobileRoutes
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+          currentUser={currentUser}
+          records={records}
+          employees={employees}
+          users={users}
+          wards={wards}
+          holidays={holidays}
+          handleViewRecord={(r) => setViewingRecord(r)}
+          setEditingRecord={setEditingRecord}
+          setIsModalOpen={setIsModalOpen}
+          setDeletingRecord={setDeletingRecord}
+          setIsDeleteModalOpen={setIsDeleteModalOpen}
+          handleUpdateCurrentAccount={handleUpdateCurrentAccount}
+          notificationEnabled={notificationEnabled}
+          setNotificationEnabled={setNotificationEnabled}
+          setUnreadMessages={setUnreadMessages}
+        />
+        
+        <AppModals 
+            isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen}
+            isImportModalOpen={isImportModalOpen} setIsImportModalOpen={setIsImportModalOpen}
+            isSettingsOpen={false} setIsSettingsOpen={() => {}} 
+            isAssignModalOpen={isAssignModalOpen} setIsAssignModalOpen={setIsAssignModalOpen}
+            isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}
+            isExportModalOpen={isExportModalOpen} setIsExportModalOpen={setIsExportModalOpen}
+            isAddToBatchModalOpen={isAddToBatchModalOpen} setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
+            isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
+            isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
+            isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
+            
+            editingRecord={editingRecord} setEditingRecord={setEditingRecord}
+            viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
+            deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
+            returnRecord={returnRecord} setReturnRecord={setReturnRecord}
+            assignTargetRecords={assignTargetRecords}
+            exportModalType={exportModalType}
+            
+            previewWorkbook={previewWorkbook} previewExcelName={previewExcelName}
+
+            handleAddOrUpdate={handleAddOrUpdateRecord}
+            handleImportRecords={onImportRecords}
+            handleSaveEmployee={handleSaveEmployee}
+            handleDeleteEmployee={handleDeleteEmployee}
+            handleDeleteAllData={handleDeleteAllData}
+            onRefreshData={loadData}
+            confirmAssign={confirmAssign}
+            handleDeleteRecord={() => { if(deletingRecord) handleDeleteRecord(deletingRecord.id); }}
+            confirmDelete={(r) => handleDeleteRecord(r.id)}
+            handleExcelPreview={(wb, name) => { setPreviewWorkbook(wb); setPreviewExcelName(name); setIsExcelPreviewOpen(true); }}
+            executeBatchExport={executeBatchExport}
+            onCreateLiquidation={(r) => { setRecordToLiquidate(r); setCurrentView('receive_contract'); }}
+            handleBulkUpdate={handleBulkUpdate}
+            confirmReturnResult={handleConfirmReturnResult}
+
+            employees={employees}
+            currentUser={currentUser}
+            wards={wards}
+            filteredRecords={recordFilterProps.filteredRecords}
+            records={records}
+            selectedCount={selectedRecordIds.size}
+            canPerformAction={canPerformAction}
+            selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
+        />
+
+        {toast && (
+            <div className={`fixed bottom-20 right-4 px-6 py-3 rounded-lg shadow-xl text-white font-bold animate-fade-in-up z-50 flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+                {toast.message}
+            </div>
+        )}
+      </MobileLayout>
+    );
+  }
 
   return (
     <MainLayout

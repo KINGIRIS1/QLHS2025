@@ -123,20 +123,20 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6 animate-fade-in-up overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in-up">
         {/* Header Section */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between shrink-0">
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 shrink-0">
             <div>
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <UserIcon className="text-blue-600" />
+                <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
+                    <UserIcon className="text-blue-600" size={20} />
                     Cài đặt tài khoản
                 </h2>
-                <p className="text-gray-500 mt-1">Quản lý thông tin cá nhân và bảo mật tài khoản.</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Quản lý thông tin cá nhân và bảo mật tài khoản.</p>
             </div>
         </div>
 
         {/* Content Section */}
-        <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col md:flex-row min-h-0">
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0 bg-gray-50/30">
             {/* Sidebar Tabs / Mobile Tabs */}
             <div className="w-full md:w-64 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 p-2 md:p-4 flex md:flex-col gap-2 shrink-0 overflow-x-auto no-scrollbar">
                 <button 

@@ -55,13 +55,12 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
       case 'account':
         return (
           <div className="flex flex-col h-full bg-white">
-            <div className="p-4 border-b flex items-center gap-3 bg-white sticky top-0 z-10">
-              <button onClick={() => setActiveSubView(null)} className="p-1 hover:bg-gray-100 rounded-full">
-                <ArrowLeft size={20} />
+            <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+                <ArrowLeft size={20} /> Quay lại
               </button>
-              <h3 className="font-bold text-lg">Tài khoản của tôi</h3>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-hidden flex flex-col p-2 bg-gray-50">
               <AccountSettingsView 
                 currentUser={currentUser}
                 linkedEmployee={employees.find(e => e.id === currentUser.employeeId)}
@@ -75,13 +74,12 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
       case 'employees':
         return (
           <div className="flex flex-col h-full bg-white">
-            <div className="p-4 border-b flex items-center gap-3 bg-white sticky top-0 z-10">
-              <button onClick={() => setActiveSubView(null)} className="p-1 hover:bg-gray-100 rounded-full">
-                <ArrowLeft size={20} />
+            <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+                <ArrowLeft size={20} /> Quay lại
               </button>
-              <h3 className="font-bold text-lg">Quản lý nhân sự</h3>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-hidden flex flex-col p-2 bg-gray-50">
               <EmployeeManagement 
                 employees={employees}
                 onSaveEmployee={props.onSaveEmployee}
@@ -95,13 +93,12 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
       case 'users':
         return (
           <div className="flex flex-col h-full bg-white">
-            <div className="p-4 border-b flex items-center gap-3 bg-white sticky top-0 z-10">
-              <button onClick={() => setActiveSubView(null)} className="p-1 hover:bg-gray-100 rounded-full">
-                <ArrowLeft size={20} />
+            <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+                <ArrowLeft size={20} /> Quay lại
               </button>
-              <h3 className="font-bold text-lg">Quản lý người dùng</h3>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-hidden flex flex-col p-2 bg-gray-50">
               <UserManagement 
                 users={users}
                 employees={employees}
@@ -115,13 +112,12 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
       case 'system':
         return (
           <div className="flex flex-col h-full bg-white">
-            <div className="p-4 border-b flex items-center gap-3 bg-white sticky top-0 z-10">
-              <button onClick={() => setActiveSubView(null)} className="p-1 hover:bg-gray-100 rounded-full">
-                <ArrowLeft size={20} />
+            <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+                <ArrowLeft size={20} /> Quay lại
               </button>
-              <h3 className="font-bold text-lg">Cấu hình hệ thống</h3>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-hidden flex flex-col p-2 bg-gray-50">
               <SystemSettingsView 
                 onDeleteAllData={props.onDeleteAllData}
                 onHolidaysChanged={props.onHolidaysChanged}

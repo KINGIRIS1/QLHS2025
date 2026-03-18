@@ -167,18 +167,18 @@ const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in-up">
         <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50">
             <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
                 <Shield className="text-blue-600" size={20} /> Quản Lý Tài Khoản
             </h2>
-            <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
-                <div className="relative flex-1 sm:flex-none sm:w-64">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                     <input 
                         type="text" 
                         placeholder="Tìm tài khoản..." 
-                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -193,19 +193,19 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     />
                     <button 
                         onClick={handleDownloadSample}
-                        className="flex items-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-xl hover:bg-gray-50 font-bold text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-xl hover:bg-gray-50 font-black text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
                     >
                         <Download size={14} /> Mẫu
                     </button>
                     <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-xl hover:bg-green-700 font-bold text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded-xl hover:bg-green-700 font-black text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
                     >
                         <FileSpreadsheet size={14} /> Nhập
                     </button>
                     <button
                         onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-                        className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 font-bold text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 font-black text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
                     >
                         <Plus size={14} /> Thêm
                     </button>
@@ -286,11 +286,16 @@ const UserManagement: React.FC<UserManagementProps> = ({
             <div className="md:hidden p-4 space-y-4">
                 {filteredUsers.length > 0 ? (
                     filteredUsers.map(user => (
-                        <div key={user.username} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
+                        <div key={user.username} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3 relative group">
                             <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Tài khoản</p>
-                                    <h3 className="text-base font-black text-slate-800 tracking-tight">{user.username}</h3>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-black shrink-0 border border-blue-100">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-black text-slate-800 tracking-tight">{user.name}</h3>
+                                        <p className="text-xs font-bold text-gray-500">@{user.username}</p>
+                                    </div>
                                 </div>
                                 <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
                                     user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
@@ -303,17 +308,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
-                                <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tên hiển thị</p>
-                                    <p className="text-sm font-bold text-slate-700">{user.name}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Nhân viên</p>
-                                    <div className="flex items-center gap-1 text-sm font-bold text-slate-600">
-                                        <Briefcase size={12} className="text-gray-400" />
-                                        <span className="truncate">{user.employeeId ? employees.find(e => e.id === user.employeeId)?.name || user.employeeId : '---'}</span>
-                                    </div>
+                            <div className="pt-2 border-t border-gray-50">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Liên kết nhân viên</p>
+                                <div className="flex items-center gap-1 text-sm font-bold text-slate-600">
+                                    <Briefcase size={12} className="text-gray-400" />
+                                    <span className="truncate">{user.employeeId ? employees.find(e => e.id === user.employeeId)?.name || user.employeeId : '---'}</span>
                                 </div>
                             </div>
 
@@ -344,56 +343,58 @@ const UserManagement: React.FC<UserManagementProps> = ({
         </div>
 
         {isModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up">
-                    <div className="flex justify-between items-center p-5 border-b">
-                        <h3 className="text-lg font-bold text-gray-800">
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
+                    <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <h3 className="text-xl font-black text-slate-800 tracking-tight">
                             {editingUser ? 'Cập nhật tài khoản' : 'Thêm tài khoản mới'}
                         </h3>
-                        <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-red-500"><X size={24} /></button>
+                        <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-xl transition-colors">
+                            <X size={20} />
+                        </button>
                     </div>
-                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập <span className="text-red-500">*</span></label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tên đăng nhập <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     disabled={!!editingUser}
-                                    className={`w-full border rounded-lg px-3 py-2 pl-9 outline-none focus:ring-2 focus:ring-blue-500 ${editingUser ? 'bg-gray-100 text-gray-500' : 'border-gray-300'}`}
+                                    className={`w-full border rounded-xl px-4 py-3 pl-10 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${editingUser ? 'bg-gray-100 text-gray-500 border-gray-200' : 'border-gray-200'}`}
                                     value={formData.username}
                                     onChange={e => setFormData({...formData, username: e.target.value})}
                                     placeholder="username"
                                 />
-                                <UserIcon size={16} className="absolute left-3 top-3 text-gray-400" />
+                                <UserIcon size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu <span className="text-red-500">*</span></label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Mật khẩu <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
                                     type="text"
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-10 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     value={formData.password}
                                     onChange={e => setFormData({...formData, password: e.target.value})}
                                     placeholder="password"
                                 />
-                                <Lock size={16} className="absolute left-3 top-3 text-gray-400" />
+                                <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tên hiển thị <span className="text-red-500">*</span></label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tên hiển thị <span className="text-red-500">*</span></label>
                             <input
                                 type="text"
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 value={formData.name}
                                 onChange={e => setFormData({...formData, name: e.target.value})}
                                 placeholder="Nguyễn Văn A"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò hệ thống</label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Vai trò hệ thống</label>
                             <select
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                                 value={formData.role}
                                 onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
                             >
@@ -405,9 +406,9 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Liên kết hồ sơ nhân viên</label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Liên kết hồ sơ nhân viên</label>
                             <select
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                                 value={formData.employeeId || ''}
                                 onChange={e => setFormData({...formData, employeeId: e.target.value})}
                             >
@@ -418,22 +419,22 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Liên kết để sử dụng các tính năng cá nhân hóa (My Tasks).</p>
+                            <p className="text-[10px] text-gray-400 mt-2 font-medium">Liên kết để sử dụng các tính năng cá nhân hóa (My Tasks).</p>
                         </div>
 
-                        <div className="pt-4 flex justify-end gap-3 border-t">
+                        <div className="pt-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100">
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                className="w-full sm:w-auto px-6 py-3 text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
                             >
                                 Hủy
                             </button>
                             <button
                                 type="submit"
-                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-medium"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
                             >
-                                <Save size={18} /> Lưu
+                                <Save size={16} /> Lưu
                             </button>
                         </div>
                     </form>

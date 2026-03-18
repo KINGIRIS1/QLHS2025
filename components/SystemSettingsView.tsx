@@ -141,8 +141,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 shrink-0">
+            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
                 <ShieldAlert className="text-red-600" size={20} />
                 Cấu hình Hệ thống (Admin)
             </h2>

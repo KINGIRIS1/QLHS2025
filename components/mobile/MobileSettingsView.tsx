@@ -143,60 +143,93 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
   }
 
   return (
-    <div className="p-4 space-y-6 bg-slate-50 min-h-full pb-24">
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-4">
-        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold border-4 border-blue-50">
-          {currentUser.name.charAt(0)}
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">{currentUser.name}</h2>
-          <p className="text-slate-500 text-sm">@{currentUser.username}</p>
-          <div className="mt-1 inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase tracking-wider">
-            {currentUser.role}
+    <div className="flex flex-col min-h-full bg-slate-50/50 pb-24">
+      {/* Header Profile Section */}
+      <div className="bg-white px-6 pt-10 pb-8 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-50 rounded-full -ml-12 -mb-12 opacity-50" />
+        
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <div className="relative">
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-blue-200 border-4 border-white">
+              {currentUser.name.charAt(0)}
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 border-4 border-white rounded-full shadow-sm" />
+          </div>
+          
+          <div className="mt-4">
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{currentUser.name}</h2>
+            <p className="text-slate-400 font-medium text-sm mt-0.5">@{currentUser.username}</p>
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-100">
+              {currentUser.role}
+            </span>
+            {currentUser.employeeId && (
+              <span className="px-3 py-1 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-full uppercase tracking-wider border border-slate-100">
+                Nhân viên
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-50">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cài đặt ứng dụng</h3>
-        </div>
-        <div className="divide-y divide-slate-50">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSubView(item.id)}
-                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 ${item.bg} ${item.color} rounded-xl flex items-center justify-center`}>
-                    <Icon size={20} />
+      <div className="px-5 mt-8 space-y-6">
+        {/* Main Menu */}
+        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-50">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Cài đặt ứng dụng</h3>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSubView(item.id)}
+                  className="w-full flex items-center justify-between p-5 hover:bg-slate-50 active:bg-slate-50/80 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 ${item.bg} ${item.color} rounded-2xl flex items-center justify-center shadow-sm group-active:scale-90 transition-transform`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="text-left">
+                      <span className="block font-bold text-slate-700 text-[15px]">{item.label}</span>
+                      <span className="text-[11px] text-slate-400 font-medium">Tùy chỉnh & Quản lý</span>
+                    </div>
                   </div>
-                  <span className="font-semibold text-slate-700">{item.label}</span>
-                </div>
-                <ChevronRight size={18} className="text-slate-300" />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-4 p-4 text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
-        >
-          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-            <LogOut size={20} />
+                  <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-400 transition-colors" />
+                </button>
+              );
+            })}
           </div>
-          <span className="font-bold">Đăng xuất</span>
-        </button>
-      </div>
+        </div>
 
-      <div className="text-center">
-        <p className="text-slate-400 text-xs">Phiên bản 2.0.0 (Mobile)</p>
+        {/* Action Menu */}
+        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-between p-5 hover:bg-red-50 active:bg-red-50/80 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center shadow-sm group-active:scale-90 transition-transform">
+                <LogOut size={22} />
+              </div>
+              <div className="text-left">
+                <span className="block font-bold text-red-600 text-[15px]">Đăng xuất</span>
+                <span className="text-[11px] text-red-400 font-medium">Kết thúc phiên làm việc</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Footer Info */}
+        <div className="pt-4 pb-8 text-center">
+          <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">
+            Phiên bản 2.1.0 • QLHS Mobile
+          </p>
+        </div>
       </div>
     </div>
   );

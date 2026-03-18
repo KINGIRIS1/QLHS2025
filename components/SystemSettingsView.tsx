@@ -149,65 +149,65 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50 px-4">
+        <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar shrink-0">
             <button 
                 onClick={() => setActiveTab('general')}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
                 <Database size={16} /> Chung
             </button>
             <button 
                 onClick={() => setActiveTab('holidays')}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
                 <Calendar size={16} /> Ngày nghỉ lễ
             </button>
             <button 
                 onClick={() => setActiveTab('data')}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
                 <AlertTriangle size={16} /> Dữ liệu
             </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 flex flex-col md:flex-row gap-4 items-center justify-between">
-                        <div>
-                            <h3 className="font-bold text-blue-800 flex items-center gap-2 mb-1"> <Database size={18} /> Cloud Database </h3>
-                            <p className="text-sm text-blue-700">Kiểm tra kết nối đến cơ sở dữ liệu Supabase.</p>
+                    <div className="bg-white border border-blue-100 rounded-2xl p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+                        <div className="text-center md:text-left">
+                            <h3 className="font-black text-blue-800 flex items-center justify-center md:justify-start gap-2 mb-1 tracking-tight"> <Database size={18} /> Cloud Database </h3>
+                            <p className="text-xs text-blue-600 font-medium">Kiểm tra kết nối đến cơ sở dữ liệu Supabase.</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            {dbTestStatus === 'success' && <div className="text-sm font-bold text-green-700 flex items-center gap-1"><CheckCircle size={16} /> Kết nối OK!</div>}
-                            {dbTestStatus === 'error' && <div className="text-sm font-bold text-red-700">{dbTestMsg || 'Lỗi!'}</div>}
-                            <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="px-4 py-2 bg-white border border-blue-300 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition-colors shadow-sm text-sm flex items-center gap-2"> 
+                        <div className="flex flex-col items-center gap-3 w-full md:w-auto">
+                            {dbTestStatus === 'success' && <div className="text-xs font-black text-green-600 flex items-center gap-1 uppercase tracking-wider"><CheckCircle size={16} /> Kết nối OK!</div>}
+                            {dbTestStatus === 'error' && <div className="text-xs font-black text-red-600 uppercase tracking-wider">{dbTestMsg || 'Lỗi!'}</div>}
+                            <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full md:w-auto px-6 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2"> 
                                 {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : 'Kiểm tra kết nối'} 
                             </button>
                         </div>
                     </div>
 
                     {/* Manual Update Config */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
-                        <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-4">
-                            <Cloud size={18} /> Cập nhật phiên bản
+                    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                        <h3 className="font-black text-gray-700 flex items-center gap-2 mb-6 tracking-tight">
+                            <Cloud size={18} className="text-purple-500" /> Cập nhật phiên bản
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-sm font-bold text-gray-600 mb-1">Phiên bản Mới nhất</label>
-                                <input type="text" className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono" placeholder="VD: 1.6.0" value={manualVersion} onChange={(e) => setManualVersion(e.target.value)} />
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Phiên bản Mới nhất</label>
+                                <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="VD: 1.6.0" value={manualVersion} onChange={(e) => setManualVersion(e.target.value)} />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-600 mb-1">Link tải (Google Drive / Web)</label>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Link tải (Drive / Web)</label>
                                 <div className="relative">
-                                    <Globe size={16} className="absolute left-3 top-2.5 text-gray-400" />
-                                    <input type="text" className="w-full border border-gray-300 rounded px-3 py-2 pl-9 text-sm" placeholder="https://..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
+                                    <Globe size={16} className="absolute left-4 top-3.5 text-gray-400" />
+                                    <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-11 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="https://..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-4 flex justify-end">
-                            <button onClick={handleSaveUpdateConfig} disabled={isSavingUpdate} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 text-sm font-bold shadow-sm">
+                        <div className="mt-8 flex justify-end">
+                            <button onClick={handleSaveUpdateConfig} disabled={isSavingUpdate} className="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-900 text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
                                 {isSavingUpdate ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Phát hành phiên bản
                             </button>
                         </div>
@@ -216,82 +216,108 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'holidays' && (
-                <div className="max-w-4xl mx-auto">
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-5">
-                        <div className="flex justify-between items-center mb-4">
+                <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="bg-white border border-orange-100 rounded-2xl p-5 shadow-sm">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                             <div>
-                                <h3 className="font-bold text-orange-800 flex items-center gap-2">
+                                <h3 className="font-black text-orange-800 flex items-center gap-2 tracking-tight">
                                     <Calendar size={18} /> Cấu hình Ngày nghỉ lễ
                                 </h3>
-                                <p className="text-xs text-orange-700 mt-1">
+                                <p className="text-[11px] text-orange-600 mt-1 font-medium">
                                     Ngày nghỉ lễ sẽ không được tính vào thời gian hẹn trả kết quả.
                                 </p>
                             </div>
                             <button 
                                 onClick={handleSaveHolidays} 
                                 disabled={savingHolidays}
-                                className="bg-orange-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-orange-700 flex items-center gap-2 shadow-sm"
+                                className="w-full md:w-auto bg-orange-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 flex items-center justify-center gap-2 shadow-lg shadow-orange-100 transition-all active:scale-95"
                             >
                                 {savingHolidays ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Lưu cấu hình
                             </button>
                         </div>
 
                         {/* Form thêm mới */}
-                        <div className="flex flex-wrap gap-3 mb-4 items-end bg-white p-4 rounded border border-orange-100 shadow-sm">
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên ngày lễ</label>
-                                <input type="text" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="VD: Giỗ tổ" value={tempName} onChange={e => setTempName(e.target.value)} />
+                        <div className="flex flex-col gap-4 mb-8 bg-orange-50/50 p-5 rounded-2xl border border-orange-100">
+                            <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest mb-1">Thêm ngày lễ mới</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                                <div className="sm:col-span-6">
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tên ngày lễ</label>
+                                    <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="VD: Giỗ tổ" value={tempName} onChange={e => setTempName(e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ngày</label>
+                                    <input type="number" min="1" max="31" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempDay} onChange={e => setTempDay(parseInt(e.target.value))} />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tháng</label>
+                                    <input type="number" min="1" max="12" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempMonth} onChange={e => setTempMonth(parseInt(e.target.value))} />
+                                </div>
+                                <div className="sm:col-span-2 flex items-end">
+                                    <label className="flex items-center cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 w-full justify-center hover:bg-gray-50 transition-colors">
+                                        <input type="checkbox" className="mr-2 w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
+                                        <span className="text-xs text-gray-700 font-black uppercase tracking-wider">Âm</span>
+                                    </label>
+                                </div>
                             </div>
-                            <div className="w-20">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày</label>
-                                <input type="number" min="1" max="31" className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-center" value={tempDay} onChange={e => setTempDay(parseInt(e.target.value))} />
-                            </div>
-                            <div className="w-20">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tháng</label>
-                                <input type="number" min="1" max="12" className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-center" value={tempMonth} onChange={e => setTempMonth(parseInt(e.target.value))} />
-                            </div>
-                            <div className="flex items-center pb-3 px-2">
-                                <label className="flex items-center cursor-pointer select-none">
-                                    <input type="checkbox" className="mr-2 w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
-                                    <span className="text-sm text-gray-700 font-medium">Âm lịch</span>
-                                </label>
-                            </div>
-                            <button onClick={handleAddHoliday} className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700 mb-[1px] flex items-center gap-1">
-                                <Plus size={16} /> Thêm
+                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95">
+                                <Plus size={16} /> Thêm vào danh sách
                             </button>
                         </div>
 
-                        {/* Danh sách */}
-                        <div className="border border-orange-200 rounded bg-white overflow-hidden">
+                        {/* Danh sách - Desktop Table */}
+                        <div className="hidden md:block border border-gray-100 rounded-2xl bg-white overflow-hidden shadow-sm">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-orange-100 text-orange-800 text-xs uppercase font-bold">
+                                <thead className="bg-orange-50 text-orange-800 text-[10px] uppercase font-black tracking-widest">
                                     <tr>
-                                        <th className="p-3">Tên ngày lễ</th>
-                                        <th className="p-3 text-center">Ngày/Tháng</th>
-                                        <th className="p-3 text-center">Loại lịch</th>
-                                        <th className="p-3 text-center w-16"></th>
+                                        <th className="p-4">Tên ngày lễ</th>
+                                        <th className="p-4 text-center">Ngày/Tháng</th>
+                                        <th className="p-4 text-center">Loại lịch</th>
+                                        <th className="p-4 text-center w-16"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-gray-50">
                                     {holidays.map(h => (
-                                        <tr key={h.id} className="hover:bg-orange-50 transition-colors">
-                                            <td className="p-3 font-medium text-gray-700">{h.name}</td>
-                                            <td className="p-3 text-center font-mono text-gray-600">{h.day}/{h.month}</td>
-                                            <td className="p-3 text-center">
-                                                <span className={`px-2 py-1 rounded text-xs font-medium border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                        <tr key={h.id} className="hover:bg-orange-50/30 transition-colors">
+                                            <td className="p-4 font-bold text-slate-700">{h.name}</td>
+                                            <td className="p-4 text-center font-black text-slate-600">{h.day}/{h.month}</td>
+                                            <td className="p-4 text-center">
+                                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
                                                     {h.isLunar ? 'Âm lịch' : 'Dương lịch'}
                                                 </span>
                                             </td>
-                                            <td className="p-3 text-center">
-                                                <button onClick={() => handleDeleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 size={16} /></button>
+                                            <td className="p-4 text-center">
+                                                <button onClick={() => handleDeleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-colors"><Trash2 size={16} /></button>
                                             </td>
                                         </tr>
                                     ))}
                                     {holidays.length === 0 && (
-                                        <tr><td colSpan={4} className="p-8 text-center text-gray-400 italic">Chưa có dữ liệu ngày lễ</td></tr>
+                                        <tr><td colSpan={4} className="p-8 text-center text-gray-400 italic font-medium">Chưa có dữ liệu ngày lễ</td></tr>
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Danh sách - Mobile Cards */}
+                        <div className="md:hidden space-y-3">
+                            {holidays.map(h => (
+                                <div key={h.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                                    <div className="flex-1 min-w-0 pr-4">
+                                        <h4 className="font-black text-slate-800 text-sm truncate tracking-tight">{h.name}</h4>
+                                        <div className="flex items-center gap-3 mt-1">
+                                            <span className="text-xs font-black text-slate-500">{h.day}/{h.month}</span>
+                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                {h.isLunar ? 'Âm' : 'Dương'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleDeleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-3 rounded-xl hover:bg-red-50 transition-colors shrink-0">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            ))}
+                            {holidays.length === 0 && (
+                                <div className="p-8 text-center text-gray-400 italic font-medium">Chưa có dữ liệu ngày lễ</div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -299,21 +325,24 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
             {activeTab === 'data' && (
                 <div className="max-w-4xl mx-auto">
-                    <div className="border-2 border-red-100 rounded-xl overflow-hidden">
-                        <div className="bg-red-50 p-4 border-b border-red-100">
-                            <h3 className="text-red-700 font-bold flex items-center gap-2 uppercase tracking-wide"> <AlertTriangle size={20} /> Vùng nguy hiểm </h3>
+                    <div className="border-2 border-red-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-red-50">
+                        <div className="bg-red-50 p-5 border-b border-red-100">
+                            <h3 className="text-red-700 font-black flex items-center gap-2 uppercase tracking-widest text-xs"> <AlertTriangle size={20} /> Vùng nguy hiểm </h3>
                         </div>
-                        <div className="p-6 bg-white">
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="p-8">
+                            <div className="flex flex-col items-center text-center gap-6">
+                                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-2">
+                                    <ShieldAlert size={40} />
+                                </div>
                                 <div> 
-                                    <h4 className="font-bold text-gray-800 text-lg flex items-center gap-2 mb-2"> <Database size={20} className="text-red-500" /> Xóa sạch dữ liệu hệ thống </h4> 
-                                    <p className="text-gray-600"> 
+                                    <h4 className="font-black text-slate-800 text-xl tracking-tight mb-3"> Xóa sạch dữ liệu hệ thống </h4> 
+                                    <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-md mx-auto"> 
                                         Hành động này sẽ xóa vĩnh viễn tất cả <strong>Hồ sơ</strong>, <strong>Hợp đồng</strong>, và <strong>Lịch sử hoạt động</strong> khỏi cơ sở dữ liệu. 
                                         <br/>
-                                        <span className="text-red-600 font-medium">Lưu ý: Không thể khôi phục dữ liệu sau khi xóa.</span>
+                                        <span className="text-red-600 font-black mt-2 block uppercase text-xs tracking-wider">Lưu ý: Không thể khôi phục dữ liệu sau khi xóa.</span>
                                     </p> 
                                 </div>
-                                <button onClick={handleConfirmDeleteData} disabled={isDeletingData} className="px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-md disabled:opacity-50 shrink-0 flex items-center gap-2"> 
+                                <button onClick={handleConfirmDeleteData} disabled={isDeletingData} className="w-full md:w-auto px-10 py-4 bg-red-600 text-white font-black text-sm uppercase tracking-widest rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-100 disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"> 
                                     {isDeletingData ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />}
                                     {isDeletingData ? 'Đang xóa...' : 'Xóa dữ liệu ngay'} 
                                 </button>

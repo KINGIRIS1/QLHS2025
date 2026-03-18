@@ -168,114 +168,179 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <Shield className="text-blue-600" /> Quản Lý Tài Khoản
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50">
+            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
+                <Shield className="text-blue-600" size={20} /> Quản Lý Tài Khoản
             </h2>
-            <div className="flex gap-2 items-center">
-                <div className="relative mr-2">
+            <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-none sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                     <input 
                         type="text" 
                         placeholder="Tìm tài khoản..." 
-                        className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    onChange={handleImportExcel}
-                    accept=".xlsx, .xls"
-                    className="hidden"
-                />
-                <button 
-                    onClick={handleDownloadSample}
-                    className="flex items-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-xs shadow-sm transition-colors"
-                >
-                    <Download size={14} /> Tải mẫu
-                </button>
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 font-medium text-xs shadow-sm transition-colors"
-                >
-                    <FileSpreadsheet size={14} /> Nhập Excel
-                </button>
-                <button
-                    onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-                    className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 font-medium text-xs shadow-sm transition-colors"
-                >
-                    <Plus size={14} /> Thêm tài khoản
-                </button>
+                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleImportExcel}
+                        accept=".xlsx, .xls"
+                        className="hidden"
+                    />
+                    <button 
+                        onClick={handleDownloadSample}
+                        className="flex items-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-xl hover:bg-gray-50 font-bold text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
+                    >
+                        <Download size={14} /> Mẫu
+                    </button>
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-xl hover:bg-green-700 font-bold text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
+                    >
+                        <FileSpreadsheet size={14} /> Nhập
+                    </button>
+                    <button
+                        onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+                        className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 font-bold text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
+                    >
+                        <Plus size={14} /> Thêm
+                    </button>
+                </div>
             </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-0">
-            <table className="w-full text-left border-collapse">
-                <thead className="bg-white sticky top-0 shadow-sm z-10 text-xs font-semibold text-gray-500 uppercase">
-                    <tr>
-                        <th className="p-4 border-b">Tên đăng nhập</th>
-                        <th className="p-4 border-b">Tên hiển thị</th>
-                        <th className="p-4 border-b">Vai trò</th>
-                        <th className="p-4 border-b">Liên kết nhân viên</th>
-                        <th className="p-4 border-b text-center">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
-                    {filteredUsers.length > 0 ? (
-                        filteredUsers.map(user => (
-                            <tr key={user.username} className="hover:bg-blue-50/50 transition-colors">
-                                <td className="p-4 font-medium text-gray-900">{user.username}</td>
-                                <td className="p-4">{user.name}</td>
-                                <td className="p-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-bold border ${
-                                        user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
-                                        user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                        user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                        user.role === UserRole.ONEDOOR ? 'bg-green-50 text-green-700 border-green-200' :
-                                        'bg-blue-50 text-blue-700 border-blue-200'
-                                    }`}>
-                                        {user.role}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-gray-600">
-                                    <div className="flex items-center gap-2">
-                                        <Briefcase size={14} className="text-gray-400" />
-                                        {getEmployeeName(user.employeeId)}
-                                    </div>
-                                </td>
-                                <td className="p-4 text-center">
-                                    <div className="flex justify-center gap-2">
-                                        <button
-                                            onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
-                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                            title="Sửa"
-                                        >
-                                            <Edit size={16} />
-                                        </button>
-                                        {user.role !== UserRole.ADMIN && (
+        <div className="flex-1 overflow-y-auto p-0 bg-gray-50/30">
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-white sticky top-0 shadow-sm z-10 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <tr>
+                            <th className="p-4 border-b">Tên đăng nhập</th>
+                            <th className="p-4 border-b">Tên hiển thị</th>
+                            <th className="p-4 border-b">Vai trò</th>
+                            <th className="p-4 border-b">Liên kết nhân viên</th>
+                            <th className="p-4 border-b text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
+                        {filteredUsers.length > 0 ? (
+                            filteredUsers.map(user => (
+                                <tr key={user.username} className="hover:bg-blue-50/50 transition-colors bg-white">
+                                    <td className="p-4 font-bold text-gray-900">{user.username}</td>
+                                    <td className="p-4 font-medium">{user.name}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                                            user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
+                                            user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                            user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                            user.role === UserRole.ONEDOOR ? 'bg-green-50 text-green-700 border-green-200' :
+                                            'bg-blue-50 text-blue-700 border-blue-200'
+                                        }`}>
+                                            {user.role}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-gray-600">
+                                        <div className="flex items-center gap-2 font-medium">
+                                            <Briefcase size={14} className="text-gray-400" />
+                                            {getEmployeeName(user.employeeId)}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <div className="flex justify-center gap-2">
                                             <button
-                                                onClick={() => handleDelete(user.username)}
-                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                title="Xóa"
+                                                onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
+                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Sửa"
                                             >
-                                                <Trash2 size={16} />
+                                                <Edit size={16} />
                                             </button>
-                                        )}
-                                    </div>
+                                            {user.role !== UserRole.ADMIN && (
+                                                <button
+                                                    onClick={() => handleDelete(user.username)}
+                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Xóa"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={5} className="p-8 text-center text-gray-400 italic font-medium">
+                                    Không tìm thấy tài khoản nào phù hợp.
                                 </td>
                             </tr>
-                        ))
-                    ) : (
-                        <tr>
-                            <td colSpan={5} className="p-8 text-center text-gray-400 italic">
-                                Không tìm thấy tài khoản nào phù hợp.
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden p-4 space-y-4">
+                {filteredUsers.length > 0 ? (
+                    filteredUsers.map(user => (
+                        <div key={user.username} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Tài khoản</p>
+                                    <h3 className="text-base font-black text-slate-800 tracking-tight">{user.username}</h3>
+                                </div>
+                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                                    user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
+                                    user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                    user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                    user.role === UserRole.ONEDOOR ? 'bg-green-50 text-green-700 border-green-200' :
+                                    'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}>
+                                    {user.role}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tên hiển thị</p>
+                                    <p className="text-sm font-bold text-slate-700">{user.name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Nhân viên</p>
+                                    <div className="flex items-center gap-1 text-sm font-bold text-slate-600">
+                                        <Briefcase size={12} className="text-gray-400" />
+                                        <span className="truncate">{user.employeeId ? employees.find(e => e.id === user.employeeId)?.name || user.employeeId : '---'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-3 border-t border-gray-50">
+                                <button
+                                    onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl font-black text-[10px] uppercase tracking-wider"
+                                >
+                                    <Edit size={14} /> Sửa
+                                </button>
+                                {user.role !== UserRole.ADMIN && (
+                                    <button
+                                        onClick={() => handleDelete(user.username)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase tracking-wider"
+                                    >
+                                        <Trash2 size={14} /> Xóa
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="p-8 text-center text-gray-400 italic font-medium">
+                        Không tìm thấy tài khoản nào phù hợp.
+                    </div>
+                )}
+            </div>
         </div>
 
         {isModalOpen && (

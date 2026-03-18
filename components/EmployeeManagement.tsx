@@ -153,7 +153,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in-up">
         {/* HEADER */}
         <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 shrink-0">
-          <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 tracking-tight">
             <UserIcon className="text-blue-600" size={20} />
             Quản Lý Nhân Sự
           </h2>
@@ -161,13 +161,13 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           <div className="flex bg-white rounded-xl p-1 border border-gray-200 shadow-sm w-full sm:w-auto overflow-x-auto no-scrollbar">
             <button 
                 onClick={() => setActiveTab('list')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
             >
                 <List size={16} /> Danh sách
             </button>
             <button 
                 onClick={() => setActiveTab('detail')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'detail' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'detail' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
             >
                 {isNew ? <Plus size={16} /> : <Edit2 size={16} />}
                 {isNew ? 'Thêm mới' : 'Chi tiết'}
@@ -187,7 +187,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                             <input 
                                 type="text" 
                                 placeholder="Tìm tên, mã nhân viên, phòng ban, chức vụ..." 
-                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -200,13 +200,13 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                 accept=".xlsx, .xls"
                                 className="hidden"
                             />
-                            <button onClick={handleDownloadSample} className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-[10px] uppercase tracking-wider font-black text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
+                            <button onClick={handleDownloadSample} className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
                                 <Download size={14} /> Mẫu
                             </button>
-                            <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 bg-green-600 text-white rounded-xl text-[10px] uppercase tracking-wider font-black hover:bg-green-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
+                            <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
                                 <FileSpreadsheet size={14} /> Nhập Excel
                             </button>
-                            <button onClick={handleAddNewClick} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] uppercase tracking-wider font-black hover:bg-blue-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0">
+                            <button onClick={handleAddNewClick} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0">
                                 <Plus size={14} /> Thêm NV
                             </button>
                         </div>
@@ -222,7 +222,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                         onClick={() => handleEditClick(emp)}
                                     >
                                         <div className="flex justify-between items-start mb-3">
-                                            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-black shrink-0 border border-blue-100">
+                                            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-semibold shrink-0 border border-blue-100">
                                                 {emp.name.charAt(0).toUpperCase()}
                                             </div>
                                             <button 
@@ -234,20 +234,20 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                             </button>
                                         </div>
                                         
-                                        <h3 className="font-black text-slate-800 text-lg mb-1 truncate tracking-tight" title={emp.name}>{emp.name}</h3>
+                                        <h3 className="font-semibold text-slate-800 text-lg mb-1 truncate tracking-tight" title={emp.name}>{emp.name}</h3>
                                         <div className="flex items-center gap-2 mb-4 flex-wrap">
-                                            <span className="text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 px-2 py-1 rounded-lg border border-gray-200">{emp.id}</span>
-                                            {emp.position && <span className="text-[10px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{emp.position}</span>}
-                                            <span className="text-xs text-gray-500 font-bold truncate" title={emp.department}>{emp.department}</span>
+                                            <span className="text-sm font-medium bg-gray-100 text-gray-500 px-2 py-1 rounded-lg border border-gray-200">{emp.id}</span>
+                                            {emp.position && <span className="text-sm font-medium text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{emp.position}</span>}
+                                            <span className="text-xs text-gray-500 font-semibold truncate" title={emp.department}>{emp.department}</span>
                                         </div>
                                         
                                         <div className="mt-auto pt-3 border-t border-gray-50">
-                                            <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest mb-2">Khu vực phụ trách</p>
+                                            <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Khu vực phụ trách</p>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {emp.managedWards.length > 0 ? emp.managedWards.slice(0, 3).map(w => (
-                                                    <span key={w} className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">{w}</span>
-                                                )) : <span className="text-[10px] font-medium text-gray-400 italic">Chưa phân công</span>}
-                                                {emp.managedWards.length > 3 && <span className="text-[10px] font-bold px-2 py-1 text-gray-500 bg-gray-50 rounded-lg border border-gray-100">+{emp.managedWards.length - 3}</span>}
+                                                    <span key={w} className="text-xs font-semibold px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">{w}</span>
+                                                )) : <span className="text-xs font-medium text-gray-400 italic">Chưa phân công</span>}
+                                                {emp.managedWards.length > 3 && <span className="text-xs font-semibold px-2 py-1 text-gray-500 bg-gray-50 rounded-lg border border-gray-100">+{emp.managedWards.length - 3}</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -269,13 +269,13 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                     <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
                         <div className="max-w-3xl mx-auto space-y-6">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4">
-                                <h3 className="text-xl font-black text-slate-800 tracking-tight">
+                                <h3 className="text-xl font-semibold text-slate-800 tracking-tight">
                                     {isNew ? 'Thêm nhân viên mới' : `Hồ sơ: ${editingEmployee.name}`}
                                 </h3>
                                 {!isNew && (
                                     <button 
                                         onClick={handleAddNewClick} 
-                                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 flex items-center gap-2 transition-colors w-full sm:w-auto justify-center"
+                                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium hover:bg-blue-100 flex items-center gap-2 transition-colors w-full sm:w-auto justify-center"
                                     >
                                         <Plus size={16} /> Tạo mới
                                     </button>
@@ -284,49 +284,49 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Mã nhân viên <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Mã nhân viên <span className="text-red-500">*</span></label>
                                     <input 
                                         type="text" 
                                         value={editingEmployee.id || ''}
                                         onChange={(e) => handleChange('id', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                         placeholder="Ví dụ: NV001"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Họ và tên <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Họ và tên <span className="text-red-500">*</span></label>
                                     <input 
                                         type="text" 
                                         value={editingEmployee.name || ''}
                                         onChange={(e) => handleChange('name', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                         placeholder="Ví dụ: Nguyễn Văn A"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Phòng ban</label>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Phòng ban</label>
                                     <input 
                                         type="text" 
                                         value={editingEmployee.department || ''}
                                         onChange={(e) => handleChange('department', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                         placeholder="Ví dụ: Phòng Kỹ Thuật"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Chức vụ</label>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Chức vụ</label>
                                     <input 
                                         type="text" 
                                         value={editingEmployee.position || ''}
                                         onChange={(e) => handleChange('position', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                         placeholder="Ví dụ: Trưởng phòng"
                                     />
                                 </div>
                             </div>
 
                             <div className="bg-blue-50/50 p-4 sm:p-6 rounded-2xl border border-blue-100">
-                                <label className="block text-[10px] font-black text-blue-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <label className="block text-sm font-medium text-blue-800 mb-4 flex items-center gap-2">
                                     <CheckSquare size={16} /> Địa bàn phụ trách <span className="text-blue-500 normal-case tracking-normal font-medium">(Hệ thống gợi ý khi giao việc)</span>
                                 </label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
@@ -338,7 +338,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                                 onChange={() => toggleWard(ward)}
                                                 className="rounded text-blue-600 focus:ring-blue-500 w-5 h-5 border-gray-300"
                                             />
-                                            <span className="text-sm text-slate-700 font-bold">{ward}</span>
+                                            <span className="text-sm text-slate-700 font-semibold">{ward}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -349,13 +349,13 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                     <div className="p-4 border-t border-gray-100 bg-white flex flex-col sm:flex-row justify-end gap-3 shrink-0">
                         <button 
                             onClick={() => setActiveTab('list')}
-                            className="w-full sm:w-auto px-6 py-3 text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
+                            className="w-full sm:w-auto px-6 py-3 text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl font-medium text-sm transition-colors"
                         >
                             Quay lại
                         </button>
                         <button 
                             onClick={handleSave} 
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 font-medium text-sm transition-all active:scale-95"
                         >
                             <Save size={16} /> {isNew ? 'Lưu nhân viên' : 'Cập nhật'}
                         </button>

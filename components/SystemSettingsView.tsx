@@ -182,7 +182,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         <div className="flex flex-col items-center gap-3 w-full md:w-auto">
                             {dbTestStatus === 'success' && <div className="text-xs font-black text-green-600 flex items-center gap-1 uppercase tracking-wider"><CheckCircle size={16} /> Kết nối OK!</div>}
                             {dbTestStatus === 'error' && <div className="text-xs font-black text-red-600 uppercase tracking-wider">{dbTestMsg || 'Lỗi!'}</div>}
-                            <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full md:w-auto px-6 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2"> 
+                            <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full md:w-auto px-6 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 font-medium text-sm rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2"> 
                                 {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : 'Kiểm tra kết nối'} 
                             </button>
                         </div>
@@ -195,11 +195,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Phiên bản Mới nhất</label>
+                                <label className="block text-sm font-medium text-gray-500 mb-2">Phiên bản Mới nhất</label>
                                 <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="VD: 1.6.0" value={manualVersion} onChange={(e) => setManualVersion(e.target.value)} />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Link tải (Drive / Web)</label>
+                                <label className="block text-sm font-medium text-gray-500 mb-2">Link tải (Drive / Web)</label>
                                 <div className="relative">
                                     <Globe size={16} className="absolute left-4 top-3.5 text-gray-400" />
                                     <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-11 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="https://..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
@@ -207,7 +207,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             </div>
                         </div>
                         <div className="mt-8 flex justify-end">
-                            <button onClick={handleSaveUpdateConfig} disabled={isSavingUpdate} className="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-900 text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
+                            <button onClick={handleSaveUpdateConfig} disabled={isSavingUpdate} className="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-900 text-sm font-medium shadow-lg transition-all active:scale-95">
                                 {isSavingUpdate ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Phát hành phiên bản
                             </button>
                         </div>
@@ -230,7 +230,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             <button 
                                 onClick={handleSaveHolidays} 
                                 disabled={savingHolidays}
-                                className="w-full md:w-auto bg-orange-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 flex items-center justify-center gap-2 shadow-lg shadow-orange-100 transition-all active:scale-95"
+                                className="w-full md:w-auto bg-orange-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-700 flex items-center justify-center gap-2 shadow-lg shadow-orange-100 transition-all active:scale-95"
                             >
                                 {savingHolidays ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Lưu cấu hình
                             </button>
@@ -238,7 +238,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
                         {/* Form thêm mới */}
                         <div className="flex flex-col gap-4 mb-8 bg-orange-50/50 p-5 rounded-2xl border border-orange-100">
-                            <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest mb-1">Thêm ngày lễ mới</p>
+                            <p className="text-sm font-medium text-orange-800 mb-1">Thêm ngày lễ mới</p>
                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
                                 <div className="sm:col-span-6">
                                     <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tên ngày lễ</label>
@@ -259,7 +259,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     </label>
                                 </div>
                             </div>
-                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95">
+                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95">
                                 <Plus size={16} /> Thêm vào danh sách
                             </button>
                         </div>
@@ -267,7 +267,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         {/* Danh sách - Desktop Table */}
                         <div className="hidden md:block border border-gray-100 rounded-2xl bg-white overflow-hidden shadow-sm">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-orange-50 text-orange-800 text-[10px] uppercase font-black tracking-widest">
+                                <thead className="bg-orange-50 text-orange-800 text-sm font-medium uppercase">
                                     <tr>
                                         <th className="p-4">Tên ngày lễ</th>
                                         <th className="p-4 text-center">Ngày/Tháng</th>
@@ -281,7 +281,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                             <td className="p-4 font-bold text-slate-700">{h.name}</td>
                                             <td className="p-4 text-center font-black text-slate-600">{h.day}/{h.month}</td>
                                             <td className="p-4 text-center">
-                                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
                                                     {h.isLunar ? 'Âm lịch' : 'Dương lịch'}
                                                 </span>
                                             </td>

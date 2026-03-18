@@ -169,7 +169,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in-up">
         <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50">
-            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 tracking-tight">
                 <Shield className="text-blue-600" size={20} /> Quản Lý Tài Khoản
             </h2>
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -178,7 +178,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     <input 
                         type="text" 
                         placeholder="Tìm tài khoản..." 
-                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -193,19 +193,19 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     />
                     <button 
                         onClick={handleDownloadSample}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-xl hover:bg-gray-50 font-black text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-xl hover:bg-gray-50 font-medium text-sm shadow-sm transition-colors whitespace-nowrap"
                     >
                         <Download size={14} /> Mẫu
                     </button>
                     <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded-xl hover:bg-green-700 font-black text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded-xl hover:bg-green-700 font-medium text-sm shadow-sm transition-colors whitespace-nowrap"
                     >
                         <FileSpreadsheet size={14} /> Nhập
                     </button>
                     <button
                         onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 font-black text-[10px] uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
                     >
                         <Plus size={14} /> Thêm
                     </button>
@@ -217,7 +217,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             {/* Desktop Table View */}
             <div className="hidden md:block">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-white sticky top-0 shadow-sm z-10 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    <thead className="bg-white sticky top-0 shadow-sm z-10 text-sm font-medium text-gray-600">
                         <tr>
                             <th className="p-4 border-b">Tên đăng nhập</th>
                             <th className="p-4 border-b">Tên hiển thị</th>
@@ -230,10 +230,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
                         {filteredUsers.length > 0 ? (
                             filteredUsers.map(user => (
                                 <tr key={user.username} className="hover:bg-blue-50/50 transition-colors bg-white">
-                                    <td className="p-4 font-bold text-gray-900">{user.username}</td>
+                                    <td className="p-4 font-semibold text-gray-900">{user.username}</td>
                                     <td className="p-4 font-medium">{user.name}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                                        <span className={`px-2 py-1 rounded-lg text-sm font-medium border ${
                                             user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
                                             user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
                                             user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
@@ -289,15 +289,15 @@ const UserManagement: React.FC<UserManagementProps> = ({
                         <div key={user.username} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3 relative group">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-black shrink-0 border border-blue-100">
+                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-semibold shrink-0 border border-blue-100">
                                         {user.name.charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                        <h3 className="text-base font-black text-slate-800 tracking-tight">{user.name}</h3>
-                                        <p className="text-xs font-bold text-gray-500">@{user.username}</p>
+                                        <h3 className="text-base font-semibold text-slate-800 tracking-tight">{user.name}</h3>
+                                        <p className="text-xs font-semibold text-gray-500">@{user.username}</p>
                                     </div>
                                 </div>
-                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                                <span className={`px-2 py-1 rounded-lg text-sm font-medium border ${
                                     user.role === UserRole.ADMIN ? 'bg-red-50 text-red-700 border-red-200' :
                                     user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
                                     user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
@@ -309,8 +309,8 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             </div>
 
                             <div className="pt-2 border-t border-gray-50">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Liên kết nhân viên</p>
-                                <div className="flex items-center gap-1 text-sm font-bold text-slate-600">
+                                <p className="text-sm font-medium text-gray-600 mb-1">Liên kết nhân viên</p>
+                                <div className="flex items-center gap-1 text-sm font-semibold text-slate-600">
                                     <Briefcase size={12} className="text-gray-400" />
                                     <span className="truncate">{user.employeeId ? employees.find(e => e.id === user.employeeId)?.name || user.employeeId : '---'}</span>
                                 </div>
@@ -319,14 +319,14 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             <div className="flex justify-end gap-2 pt-3 border-t border-gray-50">
                                 <button
                                     onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl font-black text-[10px] uppercase tracking-wider"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl font-medium text-sm"
                                 >
                                     <Edit size={14} /> Sửa
                                 </button>
                                 {user.role !== UserRole.ADMIN && (
                                     <button
                                         onClick={() => handleDelete(user.username)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase tracking-wider"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl font-medium text-sm"
                                     >
                                         <Trash2 size={14} /> Xóa
                                     </button>
@@ -346,7 +346,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h3 className="text-xl font-black text-slate-800 tracking-tight">
+                        <h3 className="text-xl font-semibold text-slate-800 tracking-tight">
                             {editingUser ? 'Cập nhật tài khoản' : 'Thêm tài khoản mới'}
                         </h3>
                         <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-xl transition-colors">
@@ -355,12 +355,12 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     </div>
                     <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tên đăng nhập <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Tên đăng nhập <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     disabled={!!editingUser}
-                                    className={`w-full border rounded-xl px-4 py-3 pl-10 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${editingUser ? 'bg-gray-100 text-gray-500 border-gray-200' : 'border-gray-200'}`}
+                                    className={`w-full border rounded-xl px-4 py-3 pl-10 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${editingUser ? 'bg-gray-100 text-gray-500 border-gray-200' : 'border-gray-200'}`}
                                     value={formData.username}
                                     onChange={e => setFormData({...formData, username: e.target.value})}
                                     placeholder="username"
@@ -369,11 +369,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             </div>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Mật khẩu <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Mật khẩu <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
                                     type="text"
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-10 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-10 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     value={formData.password}
                                     onChange={e => setFormData({...formData, password: e.target.value})}
                                     placeholder="password"
@@ -382,19 +382,19 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             </div>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tên hiển thị <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Tên hiển thị <span className="text-red-500">*</span></label>
                             <input
                                 type="text"
-                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 value={formData.name}
                                 onChange={e => setFormData({...formData, name: e.target.value})}
                                 placeholder="Nguyễn Văn A"
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Vai trò hệ thống</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Vai trò hệ thống</label>
                             <select
-                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                                 value={formData.role}
                                 onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
                             >
@@ -406,9 +406,9 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Liên kết hồ sơ nhân viên</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Liên kết hồ sơ nhân viên</label>
                             <select
-                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                                 value={formData.employeeId || ''}
                                 onChange={e => setFormData({...formData, employeeId: e.target.value})}
                             >
@@ -419,20 +419,20 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-[10px] text-gray-400 mt-2 font-medium">Liên kết để sử dụng các tính năng cá nhân hóa (My Tasks).</p>
+                            <p className="text-xs text-gray-400 mt-2 font-medium">Liên kết để sử dụng các tính năng cá nhân hóa (My Tasks).</p>
                         </div>
 
                         <div className="pt-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100">
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="w-full sm:w-auto px-6 py-3 text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
+                                className="w-full sm:w-auto px-6 py-3 text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors"
                             >
                                 Hủy
                             </button>
                             <button
                                 type="submit"
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 font-medium text-sm transition-all active:scale-95"
                             >
                                 <Save size={16} /> Lưu
                             </button>

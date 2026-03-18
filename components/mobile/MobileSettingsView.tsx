@@ -56,7 +56,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         return (
           <div className="flex flex-col h-full bg-white">
             <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
-              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors">
                 <ArrowLeft size={20} /> Quay lại
               </button>
             </div>
@@ -75,7 +75,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         return (
           <div className="flex flex-col h-full bg-white">
             <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
-              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors">
                 <ArrowLeft size={20} /> Quay lại
               </button>
             </div>
@@ -94,7 +94,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         return (
           <div className="flex flex-col h-full bg-white">
             <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
-              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors">
                 <ArrowLeft size={20} /> Quay lại
               </button>
             </div>
@@ -113,7 +113,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         return (
           <div className="flex flex-col h-full bg-white">
             <div className="p-2 flex items-center gap-3 bg-gray-50 shrink-0">
-              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-bold text-gray-600 transition-colors">
+              <button onClick={() => setActiveSubView(null)} className="p-2 hover:bg-gray-200 rounded-xl flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors">
                 <ArrowLeft size={20} /> Quay lại
               </button>
             </div>
@@ -147,23 +147,23 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         
         <div className="relative z-10 flex flex-col items-center text-center">
           <div className="relative">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-blue-200 border-4 border-white">
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center text-white text-3xl font-semibold shadow-xl shadow-blue-200 border-4 border-white">
               {currentUser.name.charAt(0)}
             </div>
             <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 border-4 border-white rounded-full shadow-sm" />
           </div>
           
           <div className="mt-4">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{currentUser.name}</h2>
+            <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">{currentUser.name}</h2>
             <p className="text-slate-400 font-medium text-sm mt-0.5">@{currentUser.username}</p>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-100">
+            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full uppercase tracking-wider border border-blue-100">
               {currentUser.role}
             </span>
             {currentUser.employeeId && (
-              <span className="px-3 py-1 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-full uppercase tracking-wider border border-slate-100">
+              <span className="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-semibold rounded-full uppercase tracking-wider border border-slate-100">
                 Nhân viên
               </span>
             )}
@@ -175,7 +175,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         {/* Main Menu */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-50">
-            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Cài đặt ứng dụng</h3>
+            <h3 className="text-sm font-medium text-slate-500">Cài đặt ứng dụng</h3>
           </div>
           <div className="divide-y divide-slate-50">
             {menuItems.map((item) => {
@@ -191,8 +191,8 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
                       <Icon size={22} />
                     </div>
                     <div className="text-left">
-                      <span className="block font-bold text-slate-700 text-[15px]">{item.label}</span>
-                      <span className="text-[11px] text-slate-400 font-medium">Tùy chỉnh & Quản lý</span>
+                      <span className="block font-semibold text-slate-700 text-[15px]">{item.label}</span>
+                      <span className="text-xs text-slate-400 font-medium">Tùy chỉnh & Quản lý</span>
                     </div>
                   </div>
                   <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-400 transition-colors" />
@@ -213,8 +213,8 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
                 <LogOut size={22} />
               </div>
               <div className="text-left">
-                <span className="block font-bold text-red-600 text-[15px]">Đăng xuất</span>
-                <span className="text-[11px] text-red-400 font-medium">Kết thúc phiên làm việc</span>
+                <span className="block font-semibold text-red-600 text-[15px]">Đăng xuất</span>
+                <span className="text-xs text-red-400 font-medium">Kết thúc phiên làm việc</span>
               </div>
             </div>
           </button>
@@ -222,7 +222,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
 
         {/* Footer Info */}
         <div className="pt-4 pb-8 text-center">
-          <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">
+          <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
             Phiên bản 2.1.0 • QLHS Mobile
           </p>
         </div>

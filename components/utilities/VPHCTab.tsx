@@ -196,8 +196,8 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <div style="text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 20px;">Về lĩnh vực đất đai(2)</div>
 
                 <p style="margin-bottom: 10px;">Hôm nay, hồi …..giờ……phút, ngày .../.../2025, tại (3) Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành.</p>
-                <p style="text-align: justify; margin-bottom: 10px;">Lý do lập biên bản tại &lt;trụ sở cơ quan của người có thẩm quyền lập biên bản/địa điểm khác:&gt;(*) Hồ sơ vụ việc do Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành phát hiện và chuyển đến Chủ tịch UBND phường Chơn Thành xử lý theo quy định.</p>
-                <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../2025 của Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành tại Trung tâm hành chính công phường Chơn Thành, tỉnh Đồng Nai.</p>
+                <p style="text-align: justify; margin-bottom: 10px;">Lý do lập biên bản tại &lt;trụ sở cơ quan của người có thẩm quyền lập biên bản/địa điểm khác:&gt;(*) Hồ sơ vụ việc do Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành phát hiện và chuyển đến Chủ tịch UBND ${data.XA_PHUONG} xử lý theo quy định.</p>
+                <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../2025 của Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành tại Trung tâm hành chính công ${data.XA_PHUONG}, tỉnh Đồng Nai.</p>
 
                 <p><b>Chúng tôi gồm:</b></p>
                 
@@ -239,7 +239,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <p><b>2. Đã có các hành vi vi phạm hành chính: (8)</b></p>
                 <p style="margin-left: 20px; margin-bottom: 5px;">Không thực hiện đăng ký biến động đất đai theo quy định tại điểm a, khoản 1 Điều 133 luật đất đai.</p>
                 <p style="margin-left: 20px; text-align: justify; margin-bottom: 10px;">
-                    Cụ thể: Vào lúc…..giờ……phút, ngày .../.../2025, tại Trung Tâm phục vụ hành chính công phường Chơn Thành, nhân viên Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành phát hiện đã quá 30 ngày kể từ ngày ký hợp đồng <b>${data.LOAIHS}</b> quyền sử dụng đất số: ${data.SOCC}, do Văn phòng Công chứng ${data.VPCC} lập ngày ${data.NGAYCC}. 
+                    Cụ thể: Vào lúc…..giờ……phút, ngày .../.../2025, tại Trung Tâm phục vụ hành chính công ${data.XA_PHUONG}, nhân viên Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành phát hiện đã quá 30 ngày kể từ ngày ký hợp đồng <b>${data.LOAIHS}</b> quyền sử dụng đất số: ${data.SOCC}, do Văn phòng Công chứng ${data.VPCC} lập ngày ${data.NGAYCC}. 
                     Ông/bà <b>${data.NGUOI}</b> không thực hiện đăng ký biến động đất đai theo quy định tại điểm a khoản 1 và khoản 3 Điều 133 Luật Đất đai năm 2024 đối với thửa đất số <b>${data.THUA}</b>, tờ bản đồ số <b>${data.TO}</b>, diện tích <b>${data.DT}m²</b> theo Giấy chứng nhận Quyền sử dụng đất số <b>${data.SPH}</b>, số vào sổ <b>${data.SVS}</b> do ${data.COQUANCAP} cấp ngày ${data.NGAYCAPGCN} cho <b>${data.CHUSDGCN}</b>. Thửa đất tọa lạc tại ${data.DC_THUA}, ${data.XA_PHUONG}.
                 </p>
 
@@ -359,7 +359,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                             <p style="margin: 0; font-size: 12pt;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                             <p style="margin: 0; font-size: 13pt;">Độc lập - Tự do - Hạnh phúc</p>
                             ${lineRightHtml}
-                            <p style="margin: 0; margin-top: 10px; font-weight: normal; font-style: italic;">Chơn Thành, ngày …. tháng …. năm 2025</p>
+                            <p style="margin: 0; margin-top: 10px; font-weight: normal; font-style: italic;">${placeName}, ngày …. tháng …. năm 2025</p>
                         </td>
                     </tr>
                 </table>

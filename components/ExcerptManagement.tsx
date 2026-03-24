@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, PlusCircle, History, AlertCircle, CheckCircle, MapPin, Hash, BookOpen, Loader2, Settings, X, Save, Trash2, Plus, RotateCcw, LayoutGrid, CalendarRange, Copy, Check } from 'lucide-react';
 import { User, UserRole, RecordFile } from '../types';
-import { fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters } from '../services/api';
+import { fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters, fetchTrichDoHistory, saveTrichDoRecord, fetchTrichDoCounters, saveTrichDoCounters } from '../services/api';
 import { confirmAction } from '../utils/appHelpers';
 
 interface ExcerptRecord {
@@ -19,7 +19,7 @@ interface ExcerptRecord {
 interface ExcerptManagementProps {
   currentUser: User;
   records: RecordFile[];
-  onUpdateRecord: (recordId: string, excerptNumber: string) => void;
+  onUpdateRecord: (recordId: string, number: string, type: 'trichluc' | 'trichdo') => void;
   wards: string[];
   onAddWard: (ward: string) => void;
   onDeleteWard: (ward: string) => void;
@@ -33,6 +33,7 @@ const INITIAL_CONFIG: Record<string, number> = {
 };
 
 const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, records, onUpdateRecord, wards, onAddWard, onDeleteWard, onResetWards }) => {
+  const [activeTab, setActiveTab] = useState<'trichluc' | 'trichdo'>('trichluc');
   const [selectedWard, setSelectedWard] = useState<string>('');
   const [mapSheet, setMapSheet] = useState<string>('');
   const [landPlot, setLandPlot] = useState<string>('');
@@ -72,14 +73,22 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
   useEffect(() => {
     loadServerData();
-  }, []);
+  }, [activeTab]);
 
   const loadServerData = async () => {
-      const serverHistory = await fetchExcerptHistory();
-      setHistory(serverHistory);
+      if (activeTab === 'trichluc') {
+          const serverHistory = await fetchExcerptHistory();
+          setHistory(serverHistory);
 
-      const serverCounters = await fetchExcerptCounters();
-      setCounters(prev => ({ ...prev, ...serverCounters }));
+          const serverCounters = await fetchExcerptCounters();
+          setCounters(prev => ({ ...INITIAL_CONFIG, ...serverCounters }));
+      } else {
+          const serverHistory = await fetchTrichDoHistory();
+          setHistory(serverHistory);
+
+          const serverCounters = await fetchTrichDoCounters();
+          setCounters(prev => ({ ...INITIAL_CONFIG, ...serverCounters }));
+      }
   };
 
   // --- LOGIC PHÂN BIỆT KHÓA THEO NĂM (QUAN TRỌNG) ---
@@ -121,7 +130,11 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
           if (counters[key] === undefined) {
               setCounters(prev => {
                   const newState = { ...prev, [key]: 0 };
-                  saveExcerptCounters(newState); 
+                  if (activeTab === 'trichluc') {
+                      saveExcerptCounters(newState); 
+                  } else {
+                      saveTrichDoCounters(newState);
+                  }
                   return newState;
               });
           }
@@ -140,7 +153,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
     try {
         // Lấy dữ liệu Counter mới nhất từ Server
-        const serverCounters = await fetchExcerptCounters();
+        const serverCounters = activeTab === 'trichluc' ? await fetchExcerptCounters() : await fetchTrichDoCounters();
         
         // Xác định Key dựa theo Năm đang chọn
         const counterKey = getCounterKey(selectedWard, currentYear);
@@ -161,11 +174,19 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
         };
 
         // Lưu lịch sử
-        await saveExcerptRecord(newRecord);
+        if (activeTab === 'trichluc') {
+            await saveExcerptRecord(newRecord);
+        } else {
+            await saveTrichDoRecord(newRecord);
+        }
         
         // Cập nhật lại counter lên Server
         const newCounters = { ...serverCounters, [counterKey]: nextCount };
-        await saveExcerptCounters(newCounters);
+        if (activeTab === 'trichluc') {
+            await saveExcerptCounters(newCounters);
+        } else {
+            await saveTrichDoCounters(newCounters);
+        }
 
         // Cập nhật UI
         setCounters(newCounters);
@@ -173,7 +194,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
         setResultNumber(nextCount);
 
         if (linkedRecord) {
-            onUpdateRecord(linkedRecord.id, nextCount.toString());
+            onUpdateRecord(linkedRecord.id, nextCount.toString(), activeTab);
             setLinkedRecord(null);
             setSearchCode('');
             setMissingWard(null);
@@ -199,7 +220,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
   };
 
   const openConfig = async () => {
-      const latest = await fetchExcerptCounters();
+      const latest = activeTab === 'trichluc' ? await fetchExcerptCounters() : await fetchTrichDoCounters();
       setCounters(prev => ({ ...prev, ...latest }));
       setEditingCounters({...latest});
       setNewWardName('');
@@ -207,7 +228,11 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
   };
 
   const saveConfig = async () => {
-      await saveExcerptCounters(editingCounters);
+      if (activeTab === 'trichluc') {
+          await saveExcerptCounters(editingCounters);
+      } else {
+          await saveTrichDoCounters(editingCounters);
+      }
       setCounters(editingCounters);
       setIsConfigOpen(false);
   };
@@ -258,12 +283,28 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
   return (
     <div className="h-full flex flex-col space-y-4 animate-fade-in-up overflow-hidden">
+      {/* TAB SELECTOR */}
+      <div className="flex space-x-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 shrink-0">
+        <button
+          onClick={() => setActiveTab('trichluc')}
+          className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-colors ${activeTab === 'trichluc' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+        >
+          Số Trích Lục
+        </button>
+        <button
+          onClick={() => setActiveTab('trichdo')}
+          className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-colors ${activeTab === 'trichdo' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+        >
+          Số Trích Đo
+        </button>
+      </div>
+
       {/* DASHBOARD TỔNG QUAN - FIXED */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 shrink-0">
          <div className="flex items-center justify-between mb-4 border-b pb-2">
              <div className="flex items-center gap-2 text-gray-700 font-bold">
                 <LayoutGrid size={20} className="text-blue-600" />
-                <h2>Theo dõi Số Trích Lục (Theo Xã/Phường)</h2>
+                <h2>Theo dõi {activeTab === 'trichluc' ? 'Số Trích Lục' : 'Số Trích Đo'} (Theo Xã/Phường)</h2>
              </div>
              
              <div className="flex items-center gap-3">
@@ -439,7 +480,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
             {/* RIGHT COLUMN: RESULT & HISTORY */}
             <div className="lg:col-span-2 space-y-6">
                 <div className={`bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl shadow-sm border border-orange-100 p-8 text-center transition-all duration-500 ${resultNumber ? 'opacity-100 scale-100' : 'opacity-50 scale-95 grayscale'}`}>
-                    <h3 className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">Số trích lục vừa cấp ({currentYear})</h3>
+                    <h3 className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">{activeTab === 'trichluc' ? 'Số trích lục' : 'Số trích đo'} vừa cấp ({currentYear})</h3>
                     <div className="flex items-center justify-center gap-4">
                         <div className="text-6xl font-black text-orange-600 drop-shadow-sm font-mono">
                             {resultNumber ? resultNumber : '---'}
@@ -448,7 +489,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                             <button 
                                 onClick={handleCopyResult}
                                 className={`p-3 rounded-full transition-all shadow-sm ${isCopied ? 'bg-green-100 text-green-600' : 'bg-white text-orange-400 hover:text-orange-600 hover:bg-orange-50 hover:shadow-md'}`}
-                                title="Sao chép số trích lục"
+                                title={`Sao chép số ${activeTab === 'trichluc' ? 'trích lục' : 'trích đo'}`}
                             >
                                 {isCopied ? <Check size={28} className="animate-bounce" /> : <Copy size={28} />}
                             </button>
@@ -544,7 +585,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                   <div className="flex justify-between items-center p-5 border-b">
                       <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                           <Settings className="text-blue-600" />
-                          Cấu hình Xã Phường & Số trích lục ({currentYear})
+                          Cấu hình Xã Phường & Số {activeTab === 'trichluc' ? 'trích lục' : 'trích đo'} ({currentYear})
                       </h3>
                       <button onClick={() => setIsConfigOpen(false)} className="text-gray-500 hover:text-red-600">
                           <X size={24} />

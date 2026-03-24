@@ -150,6 +150,8 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
         const data = { ...formData, NGUOI: formData.NGUOI.toUpperCase() };
         const creatorName = currentUser?.name || '...';
         
+        const currentYear = new Date().getFullYear();
+        
         // Logic xử lý tên địa danh cho Mẫu 01 (bỏ xã/phường)
         const placeName = data.XA_PHUONG 
             ? data.XA_PHUONG.replace(/^(xã|phường|thị trấn)\s+/i, '').trim() 
@@ -185,7 +187,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                             <p style="margin: 0; font-size: 12pt;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                             <p style="margin: 0; font-size: 13pt;">Độc lập - Tự do - Hạnh phúc</p>
                             ${lineRightHtml}
-                            <p style="margin: 0; margin-top: 10px; font-weight: normal; font-style: italic;">${placeName}, ngày …. tháng …. năm 2025</p>
+                            <p style="margin: 0; margin-top: 10px; font-weight: normal; font-style: italic;">${placeName}, ngày …. tháng …. năm ${currentYear}</p>
                         </td>
                     </tr>
                 </table>
@@ -195,9 +197,9 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <div style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 5px;">BIÊN BẢN VI PHẠM HÀNH CHÍNH*</div>
                 <div style="text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 20px;">Về lĩnh vực đất đai(2)</div>
 
-                <p style="margin-bottom: 10px;">Hôm nay, hồi …..giờ……phút, ngày .../.../2025, tại (3) Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành.</p>
+                <p style="margin-bottom: 10px;">Hôm nay, hồi …..giờ……phút, ngày .../.../${currentYear}, tại (3) Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành.</p>
                 <p style="text-align: justify; margin-bottom: 10px;">Lý do lập biên bản tại &lt;trụ sở cơ quan của người có thẩm quyền lập biên bản/địa điểm khác:&gt;(*) Hồ sơ vụ việc do Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành phát hiện và chuyển đến Chủ tịch UBND ${data.XA_PHUONG} xử lý theo quy định.</p>
-                <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../2025 của Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành tại Trung tâm hành chính công ${data.XA_PHUONG}, tỉnh Đồng Nai.</p>
+                <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../${currentYear} của Văn phòng Đăng ký đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành tại Trung tâm hành chính công ${data.XA_PHUONG}, tỉnh Đồng Nai.</p>
 
                 <p><b>Chúng tôi gồm:</b></p>
                 
@@ -239,7 +241,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <p><b>2. Đã có các hành vi vi phạm hành chính: (8)</b></p>
                 <p style="margin-left: 20px; margin-bottom: 5px;">Không thực hiện đăng ký biến động đất đai theo quy định tại điểm a, khoản 1 Điều 133 luật đất đai.</p>
                 <p style="margin-left: 20px; text-align: justify; margin-bottom: 10px;">
-                    Cụ thể: Vào lúc…..giờ……phút, ngày .../.../2025, tại Trung Tâm phục vụ hành chính công ${data.XA_PHUONG}, nhân viên Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành phát hiện đã quá 30 ngày kể từ ngày ký hợp đồng <b>${data.LOAIHS}</b> quyền sử dụng đất số: ${data.SOCC}, do Văn phòng Công chứng ${data.VPCC} lập ngày ${data.NGAYCC}. 
+                    Cụ thể: Vào lúc…..giờ……phút, ngày .../.../${currentYear}, tại Trung Tâm phục vụ hành chính công ${data.XA_PHUONG}, nhân viên Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành phát hiện đã quá 30 ngày kể từ ngày ký hợp đồng <b>${data.LOAIHS}</b> quyền sử dụng đất số: ${data.SOCC}, do Văn phòng Công chứng ${data.VPCC} lập ngày ${data.NGAYCC}. 
                     Ông/bà <b>${data.NGUOI}</b> không thực hiện đăng ký biến động đất đai theo quy định tại điểm a khoản 1 và khoản 3 Điều 133 Luật Đất đai năm 2024 đối với thửa đất số <b>${data.THUA}</b>, tờ bản đồ số <b>${data.TO}</b>, diện tích <b>${data.DT}m²</b> theo Giấy chứng nhận Quyền sử dụng đất số <b>${data.SPH}</b>, số vào sổ <b>${data.SVS}</b> do ${data.COQUANCAP} cấp ngày ${data.NGAYCAPGCN} cho <b>${data.CHUSDGCN}</b>. Thửa đất tọa lạc tại ${data.DC_THUA}, ${data.XA_PHUONG}.
                 </p>
 
@@ -289,7 +291,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <p>Yêu cầu ông (bà) (13)........ là &lt;cá nhân/người đại diện của tổ chức&gt;(*) vi phạm có mặt vào hồi ... giờ ... phút, ngày ...../....../....., tại (15) …………….. để giải quyết vụ việc.</p>
 
                 <p style="text-align: justify; margin-top: 10px;">
-                    Biên bản lập xong hồi …..giờ……phút, ngày .../.../2025 gồm 02 tờ, được lập thành 03 bản có nội dung và giá trị như nhau; đã đọc lại cho những người có tên nêu trên cùng nghe, công nhận là đúng và cùng ký tên dưới đây; giao cho ông (bà) (13) <b>${data.NGUOI}</b> là &lt;cá nhân/người đại diện của tổ chức&gt;(*) vi phạm 01 bản, &lt;cha mẹ/người giám hộ của người chưa thành niên vi phạm 01 bản&gt;(*), 01 bản lưu hồ sơ.
+                    Biên bản lập xong hồi …..giờ……phút, ngày .../.../${currentYear} gồm 02 tờ, được lập thành 03 bản có nội dung và giá trị như nhau; đã đọc lại cho những người có tên nêu trên cùng nghe, công nhận là đúng và cùng ký tên dưới đây; giao cho ông (bà) (13) <b>${data.NGUOI}</b> là &lt;cá nhân/người đại diện của tổ chức&gt;(*) vi phạm 01 bản, &lt;cha mẹ/người giám hộ của người chưa thành niên vi phạm 01 bản&gt;(*), 01 bản lưu hồ sơ.
                 </p>
 
                 <p><i>&lt;Trường hợp cá nhân/tổ chức nhận các biên bản, quyết định bằng phương thức điện tử&gt;</i></p>
@@ -335,7 +337,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 </table>
 
                 <div style="margin-top: 20px; border-top: 1px solid black; width: 100%;"></div>
-                <p style="font-size: 13pt; margin-top: 5px;"><i>&lt;In ở mặt sau&gt;</i>(**) Biên bản đã giao trực tiếp cho &lt;cá nhân/người đại diện của tổ chức&gt;(*) vi phạm vào hồi …..giờ……phút, ngày .../.../2025./.</p>
+                <p style="font-size: 13pt; margin-top: 5px;"><i>&lt;In ở mặt sau&gt;</i>(**) Biên bản đã giao trực tiếp cho &lt;cá nhân/người đại diện của tổ chức&gt;(*) vi phạm vào hồi …..giờ……phút, ngày .../.../${currentYear}./.</p>
                 
                 <div style="text-align: right; margin-top: 20px; margin-right: 50px; font-weight: bold;">
                     <p>NGƯỜI NHẬN BIÊN BẢN</p>
@@ -359,7 +361,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                             <p style="margin: 0; font-size: 12pt;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                             <p style="margin: 0; font-size: 13pt;">Độc lập - Tự do - Hạnh phúc</p>
                             ${lineRightHtml}
-                            <p style="margin: 0; margin-top: 10px; font-weight: normal; font-style: italic;">${placeName}, ngày …. tháng …. năm 2025</p>
+                            <p style="margin: 0; margin-top: 10px; font-weight: normal; font-style: italic;">${placeName}, ngày …. tháng …. năm ${currentYear}</p>
                         </td>
                     </tr>
                 </table>
@@ -369,7 +371,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <div style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 5px;">BIÊN BẢN LÀM VIỆC*</div>
                 <div style="text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 20px;">Ghi nhận sự việc liên quan đến vi phạm hành chính<br/>trong lĩnh vực đất đai</div>
 
-                <p style="margin-bottom: 10px;">Hôm nay, hồi ... giờ ... phút, ngày …. tháng …. năm 2025, tại (2) Trung tâm phục vụ hành chính công ${data.XA_PHUONG}.</p>
+                <p style="margin-bottom: 10px;">Hôm nay, hồi ... giờ ... phút, ngày …. tháng …. năm ${currentYear}, tại (2) Trung tâm phục vụ hành chính công ${data.XA_PHUONG}.</p>
                 
                 <p><b>Chúng tôi gồm có:</b></p>
                 
@@ -398,7 +400,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <p style="margin-top: 10px;"><b>Tiến hành lập biên bản làm việc đối với &lt;ông (bà)&gt;(*) ${data.NGUOI} có liên quan trực tiếp đến vụ việc:</b></p>
                 
                 <div style="margin-left: 20px;">
-                    <p>1. Thời gian xảy ra vụ việc: ngày …. tháng …. năm 2025</p>
+                    <p>1. Thời gian xảy ra vụ việc: ngày …. tháng …. năm ${currentYear}</p>
                     <p>2. Địa điểm xảy ra vụ việc: Trung tâm PVHCC ${data.XA_PHUONG}</p>
                     <p style="text-align: justify;">
                         3. Diễn biến của vụ việc: ông/bà <b>${data.NGUOI}</b> nhận <b>${data.LOAIHS}</b> thửa đất số <b>${data.THUA}</b>, tờ bản đồ số <b>${data.TO}</b>, diện tích <b>${data.DT}m²</b>, tọa lạc tại ${data.DC_THUA}, ${data.XA_PHUONG} được cấp GCNQSD đất số phát hành <b>${data.SPH}</b>, số vào sổ <b>${data.SVS}</b>, cấp ngày ${data.NGAYCAPGCN} do ${data.COQUANCAP} cho <b>${data.CHUSDGCN}</b> theo Hợp đồng <b>${data.LOAIHS}</b> số: ${data.SOCC} do Văn Phòng Công chứng ${data.VPCC} lập ngày ${data.NGAYCC}. Tuy nhiên, đến thời điểm lập biên bản làm việc, ông/bà ${data.NGUOI} vẫn chưa thực hiện thủ tục đăng ký biến động đất đai. Như vậy, ông/bà ${data.NGUOI} đã quá thời hạn đăng ký biến động đất đai là 30 ngày kể từ ngày hợp đồng ${data.LOAIHS} được công chứng theo quy định tại điểm a khoản 1 và khoản 3 Điều 133 Luật Đất đai năm 2024.<br/>
@@ -416,7 +418,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 </div>
 
                 <p style="margin-top: 15px; text-align: justify;">
-                    Biên bản lập xong hồi... giờ... phút, ngày ngày …. tháng …. năm 2025, gồm 02 tờ, được lập thành 02 bản có nội dung và giá trị như nhau; đã đọc lại cho những người có tên nêu trên cùng nghe, công nhận là đúng và cùng ký tên dưới đây; giao cho ông (bà) (6) ${data.NGUOI} là &lt;cá nhân&gt;(*) có liên quan trực tiếp đến vụ việc 01 bản, 01 bản lưu hồ sơ.
+                    Biên bản lập xong hồi... giờ... phút, ngày …. tháng …. năm ${currentYear}, gồm 02 tờ, được lập thành 02 bản có nội dung và giá trị như nhau; đã đọc lại cho những người có tên nêu trên cùng nghe, công nhận là đúng và cùng ký tên dưới đây; giao cho ông (bà) (6) ${data.NGUOI} là &lt;cá nhân&gt;(*) có liên quan trực tiếp đến vụ việc 01 bản, 01 bản lưu hồ sơ.
                 </p>
                 <p><i>&lt;Trường hợp cá nhân/người đại diện của tổ chức có liên quan trực tiếp đến vụ việc không ký biên bản làm việc&gt;</i></p>
                 <p>Lý do ông (bà) (6)................. là &lt;cá nhân/người đại diện của tổ chức&gt;(*) có liên quan trực tiếp đến vụ việc không ký biên bản:</p>
@@ -444,7 +446,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 </table>
 
                 <div style="margin-top: 20px; border-top: 1px solid black; width: 100%;"></div>
-                <p style="font-size: 13pt; margin-top: 5px;"><i>&lt;In ở mặt sau&gt;</i> Biên bản đã giao trực tiếp cho &lt;cá nhân /người đại diện của tổ chức&gt; vi phạm vào hồi…..... giờ......... phút, ngày ....../…..../2025.</p>
+                <p style="font-size: 13pt; margin-top: 5px;"><i>&lt;In ở mặt sau&gt;</i> Biên bản đã giao trực tiếp cho &lt;cá nhân /người đại diện của tổ chức&gt; vi phạm vào hồi…..... giờ......... phút, ngày ....../…..../${currentYear}.</p>
                 
                 <div style="text-align: right; margin-top: 20px; margin-right: 50px; font-weight: bold;">
                     <p>NGƯỜI NHẬN BIÊN BẢN</p>
@@ -466,10 +468,15 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
         const templateKey = templateType === 'mau01' ? STORAGE_KEYS.VPHC_TEMPLATE_01 : STORAGE_KEYS.VPHC_TEMPLATE_02;
 
         if (hasTemplate(templateKey)) {
+            const today = new Date();
             const dataToPrint = {
                 ...formData,
                 NGUOI: formData.NGUOI.toUpperCase(),
-                CHUSDGCN: formData.CHUSDGCN || formData.NGUOI.toUpperCase()
+                CHUSDGCN: formData.CHUSDGCN || formData.NGUOI.toUpperCase(),
+                NGAY: today.getDate().toString().padStart(2, '0'),
+                THANG: (today.getMonth() + 1).toString().padStart(2, '0'),
+                NAM: today.getFullYear().toString(),
+                DIA_DANH: formData.XA_PHUONG ? formData.XA_PHUONG.replace(/^(xã|phường|thị trấn)\s+/i, '').trim() : ''
             };
             
             const blob = await generateDocxBlobAsync(templateKey, dataToPrint);

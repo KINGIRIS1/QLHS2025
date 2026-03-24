@@ -11,6 +11,8 @@ export const CACHE_KEYS = {
     CONTRACTS: 'offline_contracts',
     EXCERPT_HISTORY: 'offline_excerpt_history',
     EXCERPT_COUNTERS: 'offline_excerpt_counters',
+    TRICHDO_HISTORY: 'offline_trichdo_history',
+    TRICHDO_COUNTERS: 'offline_trichdo_counters',
     PRICE_LIST: 'offline_price_list',
     HOLIDAYS: 'offline_holidays',
     SYSTEM_CONFIG: 'offline_system_config'

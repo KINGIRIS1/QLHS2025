@@ -464,7 +464,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 <ExcerptManagement
                     currentUser={currentUser}
                     records={records}
-                    onUpdateRecord={(id, num) => props.handleQuickUpdate(id, 'excerptNumber', num)}
+                    onUpdateRecord={(id, num, type) => props.handleQuickUpdate(id, type === 'trichluc' ? 'excerptNumber' : 'measurementNumber', num)}
                     wards={wards}
                     onAddWard={(w) => props.setWards(prev => [...prev, w])}
                     onDeleteWard={(w) => props.setWards(prev => prev.filter(x => x !== w))}

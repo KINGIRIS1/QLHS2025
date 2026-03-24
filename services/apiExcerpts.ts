@@ -18,7 +18,14 @@ export const fetchExcerptHistory = async (): Promise<any[]> => {
 export const saveExcerptRecord = async (record: any): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { error } = await supabase.from('excerpt_history').insert([record]);
+        const { id, ...recordData } = record;
+        // Loại bỏ các giá trị undefined để tránh lỗi Supabase
+        Object.keys(recordData).forEach(key => {
+            if (recordData[key] === undefined) {
+                recordData[key] = null;
+            }
+        });
+        const { error } = await supabase.from('excerpt_history').insert([recordData]);
         if (error) throw error;
         return true;
     } catch (error) {
@@ -73,7 +80,14 @@ export const fetchTrichDoHistory = async (): Promise<any[]> => {
 export const saveTrichDoRecord = async (record: any): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { error } = await supabase.from('trichdo_history').insert([record]);
+        const { id, ...recordData } = record;
+        // Loại bỏ các giá trị undefined để tránh lỗi Supabase
+        Object.keys(recordData).forEach(key => {
+            if (recordData[key] === undefined) {
+                recordData[key] = null;
+            }
+        });
+        const { error } = await supabase.from('trichdo_history').insert([recordData]);
         if (error) throw error;
         return true;
     } catch (error) {

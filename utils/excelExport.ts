@@ -300,6 +300,7 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
         "Xã/Phường", 
         "Ngày Nhận", 
         "Ngày Hẹn Trả", 
+        "Ngày Hoàn Thành",
         "NV Xử Lý", 
         "Trạng Thái"
     ];
@@ -313,6 +314,7 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
             getNormalizedWard(r.ward || undefined),
             formatDate(r.receivedDate),
             formatDate(r.deadline),
+            formatDate(r.completedDate || r.resultReturnedDate),
             emp ? emp.name : '',
             STATUS_LABELS[r.status] || r.status
         ];
@@ -346,7 +348,8 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
         { wch: 30 }, // Chủ sử dụng
         { wch: 20 }, // Xã
         { wch: 15 }, // Ngày nhận
-        { wch: 15 }, // Ngày trả
+        { wch: 15 }, // Ngày hẹn trả
+        { wch: 15 }, // Ngày hoàn thành
         { wch: 25 }, // NV
         { wch: 20 }  // Trạng thái
     ];

@@ -147,6 +147,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                             <th className="p-3 w-32">Xã/Phường</th>
                             <th className="p-3 w-24">Ngày nhận</th>
                             <th className="p-3 w-24">Ngày hẹn trả</th>
+                            <th className="p-3 w-24">Ngày hoàn thành</th>
                             <th className="p-3 w-32">NV Xử lý</th>
                             <th className="p-3 w-32 text-center">Trạng thái</th>
                         </tr>
@@ -163,6 +164,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                                     <td className="p-3 text-gray-600">{getNormalizedWard(r.ward)}</td>
                                     <td className="p-3 text-gray-600">{formatDate(r.receivedDate)}</td>
                                     <td className="p-3 font-medium text-orange-600">{formatDate(r.deadline)}</td>
+                                    <td className="p-3 font-medium text-green-700">{formatDate(r.completedDate || r.resultReturnedDate)}</td>
                                     <td className="p-3 text-gray-600 text-xs truncate" title={emp?.name}>{emp ? emp.name : '-'}</td>
                                     <td className="p-3 text-center">
                                         <span className={`px-2 py-1 rounded text-xs border ${
@@ -179,7 +181,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                             );
                         }) : (
                             <tr>
-                                <td colSpan={8} className="p-8 text-center text-gray-500">
+                                <td colSpan={9} className="p-8 text-center text-gray-500">
                                     Không có dữ liệu phù hợp với điều kiện lọc
                                 </td>
                             </tr>

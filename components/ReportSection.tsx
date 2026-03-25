@@ -417,16 +417,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <UserCheck size={16}/> Thống kê nhân viên
                 </button>
                 <button 
-                    onClick={() => setActiveTab('ai')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <Sparkles size={16}/> Văn bản Báo cáo (AI)
-                </button>
-                <button 
                     onClick={() => setActiveTab('daily_stats')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     <CalendarDays size={16}/> Thống kê theo ngày
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ai')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Sparkles size={16}/> Văn bản Báo cáo (AI)
                 </button>
             </div>
 
@@ -589,7 +589,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 )}
 
                 {activeTab === 'daily_stats' && (
-                    <DailyStatsView records={activeRecords} employees={employees} />
+                    <DailyStatsView records={activeRecords} employees={employees} wards={wards} />
                 )}
 
             </div>

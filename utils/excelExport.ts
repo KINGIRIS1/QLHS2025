@@ -280,7 +280,7 @@ export const exportReportToExcel = async (
     XLSX.writeFile(wb, fileName);
 };
 
-export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employee[], receiveFrom: string, receiveTo: string, returnFrom: string, returnTo: string) => {
+export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employee[], receiveFrom: string, receiveTo: string, deadlineFrom: string, deadlineTo: string) => {
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -299,7 +299,7 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
         "Chủ Sử Dụng", 
         "Xã/Phường", 
         "Ngày Nhận", 
-        "Ngày Trả", 
+        "Ngày Hẹn Trả", 
         "NV Xử Lý", 
         "Trạng Thái"
     ];
@@ -312,7 +312,7 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
             r.customerName,
             getNormalizedWard(r.ward || undefined),
             formatDate(r.receivedDate),
-            formatDate(r.completedDate || r.resultReturnedDate),
+            formatDate(r.deadline),
             emp ? emp.name : '',
             STATUS_LABELS[r.status] || r.status
         ];
@@ -322,8 +322,8 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
     if (receiveFrom || receiveTo) {
         subtitle += `\nNgày nhận: ${receiveFrom ? formatDate(receiveFrom) : '...'} - ${receiveTo ? formatDate(receiveTo) : '...'}`;
     }
-    if (returnFrom || returnTo) {
-        subtitle += `\nNgày trả: ${returnFrom ? formatDate(returnFrom) : '...'} - ${returnTo ? formatDate(returnTo) : '...'}`;
+    if (deadlineFrom || deadlineTo) {
+        subtitle += `\nNgày hẹn trả: ${deadlineFrom ? formatDate(deadlineFrom) : '...'} - ${deadlineTo ? formatDate(deadlineTo) : '...'}`;
     }
 
     const wsData = [

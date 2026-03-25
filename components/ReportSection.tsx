@@ -8,6 +8,7 @@ import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
+import DailyStatsView from './report/DailyStatsView';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -37,7 +38,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -421,6 +422,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 >
                     <Sparkles size={16}/> Văn bản Báo cáo (AI)
                 </button>
+                <button 
+                    onClick={() => setActiveTab('daily_stats')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <CalendarDays size={16}/> Thống kê theo ngày
+                </button>
             </div>
 
             {/* TAB CONTENT */}
@@ -581,6 +588,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 )}
 
+                {activeTab === 'daily_stats' && (
+                    <DailyStatsView records={activeRecords} employees={employees} />
+                )}
 
             </div>
 

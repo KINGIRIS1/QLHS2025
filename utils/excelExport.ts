@@ -280,6 +280,84 @@ export const exportReportToExcel = async (
     XLSX.writeFile(wb, fileName);
 };
 
+export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employee[], receiveFrom: string, receiveTo: string, returnFrom: string, returnTo: string) => {
+    if (records.length === 0) {
+        alert("Không có hồ sơ nào để xuất.");
+        return;
+    }
+
+    const formatDate = (d: string | undefined | null) => {
+        if (!d) return '';
+        const date = new Date(d);
+        if (isNaN(date.getTime())) return '';
+        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    };
+
+    const tableHeader = [
+        "STT", 
+        "Mã Hồ Sơ", 
+        "Chủ Sử Dụng", 
+        "Xã/Phường", 
+        "Ngày Nhận", 
+        "Ngày Trả", 
+        "NV Xử Lý", 
+        "Trạng Thái"
+    ];
+
+    const dataRows = records.map((r, i) => {
+        const emp = employees.find(e => e.id === r.assignedTo);
+        return [
+            i + 1,
+            r.code,
+            r.customerName,
+            getNormalizedWard(r.ward || undefined),
+            formatDate(r.receivedDate),
+            formatDate(r.completedDate || r.resultReturnedDate),
+            emp ? emp.name : '',
+            STATUS_LABELS[r.status] || r.status
+        ];
+    });
+
+    let subtitle = "THỐNG KÊ THEO NGÀY";
+    if (receiveFrom || receiveTo) {
+        subtitle += `\nNgày nhận: ${receiveFrom ? formatDate(receiveFrom) : '...'} - ${receiveTo ? formatDate(receiveTo) : '...'}`;
+    }
+    if (returnFrom || returnTo) {
+        subtitle += `\nNgày trả: ${returnFrom ? formatDate(returnFrom) : '...'} - ${returnTo ? formatDate(returnTo) : '...'}`;
+    }
+
+    const wsData = [
+        ["CHI NHÁNH VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI"],
+        ["CHƠN THÀNH"],
+        [],
+        ["DANH SÁCH HỒ SƠ THỐNG KÊ"],
+        [subtitle],
+        [],
+        tableHeader,
+        ...dataRows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Styling
+    ws['!cols'] = [
+        { wch: 5 },  // STT
+        { wch: 15 }, // Mã HS
+        { wch: 30 }, // Chủ sử dụng
+        { wch: 20 }, // Xã
+        { wch: 15 }, // Ngày nhận
+        { wch: 15 }, // Ngày trả
+        { wch: 25 }, // NV
+        { wch: 20 }  // Trạng thái
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ThongKe");
+    
+    const fileName = `ThongKe_${new Date().getTime()}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+};
+
 export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
     // ... Giữ nguyên code cũ cho exportReturnedListToExcel ...
     if (records.length === 0) {

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown } from 'lucide-react';
+import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings } from 'lucide-react';
 import { User, UserRole } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 
@@ -134,6 +134,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                             <UserCog size={16} />
                                         </div>
                                         Cài đặt tài khoản
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            setCurrentView('system_dashboard');
+                                            setIsUserMenuOpen(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                    >
+                                        <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
+                                            <Settings size={16} />
+                                        </div>
+                                        Cài đặt hệ thống
                                     </button>
                                     <div className="h-px bg-gray-100 my-1 mx-2"></div>
                                     <button 

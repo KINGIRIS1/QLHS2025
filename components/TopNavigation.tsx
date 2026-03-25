@@ -97,10 +97,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
         { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
         { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: !isOneDoor },
       ]
-    },
-
-    // "Hệ thống" single item
-    { id: 'system_dashboard', label: 'Hệ thống', icon: Settings, visible: true }
+    }
   ];
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['system_group']));

@@ -54,6 +54,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Export So Dia Chinh Modal State
     const [showExportSoDiaChinhModal, setShowExportSoDiaChinhModal] = useState(false);
     const [exportSoDiaChinhRange, setExportSoDiaChinhRange] = useState({ from: '', to: '' });
+    const [exportSoDiaChinhCriteria, setExportSoDiaChinhCriteria] = useState({ ward: '', month: '', letter: '' });
 
     // Export So Muc Ke State
     const [showExportSoMucKeModal, setShowExportSoMucKeModal] = useState(false);
@@ -1006,7 +1007,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             {/* Export So Dia Chinh Modal */}
             {showExportSoDiaChinhModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm animate-fade-in-up">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl animate-fade-in-up">
                         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                             <h3 className="font-bold text-gray-800 text-lg">Xuất Sổ địa chính</h3>
                             <button onClick={() => setShowExportSoDiaChinhModal(false)} className="text-gray-500 hover:text-red-500 transition-colors">
@@ -1014,30 +1015,76 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
-                            <p className="text-sm text-gray-600">
-                                Nhập khoảng số vào sổ cần xuất (chỉ nhập số).
-                            </p>
-                            <div className="flex gap-4 items-center">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Từ số</label>
-                                    <input 
-                                        type="number" 
-                                        value={exportSoDiaChinhRange.from}
-                                        onChange={(e) => setExportSoDiaChinhRange(prev => ({ ...prev, from: e.target.value }))}
-                                        className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                        placeholder="Ví dụ: 1"
-                                    />
+                            <div>
+                                <p className="text-sm text-gray-600 mb-2 font-medium">Xuất theo khoảng số (Ưu tiên):</p>
+                                <div className="flex gap-4 items-center">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Từ số</label>
+                                        <input 
+                                            type="number" 
+                                            value={exportSoDiaChinhRange.from}
+                                            onChange={(e) => setExportSoDiaChinhRange(prev => ({ ...prev, from: e.target.value }))}
+                                            className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                            placeholder="Ví dụ: 1"
+                                        />
+                                    </div>
+                                    <span className="text-gray-400 font-bold mt-5">-</span>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Đến số</label>
+                                        <input 
+                                            type="number" 
+                                            value={exportSoDiaChinhRange.to}
+                                            onChange={(e) => setExportSoDiaChinhRange(prev => ({ ...prev, to: e.target.value }))}
+                                            className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                            placeholder="Ví dụ: 100"
+                                        />
+                                    </div>
                                 </div>
-                                <span className="text-gray-400 font-bold mt-5">-</span>
-                                <div className="flex-1">
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Đến số</label>
-                                    <input 
-                                        type="number" 
-                                        value={exportSoDiaChinhRange.to}
-                                        onChange={(e) => setExportSoDiaChinhRange(prev => ({ ...prev, to: e.target.value }))}
-                                        className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                        placeholder="Ví dụ: 100"
-                                    />
+                            </div>
+
+                            <div className="border-t pt-4">
+                                <p className="text-sm text-gray-600 mb-2 font-medium">Hoặc xuất theo tiêu chí:</p>
+                                <div className="space-y-4">
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Xã/Phường</label>
+                                            <select 
+                                                value={exportSoDiaChinhCriteria.ward}
+                                                onChange={(e) => setExportSoDiaChinhCriteria(prev => ({ ...prev, ward: e.target.value }))}
+                                                className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                            >
+                                                <option value="">Tất cả</option>
+                                                {wards.map(w => <option key={w} value={w}>{w}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Tháng (YYYY-MM)</label>
+                                            <input 
+                                                type="month" 
+                                                value={exportSoDiaChinhCriteria.month}
+                                                onChange={(e) => setExportSoDiaChinhCriteria(prev => ({ ...prev, month: e.target.value }))}
+                                                className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Chữ cái đầu tên</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {['A', 'Ă', 'Â', 'B', 'C', 'D', 'Đ', 'E', 'Ê', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'Ô', 'Ơ', 'P', 'Q', 'R', 'S', 'T', 'U', 'Ư', 'V', 'X', 'Y'].map(letter => (
+                                                <button
+                                                    key={letter}
+                                                    onClick={() => setExportSoDiaChinhCriteria(prev => ({ ...prev, letter: prev.letter === letter ? '' : letter }))}
+                                                    className={`w-10 h-10 flex items-center justify-center rounded-md border text-sm font-medium transition-colors ${
+                                                        exportSoDiaChinhCriteria.letter === letter 
+                                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    {letter}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1053,33 +1100,69 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     const fromNum = parseInt(exportSoDiaChinhRange.from);
                                     const toNum = parseInt(exportSoDiaChinhRange.to);
                                     
-                                    if (isNaN(fromNum) || isNaN(toNum) || fromNum > toNum) {
-                                        alert("Vui lòng nhập khoảng số hợp lệ.");
-                                        return;
-                                    }
+                                    let recordsToExport = [];
 
-                                    const recordsToExport = records.filter(r => {
-                                        const val = r.data?.so_vao_so || '';
-                                        let num = NaN;
-                                        if (val.startsWith('CN ')) {
-                                            num = parseInt(val.replace('CN ', ''));
-                                        } else {
-                                            num = parseInt(val);
+                                    if (!isNaN(fromNum) && !isNaN(toNum) && fromNum <= toNum) {
+                                        // Export by number range
+                                        recordsToExport = records.filter(r => {
+                                            const val = r.data?.so_vao_so || '';
+                                            let num = NaN;
+                                            if (val.startsWith('CN ')) {
+                                                num = parseInt(val.replace('CN ', ''));
+                                            } else {
+                                                num = parseInt(val);
+                                            }
+                                            return !isNaN(num) && num >= fromNum && num <= toNum;
+                                        });
+
+                                        // Sort by number
+                                        recordsToExport.sort((a, b) => {
+                                            const numA = parseInt((a.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                            const numB = parseInt((b.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                            return numA - numB;
+                                        });
+                                    } else {
+                                        // Export by criteria
+                                        const { ward, month, letter } = exportSoDiaChinhCriteria;
+                                        if (!ward && !month && !letter) {
+                                            alert("Vui lòng nhập khoảng số hoặc chọn ít nhất một tiêu chí xuất.");
+                                            return;
                                         }
-                                        return !isNaN(num) && num >= fromNum && num <= toNum;
-                                    });
+
+                                        recordsToExport = records.filter(r => {
+                                            let matchWard = true;
+                                            let matchMonth = true;
+                                            let matchLetter = true;
+
+                                            if (ward) {
+                                                matchWard = r.data?.dia_danh?.toLowerCase().includes(ward.toLowerCase());
+                                            }
+
+                                            if (month) {
+                                                const recordDate = r.data?.ngay_nhan || r.ngay_thang;
+                                                if (recordDate) {
+                                                    matchMonth = recordDate.startsWith(month);
+                                                } else {
+                                                    matchMonth = false;
+                                                }
+                                            }
+
+                                            if (letter) {
+                                                const ownerName = r.data?.ten_chu_su_dung || '';
+                                                const parts = ownerName.trim().split(' ');
+                                                const firstName = parts[parts.length - 1] || '';
+                                                const firstLetter = firstName.charAt(0).toUpperCase();
+                                                matchLetter = firstLetter === letter;
+                                            }
+
+                                            return matchWard && matchMonth && matchLetter;
+                                        });
+                                    }
 
                                     if (recordsToExport.length === 0) {
-                                        alert("Không tìm thấy hồ sơ nào trong khoảng số này.");
+                                        alert("Không tìm thấy hồ sơ nào thỏa mãn điều kiện.");
                                         return;
                                     }
-
-                                    // Sort by number
-                                    recordsToExport.sort((a, b) => {
-                                        const numA = parseInt((a.data?.so_vao_so || '').replace('CN ', '')) || 0;
-                                        const numB = parseInt((b.data?.so_vao_so || '').replace('CN ', '')) || 0;
-                                        return numA - numB;
-                                    });
 
                                     exportSoDiaChinh(recordsToExport);
                                     setShowExportSoDiaChinhModal(false);

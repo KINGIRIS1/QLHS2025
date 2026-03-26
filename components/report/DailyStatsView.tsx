@@ -8,9 +8,10 @@ interface DailyStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
     wards: string[];
+    onFilteredRecordsChange?: (records: RecordFile[]) => void;
 }
 
-const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, wards }) => {
+const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, wards, onFilteredRecordsChange }) => {
     const [receiveFrom, setReceiveFrom] = useState('');
     const [receiveTo, setReceiveTo] = useState('');
     
@@ -69,6 +70,12 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
             return matchReceive && matchDeadline && matchWard;
         });
     }, [records, receiveFrom, receiveTo, deadlineFrom, deadlineTo, selectedWard]);
+
+    React.useEffect(() => {
+        if (onFilteredRecordsChange) {
+            onFilteredRecordsChange(filteredRecords);
+        }
+    }, [filteredRecords, onFilteredRecordsChange]);
 
     // Pagination Logic
     const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);

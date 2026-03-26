@@ -48,6 +48,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
+    const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
+
     // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
     const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
@@ -167,8 +169,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const generalStats = useMemo(() => {
         let sourceData = filteredData;
 
+        // Nếu đang ở tab Thống kê theo ngày -> Lọc theo điều kiện của tab đó
+        if (activeTab === 'daily_stats') {
+            sourceData = dailyStatsRecords;
+        }
         // Nếu đang ở tab Nhân viên và đã chọn nhân viên -> Lọc theo nhân viên đó
-        if (activeTab === 'employee' && selectedEmpId) {
+        else if (activeTab === 'employee' && selectedEmpId) {
             sourceData = filteredData.filter(r => r.assignedTo === selectedEmpId);
         }
 
@@ -202,7 +208,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const processing = total - completed - withdrawn;
         
         return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
-    }, [filteredData, activeTab, selectedEmpId]);
+    }, [filteredData, activeTab, selectedEmpId, dailyStatsRecords]);
 
     const handleQuickReport = (type: 'week' | 'month') => {
         const now = new Date();
@@ -589,7 +595,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 )}
 
                 {activeTab === 'daily_stats' && (
-                    <DailyStatsView records={activeRecords} employees={employees} wards={wards} />
+                    <DailyStatsView 
+                        records={activeRecords} 
+                        employees={employees} 
+                        wards={wards} 
+                        onFilteredRecordsChange={setDailyStatsRecords}
+                    />
                 )}
 
             </div>

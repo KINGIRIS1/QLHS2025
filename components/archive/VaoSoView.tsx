@@ -1058,13 +1058,36 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             </select>
                                         </div>
                                         <div className="flex-1">
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Tháng (YYYY-MM)</label>
-                                            <input 
-                                                type="month" 
-                                                value={exportSoDiaChinhCriteria.month}
-                                                onChange={(e) => setExportSoDiaChinhCriteria(prev => ({ ...prev, month: e.target.value }))}
-                                                className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                            />
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Tháng / Năm</label>
+                                            <div className="flex gap-2">
+                                                <select
+                                                    value={exportSoDiaChinhCriteria.month ? exportSoDiaChinhCriteria.month.split('-')[1] : ''}
+                                                    onChange={(e) => {
+                                                        const m = e.target.value;
+                                                        const y = exportSoDiaChinhCriteria.month ? exportSoDiaChinhCriteria.month.split('-')[0] : new Date().getFullYear().toString();
+                                                        setExportSoDiaChinhCriteria(prev => ({ ...prev, month: m ? `${y}-${m}` : '' }));
+                                                    }}
+                                                    className="w-1/2 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                >
+                                                    <option value="">Chọn tháng</option>
+                                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                        <option key={m} value={m.toString().padStart(2, '0')}>Tháng {m}</option>
+                                                    ))}
+                                                </select>
+                                                <input
+                                                    type="number"
+                                                    value={exportSoDiaChinhCriteria.month ? exportSoDiaChinhCriteria.month.split('-')[0] : new Date().getFullYear().toString()}
+                                                    onChange={(e) => {
+                                                        const y = e.target.value;
+                                                        const m = exportSoDiaChinhCriteria.month ? exportSoDiaChinhCriteria.month.split('-')[1] : '';
+                                                        if (m) {
+                                                            setExportSoDiaChinhCriteria(prev => ({ ...prev, month: `${y}-${m}` }));
+                                                        }
+                                                    }}
+                                                    placeholder="Năm"
+                                                    className="w-1/2 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     <div>

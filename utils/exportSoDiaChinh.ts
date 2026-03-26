@@ -144,13 +144,30 @@ export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
             },
             children: [
                 // Header: Page number placeholder
-                new Paragraph({
-                    alignment: AlignmentType.RIGHT,
-                    children: [
-                        new TextRun({ text: "(Tiếp theo trang số: ............)", size: 22, font: "Arial" }),
-                        new TextRun({ text: "\t\t\t\t\t\t\t\t", size: 22 }), // Tabs for spacing
-                        new TextRun({ text: "Trang số: ............", size: 22, font: "Arial" }),
-                    ],
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    borders: {
+                        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    },
+                    rows: [
+                        new TableRow({
+                            children: [
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: "(Tiếp theo trang số: ............)", size: 22, font: "Arial" })] })],
+                                    borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Trang số: ............", size: 22, font: "Arial" })] })],
+                                    borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
+                                }),
+                            ]
+                        })
+                    ]
                 }),
                 new Paragraph({ text: "", spacing: { after: 200 } }),
 
@@ -175,7 +192,6 @@ export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
                                     children: [
                                         new Paragraph({ children: [new TextRun({ text: `Ông: ${data.ten_chu_su_dung || record.noi_nhan_gui || ""}`, bold: true, size: 22, font: "Arial" })] }),
                                         new Paragraph({ children: [new TextRun({ text: `CCCD: ${data.cccd || ""}`, size: 22, font: "Arial" })] }),
-                                        new Paragraph({ children: [new TextRun({ text: `Địa chỉ: ${data.dia_chi || ""}`, size: 22, font: "Arial" })] }),
                                     ],
                                     columnSpan: 10,
                                     margins: { top: 100, bottom: 100, left: 100, right: 100 },

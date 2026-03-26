@@ -4,7 +4,8 @@ import { User } from '../../types';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
-import { exportSoDiaChinh } from '../../utils/exportSoDiaChinh';
+import { saveAs } from 'file-saver';
+import { exportSoDiaChinh, generateSoDiaChinhBlob } from '../../utils/exportSoDiaChinh';
 import { exportSoMucKe } from '../../utils/exportSoMucKe';
 import { getSystemSetting, saveSystemSetting } from '../../services/apiSystem';
 
@@ -54,7 +55,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Export So Dia Chinh Modal State
     const [showExportSoDiaChinhModal, setShowExportSoDiaChinhModal] = useState(false);
     const [exportSoDiaChinhRange, setExportSoDiaChinhRange] = useState({ from: '', to: '' });
-    const [exportSoDiaChinhCriteria, setExportSoDiaChinhCriteria] = useState({ ward: '', month: '', letter: '' });
+    const [exportSoDiaChinhCriteria, setExportSoDiaChinhCriteria] = useState({ ward: '', month: '', splitByLetter: false });
 
     // Export So Muc Ke State
     const [showExportSoMucKeModal, setShowExportSoMucKeModal] = useState(false);
@@ -1090,23 +1091,17 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Chữ cái đầu tên</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {['A', 'Ă', 'Â', 'B', 'C', 'D', 'Đ', 'E', 'Ê', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'Ô', 'Ơ', 'P', 'Q', 'R', 'S', 'T', 'U', 'Ư', 'V', 'X', 'Y'].map(letter => (
-                                                <button
-                                                    key={letter}
-                                                    onClick={() => setExportSoDiaChinhCriteria(prev => ({ ...prev, letter: prev.letter === letter ? '' : letter }))}
-                                                    className={`w-10 h-10 flex items-center justify-center rounded-md border text-sm font-medium transition-colors ${
-                                                        exportSoDiaChinhCriteria.letter === letter 
-                                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
-                                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
-                                                    }`}
-                                                >
-                                                    {letter}
-                                                </button>
-                                            ))}
-                                        </div>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="splitByLetter"
+                                            checked={exportSoDiaChinhCriteria.splitByLetter}
+                                            onChange={(e) => setExportSoDiaChinhCriteria(prev => ({ ...prev, splitByLetter: e.target.checked }))}
+                                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="splitByLetter" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                            Xuất chia theo từng chữ cái đầu của tên chủ (A, B, C...)
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -1146,8 +1141,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         });
                                     } else {
                                         // Export by criteria
-                                        const { ward, month, letter } = exportSoDiaChinhCriteria;
-                                        if (!ward && !month && !letter) {
+                                        const { ward, month, splitByLetter } = exportSoDiaChinhCriteria;
+                                        if (!ward && !month && !splitByLetter) {
                                             alert("Vui lòng nhập khoảng số hoặc chọn ít nhất một tiêu chí xuất.");
                                             return;
                                         }
@@ -1155,7 +1150,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         recordsToExport = records.filter(r => {
                                             let matchWard = true;
                                             let matchMonth = true;
-                                            let matchLetter = true;
 
                                             if (ward) {
                                                 matchWard = r.data?.dia_danh?.toLowerCase().includes(ward.toLowerCase());
@@ -1170,15 +1164,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                 }
                                             }
 
-                                            if (letter) {
-                                                const ownerName = r.data?.ten_chu_su_dung || '';
-                                                const parts = ownerName.trim().split(' ');
-                                                const firstName = parts[parts.length - 1] || '';
-                                                const firstLetter = firstName.charAt(0).toUpperCase();
-                                                matchLetter = firstLetter === letter;
-                                            }
-
-                                            return matchWard && matchMonth && matchLetter;
+                                            return matchWard && matchMonth;
                                         });
                                     }
 
@@ -1187,8 +1173,56 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         return;
                                     }
 
-                                    exportSoDiaChinh(recordsToExport);
-                                    setShowExportSoDiaChinhModal(false);
+                                    if (exportSoDiaChinhCriteria.splitByLetter && !exportSoDiaChinhRange.from && !exportSoDiaChinhRange.to) {
+                                        // Group by letter
+                                        const groups: Record<string, typeof recordsToExport> = {};
+                                        recordsToExport.forEach(r => {
+                                            const ownerName = r.data?.ten_chu_su_dung || '';
+                                            const parts = ownerName.trim().split(' ');
+                                            const firstName = parts[parts.length - 1] || '';
+                                            let firstLetter = firstName.charAt(0).toUpperCase();
+                                            
+                                            // Normalize to base letter if needed, but keeping original uppercase is fine
+                                            if (!firstLetter || !/[A-ZĂÂĐÊÔƠƯ]/.test(firstLetter)) {
+                                                firstLetter = 'Khac';
+                                            }
+                                            
+                                            if (!groups[firstLetter]) groups[firstLetter] = [];
+                                            groups[firstLetter].push(r);
+                                        });
+
+                                        import('jszip').then(async ({ default: JSZip }) => {
+                                            const zip = new JSZip();
+                                            const monthStr = exportSoDiaChinhCriteria.month ? exportSoDiaChinhCriteria.month.split('-')[1] : 'All';
+                                            const yearStr = exportSoDiaChinhCriteria.month ? exportSoDiaChinhCriteria.month.split('-')[0] : 'All';
+
+                                            for (const [letter, groupRecords] of Object.entries(groups)) {
+                                                // Sort groupRecords by number
+                                                groupRecords.sort((a, b) => {
+                                                    const numA = parseInt((a.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                                    const numB = parseInt((b.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                                    return numA - numB;
+                                                });
+
+                                                const blob = await generateSoDiaChinhBlob(groupRecords);
+                                                const fileName = `SDC-${monthStr}-${yearStr}-${letter}.docx`;
+                                                zip.file(fileName, blob);
+                                            }
+
+                                            const zipBlob = await zip.generateAsync({ type: 'blob' });
+                                            saveAs(zipBlob, `SoDiaChinh_${monthStr}_${yearStr}.zip`);
+                                            setShowExportSoDiaChinhModal(false);
+                                        });
+                                    } else {
+                                        // Sort by number
+                                        recordsToExport.sort((a, b) => {
+                                            const numA = parseInt((a.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                            const numB = parseInt((b.data?.so_vao_so || '').replace('CN ', '')) || 0;
+                                            return numA - numB;
+                                        });
+                                        exportSoDiaChinh(recordsToExport);
+                                        setShowExportSoDiaChinhModal(false);
+                                    }
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
                             >

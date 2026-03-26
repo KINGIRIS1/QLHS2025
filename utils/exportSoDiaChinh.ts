@@ -2,8 +2,8 @@ import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, Width
 import { saveAs } from "file-saver";
 import { ArchiveRecord } from "../services/apiArchive";
 
-export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
-    if (!records || records.length === 0) return;
+export const generateSoDiaChinhBlob = async (records: ArchiveRecord[]): Promise<Blob> => {
+    if (!records || records.length === 0) throw new Error("No records");
 
     // Helper to create a cell with specific text
     const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
@@ -326,11 +326,14 @@ export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
         sections: sections as any,
     });
 
-    // Generate and save
-    Packer.toBlob(doc).then((blob) => {
-        const fileName = records.length === 1 
-            ? `SoDiaChinh_${records[0].data?.so_vao_so || "new"}.docx`
-            : `SoDiaChinh_Multiple_${records.length}_records.docx`;
-        saveAs(blob, fileName);
-    });
+    return await Packer.toBlob(doc);
+};
+
+export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
+    if (!records || records.length === 0) return;
+    const blob = await generateSoDiaChinhBlob(records);
+    const fileName = records.length === 1 
+        ? `SoDiaChinh_${records[0].data?.so_vao_so || "new"}.docx`
+        : `SoDiaChinh_Multiple_${records.length}_records.docx`;
+    saveAs(blob, fileName);
 };

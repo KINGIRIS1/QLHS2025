@@ -35,8 +35,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'records_group'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
 
   // Define menu structure
   const menuItems = [
@@ -95,7 +95,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       subItems: [
         { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: !isOneDoor },
         { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
-        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: !isOneDoor },
+        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: true },
       ]
     }
   ];

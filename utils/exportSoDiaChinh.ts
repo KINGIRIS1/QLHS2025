@@ -34,8 +34,8 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
         return Number(val.toFixed(2)).toString();
     };
 
-    const rowsPerPage = 40;
-    const itemsPerPage = rowsPerPage * 2; // 80 items per TOC page
+    const rowsPerPage = 33; // Changed from 40 to 33 to fit A3 page perfectly
+    const itemsPerPage = rowsPerPage * 2; // 66 items per TOC page
     const tocPagesCount = Math.max(1, Math.ceil(records.length / itemsPerPage));
 
     const tocSections = [];

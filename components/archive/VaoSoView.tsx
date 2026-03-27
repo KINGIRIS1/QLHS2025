@@ -55,7 +55,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Export So Dia Chinh Modal State
     const [showExportSoDiaChinhModal, setShowExportSoDiaChinhModal] = useState(false);
     const [exportSoDiaChinhRange, setExportSoDiaChinhRange] = useState({ from: '', to: '' });
-    const [exportSoDiaChinhCriteria, setExportSoDiaChinhCriteria] = useState({ ward: '', month: '', splitByLetter: false });
+    const [exportSoDiaChinhCriteria, setExportSoDiaChinhCriteria] = useState({ ward: '', month: '', splitByLetter: false, exportTocOnly: false });
 
     // Export So Muc Ke State
     const [showExportSoMucKeModal, setShowExportSoMucKeModal] = useState(false);
@@ -1103,6 +1103,18 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             Xuất chia theo từng chữ cái đầu của tên chủ (A, B, C...)
                                         </label>
                                     </div>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="exportTocOnly"
+                                            checked={exportSoDiaChinhCriteria.exportTocOnly || false}
+                                            onChange={(e) => setExportSoDiaChinhCriteria(prev => ({ ...prev, exportTocOnly: e.target.checked }))}
+                                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="exportTocOnly" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                            Chỉ xuất mục lục
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1205,7 +1217,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                 });
 
                                                 const quyenSo = `${letter}${monthStr}`;
-                                                const blob = await generateSoDiaChinhBlob(groupRecords, quyenSo);
+                                                const blob = await generateSoDiaChinhBlob(groupRecords, quyenSo, exportSoDiaChinhCriteria.exportTocOnly);
                                                 const fileName = `SDC-${monthStr}-${yearStr}-${letter}.docx`;
                                                 zip.file(fileName, blob);
                                             }
@@ -1221,7 +1233,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             const numB = parseInt((b.data?.so_vao_so || '').replace('CN ', '')) || 0;
                                             return numA - numB;
                                         });
-                                        exportSoDiaChinh(recordsToExport);
+                                        exportSoDiaChinh(recordsToExport, "", exportSoDiaChinhCriteria.exportTocOnly);
                                         setShowExportSoDiaChinhModal(false);
                                     }
                                 }}

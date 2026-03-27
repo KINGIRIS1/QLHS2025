@@ -2,7 +2,7 @@ import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, Width
 import { saveAs } from "file-saver";
 import { ArchiveRecord } from "../services/apiArchive";
 
-export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: string = ""): Promise<Blob> => {
+export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: string = "", exportTocOnly: boolean = false): Promise<Blob> => {
     if (!records || records.length === 0) throw new Error("No records");
 
     // Helper to create a cell with specific text
@@ -29,16 +29,18 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
+    const formatArea = (val: number) => {
+        if (isNaN(val)) return "";
+        return Number(val.toFixed(2)).toString();
+    };
+
     const rowsPerPage = 40;
-    const tocRowsCount = Math.ceil(records.length / 2);
-    const tocPagesCount = Math.max(1, Math.ceil(tocRowsCount / rowsPerPage));
+    const itemsPerPage = rowsPerPage * 2; // 80 items per TOC page
+    const tocPagesCount = Math.max(1, Math.ceil(records.length / itemsPerPage));
 
     const tocSections = [];
     
     for (let pageIdx = 0; pageIdx < tocPagesCount; pageIdx++) {
-        const startRow = pageIdx * rowsPerPage;
-        const endRow = Math.min((pageIdx + 1) * rowsPerPage, tocRowsCount);
-        
         const tocTableRows = [];
         
         // Header rows
@@ -65,23 +67,23 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
             })
         );
 
-        for (let i = startRow; i < endRow; i++) {
-            const leftIndex = i * 2;
-            const rightIndex = i * 2 + 1;
+        for (let rowIdx = 0; rowIdx < rowsPerPage; rowIdx++) {
+            const leftIndex = pageIdx * itemsPerPage + rowIdx;
+            const rightIndex = pageIdx * itemsPerPage + rowsPerPage + rowIdx;
             
-            const leftRecord = records[leftIndex];
+            const leftRecord = leftIndex < records.length ? records[leftIndex] : null;
             const rightRecord = rightIndex < records.length ? records[rightIndex] : null;
 
-            const leftPageNum = tocPagesCount + leftIndex + 1;
-            const rightPageNum = rightRecord ? tocPagesCount + rightIndex + 1 : "";
+            const leftPageNum = leftIndex + 1;
+            const rightPageNum = rightIndex + 1;
 
             tocTableRows.push(
                 new TableRow({
                     children: [
-                        createCell((leftIndex + 1).toString(), 5, false, AlignmentType.CENTER),
+                        createCell(leftRecord ? (leftIndex + 1).toString() : "", 5, false, AlignmentType.CENTER),
                         createCell(leftRecord?.data?.ten_chu_su_dung || leftRecord?.noi_nhan_gui || "", 25, false, AlignmentType.LEFT),
-                        createCell(quyenSo, 10, false, AlignmentType.CENTER),
-                        createCell(leftPageNum.toString(), 10, false, AlignmentType.CENTER),
+                        createCell(leftRecord ? quyenSo : "", 10, false, AlignmentType.CENTER),
+                        createCell(leftRecord ? leftPageNum.toString() : "", 10, false, AlignmentType.CENTER),
                         
                         createCell(rightRecord ? (rightIndex + 1).toString() : "", 5, false, AlignmentType.CENTER),
                         createCell(rightRecord?.data?.ten_chu_su_dung || rightRecord?.noi_nhan_gui || "", 25, false, AlignmentType.LEFT),
@@ -128,7 +130,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                                     borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
                                 }),
                                 new TableCell({
-                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Chuyển tiếp trang số: ${pageIdx < tocPagesCount - 1 ? pageIdx + 2 : tocPagesCount + 1}`, size: 22, font: "Arial", italics: true })] })],
+                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Chuyển tiếp trang số: ....................`, size: 22, font: "Arial", italics: true })] })],
                                     borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
                                 }),
                             ]
@@ -144,6 +146,10 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
         });
     }
 
+    if (exportTocOnly) {
+        return await Packer.toBlob(new Document({ sections: tocSections as any }));
+    }
+
     const sections = records.map((record, index) => {
         const data = record.data || {};
         const ngayVaoSo = formatDate(data.ngay_nhan);
@@ -151,8 +157,8 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
         const soVaoSo = data.so_vao_so || "";
         
         // Determine land use purpose and generate data rows
-        const tongDienTich = parseFloat(data.tong_dien_tich || "0");
-        const dienTichThoCu = parseFloat(data.dien_tich_tho_cu || "0");
+        const tongDienTich = parseFloat(data.tong_dien_tich?.toString().replace(',', '.') || "0");
+        const dienTichThoCu = parseFloat(data.dien_tich_tho_cu?.toString().replace(',', '.') || "0");
         const dienTichCLN = tongDienTich - dienTichThoCu;
 
         const hasODT = dienTichThoCu > 0;
@@ -182,7 +188,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                     createCell(ngayVaoSo, 10),
                     createCell(data.so_thua || "", 8),
                     createCell(data.so_to || "", 8),
-                    createCell(data.tong_dien_tich || "", 8),
+                    createCell(data.tong_dien_tich ? formatArea(tongDienTich) : "", 8),
                     createCell("", 8), // Chung
                     createCell(mucDichSuDung, 10),
                     createCell(thoiHanSuDung, 10),
@@ -203,7 +209,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                         createCell("", 10),
                         createCell("", 8),
                         createCell("", 8),
-                        createCell(dienTichThoCu.toString(), 8),
+                        createCell(formatArea(dienTichThoCu), 8),
                         createCell("", 8),
                         createCell("ODT", 10),
                         createCell("Lâu dài", 10),
@@ -222,7 +228,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                         createCell("", 10),
                         createCell("", 8),
                         createCell("", 8),
-                        createCell(dienTichCLN.toString(), 8),
+                        createCell(formatArea(dienTichCLN), 8),
                         createCell("", 8),
                         createCell("CLN", 10),
                         createCell("", 10), // CLN không ghi thời hạn
@@ -273,11 +279,11 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: `(Tiếp theo trang số: ${index > 0 ? tocPagesCount + index : "............"})`, size: 22, font: "Arial" })] })],
+                                    children: [new Paragraph({ children: [new TextRun({ text: `(Tiếp theo trang số: ${index > 0 ? index : "............"})`, size: 22, font: "Arial" })] })],
                                     borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
                                 }),
                                 new TableCell({
-                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Trang số: ${tocPagesCount + index + 1}`, size: 22, font: "Arial" })] })],
+                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Trang số: ${index + 1}`, size: 22, font: "Arial" })] })],
                                     borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
                                 }),
                             ]
@@ -429,7 +435,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                     alignment: AlignmentType.RIGHT,
                     spacing: { before: 300 },
                     children: [
-                        new TextRun({ text: `Chuyển tiếp trang số: ${index < records.length - 1 ? tocPagesCount + index + 2 : "............"}`, size: 22, font: "Arial" }),
+                        new TextRun({ text: `Chuyển tiếp trang số: ${index < records.length - 1 ? index + 2 : "............"}`, size: 22, font: "Arial" }),
                     ],
                 }),
             ],
@@ -444,9 +450,9 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
     return await Packer.toBlob(doc);
 };
 
-export const exportSoDiaChinh = async (records: ArchiveRecord[]) => {
+export const exportSoDiaChinh = async (records: ArchiveRecord[], quyenSo: string = "", exportTocOnly: boolean = false) => {
     if (!records || records.length === 0) return;
-    const blob = await generateSoDiaChinhBlob(records);
+    const blob = await generateSoDiaChinhBlob(records, quyenSo, exportTocOnly);
     const fileName = records.length === 1 
         ? `SoDiaChinh_${records[0].data?.so_vao_so || "new"}.docx`
         : `SoDiaChinh_Multiple_${records.length}_records.docx`;

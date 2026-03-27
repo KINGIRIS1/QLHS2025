@@ -2,11 +2,11 @@ import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, Width
 import { saveAs } from "file-saver";
 import { ArchiveRecord } from "../services/apiArchive";
 
-export const generateSoDiaChinhBlob = async (records: ArchiveRecord[]): Promise<Blob> => {
+export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: string = ""): Promise<Blob> => {
     if (!records || records.length === 0) throw new Error("No records");
 
     // Helper to create a cell with specific text
-    const createCell = (text: string, width: number, bold = false, align = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
+    const createCell = (text: string, width: number, bold = false, align: typeof AlignmentType[keyof typeof AlignmentType] = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
         const lines = text.split('\n');
         return new TableCell({
             width: { size: width, type: WidthType.PERCENTAGE },
@@ -29,7 +29,122 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[]): Promise<
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
-    const sections = records.map(record => {
+    const rowsPerPage = 40;
+    const tocRowsCount = Math.ceil(records.length / 2);
+    const tocPagesCount = Math.max(1, Math.ceil(tocRowsCount / rowsPerPage));
+
+    const tocSections = [];
+    
+    for (let pageIdx = 0; pageIdx < tocPagesCount; pageIdx++) {
+        const startRow = pageIdx * rowsPerPage;
+        const endRow = Math.min((pageIdx + 1) * rowsPerPage, tocRowsCount);
+        
+        const tocTableRows = [];
+        
+        // Header rows
+        tocTableRows.push(
+            new TableRow({
+                children: [
+                    createCell("Số\nthứ tự", 5, true, AlignmentType.CENTER, 1, 2),
+                    createCell("Tên người sử dụng đất", 25, true, AlignmentType.CENTER, 1, 2),
+                    createCell("Đăng ký tại\nsổ địa chính", 20, true, AlignmentType.CENTER, 2, 1),
+                    createCell("Số\nthứ tự", 5, true, AlignmentType.CENTER, 1, 2),
+                    createCell("Tên người sử dụng đất", 25, true, AlignmentType.CENTER, 1, 2),
+                    createCell("Đăng ký tại\nsổ địa chính", 20, true, AlignmentType.CENTER, 2, 1),
+                ],
+                height: { value: 500, rule: "atLeast" }
+            }),
+            new TableRow({
+                children: [
+                    createCell("Quyển số", 10, true, AlignmentType.CENTER),
+                    createCell("Trang số", 10, true, AlignmentType.CENTER),
+                    createCell("Quyển số", 10, true, AlignmentType.CENTER),
+                    createCell("Trang số", 10, true, AlignmentType.CENTER),
+                ],
+                height: { value: 500, rule: "atLeast" }
+            })
+        );
+
+        for (let i = startRow; i < endRow; i++) {
+            const leftIndex = i * 2;
+            const rightIndex = i * 2 + 1;
+            
+            const leftRecord = records[leftIndex];
+            const rightRecord = rightIndex < records.length ? records[rightIndex] : null;
+
+            const leftPageNum = tocPagesCount + leftIndex + 1;
+            const rightPageNum = rightRecord ? tocPagesCount + rightIndex + 1 : "";
+
+            tocTableRows.push(
+                new TableRow({
+                    children: [
+                        createCell((leftIndex + 1).toString(), 5, false, AlignmentType.CENTER),
+                        createCell(leftRecord?.data?.ten_chu_su_dung || leftRecord?.noi_nhan_gui || "", 25, false, AlignmentType.LEFT),
+                        createCell(quyenSo, 10, false, AlignmentType.CENTER),
+                        createCell(leftPageNum.toString(), 10, false, AlignmentType.CENTER),
+                        
+                        createCell(rightRecord ? (rightIndex + 1).toString() : "", 5, false, AlignmentType.CENTER),
+                        createCell(rightRecord?.data?.ten_chu_su_dung || rightRecord?.noi_nhan_gui || "", 25, false, AlignmentType.LEFT),
+                        createCell(rightRecord ? quyenSo : "", 10, false, AlignmentType.CENTER),
+                        createCell(rightRecord ? rightPageNum.toString() : "", 10, false, AlignmentType.CENTER),
+                    ],
+                    height: { value: 400, rule: "atLeast" }
+                })
+            );
+        }
+
+        tocSections.push({
+            properties: {
+                page: {
+                    size: {
+                        width: 16838, // A3 width in twips (297mm)
+                        height: 23811, // A3 height in twips (420mm)
+                        orientation: "portrait",
+                    },
+                    margin: {
+                        top: 567, // 1cm
+                        bottom: 567, // 1cm
+                        left: 1701, // 3cm
+                        right: 1134, // 2cm
+                    },
+                },
+            },
+            children: [
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    borders: {
+                        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    },
+                    rows: [
+                        new TableRow({
+                            children: [
+                                new TableCell({
+                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "MỤC LỤC NGƯỜI SỬ DỤNG ĐẤT", bold: true, size: 28, font: "Arial" })] })],
+                                    borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Chuyển tiếp trang số: ${pageIdx < tocPagesCount - 1 ? pageIdx + 2 : tocPagesCount + 1}`, size: 22, font: "Arial", italics: true })] })],
+                                    borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
+                                }),
+                            ]
+                        })
+                    ]
+                }),
+                new Paragraph({ text: "", spacing: { after: 200 } }),
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    rows: tocTableRows
+                })
+            ]
+        });
+    }
+
+    const sections = records.map((record, index) => {
         const data = record.data || {};
         const ngayVaoSo = formatDate(data.ngay_nhan);
         const soPhatHanh = data.so_phat_hanh || "";
@@ -158,11 +273,11 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[]): Promise<
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: "(Tiếp theo trang số: ............)", size: 22, font: "Arial" })] })],
+                                    children: [new Paragraph({ children: [new TextRun({ text: `(Tiếp theo trang số: ${index > 0 ? tocPagesCount + index : "............"})`, size: 22, font: "Arial" })] })],
                                     borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
                                 }),
                                 new TableCell({
-                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Trang số: ............", size: 22, font: "Arial" })] })],
+                                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Trang số: ${tocPagesCount + index + 1}`, size: 22, font: "Arial" })] })],
                                     borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } },
                                 }),
                             ]
@@ -314,7 +429,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[]): Promise<
                     alignment: AlignmentType.RIGHT,
                     spacing: { before: 300 },
                     children: [
-                        new TextRun({ text: "Chuyển tiếp trang số: ............", size: 22, font: "Arial" }),
+                        new TextRun({ text: `Chuyển tiếp trang số: ${index < records.length - 1 ? tocPagesCount + index + 2 : "............"}`, size: 22, font: "Arial" }),
                     ],
                 }),
             ],
@@ -323,7 +438,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[]): Promise<
 
     // Create the document
     const doc = new Document({
-        sections: sections as any,
+        sections: [...tocSections, ...sections] as any,
     });
 
     return await Packer.toBlob(doc);

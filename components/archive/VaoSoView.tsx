@@ -1204,7 +1204,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                     return numA - numB;
                                                 });
 
-                                                const blob = await generateSoDiaChinhBlob(groupRecords);
+                                                const quyenSo = `${letter}${monthStr}`;
+                                                const blob = await generateSoDiaChinhBlob(groupRecords, quyenSo);
                                                 const fileName = `SDC-${monthStr}-${yearStr}-${letter}.docx`;
                                                 zip.file(fileName, blob);
                                             }

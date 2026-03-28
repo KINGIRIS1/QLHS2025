@@ -56,6 +56,7 @@ export const RECORD_TYPES = [
 export const EXTENDED_RECORD_TYPES = [
   ...RECORD_TYPES,
   'Cung cấp thông tin',
+  'CMD',
   'Thi hành án',
   'Tòa án'
 ];

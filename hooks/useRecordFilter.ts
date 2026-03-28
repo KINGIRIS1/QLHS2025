@@ -77,9 +77,9 @@ export const useRecordFilter = (
         let result = Array.from(uniqueMap.values()) as RecordFile[];
 
         // View-based filtering
-        if (currentView === 'check_list') {
+        if (currentView === 'check_list' || currentView === 'other_check_list') {
             result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);
-        } else if (currentView === 'handover_list') {
+        } else if (currentView === 'handover_list' || currentView === 'other_handover_list') {
             if (handoverTab === 'today') {
                 // Tab chờ giao: Bao gồm Đã ký HOẶC (Đã rút VÀ chưa có đợt xuất)
                 result = result.filter(r => 
@@ -114,8 +114,18 @@ export const useRecordFilter = (
                     });
                 }
             }
-        } else if (currentView === 'assign_tasks') {
+        } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks') {
             result = result.filter(r => r.status === RecordStatus.RECEIVED);
+        }
+
+        // Filter by recordType based on view group
+        const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list'].includes(currentView);
+        const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
+        
+        if (isOtherView) {
+            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType));
+        } else if (isMeasurementView) {
+            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType));
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)

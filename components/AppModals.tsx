@@ -81,6 +81,7 @@ interface AppModalsProps {
     selectedCount: number;
     canPerformAction: boolean;
     selectedRecordsForBulk: RecordFile[];
+    currentView: string;
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
@@ -98,6 +99,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees}
                 currentUser={props.currentUser}
                 wards={props.wards}
+                currentView={props.currentView}
             />
             
             <ImportModal 

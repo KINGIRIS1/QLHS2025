@@ -12,9 +12,10 @@ interface RecordModalProps {
   employees: Employee[];
   currentUser: User;
   wards: string[];
+  currentView?: string;
 }
 
-const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards }) => {
+const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView }) => {
   const defaultState: Partial<RecordFile> = {
     code: '', customerName: '', phoneNumber: '', cccd: '', content: '', otherDocs: '',
     receivedDate: new Date().toISOString().split('T')[0], deadline: '', assignedTo: '',
@@ -119,6 +120,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleChange = (field: keyof RecordFile, value: any) => setFormData(prev => ({ ...prev, [field]: value }));
   const val = (v: any) => v === undefined || v === null ? '' : v;
 
+  const isOtherView = currentView?.startsWith('other_');
+  const allowedRecordTypes = isOtherView 
+    ? EXTENDED_RECORD_TYPES.filter(t => ['CMD', 'Tòa án', 'Thi hành án'].includes(t))
+    : EXTENDED_RECORD_TYPES.filter(t => !['CMD', 'Tòa án', 'Thi hành án'].includes(t));
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-0 md:p-4 backdrop-blur-sm">
       <div className="bg-white md:rounded-xl shadow-2xl w-full max-w-4xl h-full md:max-h-[95vh] flex flex-col animate-fade-in-up">
@@ -147,7 +153,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <label className="block text-xs font-bold text-gray-700 mb-1">Loại hồ sơ</label>
                             <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={val(formData.recordType)} onChange={(e) => handleChange('recordType', e.target.value)}>
                                 <option value="">-- Chọn loại hồ sơ --</option>
-                                {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
                         {hasAdminRights && (

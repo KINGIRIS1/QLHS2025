@@ -547,6 +547,7 @@ function App() {
             selectedCount={selectedRecordIds.size}
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
+            currentView={currentView}
         />
 
         {toast && (
@@ -689,6 +690,7 @@ function App() {
             selectedCount={selectedRecordIds.size}
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
+            currentView={currentView}
         />
 
         {toast && (

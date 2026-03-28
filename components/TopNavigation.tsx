@@ -35,8 +35,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
 
   // Define menu structure
   const menuItems = [
@@ -66,6 +66,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isTabGroup: true,
       subItems: [
         { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
+        { id: 'other_records', label: 'Khác', icon: Layers, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },

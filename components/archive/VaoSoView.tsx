@@ -1194,6 +1194,22 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             const firstName = parts[parts.length - 1] || '';
                                             let firstLetter = firstName.charAt(0).toUpperCase();
                                             
+                                            const charMap: Record<string, string> = {
+                                                'À':'A', 'Á':'A', 'Ạ':'A', 'Ả':'A', 'Ã':'A',
+                                                'Ầ':'Â', 'Ấ':'Â', 'Ậ':'Â', 'Ẩ':'Â', 'Ẫ':'Â',
+                                                'Ằ':'Ă', 'Ắ':'Ă', 'Ặ':'Ă', 'Ẳ':'Ă', 'Ẵ':'Ă',
+                                                'È':'E', 'É':'E', 'Ẹ':'E', 'Ẻ':'E', 'Ẽ':'E',
+                                                'Ề':'Ê', 'Ế':'Ê', 'Ệ':'Ê', 'Ể':'Ê', 'Ễ':'Ê',
+                                                'Ì':'I', 'Í':'I', 'Ị':'I', 'Ỉ':'I', 'Ĩ':'I',
+                                                'Ò':'O', 'Ó':'O', 'Ọ':'O', 'Ỏ':'O', 'Õ':'O',
+                                                'Ồ':'Ô', 'Ố':'Ô', 'Ộ':'Ô', 'Ổ':'Ô', 'Ỗ':'Ô',
+                                                'Ờ':'Ơ', 'Ớ':'Ơ', 'Ợ':'Ơ', 'Ở':'Ơ', 'Ỡ':'Ơ',
+                                                'Ù':'U', 'Ú':'U', 'Ụ':'U', 'Ủ':'U', 'Ũ':'U',
+                                                'Ừ':'Ư', 'Ứ':'Ư', 'Ự':'Ư', 'Ử':'Ư', 'Ữ':'Ư',
+                                                'Ỳ':'Y', 'Ý':'Y', 'Ỵ':'Y', 'Ỷ':'Y', 'Ỹ':'Y',
+                                            };
+                                            firstLetter = charMap[firstLetter] || firstLetter;
+                                            
                                             // Normalize to base letter if needed, but keeping original uppercase is fine
                                             if (!firstLetter || !/[A-ZĂÂĐÊÔƠƯ]/.test(firstLetter)) {
                                                 firstLetter = 'Khac';

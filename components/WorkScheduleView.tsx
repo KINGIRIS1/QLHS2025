@@ -4,6 +4,7 @@ import { User, WorkSchedule } from '../types';
 import { fetchWorkSchedules, saveWorkSchedule, deleteWorkSchedule } from '../services/apiWorkSchedule';
 import ScheduleForm from './work-schedule/ScheduleForm';
 import ScheduleList from './work-schedule/ScheduleList';
+import ScheduleSummary from './work-schedule/ScheduleSummary';
 import { Calendar, Plus } from 'lucide-react';
 
 interface WorkScheduleViewProps {
@@ -47,10 +48,10 @@ const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
     };
 
     return (
-        <div className="flex h-full gap-6 animate-fade-in">
+        <div className="flex h-full gap-6 animate-fade-in overflow-hidden">
             {/* Left Column: Form (Sticky or Modal-like behaviour handled by UI layout) */}
-            <div className={`w-full max-w-sm flex-none transition-all duration-300 ${isFormOpen ? 'block' : 'hidden md:block'}`}>
-                <div className="h-full flex flex-col gap-4">
+            <div className={`w-full max-w-sm flex-none transition-all duration-300 overflow-y-auto pr-2 ${isFormOpen ? 'block' : 'hidden md:block'}`}>
+                <div className="flex flex-col gap-4">
                     <button 
                         onClick={() => { setEditingSchedule(null); setIsFormOpen(true); }}
                         className="w-full py-3 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 font-bold flex items-center justify-center gap-2 md:hidden"
@@ -76,13 +77,19 @@ const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
                 </div>
             </div>
 
-            {/* Right Column: List */}
-            <div className={`flex-1 min-w-0 transition-all duration-300 ${isFormOpen ? 'hidden md:block' : 'block'}`}>
-                <ScheduleList 
-                    schedules={schedules}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                />
+            {/* Right Column: List & Summary */}
+            <div className={`flex-1 min-w-0 transition-all duration-300 flex flex-col gap-6 overflow-y-auto pr-2 ${isFormOpen ? 'hidden md:block' : 'block'}`}>
+                <div className="h-[500px] flex-shrink-0">
+                    <ScheduleList 
+                        schedules={schedules}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                    />
+                </div>
+                
+                <div className="flex-shrink-0 pb-6">
+                    <ScheduleSummary schedules={schedules} />
+                </div>
             </div>
         </div>
     );

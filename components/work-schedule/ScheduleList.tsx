@@ -16,6 +16,10 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     const [filterType, setFilterType] = useState<'all' | 'week' | 'month' | 'range'>('month');
     const [dateRange, setDateRange] = useState({ from: '', to: '' });
 
+    // Pagination States
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+
     // Init current month range
     React.useEffect(() => {
         const now = new Date();
@@ -150,6 +154,18 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
         }
     };
 
+    // Reset pagination when filter changes
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterType, dateRange]);
+
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+    const paginatedList = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredList.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredList, currentPage, itemsPerPage]);
+
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-full overflow-hidden">
             <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col gap-3">
@@ -204,9 +220,9 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                         </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-gray-100">
-                        {filteredList.length > 0 ? filteredList.map((item, idx) => (
+                        {paginatedList.length > 0 ? paginatedList.map((item, idx) => (
                             <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
-                                <td className="p-3 text-center text-gray-400">{idx + 1}</td>
+                                <td className="p-3 text-center text-gray-400">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                 <td className="p-3 font-medium text-blue-600">{formatDate(item.date)}</td>
                                 <td className="p-3 text-gray-800 font-medium">{item.content}</td>
                                 <td className="p-3 text-gray-600">{item.partner || '-'}</td>
@@ -224,6 +240,45 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {filteredList.length > 0 && (
+                <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-between items-center shrink-0 rounded-b-xl">
+                    <span className="text-xs text-gray-500">
+                        Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, filteredList.length)}</strong> trên tổng <strong>{filteredList.length}</strong>
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <div className="flex items-center mr-4 gap-2">
+                            <span className="text-xs text-gray-500">Số lượng:</span>
+                            <select 
+                                value={itemsPerPage} 
+                                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} 
+                                className="border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                            >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                        </div>
+                        <button 
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                            disabled={currentPage === 1} 
+                            className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
+                        >
+                            Trước
+                        </button>
+                        <span className="text-xs font-medium mx-2">Trang {currentPage} / {totalPages}</span>
+                        <button 
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                            disabled={currentPage === totalPages} 
+                            className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
+                        >
+                            Sau
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

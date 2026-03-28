@@ -123,9 +123,9 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
         
         if (isOtherView) {
-            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType));
+            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || ''));
         } else if (isMeasurementView) {
-            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType));
+            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || ''));
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)

@@ -204,15 +204,23 @@ export const useRecordFilter = (
         let overdue = 0;
         let approaching = 0;
         if (records.length > 0 && currentUser) {
+            const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list'].includes(currentView);
+            const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
+
             records.forEach(r => {
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 
                 if (!checkWarningPermission(r)) return; 
+                
+                // Filter by recordType based on view group
+                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return;
+                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return;
+
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;
             });
         }
         return { overdue, approaching };
-    }, [records, currentUser, employees]);
+    }, [records, currentUser, employees, currentView]);
 
     return {
         filteredRecords, paginatedRecords, totalPages, warningCount,

@@ -66,8 +66,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isTabGroup: true,
       subItems: [
         { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
-        { id: 'other_records', label: 'Khác', icon: Layers, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
+        { id: 'other_records', label: 'Khác', icon: Layers, visible: true },
       ]
     },
 

@@ -181,7 +181,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                             <p style="margin: 0; font-size: 12pt;">VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI</p>
                             <p style="margin: 0; font-size: 13pt;">CHI NHÁNH CHƠN THÀNH</p>
                             ${lineLeftHtml}
-                            <p style="margin: 0; font-weight: normal; font-size: 13pt; margin-top: 5px;">Số: ${data.STT || '.....'} /BB-VPHV-HCTH</p>
+                            <p style="margin: 0; font-weight: normal; font-size: 13pt; margin-top: 5px;">Số: ${data.STT || '.....'} /BB-VPHV</p>
                         </td>
                         <td style="width: 55%; padding: 0;">
                             <p style="margin: 0; font-size: 12pt;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>

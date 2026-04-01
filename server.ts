@@ -1,11 +1,11 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 // @ts-ignore
 import jsonServer from 'json-server';
 import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,6 +164,7 @@ server.post('/custom/counters', (req: Request, res: Response) => {
 // Vite middleware setup
 const startServer = async () => {
     if (process.env.NODE_ENV !== 'production') {
+        const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
             server: { middlewareMode: true },
             appType: 'spa',

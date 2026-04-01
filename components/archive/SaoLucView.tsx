@@ -316,7 +316,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const handleConfirmHandover = async (listName: string, handoverDate: string) => {
         if (pendingCompletionRecord) {
             const historyEntry = {
-                action: 'Đã giao 1 cửa',
+                action: 'Đã trả kết quả',
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 user: currentUser.name,
@@ -340,7 +340,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             loadData();
         } else if (selectedIds.size > 0 && subTab === 'signed') {
             const historyEntry = {
-                action: 'Đã giao 1 cửa',
+                action: 'Đã trả kết quả',
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 user: currentUser.name,
@@ -675,7 +675,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                             onClick={() => setSubTab('result')} 
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            <FileCheck size={16}/> Đã giao 1 cửa
+                            <FileCheck size={16}/> Đã trả kết quả
                         </button>
                     </div>
 
@@ -697,7 +697,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                         )}
                         {subTab === 'signed' && isManager && selectedIds.size > 0 && (
                             <button onClick={() => setShowHandoverModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm animate-pulse">
-                                <FileCheck size={16}/> Đã giao 1 cửa ({selectedIds.size})
+                                <FileCheck size={16}/> Đã trả kết quả ({selectedIds.size})
                             </button>
                         )}
                         {(subTab === 'draft' || subTab === 'all') && isManager && (
@@ -927,7 +927,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                                 {r.status === 'signed' && isManager && (
                                                     <>
                                                         <button onClick={() => handleStatusChange(r, 'pending_sign')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
-                                                        <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Đã giao 1 cửa"><FileCheck size={14}/></button>
+                                                        <button onClick={() => handleStatusChange(r, 'completed')} className="p-1.5 text-green-600 bg-green-50 rounded hover:bg-green-100" title="Đã trả kết quả"><FileCheck size={14}/></button>
                                                     </>
                                                 )}
                                                 

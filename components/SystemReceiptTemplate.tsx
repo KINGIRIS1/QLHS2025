@@ -45,6 +45,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         .text-xl { font-size: 20px; }
                         .indent { padding-left: 40px; }
                         .space-y-2 > * + * { margin-top: 8px; }
+                        .whitespace-nowrap { white-space: nowrap; }
                     </style>
                 </head>
                 <body>
@@ -135,19 +136,19 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         {/* Header */}
                         <div className="flex justify-between mb-6">
                             <div className="text-center" style={{ width: '48%' }}>
-                                <div className="font-bold text-[16px]">VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI</div>
-                                <div className="font-bold text-[16px]">CHI NHÁNH CHƠN THÀNH</div>
-                                <div className="text-[15px]">TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG</div>
-                                <div className="text-[16px] font-bold underline">{wardName.toUpperCase()}</div>
+                                <div className="font-bold" style={{ fontSize: '16px' }}>VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI</div>
+                                <div className="font-bold" style={{ fontSize: '16px' }}>CHI NHÁNH CHƠN THÀNH</div>
+                                <div className="whitespace-nowrap" style={{ fontSize: '15px' }}>TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG</div>
+                                <div className="font-bold underline" style={{ fontSize: '16px' }}>{wardName.toUpperCase()}</div>
                                 
-                                <div className="mt-4 text-[16px]">
+                                <div className="mt-4" style={{ fontSize: '16px' }}>
                                     Mã số hồ sơ: <span className="font-bold">{data.code}</span>
                                 </div>
                             </div>
                             <div className="text-center" style={{ width: '52%' }}>
-                                <div className="font-bold text-[16px]">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                                <div className="font-bold underline mb-2 text-[16px]">Độc lập - Tự do - Hạnh phúc</div>
-                                <div className="italic mt-4 text-[16px]">{getTitleCase(wardNameNoPrefix)}, {formatDateOnly(new Date())}</div>
+                                <div className="font-bold whitespace-nowrap" style={{ fontSize: '16px' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                                <div className="font-bold underline mb-2" style={{ fontSize: '16px' }}>Độc lập - Tự do - Hạnh phúc</div>
+                                <div className="italic mt-4" style={{ fontSize: '16px' }}>{getTitleCase(wardNameNoPrefix)}, {formatDateOnly(new Date())}</div>
                             </div>
                         </div>
 

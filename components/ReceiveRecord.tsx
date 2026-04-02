@@ -13,6 +13,7 @@ import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
+import SystemReceiptTemplate from './SystemReceiptTemplate';
 import ExcelPreviewModal from './ExcelPreviewModal';
 
 interface ReceiveRecordProps {
@@ -69,6 +70,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   const [templateType, setTemplateType] = useState<'receipt' | 'contract'>('receipt');
   
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [showSystemReceipt, setShowSystemReceipt] = useState(false);
+  const [systemReceiptData, setSystemReceiptData] = useState<Partial<RecordFile> | null>(null);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
 
@@ -314,11 +317,16 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(dataToUse.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
     
-    const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
-    if (blob) { 
-        setPreviewBlob(blob); 
-        setPreviewFileName(`BienNhan_${dataToUse.code}`); 
-        setIsPreviewOpen(true); 
+    if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
+        const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+        if (blob) { 
+            setPreviewBlob(blob); 
+            setPreviewFileName(`BienNhan_${dataToUse.code}`); 
+            setIsPreviewOpen(true); 
+        }
+    } else {
+        setSystemReceiptData(dataToUse);
+        setShowSystemReceipt(true);
     }
   };
 
@@ -408,6 +416,13 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       <TemplateConfigModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} type={templateType as any} />
       <DocxPreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} docxBlob={previewBlob} fileName={previewFileName} />
       <ExcelPreviewModal isOpen={isExcelPreviewOpen} onClose={() => setIsExcelPreviewOpen(false)} workbook={previewWorkbook} fileName={previewExcelName} />
+      {showSystemReceipt && systemReceiptData && (
+          <SystemReceiptTemplate
+              data={systemReceiptData}
+              receivingWard={systemReceiptData.ward || ''}
+              onClose={() => setShowSystemReceipt(false)}
+          />
+      )}
     </div>
   );
 };

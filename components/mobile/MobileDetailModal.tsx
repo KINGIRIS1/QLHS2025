@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
+import SystemReceiptTemplate from '../SystemReceiptTemplate';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 
 interface MobileDetailModalProps {
@@ -29,6 +30,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   isOpen, onClose, record, employees, currentUser, onEdit, onDelete, onCreateLiquidation 
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [showSystemReceipt, setShowSystemReceipt] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -225,12 +227,17 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(record.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
 
-    const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
-    setIsProcessing(false);
-    if (blob) {
-        setPreviewBlob(blob);
-        setPreviewFileName(`BienNhan_${record.code}`);
-        setIsPreviewOpen(true);
+    if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
+        const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+        setIsProcessing(false);
+        if (blob) {
+            setPreviewBlob(blob);
+            setPreviewFileName(`BienNhan_${record.code}`);
+            setIsPreviewOpen(true);
+        }
+    } else {
+        setIsProcessing(false);
+        setShowSystemReceipt(true);
     }
   };
 
@@ -592,6 +599,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         docxBlob={previewBlob}
         fileName={previewFileName}
       />
+      {showSystemReceipt && (
+          <SystemReceiptTemplate
+              data={record}
+              receivingWard={record.ward || ''}
+              onClose={() => setShowSystemReceipt(false)}
+          />
+      )}
     </div>
   );
 };

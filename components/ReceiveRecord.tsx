@@ -194,14 +194,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         alert("Vui lòng nhập ít nhất Mã hồ sơ và Tên khách hàng để in."); 
         return; 
     }
-    
-    if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
-        if(await confirmAction('Bạn chưa tải lên mẫu Biên Nhận (.docx). Bạn có muốn cấu hình ngay không?')) {
-            setTemplateType('receipt');
-            setIsTemplateModalOpen(true);
-        }
-        return;
-    }
 
     const rDate = dataToUse.receivedDate ? new Date(dataToUse.receivedDate) : new Date();
     const dDate = dataToUse.deadline ? new Date(dataToUse.deadline) : new Date();

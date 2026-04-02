@@ -121,8 +121,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   };
 
   const handlePrintReceipt = async () => {
-    if (!currentUser || !hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
-      alert('Chưa có mẫu biên nhận.');
+    if (!currentUser) {
       return;
     }
     setIsProcessing(true);

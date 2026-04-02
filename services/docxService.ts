@@ -4,6 +4,7 @@ import Docxtemplater from 'docxtemplater';
 import saveAs from 'file-saver';
 import { saveSystemSetting, getSystemSetting } from './api';
 import { supabase } from './supabaseClient';
+import { generateDefaultReceiptDocx } from '../utils/exportReceipt';
 
 // Khóa lưu trữ trong LocalStorage
 export const STORAGE_KEYS = {
@@ -182,6 +183,10 @@ const createDocAsync = async (templateKey: string, data: any) => {
 
 export const generateDocxBlobAsync = async (templateKey: string, data: any): Promise<Blob | null> => {
     try {
+        if (templateKey === STORAGE_KEYS.RECEIPT_TEMPLATE && !hasTemplate(templateKey)) {
+            return await generateDefaultReceiptDocx(data);
+        }
+
         const doc = await createDocAsync(templateKey, data);
         const out = doc.getZip().generate({
             type: 'blob',

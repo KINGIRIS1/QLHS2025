@@ -169,11 +169,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   const handlePrintReceipt = async () => {
     if (!currentUser) return;
-    
-    if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
-        alert('Chưa có mẫu biên nhận. Vui lòng vào mục "Tiếp nhận hồ sơ" để cấu hình mẫu in trước.');
-        return;
-    }
 
     setIsProcessing(true);
 

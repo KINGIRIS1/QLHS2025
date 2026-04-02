@@ -44,6 +44,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         .text-lg { font-size: 18px; }
                         .text-xl { font-size: 20px; }
                         .indent { padding-left: 40px; }
+                        .space-y-2 > * + * { margin-top: 8px; }
                     </style>
                 </head>
                 <body>
@@ -179,12 +180,12 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         </div>
 
                         {/* Signatures */}
-                        <div className="flex justify-between mt-12 text-center">
-                            <div className="w-1/2">
+                        <div className="flex justify-between mt-8 text-center">
+                            <div style={{ width: '48%' }}>
                                 <div className="font-bold text-[16px]">NGƯỜI NỘP HỒ SƠ</div>
                                 <div className="italic text-[16px]">(Ký và ghi rõ họ tên)</div>
                             </div>
-                            <div className="w-1/2">
+                            <div style={{ width: '52%' }}>
                                 <div className="font-bold text-[16px]">NGƯỜI TIẾP NHẬN HỒ SƠ</div>
                                 <div className="italic text-[16px]">(Ký và ghi rõ họ tên)</div>
                             </div>

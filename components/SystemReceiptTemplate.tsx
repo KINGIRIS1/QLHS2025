@@ -97,7 +97,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
 
     let tp1Value = 'Phiếu yêu cầu';
     if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
-        tp1Value = `Phiếu yêu cầu trích lục, trích đo tại ${wardName.toLowerCase()}`;
+        tp1Value = `Phiếu yêu cầu trích lục, trích đo`;
     } 
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
@@ -133,17 +133,17 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         
                         {/* Header */}
                         <div className="flex justify-between mb-6">
-                            <div className="text-center" style={{ width: '45%' }}>
+                            <div className="text-center" style={{ width: '48%' }}>
                                 <div className="font-bold text-[16px]">VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI</div>
                                 <div className="font-bold text-[16px]">CHI NHÁNH CHƠN THÀNH</div>
-                                <div className="text-[16px]">TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG</div>
+                                <div className="text-[15px]">TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG</div>
                                 <div className="text-[16px] font-bold underline">{wardName.toUpperCase()}</div>
                                 
                                 <div className="mt-4 text-[16px]">
                                     Mã số hồ sơ: <span className="font-bold">{data.code}</span>
                                 </div>
                             </div>
-                            <div className="text-center" style={{ width: '55%' }}>
+                            <div className="text-center" style={{ width: '52%' }}>
                                 <div className="font-bold text-[16px]">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
                                 <div className="font-bold underline mb-2 text-[16px]">Độc lập - Tự do - Hạnh phúc</div>
                                 <div className="italic mt-4 text-[16px]">{getTitleCase(wardNameNoPrefix)}, {formatDateOnly(new Date())}</div>

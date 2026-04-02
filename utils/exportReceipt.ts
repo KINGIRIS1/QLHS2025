@@ -172,7 +172,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                         indent: { left: 360 },
                         children: [
                             new TextRun({ text: "Nội dung yêu cầu giải quyết: ", font: "Times New Roman", size: 26, bold: true }),
-                            new TextRun({ text: `${data.NOI_DUNG || ''}`, font: "Times New Roman", size: 26, bold: true }),
+                            new TextRun({ text: `${data.LOAI_HS ? data.LOAI_HS + ' - ' : ''}${data.NOI_DUNG || ''}`, font: "Times New Roman", size: 26, bold: true }),
                         ],
                     }),
                     new Paragraph({

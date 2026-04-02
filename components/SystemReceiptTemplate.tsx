@@ -165,7 +165,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div>Tờ bản đồ số: {data.mapSheet}</div>
                             <div>Diện tích: {data.area}m<sup>2</sup></div>
                             <div>Địa chỉ thửa đất: {data.address ? data.address + ' - ' : ''}{getFullWard(data.ward || '')}</div>
-                            <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{data.content}</span></div>
+                            <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{data.recordType ? `${data.recordType} - ` : ''}{data.content}</span></div>
                             
                             <div>1. {tp1Value}</div>
                             <div>2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)</div>

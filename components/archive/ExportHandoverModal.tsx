@@ -31,8 +31,9 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
     useEffect(() => {
         const batches = new Set<string>();
         records.forEach(r => {
-            // Filter by type and completed status
-            if (r.type !== type || r.status !== 'completed') return;
+            // Filter by type and completed/returned status
+            const isCompleted = type === 'saoluc' ? r.status === 'returned' : r.status === 'completed';
+            if (r.type !== type || !isCompleted) return;
             
             // Filter by date (ngay_hoan_thanh)
             if (r.data?.ngay_hoan_thanh !== selectedDate) return;
@@ -53,7 +54,8 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
     const handleExport = () => {
         // Filter records to export
         const exportData = records.filter(r => {
-            if (r.type !== type || r.status !== 'completed') return false;
+            const isCompleted = type === 'saoluc' ? r.status === 'returned' : r.status === 'completed';
+            if (r.type !== type || !isCompleted) return false;
             if (r.data?.ngay_hoan_thanh !== selectedDate) return false;
             if (type === 'saoluc' && selectedWard !== 'all' && r.data?.xa_phuong !== selectedWard) return false;
             if (selectedBatch !== 'all' && r.data?.danh_sach !== selectedBatch) return false;

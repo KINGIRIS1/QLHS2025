@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
-import { getNormalizedWard } from '../../constants';
+import { getNormalizedWard, getFullWard } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -138,7 +138,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     let tp1Value = 'Phiếu yêu cầu';
     if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
-    if (record.ward) tp1Value += ` tại ${getNormalizedWard(record.ward)}`;
     
     let sdtLienHe = "";
     const wRaw = (record.ward || "").toLowerCase();
@@ -184,12 +183,12 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         PHONE: val(record.phoneNumber),
         CCCD: val(record.cccd), 
         CMND: val(record.cccd),
-        DIA_CHI: val(record.address || getNormalizedWard(record.ward)),
-        DC: val(record.address || getNormalizedWard(record.ward)),
-        ADDRESS: val(record.address || getNormalizedWard(record.ward)),
-        XA: val(getNormalizedWard(record.ward)), 
-        PHUONG: val(getNormalizedWard(record.ward)),
-        WARD: val(getNormalizedWard(record.ward)),
+        DIA_CHI: val(record.address || getFullWard(record.ward)),
+        DC: val(record.address || getFullWard(record.ward)),
+        ADDRESS: val(record.address || getFullWard(record.ward)),
+        XA: val(getFullWard(record.ward)).toUpperCase(), 
+        PHUONG: val(getFullWard(record.ward)).toUpperCase(),
+        WARD: val(getFullWard(record.ward)).toUpperCase(),
         TO: val(record.mapSheet), 
         SO_TO: val(record.mapSheet),
         THUA: val(record.landPlot), 
@@ -223,7 +222,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         TIEU_DE: tp1Value,
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
-        HUYEN: "thị xã Chơn Thành"
+        HUYEN: "thị xã Chơn Thành",
+        NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(record.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
 
     const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);

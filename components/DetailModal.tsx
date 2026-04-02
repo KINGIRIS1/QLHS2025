@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
-import { getNormalizedWard } from '../constants';
+import { getNormalizedWard, getFullWard } from '../constants';
 import StatusBadge from './StatusBadge';
 import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -200,9 +200,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
-    if (record.ward) {
-        tp1Value += ` tại ${getNormalizedWard(record.ward)}`;
-    }
     
     // Logic SĐT Liên hệ tự động
     let sdtLienHe = "";
@@ -269,12 +266,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         CMND: val(record.cccd),
 
         // --- NHÓM ĐỊA CHỈ ---
-        DIA_CHI: val(record.address || getNormalizedWard(record.ward)),
-        DC: val(record.address || getNormalizedWard(record.ward)),
-        ADDRESS: val(record.address || getNormalizedWard(record.ward)),
-        XA: val(getNormalizedWard(record.ward)), 
-        PHUONG: val(getNormalizedWard(record.ward)),
-        WARD: val(getNormalizedWard(record.ward)),
+        DIA_CHI: val(record.address || getFullWard(record.ward)),
+        DC: val(record.address || getFullWard(record.ward)),
+        ADDRESS: val(record.address || getFullWard(record.ward)),
+        XA: val(getFullWard(record.ward)).toUpperCase(), 
+        PHUONG: val(getFullWard(record.ward)).toUpperCase(),
+        WARD: val(getFullWard(record.ward)).toUpperCase(),
         
         // --- NHÓM THỬA ĐẤT ---
         TO: val(record.mapSheet), 
@@ -321,7 +318,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         TIEU_DE: tp1Value,
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
-        HUYEN: "thị xã Chơn Thành"
+        HUYEN: "thị xã Chơn Thành",
+        NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(record.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
 
     const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);

@@ -80,6 +80,20 @@ export const getNormalizedWard = (ward: string | null | undefined): string => {
   return w.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
+// Hàm lấy tên đầy đủ Xã/Phường
+export const getFullWard = (ward: string | null | undefined): string => {
+  if (!ward) return '';
+  const w = ward.trim();
+  if (/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/i.test(w)) {
+    return w;
+  }
+  const lower = w.toLowerCase();
+  if (['nha bích', 'minh lập', 'minh thắng', 'quang minh'].includes(lower)) {
+    return `Xã ${w}`;
+  }
+  return `Phường ${w}`;
+};
+
 // Hàm rút gọn tên loại hồ sơ để hiển thị trong Danh sách (Table)
 export const getShortRecordType = (type: string | null | undefined): string => {
   if (!type) return '---';

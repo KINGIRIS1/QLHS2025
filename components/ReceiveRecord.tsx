@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, Holiday } from '../types';
-import { getNormalizedWard } from '../constants';
+import { getNormalizedWard, getFullWard } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
@@ -218,9 +218,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     } else if (rType.includes('đo đạc') || rType.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
-    if (dataToUse.ward) {
-        tp1Value += ` tại ${getNormalizedWard(dataToUse.ward || '')}`;
-    }
 
     let sdtLienHe = "";
     const wRaw = (dataToUse.ward || "").toLowerCase();
@@ -275,12 +272,12 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         CCCD: val(dataToUse.cccd), 
         CMND: val(dataToUse.cccd),
 
-        DIA_CHI: val(dataToUse.address || getNormalizedWard(dataToUse.ward)),
-        DC: val(dataToUse.address || getNormalizedWard(dataToUse.ward)),
-        ADDRESS: val(dataToUse.address || getNormalizedWard(dataToUse.ward)),
-        XA: val(getNormalizedWard(dataToUse.ward)), 
-        PHUONG: val(getNormalizedWard(dataToUse.ward)),
-        WARD: val(getNormalizedWard(dataToUse.ward)),
+        DIA_CHI: val(dataToUse.address || getFullWard(dataToUse.ward)),
+        DC: val(dataToUse.address || getFullWard(dataToUse.ward)),
+        ADDRESS: val(dataToUse.address || getFullWard(dataToUse.ward)),
+        XA: val(getFullWard(dataToUse.ward)).toUpperCase(), 
+        PHUONG: val(getFullWard(dataToUse.ward)).toUpperCase(),
+        WARD: val(getFullWard(dataToUse.ward)).toUpperCase(),
         
         TO: val(dataToUse.mapSheet), 
         SO_TO: val(dataToUse.mapSheet),
@@ -321,7 +318,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         TIEU_DE: tp1Value,
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
-        HUYEN: "thị xã Chơn Thành"
+        HUYEN: "thị xã Chơn Thành",
+        NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(dataToUse.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
     
     const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);

@@ -10,9 +10,10 @@ interface ExportHandoverModalProps {
     records: ArchiveRecord[];
     type: 'saoluc' | 'congvan';
     wards?: string[];
+    exportType?: 'handover' | 'returned'; // 'handover' = Đã giao 1 cửa (completed), 'returned' = Đã trả kết quả (returned)
 }
 
-const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClose, records, type, wards }) => {
+const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClose, records, type, wards, exportType = 'handover' }) => {
     const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
@@ -37,9 +38,9 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
     useEffect(() => {
         const batches = new Set<string>();
         records.forEach(r => {
-            // Filter by type and completed/returned status
-            const isCompleted = type === 'saoluc' ? r.status === 'returned' : r.status === 'completed';
-            if (r.type !== type || !isCompleted) return;
+            // Filter by type and status based on exportType
+            const targetStatus = exportType === 'returned' ? 'returned' : 'completed';
+            if (r.type !== type || r.status !== targetStatus) return;
             
             // Filter by date (ngay_hoan_thanh)
             if (dateMode === 'single') {
@@ -59,13 +60,13 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         });
         setAvailableBatches(Array.from(batches).sort());
         setSelectedBatch('all'); // Reset batch selection
-    }, [dateMode, selectedDate, fromDate, toDate, selectedWard, records, type]);
+    }, [dateMode, selectedDate, fromDate, toDate, selectedWard, records, type, exportType]);
 
     const handleExport = () => {
         // Filter records to export
         const exportData = records.filter(r => {
-            const isCompleted = type === 'saoluc' ? r.status === 'returned' : r.status === 'completed';
-            if (r.type !== type || !isCompleted) return false;
+            const targetStatus = exportType === 'returned' ? 'returned' : 'completed';
+            if (r.type !== type || r.status !== targetStatus) return false;
             
             if (dateMode === 'single') {
                 if (r.data?.ngay_hoan_thanh !== selectedDate) return false;
@@ -107,7 +108,9 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         wsData.push(['Độc lập - Tự do - Hạnh phúc']);
         wsData.push(['']); // Empty row
 
-        const title = type === 'saoluc' ? 'DANH SÁCH BÀN GIAO HỒ SƠ SAO LỤC' : 'DANH SÁCH BÀN GIAO CÔNG VĂN';
+        const title = exportType === 'returned' 
+            ? (type === 'saoluc' ? 'DANH SÁCH TRẢ KẾT QUẢ HỒ SƠ SAO LỤC' : 'DANH SÁCH TRẢ KẾT QUẢ CÔNG VĂN')
+            : (type === 'saoluc' ? 'DANH SÁCH BÀN GIAO HỒ SƠ SAO LỤC' : 'DANH SÁCH BÀN GIAO CÔNG VĂN');
         wsData.push([title]);
         
         if (dateMode === 'single') {

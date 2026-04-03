@@ -59,6 +59,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
     // Export Modal State
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showExportReturnedModal, setShowExportReturnedModal] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
@@ -731,9 +732,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 </button>
                             </>
                         )}
-                        <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
-                            <FileDown size={16}/> Xuất Bàn Giao
-                        </button>
+                        {subTab === 'result' ? (
+                            <button onClick={() => setShowExportReturnedModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm">
+                                <FileDown size={16}/> Xuất DS Trả Kết Quả
+                            </button>
+                        ) : (
+                            <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
+                                <FileDown size={16}/> Xuất Bàn Giao
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -763,6 +770,16 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     records={records}
                     type="saoluc"
                     wards={wards}
+                />
+
+                {/* Export Returned Modal */}
+                <ExportHandoverModal
+                    isOpen={showExportReturnedModal}
+                    onClose={() => setShowExportReturnedModal(false)}
+                    records={records}
+                    type="saoluc"
+                    wards={wards}
+                    exportType="returned"
                 />
 
                 {/* Assign Modal */}

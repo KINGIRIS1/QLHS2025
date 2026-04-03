@@ -41,6 +41,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     // Export Modal State
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showExportReturnedModal, setShowExportReturnedModal] = useState(false);
 
     const [formData, setFormData] = useState<Partial<ArchiveRecord>>({
         type: 'congvan',
@@ -608,9 +609,15 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 </button>
                             </>
                         )}
-                        <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
-                            <FileDown size={16}/> Xuất Bàn Giao
-                        </button>
+                        {subTab === 'result' ? (
+                            <button onClick={() => setShowExportReturnedModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm">
+                                <FileDown size={16}/> Xuất DS Trả Kết Quả
+                            </button>
+                        ) : (
+                            <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
+                                <FileDown size={16}/> Xuất Bàn Giao
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -639,6 +646,15 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     onClose={() => setShowExportModal(false)}
                     records={records}
                     type="congvan"
+                />
+
+                {/* Export Returned Modal */}
+                <ExportHandoverModal
+                    isOpen={showExportReturnedModal}
+                    onClose={() => setShowExportReturnedModal(false)}
+                    records={records}
+                    type="congvan"
+                    exportType="returned"
                 />
 
                 {/* Assign Modal */}

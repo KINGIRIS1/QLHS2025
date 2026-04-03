@@ -125,10 +125,15 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             wsData.push([`TỪ NGÀY ${fDate.getDate() < 10 ? '0' + fDate.getDate() : fDate.getDate()}/${fDate.getMonth() + 1 < 10 ? '0' + (fDate.getMonth() + 1) : fDate.getMonth() + 1}/${fDate.getFullYear()} ĐẾN NGÀY ${tDate.getDate() < 10 ? '0' + tDate.getDate() : tDate.getDate()}/${tDate.getMonth() + 1 < 10 ? '0' + (tDate.getMonth() + 1) : tDate.getMonth() + 1}/${tDate.getFullYear()}`]);
         }
         
-        const batchText = selectedBatch !== 'all' ? `ĐỢT: ${selectedBatch.replace(/Đợt /i, '')}` : 'TẤT CẢ CÁC ĐỢT';
+        const batchText = exportType === 'returned' 
+            ? '' 
+            : (selectedBatch !== 'all' ? `ĐỢT: ${selectedBatch.replace(/Đợt /i, '')}` : 'TẤT CẢ CÁC ĐỢT');
         
         // Add Ward name to title if selected
-        let fullBatchTitle = `${batchText} - TỔNG SỐ HỒ SƠ: ${data.length}`;
+        let fullBatchTitle = exportType === 'returned' 
+            ? `TỔNG SỐ HỒ SƠ: ${data.length}`
+            : `${batchText} - TỔNG SỐ HỒ SƠ: ${data.length}`;
+            
         if (type === 'saoluc' && selectedWard !== 'all') {
             fullBatchTitle = `${selectedWard.toUpperCase()} - ${fullBatchTitle}`;
         }
@@ -182,15 +187,20 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         const lastCol = headers.length - 1;
 
         // Merge Title Rows
-        ws['!merges'] = [
+        const merges = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, // CỘNG HÒA...
             { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }, // Độc lập...
             { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } }, // DANH SÁCH...
             { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } }, // NGÀY...
-            { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } }, // ĐỢT...
             { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 3 } }, // BÊN GIAO...
             { s: { r: wsData.length - 1, c: 9 }, e: { r: wsData.length - 1, c: 10 } }, // BÊN NHẬN...
         ];
+        
+        if (exportType !== 'returned') {
+            merges.push({ s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } }); // ĐỢT...
+        }
+        
+        ws['!merges'] = merges;
 
         // Column Widths
         ws['!cols'] = [
@@ -236,8 +246,10 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         if(ws[XLSX.utils.encode_cell({r:3, c:0})]) ws[XLSX.utils.encode_cell({r:3, c:0})].s = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center' } };
         // Row 4: NGÀY...
         if(ws[XLSX.utils.encode_cell({r:4, c:0})]) ws[XLSX.utils.encode_cell({r:4, c:0})].s = { font: { italic: true }, alignment: { horizontal: 'center' } };
-        // Row 5: ĐỢT...
-        if(ws[XLSX.utils.encode_cell({r:5, c:0})]) ws[XLSX.utils.encode_cell({r:5, c:0})].s = { font: { bold: true, italic: true }, alignment: { horizontal: 'center' } };
+        // Row 5: ĐỢT... (only if not returned)
+        if(exportType !== 'returned' && ws[XLSX.utils.encode_cell({r:5, c:0})]) ws[XLSX.utils.encode_cell({r:5, c:0})].s = { font: { bold: true, italic: true }, alignment: { horizontal: 'center' } };
+        // Row 5: TỔNG SỐ HỒ SƠ... (if returned, it's on row 5)
+        if(exportType === 'returned' && ws[XLSX.utils.encode_cell({r:5, c:0})]) ws[XLSX.utils.encode_cell({r:5, c:0})].s = { font: { bold: true, italic: true }, alignment: { horizontal: 'center' } };
 
         // Header Row (Row 7 - index 7 because of empty rows)
         const headerRowIdx = 7;
@@ -266,9 +278,10 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         if(ws[XLSX.utils.encode_cell({r:footerRowIdx, c:0})]) ws[XLSX.utils.encode_cell({r:footerRowIdx, c:0})].s = boldCenterStyle;
         if(ws[XLSX.utils.encode_cell({r:footerRowIdx, c:9})]) ws[XLSX.utils.encode_cell({r:footerRowIdx, c:9})].s = boldCenterStyle;
 
-        XLSX.utils.book_append_sheet(wb, ws, "DanhSachBanGiao");
+        XLSX.utils.book_append_sheet(wb, ws, exportType === 'returned' ? "DanhSachTraKetQua" : "DanhSachBanGiao");
         const fileNameDate = dateMode === 'single' ? selectedDate : `${fromDate}_den_${toDate}`;
-        XLSX.writeFile(wb, `DanhSachBanGiao_${type}_${fileNameDate}.xlsx`);
+        const fileNamePrefix = exportType === 'returned' ? 'DanhSachTraKetQua' : 'DanhSachBanGiao';
+        XLSX.writeFile(wb, `${fileNamePrefix}_${type}_${fileNameDate}.xlsx`);
         onClose();
     };
 
@@ -279,7 +292,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             <div className="bg-white rounded-xl shadow-xl w-[500px] overflow-hidden animate-scale-in">
                 <div className="bg-green-600 p-4 flex justify-between items-center text-white">
                     <h3 className="font-bold text-lg flex items-center gap-2">
-                        <FileDown size={20}/> Xuất danh sách bàn giao
+                        <FileDown size={20}/> {exportType === 'returned' ? 'Xuất danh sách trả kết quả' : 'Xuất danh sách bàn giao'}
                     </h3>
                     <button onClick={onClose} className="hover:bg-green-700 p-1 rounded-full transition-colors">
                         <X size={20} />
@@ -356,29 +369,31 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                     )}
 
                     {/* Batch Selection */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                            <List size={14}/> Đợt giao
-                        </label>
-                        <select 
-                            value={selectedBatch} 
-                            onChange={(e) => setSelectedBatch(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                            disabled={availableBatches.length === 0}
-                        >
-                            <option value="all">Tất cả các đợt</option>
-                            {availableBatches.map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                        {availableBatches.length === 0 && (
-                            <p className="text-xs text-red-500 mt-1 italic">Không tìm thấy đợt giao nào trong ngày này.</p>
-                        )}
-                    </div>
+                    {exportType !== 'returned' && (
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
+                                <List size={14}/> Đợt giao
+                            </label>
+                            <select 
+                                value={selectedBatch} 
+                                onChange={(e) => setSelectedBatch(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                disabled={availableBatches.length === 0}
+                            >
+                                <option value="all">Tất cả các đợt</option>
+                                {availableBatches.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                            {availableBatches.length === 0 && (
+                                <p className="text-xs text-red-500 mt-1 italic">Không tìm thấy đợt giao nào trong ngày này.</p>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
                         <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Hủy</button>
                         <button 
                             onClick={handleExport} 
-                            disabled={availableBatches.length === 0 && selectedBatch !== 'all'}
+                            disabled={exportType !== 'returned' && availableBatches.length === 0 && selectedBatch !== 'all'}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <FileDown size={16}/> Xuất Excel

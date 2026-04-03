@@ -2,7 +2,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import saveAs from 'file-saver';
-import { saveSystemSetting, getSystemSetting } from './api';
+import { saveSystemSetting, getSystemSetting, deleteSystemSetting } from './api';
 import { supabase } from './supabaseClient';
 import { generateDefaultReceiptDocx } from '../utils/exportReceipt';
 
@@ -101,8 +101,9 @@ export const getTemplateSourceType = (key: string): 'FILE' | 'URL' | 'NONE' => {
     return 'FILE';
 };
 
-export const removeTemplate = (key: string) => {
+export const removeTemplate = async (key: string) => {
     localStorage.removeItem(key);
+    await deleteSystemSetting(key);
 };
 
 // --- SYNC TEMPLATES FROM CLOUD ---

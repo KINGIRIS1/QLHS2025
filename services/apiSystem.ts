@@ -105,6 +105,21 @@ export const saveSystemSetting = async (key: string, value: string): Promise<boo
     }
 };
 
+export const deleteSystemSetting = async (key: string): Promise<boolean> => {
+    if (!isConfigured) return false;
+    try {
+        const { error } = await supabase
+            .from('system_settings')
+            .delete()
+            .eq('key', key);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteSystemSetting", error);
+        return false;
+    }
+};
+
 export const updateLatestVersion = async (version: string): Promise<boolean> => {
     return saveUpdateInfo(version, ''); 
 };

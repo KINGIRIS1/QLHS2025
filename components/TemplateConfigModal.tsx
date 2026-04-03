@@ -136,8 +136,8 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
 
   const handleDelete = async () => {
       if(await confirmAction(`Bạn có chắc muốn xóa mẫu "${title}" hiện tại?`)) {
-          if (isExcel) removeExcelTemplate(storageKey);
-          else removeTemplate(storageKey);
+          if (isExcel) await removeExcelTemplate(storageKey);
+          else await removeTemplate(storageKey);
           setSavedType('NONE');
           setFile(null);
           setUrl('');

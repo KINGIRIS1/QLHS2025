@@ -13,7 +13,10 @@ interface ExportHandoverModalProps {
 }
 
 const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClose, records, type, wards }) => {
+    const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
+    const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedWard, setSelectedWard] = useState<string>('all');
     const [selectedBatch, setSelectedBatch] = useState<string>('all');
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
@@ -21,7 +24,10 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
     // Reset state when opening
     useEffect(() => {
         if (isOpen) {
+            setDateMode('single');
             setSelectedDate(new Date().toISOString().split('T')[0]);
+            setFromDate(new Date().toISOString().split('T')[0]);
+            setToDate(new Date().toISOString().split('T')[0]);
             setSelectedWard('all');
             setSelectedBatch('all');
         }
@@ -36,7 +42,11 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             if (r.type !== type || !isCompleted) return;
             
             // Filter by date (ngay_hoan_thanh)
-            if (r.data?.ngay_hoan_thanh !== selectedDate) return;
+            if (dateMode === 'single') {
+                if (r.data?.ngay_hoan_thanh !== selectedDate) return;
+            } else {
+                if (!r.data?.ngay_hoan_thanh || r.data.ngay_hoan_thanh < fromDate || r.data.ngay_hoan_thanh > toDate) return;
+            }
 
             // Filter by ward (if applicable and selected)
             if (type === 'saoluc' && selectedWard !== 'all') {
@@ -49,14 +59,20 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         });
         setAvailableBatches(Array.from(batches).sort());
         setSelectedBatch('all'); // Reset batch selection
-    }, [selectedDate, selectedWard, records, type]);
+    }, [dateMode, selectedDate, fromDate, toDate, selectedWard, records, type]);
 
     const handleExport = () => {
         // Filter records to export
         const exportData = records.filter(r => {
             const isCompleted = type === 'saoluc' ? r.status === 'returned' : r.status === 'completed';
             if (r.type !== type || !isCompleted) return false;
-            if (r.data?.ngay_hoan_thanh !== selectedDate) return false;
+            
+            if (dateMode === 'single') {
+                if (r.data?.ngay_hoan_thanh !== selectedDate) return false;
+            } else {
+                if (!r.data?.ngay_hoan_thanh || r.data.ngay_hoan_thanh < fromDate || r.data.ngay_hoan_thanh > toDate) return false;
+            }
+            
             if (type === 'saoluc' && selectedWard !== 'all' && r.data?.xa_phuong !== selectedWard) return false;
             if (selectedBatch !== 'all' && r.data?.danh_sach !== selectedBatch) return false;
             return true;
@@ -93,7 +109,18 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         const title = type === 'saoluc' ? 'DANH SÁCH BÀN GIAO HỒ SƠ SAO LỤC' : 'DANH SÁCH BÀN GIAO CÔNG VĂN';
         wsData.push([title]);
-        wsData.push([`NGÀY ${day < 10 ? '0' + day : day} THÁNG ${month < 10 ? '0' + month : month} NĂM ${year}`]);
+        
+        if (dateMode === 'single') {
+            const now = new Date(selectedDate);
+            const day = now.getDate();
+            const month = now.getMonth() + 1;
+            const year = now.getFullYear();
+            wsData.push([`NGÀY ${day < 10 ? '0' + day : day} THÁNG ${month < 10 ? '0' + month : month} NĂM ${year}`]);
+        } else {
+            const fDate = new Date(fromDate);
+            const tDate = new Date(toDate);
+            wsData.push([`TỪ NGÀY ${fDate.getDate() < 10 ? '0' + fDate.getDate() : fDate.getDate()}/${fDate.getMonth() + 1 < 10 ? '0' + (fDate.getMonth() + 1) : fDate.getMonth() + 1}/${fDate.getFullYear()} ĐẾN NGÀY ${tDate.getDate() < 10 ? '0' + tDate.getDate() : tDate.getDate()}/${tDate.getMonth() + 1 < 10 ? '0' + (tDate.getMonth() + 1) : tDate.getMonth() + 1}/${tDate.getFullYear()}`]);
+        }
         
         const batchText = selectedBatch !== 'all' ? `ĐỢT: ${selectedBatch.replace(/Đợt /i, '')}` : 'TẤT CẢ CÁC ĐỢT';
         
@@ -237,7 +264,8 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         if(ws[XLSX.utils.encode_cell({r:footerRowIdx, c:9})]) ws[XLSX.utils.encode_cell({r:footerRowIdx, c:9})].s = boldCenterStyle;
 
         XLSX.utils.book_append_sheet(wb, ws, "DanhSachBanGiao");
-        XLSX.writeFile(wb, `DanhSachBanGiao_${type}_${selectedDate}.xlsx`);
+        const fileNameDate = dateMode === 'single' ? selectedDate : `${fromDate}_den_${toDate}`;
+        XLSX.writeFile(wb, `DanhSachBanGiao_${type}_${fileNameDate}.xlsx`);
         onClose();
     };
 
@@ -258,15 +286,53 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                 <div className="p-6 space-y-4">
                     {/* Date Selection */}
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                            <Calendar size={14}/> Ngày giao
-                        </label>
-                        <input 
-                            type="date" 
-                            value={selectedDate} 
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        />
+                        <div className="flex items-center gap-4 mb-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="dateMode" 
+                                    checked={dateMode === 'single'} 
+                                    onChange={() => setDateMode('single')} 
+                                    className="accent-green-600"
+                                />
+                                <span className="text-sm font-bold text-gray-700">Theo ngày</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="dateMode" 
+                                    checked={dateMode === 'range'} 
+                                    onChange={() => setDateMode('range')} 
+                                    className="accent-green-600"
+                                />
+                                <span className="text-sm font-bold text-gray-700">Từ ngày - Đến ngày</span>
+                            </label>
+                        </div>
+
+                        {dateMode === 'single' ? (
+                            <input 
+                                type="date" 
+                                value={selectedDate} 
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                            />
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="date" 
+                                    value={fromDate} 
+                                    onChange={(e) => setFromDate(e.target.value)}
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                                <span className="text-gray-500">-</span>
+                                <input 
+                                    type="date" 
+                                    value={toDate} 
+                                    onChange={(e) => setToDate(e.target.value)}
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Ward Selection (Only for Sao Luc) */}

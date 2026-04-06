@@ -15,9 +15,20 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const handlePrint = () => {
         if (!printRef.current) return;
         const printContent = printRef.current.innerHTML;
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const printDocument = iframe.contentWindow?.document;
+        if (printDocument) {
+            printDocument.open();
+            printDocument.write(`
                 <html>
                 <head>
                     <title>In Biên Nhận</title>
@@ -53,11 +64,14 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                 </body>
                 </html>
             `);
-            printWindow.document.close();
-            printWindow.focus();
+            printDocument.close();
+            
+            iframe.contentWindow?.focus();
             setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
+                iframe.contentWindow?.print();
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 1000);
             }, 500);
         }
     };

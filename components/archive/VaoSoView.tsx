@@ -8,6 +8,7 @@ import { saveAs } from 'file-saver';
 import { exportSoDiaChinh, generateSoDiaChinhBlob } from '../../utils/exportSoDiaChinh';
 import { exportSoMucKe } from '../../utils/exportSoMucKe';
 import { getSystemSetting, saveSystemSetting } from '../../services/apiSystem';
+import MortgageModal from './MortgageModal';
 
 // Định nghĩa các cột
 const COLUMNS = [
@@ -56,6 +57,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [showExportSoDiaChinhModal, setShowExportSoDiaChinhModal] = useState(false);
     const [exportSoDiaChinhRange, setExportSoDiaChinhRange] = useState({ from: '', to: '' });
     const [exportSoDiaChinhCriteria, setExportSoDiaChinhCriteria] = useState({ ward: '', month: '', splitByLetter: false, exportTocOnly: false });
+
+    // Mortgage Modal State
+    const [showMortgageModal, setShowMortgageModal] = useState(false);
+    const [selectedMortgageRecord, setSelectedMortgageRecord] = useState<ArchiveRecord | null>(null);
 
     // Export So Muc Ke State
     const [showExportSoMucKeModal, setShowExportSoMucKeModal] = useState(false);
@@ -606,6 +611,23 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
                         <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
                             <FileSpreadsheet size={16}/> Xuất Excel
+                        </button>
+                        <button 
+                            onClick={() => {
+                                if (selectedIds.size === 1) {
+                                    const rec = records.find(r => selectedIds.has(r.id));
+                                    if (rec) {
+                                        setSelectedMortgageRecord(rec);
+                                        setShowMortgageModal(true);
+                                    }
+                                } else {
+                                    alert("Vui lòng chọn 1 hồ sơ để quản lý thế chấp.");
+                                }
+                            }} 
+                            disabled={selectedIds.size !== 1}
+                            className="flex items-center gap-2 bg-yellow-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-yellow-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span className="font-bold text-lg leading-none">$</span> Thế chấp
                         </button>
                         <button onClick={() => {
                             if (selectedIds.size > 0) {
@@ -1297,6 +1319,26 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                     </div>
                 </div>
             )}
+
+            <MortgageModal 
+                isOpen={showMortgageModal} 
+                onClose={() => {
+                    setShowMortgageModal(false);
+                    setSelectedMortgageRecord(null);
+                }} 
+                record={selectedMortgageRecord}
+                onSave={async (recordId, mortgages) => {
+                    const rec = records.find(r => r.id === recordId);
+                    if (rec) {
+                        const updatedData = { ...rec.data, mortgages };
+                        const saved = await saveArchiveRecord({ ...rec, data: updatedData });
+                        if (saved) {
+                            setRecords(prev => prev.map(r => r.id === saved.id ? saved : r));
+                            setSelectedMortgageRecord(saved);
+                        }
+                    }
+                }}
+            />
         </div>
     );
 };

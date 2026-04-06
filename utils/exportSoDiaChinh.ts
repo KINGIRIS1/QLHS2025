@@ -247,6 +247,49 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
             height: { value: 375, rule: "exact" } // 30px
         }));
 
+        // Mortgage Rows
+        const mortgages = data.mortgages || [];
+        const sortedMortgages = [...mortgages].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        const mortgageRows = sortedMortgages.map(m => {
+            const dateParts = m.date.split('-');
+            const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : m.date;
+            const text = m.type === 'mortgage' 
+                ? `Thế chấp tại ${m.bank}, số ${m.number}`
+                : `Xóa thế chấp tại ${m.bank}, số ${m.number}`;
+            
+            return new TableRow({
+                children: [
+                    createCell(data.so_thua || "", 10, false, AlignmentType.CENTER, 1),
+                    createCell(formattedDate, 16, false, AlignmentType.CENTER, 2),
+                    new TableCell({
+                        width: { size: 74, type: WidthType.PERCENTAGE },
+                        columnSpan: 7,
+                        verticalAlign: VerticalAlign.CENTER,
+                        children: [
+                            new Paragraph({
+                                children: [new TextRun({ text: text, size: 22, font: "Arial" })],
+                                alignment: AlignmentType.LEFT,
+                            }),
+                        ],
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                    }),
+                ],
+                height: { value: 375, rule: "exact" }
+            });
+        });
+
+        const totalUsedChangesRows = 1 + mortgageRows.length;
+        const emptyChangesRowsCount = Math.max(0, 18 - totalUsedChangesRows);
+        const emptyChangesRows = Array(emptyChangesRowsCount).fill(0).map(() => new TableRow({
+            children: [
+                createCell("", 10, false, AlignmentType.CENTER, 1),
+                createCell("", 16, false, AlignmentType.CENTER, 2),
+                createCell("", 74, false, AlignmentType.CENTER, 7),
+            ],
+            height: { value: 375, rule: "exact" }
+        }));
+
         return {
             properties: {
                 page: {
@@ -418,15 +461,9 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
                             ],
                             height: { value: 375, rule: "exact" } // 25px
                         }),
-                        // Empty rows to fill space (20 rows to make it 21 total)
-                        ...Array(17).fill(0).map(() => new TableRow({
-                            children: [
-                                createCell("", 10, false, AlignmentType.CENTER, 1),
-                                createCell("", 16, false, AlignmentType.CENTER, 2),
-                                createCell("", 74, false, AlignmentType.CENTER, 7),
-                            ],
-                            height: { value: 375, rule: "exact" } // 25px
-                        }))
+                        ...mortgageRows,
+                        // Empty rows to fill space
+                        ...emptyChangesRows
                     ],
                 }),
                 

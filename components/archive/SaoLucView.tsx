@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, AlertTriangle } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
@@ -11,6 +11,7 @@ import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
+import DeleteAllModal from './DeleteAllModal';
 
 interface SaoLucViewProps {
     currentUser: User;
@@ -82,6 +83,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
 
+    // Delete All Modal State
+    const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+
     useEffect(() => {
         loadData();
         loadEmployees();
@@ -90,6 +94,11 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const loadData = async () => {
         const data = await fetchArchiveRecords('saoluc');
         setRecords(data);
+    };
+
+    const handleDeleteAll = async () => {
+        await deleteAllArchiveRecordsByType('saoluc');
+        loadData();
     };
 
     const loadEmployees = async () => {
@@ -730,6 +739,11 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
                                     <Plus size={16}/> Thêm mới
                                 </button>
+                                {currentUser.role === 'ADMIN' && (
+                                    <button onClick={() => setShowDeleteAllModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-700 shadow-sm">
+                                        <Trash2 size={16}/> Xóa dữ liệu
+                                    </button>
+                                )}
                             </>
                         )}
                         {subTab === 'result' ? (
@@ -1029,6 +1043,14 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     )}
                 </div>
             </div>
+
+            <DeleteAllModal
+                isOpen={showDeleteAllModal}
+                onClose={() => setShowDeleteAllModal(false)}
+                onConfirm={handleDeleteAll}
+                currentUser={currentUser}
+                title="Sao lục hồ sơ"
+            />
         </div>
     );
 };

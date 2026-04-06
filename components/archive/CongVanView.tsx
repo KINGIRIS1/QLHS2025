@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
@@ -11,6 +11,7 @@ import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
+import DeleteAllModal from './DeleteAllModal';
 
 interface CongVanViewProps {
     currentUser: User;
@@ -57,6 +58,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
 
+    // Delete All Modal State
+    const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+
     useEffect(() => {
         loadData();
         loadEmployees();
@@ -65,6 +69,11 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     const loadData = async () => {
         const data = await fetchArchiveRecords('congvan');
         setRecords(data);
+    };
+
+    const handleDeleteAll = async () => {
+        await deleteAllArchiveRecordsByType('congvan');
+        loadData();
     };
 
     const loadEmployees = async () => {
@@ -607,6 +616,11 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm">
                                     <Plus size={16}/> Tạo mới
                                 </button>
+                                {currentUser.role === 'ADMIN' && (
+                                    <button onClick={() => setShowDeleteAllModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-700 shadow-sm">
+                                        <Trash2 size={16}/> Xóa dữ liệu
+                                    </button>
+                                )}
                             </>
                         )}
                         {subTab === 'result' ? (
@@ -841,6 +855,14 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     </div>
                 )}
             </div>
+
+            <DeleteAllModal
+                isOpen={showDeleteAllModal}
+                onClose={() => setShowDeleteAllModal(false)}
+                onConfirm={handleDeleteAll}
+                currentUser={currentUser}
+                title="Công văn"
+            />
         </div>
     );
 };

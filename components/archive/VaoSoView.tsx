@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Download } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Download, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -9,6 +9,7 @@ import { exportSoDiaChinh, generateSoDiaChinhBlob } from '../../utils/exportSoDi
 import { exportSoMucKe } from '../../utils/exportSoMucKe';
 import { getSystemSetting, saveSystemSetting } from '../../services/apiSystem';
 import MortgageModal from './MortgageModal';
+import DeleteAllModal from './DeleteAllModal';
 
 // Định nghĩa các cột
 const COLUMNS = [
@@ -69,6 +70,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
+
+    // Delete All Modal State
+    const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
     // Filters
     const [fromDate, setFromDate] = useState('');
@@ -208,6 +212,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             await deleteArchiveRecord(id);
             loadData();
         }
+    };
+
+    const handleDeleteAll = async () => {
+        await deleteAllArchiveRecordsByType('vaoso');
+        loadData();
     };
 
     const handleCellChange = (id: string, key: string, value: string) => {
@@ -619,6 +628,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm">
                                     <Plus size={16}/> Thêm mới
                                 </button>
+                                {currentUser.role === 'ADMIN' && (
+                                    <button onClick={() => setShowDeleteAllModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-700 shadow-sm">
+                                        <Trash2 size={16}/> Xóa dữ liệu
+                                    </button>
+                                )}
                                 {selectedIds.size > 0 && (
                                     <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
                                         <Send size={16}/> Chuyển Scan ({selectedIds.size})
@@ -1368,6 +1382,14 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         }
                     }
                 }}
+            />
+
+            <DeleteAllModal
+                isOpen={showDeleteAllModal}
+                onClose={() => setShowDeleteAllModal(false)}
+                onConfirm={handleDeleteAll}
+                currentUser={currentUser}
+                title="Vào số GCN"
             />
         </div>
     );

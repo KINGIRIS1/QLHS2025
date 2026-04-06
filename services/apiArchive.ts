@@ -139,6 +139,24 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
     }
 };
 
+export const deleteAllArchiveRecordsByType = async (type: string): Promise<boolean> => {
+    if (!isConfigured) {
+        const newArchive = MOCK_ARCHIVE.filter(r => r.type !== type);
+        MOCK_ARCHIVE.length = 0;
+        MOCK_ARCHIVE.push(...newArchive);
+        saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('archive_records').delete().eq('type', type);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteAllArchiveRecordsByType", error);
+        return false;
+    }
+};
+
 export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): Promise<boolean> => {
     if (!isConfigured) {
         records.forEach(r => {

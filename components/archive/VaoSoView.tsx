@@ -273,6 +273,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const handleDownloadTemplate = () => {
         const templateData = [
             {
+                'Số vào sổ': 'CN 00001',
                 'Mã hồ sơ': 'HS001',
                 'Tên chuyển quyền': 'Nguyễn Văn A',
                 'Tên chủ sử dụng': 'Trần Thị B',

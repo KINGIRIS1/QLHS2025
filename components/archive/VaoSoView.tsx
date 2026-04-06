@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Download } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -268,6 +268,32 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     const handleImportClick = () => {
         fileInputRef.current?.click();
+    };
+
+    const handleDownloadTemplate = () => {
+        const templateData = [
+            {
+                'Mã hồ sơ': 'HS001',
+                'Tên chuyển quyền': 'Nguyễn Văn A',
+                'Tên chủ sử dụng': 'Trần Thị B',
+                'Loại biến động': 'Chuyển nhượng',
+                'Loại GCN': 'GCN mới',
+                'Ngày nhận': '2023-10-25',
+                'Số tờ': '12',
+                'Số thửa': '34',
+                'Tổng diện tích': '150.5',
+                'Diện tích thổ cư': '100',
+                'Địa danh': 'Phường 1',
+                'Số phát hành': 'CQ123456',
+                'Ngày ký GCN': '2023-11-01',
+                'Ngày ký phiếu TK': '2023-11-02',
+                'Ghi chú': 'Ghi chú mẫu'
+            }
+        ];
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "MauNhapLieu");
+        XLSX.writeFile(wb, "Mau_Nhap_Lieu_Vao_So_GCN.xlsx");
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,6 +607,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     title="Cài đặt số vào sổ"
                                 >
                                     <Settings size={16}/>
+                                </button>
+                                <button onClick={handleDownloadTemplate} className="flex items-center gap-2 bg-gray-100 text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md font-bold text-sm hover:bg-gray-200 shadow-sm">
+                                    <Download size={16}/> Tải mẫu
                                 </button>
                                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                                 <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">

@@ -128,8 +128,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         // But here we use activeTab directly.
         
         if (activeTab === 'all') {
-            // Danh sách tổng: Hiển thị tối đa 1000 dòng mới nhất
-            filtered = records.slice(0, 1000);
+            // Danh sách tổng: Hiển thị tất cả
+            filtered = records;
         } else if (activeTab === 'pending') {
             // Chờ chuyển Scan: Đã được đánh dấu chuyển scan NHƯNG chưa có đợt scan (chưa scan xong)
             filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);

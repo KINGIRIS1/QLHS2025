@@ -391,7 +391,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             chu_su_dung: r.noi_nhan_gui,
             ngay_nhan: r.ngay_thang,
             noi_dung: r.trich_yeu,
-            status: r.status,
+            status: r.status as any,
             xa_phuong: r.data?.xa_phuong || 'Chơn Thành',
             to_ban_do: r.data?.to_ban_do || '',
             thua_dat: r.data?.thua_dat || '',

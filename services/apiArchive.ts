@@ -7,8 +7,8 @@ export interface ArchiveRecord {
     id: string;
     created_at: string;
     created_by: string;
-    type: 'saoluc' | 'vaoso' | 'congvan';
-    status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed' | 'returned'; // Nháp | Đã giao | Đã thực hiện | Trình ký | Đã ký | Đã giao 1 cửa | Đã trả kết quả
+    type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky';
+    status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed' | 'returned' | 'tiep_nhan' | 'xu_ly' | 'chuyen_thue' | 'dong_thue' | 'ky_gcn' | 'hoan_thanh'; // Nháp | Đã giao | Đã thực hiện | Trình ký | Đã ký | Đã giao 1 cửa | Đã trả kết quả | Tiếp nhận | Xử lý | Chuyển thuế | Đóng thuế | Ký GCN | Hoàn thành
     so_hieu: string; // Số hiệu/Số hồ sơ
     trich_yeu: string; // Nội dung/Trích yếu
     ngay_thang: string;
@@ -23,7 +23,7 @@ const CACHE_KEY_ARCHIVE = 'offline_archive_records';
 
 // --- API ---
 
-export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'): Promise<ArchiveRecord[]> => {
+export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky'): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         // Nếu cache rỗng và chưa có mock in-mem, dùng mảng rỗng. Nếu mock có data thì dùng mock (để sync trong session)

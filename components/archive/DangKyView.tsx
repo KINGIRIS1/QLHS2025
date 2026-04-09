@@ -184,6 +184,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             noi_nhan_gui: formData.chu_su_dung,
             trich_yeu: formData.loai_bien_dong,
             ngay_thang: formData.ngay_nhan,
+            created_by: currentUser.username,
             data: {
                 chuyen_quyen: formData.chuyen_quyen,
                 cccd: formData.cccd,

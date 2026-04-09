@@ -91,6 +91,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
         if (record.id) {
             const { data, error } = await supabase.from('archive_records').update({ 
+                type: payload.type,
                 status: payload.status,
                 so_hieu: payload.so_hieu,
                 trich_yeu: payload.trich_yeu,

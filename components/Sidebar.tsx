@@ -43,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Cập nhật danh sách các view được phép
   const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'dangky_records'];
   const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records'];
+  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records'];
 
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
@@ -175,6 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {menuItems.filter(item => {
              if (isOneDoor && !oneDoorAllowedViews.includes(item.id)) return false;
              if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
+             if (isEmployee && !employeeAllowedViews.includes(item.id)) return false;
              return item.visible;
           }).map((item) => {
             // Logic Active

@@ -35,8 +35,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'dangky_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'records_group', 'tools_group'];
+  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'records_group', 'tools_group'];
 
   // Define menu structure
   const menuItems = [
@@ -66,6 +67,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isTabGroup: true,
       subItems: [
         { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
+        { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardList, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
         { id: 'other_records', label: 'Khác', icon: Layers, visible: true },
       ]
@@ -140,6 +142,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             // Check visibility
             if (isOneDoor && !oneDoorAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
             if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
+            if (isEmployee && !employeeAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
             if (!item.visible) return null;
 
             // Check if any sub-item is active
@@ -152,6 +155,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
               const hasVisibleItems = item.subItems?.some(sub => {
                  if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return false;
                  if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return false;
+                 if (isEmployee && !employeeAllowedViews.includes(sub.id)) return false;
                  return sub.visible;
               });
               
@@ -166,6 +170,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                     {item.subItems?.map(sub => {
                        if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
                        if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
+                       if (isEmployee && !employeeAllowedViews.includes(sub.id)) return null;
                        if (!sub.visible) return null;
     
                        const isSubActive = currentView === sub.id;

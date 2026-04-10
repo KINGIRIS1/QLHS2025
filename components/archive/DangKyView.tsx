@@ -8,6 +8,8 @@ import * as XLSX from 'xlsx-js-style';
 import DeleteAllModal from './DeleteAllModal';
 import AssignModal from '../AssignModal';
 
+import RecordDetailModal from './RecordDetailModal';
+
 interface DangKyViewProps {
     currentUser: User;
     wards: string[];
@@ -49,6 +51,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [assignTargetStatus, setAssignTargetStatus] = useState<string>('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
+    const [showDetailModal, setShowDetailModal] = useState(false);
     
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<DangKyFormData>({
@@ -93,6 +97,15 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         loadData();
     };
 
+    const filteredEmployeesForAssign = useMemo(() => {
+        if (assignTargetStatus === 'ky_gcn') {
+            return employees.filter(e => e.position && (e.position.toLowerCase().includes('giám đốc') || e.position.toLowerCase().includes('phó giám đốc')));
+        } else if (assignTargetStatus === 'chuyen_thue') {
+            return employees.filter(e => e.position && (e.position.toLowerCase().includes('tổ trưởng tổ đăng ký') || e.position.toLowerCase().includes('tổ phó tổ đăng ký')));
+        }
+        return employees;
+    }, [employees, assignTargetStatus]);
+
     const filteredRecords = useMemo(() => {
         let list = records;
         
@@ -100,7 +113,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         if (activeTab === 'all') {
             // Show all
         } else if (activeTab === 'xu_ly') {
-            list = list.filter(r => r.status === 'xu_ly' || r.status === 'tiep_nhan');
+            list = list.filter(r => r.status === 'xu_ly');
         } else if (activeTab === 'thue') {
             list = list.filter(r => r.status === thueSubTab);
         } else if (activeTab === 'gcn') {
@@ -280,14 +293,38 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             const record = records.find(r => r.id === id);
             if (!record) continue;
 
+            // Create a new record for Vao So
             await saveArchiveRecord({
-                ...record,
-                type: 'vaoso' as any,
-                status: 'pending' as any,
+                type: 'vaoso',
+                status: 'completed',
+                so_hieu: record.so_hieu,
+                noi_nhan_gui: record.noi_nhan_gui,
+                trich_yeu: record.trich_yeu,
+                ngay_thang: record.ngay_thang,
+                created_by: currentUser.username,
                 data: {
                     ...record.data,
+                    ten_chuyen_quyen: record.data?.chuyen_quyen || '',
+                    ten_chu_su_dung: record.noi_nhan_gui || '',
                     is_pending_scan: true,
                     is_scanned: false
+                }
+            });
+
+            // Update the current record status to hoan_thanh
+            const history = record.data?.history || [];
+            history.push({
+                action: `Chuyển sang Vào số GCN`,
+                timestamp: new Date().toISOString(),
+                user: currentUser.name,
+            });
+
+            await saveArchiveRecord({
+                ...record,
+                status: 'hoan_thanh',
+                data: {
+                    ...record.data,
+                    history
                 }
             });
         }
@@ -597,6 +634,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                                         <td className="p-3">{getStatusLabel(r.status)}</td>
                                         <td className="p-3">
                                             <div className="flex items-center justify-center gap-1">
+                                                <button onClick={() => { setDetailRecord(r); setShowDetailModal(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded" title="Xem chi tiết"><FileText size={14}/></button>
                                                 {activeTab === 'all' && (
                                                     <>
                                                         <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
@@ -755,8 +793,16 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 isOpen={showAssignModal}
                 onClose={() => setShowAssignModal(false)}
                 onConfirm={handleConfirmAssign}
-                employees={employees}
+                employees={filteredEmployeesForAssign}
                 selectedRecords={[]}
+                filterDepartment={assignTargetStatus === 'ky_gcn' ? 'Ban Giám đốc' : assignTargetStatus === 'chuyen_thue' ? 'Tổ trưởng/Tổ phó' : undefined}
+                forceAllRecommended={assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue'}
+            />
+
+            <RecordDetailModal
+                isOpen={showDetailModal}
+                onClose={() => setShowDetailModal(false)}
+                record={detailRecord}
             />
         </div>
     );

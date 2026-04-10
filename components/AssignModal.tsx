@@ -10,6 +10,7 @@ interface AssignModalProps {
   employees: Employee[];
   selectedRecords: RecordFile[];
   filterDepartment?: string; // MỚI: Lọc theo phòng ban (VD: "Thông tin lưu trữ")
+  forceAllRecommended?: boolean;
 }
 
 interface EmployeeItemProps {
@@ -44,7 +45,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isRecommended, isSelec
             
             <div className={`text-xs truncate mb-1 flex items-center gap-1 ${isSurveyTeam ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
                 {isSurveyTeam && <Briefcase size={10} />}
-                {emp.department}
+                {emp.position ? `${emp.position} - ${emp.department}` : emp.department}
             </div>
 
             {/* Hiển thị tags địa bàn nếu có (chỉ hiện tối đa 2 cái) */}
@@ -73,7 +74,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isRecommended, isSelec
     </div>
 );
 
-const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment }) => {
+const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment, forceAllRecommended }) => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -104,12 +105,16 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
     );
 
     // 2. Nếu có filterDepartment, lọc cứng theo phòng ban và trả về hết vào recommended
-    if (filterDepartment) {
+    if (filterDepartment && !forceAllRecommended) {
         const deptKeyword = removeVietnameseTones(filterDepartment).toLowerCase();
         const rec = filteredEmployees.filter(e => 
             removeVietnameseTones(e.department).toLowerCase().includes(deptKeyword)
         );
         return { recommended: rec, others: [] };
+    }
+
+    if (forceAllRecommended) {
+        return { recommended: filteredEmployees, others: [] };
     }
 
     const rec: Employee[] = [];
@@ -226,7 +231,12 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                         {filterDepartment ? (
                             <>
                                 <Users size={16} />
-                                Nhân viên {filterDepartment}
+                                {filterDepartment}
+                            </>
+                        ) : forceAllRecommended ? (
+                            <>
+                                <Users size={16} />
+                                Danh sách nhân sự
                             </>
                         ) : (
                             <>
@@ -235,7 +245,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                             </>
                         )}
                      </div>
-                     {!filterDepartment && (
+                     {!filterDepartment && !forceAllRecommended && (
                         targetWardName ? (
                             <div className="text-xs text-blue-600 mt-1 font-medium bg-white px-2 py-1 rounded border border-blue-200 inline-block">
                                 Địa bàn: {targetWardName}

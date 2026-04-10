@@ -180,6 +180,13 @@ const startServer = async () => {
     // json-server router handles requests matching db.json keys.
     server.use(router);
 
+    if (process.env.NODE_ENV === 'production') {
+        const distPath = path.join(__dirname, 'dist');
+        server.get('*', (req, res) => {
+            res.sendFile(path.join(distPath, 'index.html'));
+        });
+    }
+
     const PORT = 3000;
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://localhost:${PORT}`);

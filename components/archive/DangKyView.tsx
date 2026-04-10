@@ -101,7 +101,10 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         if (assignTargetStatus === 'ky_gcn') {
             return employees.filter(e => e.position && (e.position.toLowerCase().includes('giám đốc') || e.position.toLowerCase().includes('phó giám đốc')));
         } else if (assignTargetStatus === 'chuyen_thue') {
-            return employees.filter(e => e.position && (e.position.toLowerCase().includes('tổ trưởng tổ đăng ký') || e.position.toLowerCase().includes('tổ phó tổ đăng ký')));
+            return employees.filter(e => 
+                e.department && e.department.toLowerCase().includes('đăng ký') && 
+                e.position && (e.position.toLowerCase().includes('tổ trưởng') || e.position.toLowerCase().includes('tổ phó'))
+            );
         }
         return employees;
     }, [employees, assignTargetStatus]);

@@ -349,6 +349,26 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             const date = new Date(Math.round((val - 25569) * 86400 * 1000));
             return date.toISOString().split('T')[0];
         }
+        if (typeof val === 'string') {
+            const str = val.trim();
+            // Check if already YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            
+            // Try to parse DD/MM/YYYY or DD-MM-YYYY
+            const parts = str.split(/[-/]/);
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    // YYYY/MM/DD
+                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                } else {
+                    // DD/MM/YYYY
+                    const day = parts[0].padStart(2, '0');
+                    const month = parts[1].padStart(2, '0');
+                    const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                    return `${year}-${month}-${day}`;
+                }
+            }
+        }
         return val.toString();
     };
 

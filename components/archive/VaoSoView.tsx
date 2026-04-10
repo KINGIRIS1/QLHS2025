@@ -389,7 +389,25 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                              const date = new Date(Math.round((val - 25569) * 86400 * 1000));
                              return date.toISOString().split('T')[0];
                         }
-                        return String(val).trim();
+                        
+                        const str = String(val).trim();
+                        
+                        // Check if it looks like a date (DD/MM/YYYY or DD-MM-YYYY)
+                        if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(str)) {
+                            const parts = str.split(/[-/]/);
+                            if (parts.length === 3) {
+                                if (parts[0].length === 4) {
+                                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                                } else {
+                                    const day = parts[0].padStart(2, '0');
+                                    const month = parts[1].padStart(2, '0');
+                                    const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                                    return `${year}-${month}-${day}`;
+                                }
+                            }
+                        }
+                        
+                        return str;
                     };
 
                     const recordData = {

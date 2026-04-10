@@ -176,7 +176,14 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
         const payload = records.map(r => {
             const p: any = { ...r };
             delete p.id; // Để DB tự sinh UUID
-            if (p.ngay_thang === '') p.ngay_thang = null;
+            if (p.ngay_thang === '' || !p.ngay_thang) {
+                p.ngay_thang = null;
+            } else {
+                // Ensure it's a valid YYYY-MM-DD format, otherwise set to null
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(p.ngay_thang)) {
+                    p.ngay_thang = null;
+                }
+            }
             return p;
         });
 

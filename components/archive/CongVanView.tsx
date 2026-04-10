@@ -184,35 +184,25 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 const parseExcelDate = (val: any) => {
                     if (!val) return '';
                     
-                    let date: Date | null = null;
-
                     if (typeof val === 'number') {
-                        // Excel serial date
-                        date = new Date(Math.round((val - 25569) * 86400 * 1000));
-                    } else if (typeof val === 'string') {
-                        const cleanVal = val.trim();
-                        // Check for DD/MM/YYYY
-                        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanVal)) {
-                            const [d, m, y] = cleanVal.split('/');
-                            date = new Date(Number(y), Number(m) - 1, Number(d));
-                        }
-                        // Check for DD-MM-YYYY
-                        else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(cleanVal)) {
-                            const [d, m, y] = cleanVal.split('-');
-                            date = new Date(Number(y), Number(m) - 1, Number(d));
-                        }
-                        // Check for YYYY-MM-DD
-                        else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
-                            date = new Date(cleanVal);
-                        }
+                        const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                        return date.toISOString().split('T')[0];
                     }
-
-                    if (date && !isNaN(date.getTime())) {
-                        const y = date.getFullYear();
-                        if (y >= 1900 && y <= 2100) {
-                            const offset = date.getTimezoneOffset() * 60000;
-                            const localDate = new Date(date.getTime() - offset);
-                            return localDate.toISOString().split('T')[0];
+                    
+                    if (typeof val === 'string') {
+                        const str = val.trim();
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+                        
+                        const parts = str.split(/[-/]/);
+                        if (parts.length === 3) {
+                            if (parts[0].length === 4) {
+                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                            } else {
+                                const day = parts[0].padStart(2, '0');
+                                const month = parts[1].padStart(2, '0');
+                                const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                                return `${year}-${month}-${day}`;
+                            }
                         }
                     }
                     return '';

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { X, Clock, User, FileText, MapPin, Calendar, Save, MessageSquare } from 'lucide-react';
+import { Employee } from '../../types';
 
 interface RecordDetailModalProps {
     isOpen: boolean;
@@ -8,9 +9,22 @@ interface RecordDetailModalProps {
     record: ArchiveRecord | null;
     currentUser: any;
     onUpdateRecord?: () => void;
+    employees?: Employee[];
 }
 
-const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, record, currentUser, onUpdateRecord }) => {
+const getStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+        'tiep_nhan': 'Tiếp nhận',
+        'xu_ly': 'Xử lý',
+        'chuyen_thue': 'Chuyển thuế',
+        'dong_thue': 'Đóng thuế',
+        'ky_gcn': 'Ký GCN',
+        'hoan_thanh': 'Hoàn thành'
+    };
+    return statusMap[status] || status;
+};
+
+const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, record, currentUser, onUpdateRecord, employees = [] }) => {
     const [personalNote, setPersonalNote] = useState('');
     const [internalNote, setInternalNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -26,6 +40,12 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
     if (!isOpen || !record) return null;
 
     const history = record.data?.history || [];
+
+    const getEmployeeName = (idOrName: string) => {
+        if (!idOrName) return '';
+        const employee = employees.find(e => e.id === idOrName || e.name === idOrName);
+        return employee ? employee.name : idOrName;
+    };
 
     const handleSaveNotes = async () => {
         if (!record) return;
@@ -130,7 +150,7 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                         <User size={16} />
                                     </div>
                                     <span className="font-bold text-gray-900 text-sm">
-                                        {record.status === 'tiep_nhan' ? 'Chưa giao' : (history[history.length - 1]?.assignedTo || 'Đang xử lý')}
+                                        {record.status === 'tiep_nhan' ? 'Chưa giao' : getEmployeeName(history[history.length - 1]?.user || 'Đang xử lý')}
                                     </span>
                                 </div>
                             </div>
@@ -199,7 +219,7 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-green-600 font-bold uppercase">Trạng thái</p>
-                                            <p className="font-bold text-gray-900 text-sm">{record.status || '---'}</p>
+                                            <p className="font-bold text-gray-900 text-sm">{getStatusText(record.status) || '---'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -253,9 +273,9 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                                         <div className="w-3 h-3 rounded-full bg-gray-300"></div>
                                                     </div>
                                                     <div className="flex-1 pt-1">
-                                                        <p className="text-sm font-bold text-gray-700 uppercase">{h.action}</p>
+                                                        <p className="text-sm font-bold text-gray-700 uppercase">{h.action && h.action.startsWith('Chuyển trạng thái: ') ? `Chuyển trạng thái: ${getStatusText(h.action.replace('Chuyển trạng thái: ', ''))}` : h.action}</p>
                                                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-500">
-                                                            <span className="flex items-center gap-1"><User size={12} /> {h.user} {h.assignedTo ? `-> ${h.assignedTo}` : ''}</span>
+                                                            <span className="flex items-center gap-1"><User size={12} /> {getEmployeeName(h.user)} {h.assignedTo ? `-> ${getEmployeeName(h.assignedTo)}` : ''}</span>
                                                             <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(h.timestamp).toLocaleString('vi-VN')}</span>
                                                         </div>
                                                     </div>

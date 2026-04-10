@@ -808,6 +808,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 record={detailRecord}
                 currentUser={currentUser}
                 onUpdateRecord={loadData}
+                employees={employees}
             />
         </div>
     );

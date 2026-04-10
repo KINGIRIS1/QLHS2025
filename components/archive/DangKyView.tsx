@@ -806,6 +806,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 isOpen={showDetailModal}
                 onClose={() => setShowDetailModal(false)}
                 record={detailRecord}
+                currentUser={currentUser}
+                onUpdateRecord={loadData}
             />
         </div>
     );

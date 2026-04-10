@@ -225,7 +225,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         <div className="flex-1 flex overflow-hidden">
              
              {/* LEFT SIDE: RECOMMENDED (30-35%) - CHỈ HIỆN KỸ THUẬT ĐÚNG TUYẾN HOẶC LỌC THEO PHÒNG BAN */}
-             <div className="w-[320px] bg-blue-50/50 border-r border-blue-100 flex flex-col shrink-0">
+             <div className={`${forceAllRecommended ? 'w-full' : 'w-[320px]'} bg-blue-50/50 border-r border-blue-100 flex flex-col shrink-0`}>
                  <div className="p-4 border-b border-blue-100 bg-blue-50/80 sticky top-0 backdrop-blur-sm z-10">
                      <div className="flex items-center gap-2 text-sm font-bold text-blue-800 uppercase tracking-wide">
                         {filterDepartment ? (
@@ -260,7 +260,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                  
                  <div className="p-3 overflow-y-auto flex-1 custom-scrollbar">
                      {recommended.length > 0 ? (
-                         <div className="flex flex-col gap-2">
+                         <div className={forceAllRecommended ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" : "flex flex-col gap-2"}>
                             {recommended.map(emp => (
                                 <EmployeeItem 
                                     key={emp.id} 
@@ -290,35 +290,37 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
              </div>
 
              {/* RIGHT SIDE: OTHERS (Grid 2 Cols) - CÁC TỔ KHÁC + KỸ THUẬT TRÁI TUYẾN */}
-             <div className="flex-1 flex flex-col bg-white">
-                 <div className="p-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-                     <div className="flex items-center gap-2 text-sm font-bold text-gray-600 uppercase tracking-wide">
-                        <User size={16} />
-                        Nhân viên khác ({others.length})
+             {!forceAllRecommended && (
+                 <div className="flex-1 flex flex-col bg-white">
+                     <div className="p-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+                         <div className="flex items-center gap-2 text-sm font-bold text-gray-600 uppercase tracking-wide">
+                            <User size={16} />
+                            Nhân viên khác ({others.length})
+                         </div>
+                         <p className="text-[11px] text-gray-400 mt-0.5">Bao gồm: Kỹ thuật khác tuyến, Văn phòng, Một cửa, Lãnh đạo...</p>
                      </div>
-                     <p className="text-[11px] text-gray-400 mt-0.5">Bao gồm: Kỹ thuật khác tuyến, Văn phòng, Một cửa, Lãnh đạo...</p>
-                 </div>
 
-                 <div className="p-4 overflow-y-auto flex-1 custom-scrollbar bg-slate-50">
-                     {others.length > 0 ? (
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-                            {others.map(emp => (
-                                <EmployeeItem 
-                                    key={emp.id} 
-                                    emp={emp}
-                                    isSelected={selectedEmpId === emp.id}
-                                    onSelect={setSelectedEmpId}
-                                    isSurveyTeam={isSurveyTeamMember(emp)}
-                                />
-                            ))}
-                         </div>
-                     ) : (
-                         <div className="h-64 flex flex-col items-center justify-center text-gray-400">
-                            <p>Không tìm thấy nhân viên nào khác.</p>
-                         </div>
-                     )}
+                     <div className="p-4 overflow-y-auto flex-1 custom-scrollbar bg-slate-50">
+                         {others.length > 0 ? (
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                                {others.map(emp => (
+                                    <EmployeeItem 
+                                        key={emp.id} 
+                                        emp={emp}
+                                        isSelected={selectedEmpId === emp.id}
+                                        onSelect={setSelectedEmpId}
+                                        isSurveyTeam={isSurveyTeamMember(emp)}
+                                    />
+                                ))}
+                             </div>
+                         ) : (
+                             <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+                                <p>Không tìm thấy nhân viên nào khác.</p>
+                             </div>
+                         )}
+                     </div>
                  </div>
-             </div>
+             )}
         </div>
 
         {/* Footer */}

@@ -30,12 +30,12 @@ interface DangKyFormData {
     dat_o: string;
     dia_danh: string;
     so_phat_hanh: string;
-    status: 'tiep_nhan' | 'xu_ly' | 'chuyen_thue' | 'dong_thue' | 'ky_gcn' | 'hoan_thanh';
+    status: 'tiep_nhan' | 'xu_ly' | 'tham_tra_thue' | 'chuyen_thue' | 'dong_thue' | 'ky_gcn' | 'hoan_thanh';
 }
 
 const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const [activeTab, setActiveTab] = useState<'all' | 'xu_ly' | 'thue' | 'gcn'>('all');
-    const [thueSubTab, setThueSubTab] = useState<'chuyen_thue' | 'dong_thue'>('chuyen_thue');
+    const [thueSubTab, setThueSubTab] = useState<'tham_tra_thue' | 'chuyen_thue' | 'dong_thue'>('tham_tra_thue');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +45,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [filterWard, setFilterWard] = useState('');
+    const [filterAssignee, setFilterAssignee] = useState('');
 
     // Modal States
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -98,9 +99,9 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     };
 
     const filteredEmployeesForAssign = useMemo(() => {
-        if (assignTargetStatus === 'ky_gcn') {
+        if (assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue') {
             return employees.filter(e => e.position && (e.position.toLowerCase().includes('giám đốc') || e.position.toLowerCase().includes('phó giám đốc')));
-        } else if (assignTargetStatus === 'chuyen_thue') {
+        } else if (assignTargetStatus === 'tham_tra_thue') {
             return employees.filter(e => 
                 e.department && e.department.toLowerCase().includes('đăng ký') && 
                 e.position && (e.position.toLowerCase().includes('tổ trưởng') || e.position.toLowerCase().includes('tổ phó'))
@@ -130,6 +131,15 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         // Filter by Ward
         if (filterWard) list = list.filter(r => r.data?.dia_danh === filterWard);
 
+        // Filter by Assignee
+        if (filterAssignee) {
+            list = list.filter(r => {
+                const history = r.data?.history || [];
+                const lastAssignment = [...history].reverse().find(h => h.assignedTo);
+                return lastAssignment?.assignedTo === filterAssignee;
+            });
+        }
+
         // Filter by Search
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
@@ -140,12 +150,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             );
         }
         return list;
-    }, [records, activeTab, thueSubTab, searchTerm, fromDate, toDate, filterWard]);
+    }, [records, activeTab, thueSubTab, searchTerm, fromDate, toDate, filterWard, filterAssignee]);
 
     useEffect(() => {
         setSelectedIds(new Set());
         setCurrentPage(1);
-    }, [activeTab, thueSubTab, searchTerm, fromDate, toDate, filterWard]);
+    }, [activeTab, thueSubTab, searchTerm, fromDate, toDate, filterWard, filterAssignee]);
 
     const isManager = (currentUser.role as string) === 'ADMIN' || (currentUser.role as string) === 'SUBADMIN' || (currentUser.role as string) === 'admin' || (currentUser.role as string) === 'subadmin';
 
@@ -548,20 +558,51 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     </div>
 
                     {activeTab === 'thue' && (
-                        <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
-                            <button 
-                                onClick={() => setThueSubTab('chuyen_thue')} 
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${thueSubTab === 'chuyen_thue' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                Đã chuyển thuế
-                            </button>
-                            <button 
-                                onClick={() => setThueSubTab('dong_thue')} 
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${thueSubTab === 'dong_thue' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                Đã đóng thuế
-                            </button>
-                        </div>
+                        <>
+                            <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+                                <button 
+                                    onClick={() => setThueSubTab('tham_tra_thue')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${thueSubTab === 'tham_tra_thue' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    Thẩm tra thuế
+                                </button>
+                                <button 
+                                    onClick={() => setThueSubTab('chuyen_thue')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${thueSubTab === 'chuyen_thue' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    Đã chuyển thuế
+                                </button>
+                                <button 
+                                    onClick={() => setThueSubTab('dong_thue')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${thueSubTab === 'dong_thue' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    Đã đóng thuế
+                                </button>
+                            </div>
+                            {(thueSubTab === 'tham_tra_thue' || thueSubTab === 'chuyen_thue') && (
+                                <div className="flex items-center mr-2">
+                                    <select
+                                        className="p-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        value={filterAssignee}
+                                        onChange={(e) => setFilterAssignee(e.target.value)}
+                                    >
+                                        <option value="">Tất cả người phụ trách</option>
+                                        {employees
+                                            .filter(e => {
+                                                if (thueSubTab === 'tham_tra_thue') {
+                                                    return e.position && (e.position.toLowerCase().includes('tổ trưởng') || e.position.toLowerCase().includes('tổ phó'));
+                                                } else {
+                                                    return e.position && (e.position.toLowerCase().includes('giám đốc') || e.position.toLowerCase().includes('phó giám đốc'));
+                                                }
+                                            })
+                                            .map(e => (
+                                                <option key={e.id} value={e.id}>{e.name}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     <div className="ml-auto flex gap-2">
@@ -595,10 +636,16 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                                 <button onClick={() => openAssignModal('ky_gcn')} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm animate-pulse">
                                     <Send size={16}/> Trình Ban Giám Đốc ({selectedIds.size})
                                 </button>
-                                <button onClick={() => openAssignModal('chuyen_thue')} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
+                                <button onClick={() => openAssignModal('tham_tra_thue')} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
                                     <Send size={16}/> Trình Tổ trưởng/Tổ phó ({selectedIds.size})
                                 </button>
                             </>
+                        )}
+
+                        {activeTab === 'thue' && thueSubTab === 'tham_tra_thue' && selectedIds.size > 0 && (
+                            <button onClick={() => openAssignModal('chuyen_thue')} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm animate-pulse">
+                                <Send size={16}/> Trình Giám đốc/Phó giám đốc ({selectedIds.size})
+                            </button>
                         )}
 
                         {activeTab === 'thue' && thueSubTab === 'chuyen_thue' && selectedIds.size > 0 && (
@@ -818,8 +865,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 onConfirm={handleConfirmAssign}
                 employees={filteredEmployeesForAssign}
                 selectedRecords={[]}
-                filterDepartment={assignTargetStatus === 'ky_gcn' ? 'Ban Giám đốc' : assignTargetStatus === 'chuyen_thue' ? 'Tổ trưởng/Tổ phó' : undefined}
-                forceAllRecommended={assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue'}
+                filterDepartment={assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue' ? 'Ban Giám đốc' : assignTargetStatus === 'tham_tra_thue' ? 'Tổ trưởng/Tổ phó' : undefined}
+                forceAllRecommended={assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue' || assignTargetStatus === 'tham_tra_thue'}
             />
 
             <RecordDetailModal

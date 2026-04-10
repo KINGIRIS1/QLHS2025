@@ -66,96 +66,197 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                        {/* Cột 1: Thông tin hồ sơ */}
-                        <div className="col-span-1 flex flex-col gap-4">
-                            <div className="bg-white border rounded-lg overflow-hidden shadow-sm h-full">
-                                <div className="bg-blue-50/50 px-4 py-3 border-b border-blue-100 font-semibold text-blue-800 flex items-center gap-2">
-                                    <FileText size={18} />
-                                    Thông tin hồ sơ
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/50">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+                        {/* Cột 1: Thông tin chủ hồ sơ, địa chính, người xử lý, ghi chú cá nhân */}
+                        <div className="col-span-1 lg:col-span-4 flex flex-col gap-4">
+                            {/* THÔNG TIN CHỦ HỒ SƠ */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
+                                    <User size={16} className="text-blue-600" />
+                                    <h4 className="font-bold text-blue-600 text-sm uppercase">Thông tin chủ hồ sơ</h4>
                                 </div>
-                                <div className="p-4 grid grid-cols-1 gap-4">
+                                <div className="space-y-4">
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Mã hồ sơ</p>
-                                        <p className="font-medium text-gray-900">{record.so_hieu}</p>
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Chủ sử dụng</p>
+                                        <p className="font-bold text-gray-900 text-lg uppercase">{record.noi_nhan_gui || '---'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Loại biến động</p>
-                                        <p className="font-medium text-gray-900">{record.trich_yeu}</p>
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">CCCD / Số điện thoại</p>
+                                        <p className="font-bold text-gray-900 text-base">{record.data?.cccd || '---'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* THÔNG TIN ĐỊA CHÍNH */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1 h-4 bg-green-500 rounded-full"></div>
+                                    <MapPin size={16} className="text-green-500" />
+                                    <h4 className="font-bold text-green-500 text-sm uppercase">Thông tin địa chính</h4>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div className="col-span-1">
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Xã/Phường</p>
+                                        <p className="font-bold text-gray-900">{record.data?.dia_danh || '---'}</p>
+                                    </div>
+                                    <div className="col-span-1">
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Tờ bản đồ</p>
+                                        <div className="border border-gray-200 rounded p-2 text-center font-bold text-gray-900">{record.data?.so_to || '---'}</div>
+                                    </div>
+                                    <div className="col-span-1">
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Thửa đất</p>
+                                        <div className="border border-gray-200 rounded p-2 text-center font-bold text-gray-900">{record.data?.so_thua || '---'}</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Diện tích</p>
+                                        <p className="font-bold text-gray-900">{record.data?.dien_tich || '---'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Chuyển quyền</p>
-                                        <p className="font-medium text-gray-900">{record.data?.chuyen_quyen}</p>
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Đất ở</p>
+                                        <p className="font-bold text-gray-900">{record.data?.dat_o || '---'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* NGƯỜI XỬ LÝ HỒ SƠ */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                                <p className="text-xs text-gray-500 font-medium mb-3 uppercase">Người xử lý hồ sơ</p>
+                                <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                        <User size={16} />
+                                    </div>
+                                    <span className="font-bold text-gray-900 text-sm">
+                                        {record.status === 'tiep_nhan' ? 'Chưa giao' : (history[history.length - 1]?.assignedTo || 'Đang xử lý')}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* GHI CHÚ CÁ NHÂN */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <FileText size={16} className="text-blue-600" />
+                                        <h4 className="font-bold text-blue-600 text-sm uppercase">Ghi chú cá nhân</h4>
+                                    </div>
+                                    <button 
+                                        onClick={handleSaveNotes}
+                                        disabled={isSaving}
+                                        className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                        <Save size={12} /> Lưu
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={personalNote}
+                                    onChange={(e) => setPersonalNote(e.target.value)}
+                                    placeholder="Nhập ghi chú riêng của bạn..."
+                                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none h-24 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Cột 2: Nội dung chi tiết */}
+                        <div className="col-span-1 lg:col-span-4 flex flex-col gap-4">
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm h-full flex flex-col">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1 h-4 bg-purple-500 rounded-full"></div>
+                                    <FileText size={16} className="text-purple-500" />
+                                    <h4 className="font-bold text-purple-500 text-sm uppercase">Nội dung chi tiết</h4>
+                                </div>
+                                
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 mb-6">
+                                    <p className="font-medium text-gray-900">{record.trich_yeu || '---'}</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6 mb-6">
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Mã hồ sơ</p>
+                                        <p className="font-bold text-gray-900">{record.so_hieu || '---'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Chủ sử dụng</p>
-                                        <p className="font-medium text-gray-900">{record.noi_nhan_gui}</p>
+                                        <p className="text-xs text-gray-500 font-medium mb-1 uppercase">Chuyển quyền</p>
+                                        <p className="font-bold text-gray-900">{record.data?.chuyen_quyen || '---'}</p>
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">CCCD</p>
-                                        <p className="font-medium text-gray-900">{record.data?.cccd}</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center text-blue-600">
+                                            <FileText size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-blue-600 font-bold uppercase">Số phát hành</p>
+                                            <p className="font-bold text-gray-900 text-sm">{record.data?.so_phat_hanh || '---'}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Ngày nhận</p>
-                                        <p className="font-medium text-gray-900">{record.data?.ngay_nhan}</p>
+                                    <div className="bg-green-50 p-3 rounded-lg border border-green-100 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center text-green-600">
+                                            <FileText size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-green-600 font-bold uppercase">Trạng thái</p>
+                                            <p className="font-bold text-gray-900 text-sm">{record.status || '---'}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Ngày trả kết quả</p>
-                                        <p className="font-medium text-gray-900">{record.data?.ngay_tra_kq}</p>
+                                </div>
+
+                                <div className="mt-auto">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-xs text-gray-500 font-medium uppercase">Ghi chú nội bộ</p>
+                                        <button 
+                                            onClick={handleSaveNotes}
+                                            disabled={isSaving}
+                                            className="text-blue-600 hover:text-blue-800 text-xs font-medium disabled:opacity-50"
+                                        >
+                                            Lưu
+                                        </button>
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Địa danh</p>
-                                        <p className="font-medium text-gray-900">{record.data?.dia_danh}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Số tờ / Số thửa</p>
-                                        <p className="font-medium text-gray-900">{record.data?.so_to} / {record.data?.so_thua}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Diện tích</p>
-                                        <p className="font-medium text-gray-900">{record.data?.dien_tich}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Đất ở</p>
-                                        <p className="font-medium text-gray-900">{record.data?.dat_o}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">Số phát hành</p>
-                                        <p className="font-medium text-gray-900">{record.data?.so_phat_hanh}</p>
-                                    </div>
+                                    <textarea
+                                        value={internalNote}
+                                        onChange={(e) => setInternalNote(e.target.value)}
+                                        placeholder="Ghi chú chung cho tất cả mọi người..."
+                                        className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none h-32 text-sm bg-gray-50"
+                                    />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Cột 2: Tiến độ giải quyết */}
-                        <div className="col-span-1 flex flex-col gap-4">
-                            <div className="bg-white border rounded-lg overflow-hidden shadow-sm h-full">
-                                <div className="bg-indigo-50/50 px-4 py-3 border-b border-indigo-100 font-semibold text-indigo-800 flex items-center gap-2">
+                        {/* Cột 3: Tiến độ & Thời gian */}
+                        <div className="col-span-1 lg:col-span-4 flex flex-col gap-4">
+                            <div className="bg-white border border-gray-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden">
+                                <div className="bg-indigo-600 px-5 py-4 flex items-center gap-2 text-white">
                                     <Clock size={18} />
-                                    Tiến độ giải quyết
+                                    <h4 className="font-bold text-sm uppercase">Tiến độ & Thời gian</h4>
                                 </div>
-                                <div className="p-4">
+                                
+                                <div className="p-6 border-b border-gray-100 text-center">
+                                    <p className="text-xs text-gray-500 font-bold uppercase mb-2">Hạn trả kết quả</p>
+                                    <p className="text-3xl font-black text-gray-900 mb-2">{record.data?.ngay_tra_kq || '---'}</p>
+                                    <div className="inline-block bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full font-medium">
+                                        Ngày nhận: {record.data?.ngay_nhan || '---'}
+                                    </div>
+                                </div>
+
+                                <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                                     {history.length > 0 ? (
-                                        <div className="space-y-4">
+                                        <div className="space-y-6">
                                             {history.map((h: any, idx: number) => (
-                                                <div key={idx} className="flex gap-3 relative">
+                                                <div key={idx} className="flex gap-4 relative">
                                                     {idx !== history.length - 1 && (
-                                                        <div className="absolute left-[11px] top-6 bottom-[-16px] w-0.5 bg-gray-200"></div>
+                                                        <div className="absolute left-[15px] top-8 bottom-[-24px] w-0.5 bg-gray-200"></div>
                                                     )}
-                                                    <div className="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white shadow-sm flex items-center justify-center flex-shrink-0 z-10">
-                                                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                                    <div className="w-8 h-8 rounded-full border-2 border-gray-200 bg-white flex items-center justify-center flex-shrink-0 z-10">
+                                                        <div className="w-3 h-3 rounded-full bg-gray-300"></div>
                                                     </div>
-                                                    <div className="flex-1 pb-2">
-                                                        <p className="text-sm font-medium text-gray-900">{h.action}</p>
+                                                    <div className="flex-1 pt-1">
+                                                        <p className="text-sm font-bold text-gray-700 uppercase">{h.action}</p>
                                                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-500">
+                                                            <span className="flex items-center gap-1"><User size={12} /> {h.user} {h.assignedTo ? `-> ${h.assignedTo}` : ''}</span>
                                                             <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(h.timestamp).toLocaleString('vi-VN')}</span>
-                                                            <span className="flex items-center gap-1"><User size={12} /> {h.user}</span>
-                                                            {h.assignedTo && (
-                                                                <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded w-fit">
-                                                                    Trình: {h.assignedTo}
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -164,44 +265,6 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                     ) : (
                                         <p className="text-sm text-gray-500 italic text-center py-4">Chưa có lịch sử xử lý.</p>
                                     )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Cột 3: Ghi chú */}
-                        <div className="col-span-1 flex flex-col gap-4">
-                            <div className="bg-white border rounded-lg overflow-hidden shadow-sm h-full flex flex-col">
-                                <div className="bg-amber-50/50 px-4 py-3 border-b border-amber-100 font-semibold text-amber-800 flex items-center gap-2">
-                                    <MessageSquare size={18} />
-                                    Ghi chú
-                                </div>
-                                <div className="p-4 flex-1 flex flex-col gap-4">
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-sm font-medium text-gray-700">Ghi chú cá nhân (Chỉ bạn thấy)</label>
-                                        <textarea
-                                            value={personalNote}
-                                            onChange={(e) => setPersonalNote(e.target.value)}
-                                            placeholder="Nhập ghi chú cá nhân..."
-                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none h-32 text-sm"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-sm font-medium text-gray-700">Ghi chú nội bộ (Tất cả đều thấy)</label>
-                                        <textarea
-                                            value={internalNote}
-                                            onChange={(e) => setInternalNote(e.target.value)}
-                                            placeholder="Nhập ghi chú nội bộ..."
-                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none h-32 text-sm"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={handleSaveNotes}
-                                        disabled={isSaving}
-                                        className="mt-auto flex items-center justify-center gap-2 w-full py-2.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
-                                    >
-                                        <Save size={18} />
-                                        {isSaving ? 'Đang lưu...' : 'Lưu ghi chú'}
-                                    </button>
                                 </div>
                             </div>
                         </div>

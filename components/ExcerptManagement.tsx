@@ -258,7 +258,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
   };
 
   const filteredHistory = useMemo(() => {
-      return history.filter(h => {
+      const filtered = history.filter(h => {
           const itemYear = new Date(h.createdAt).getFullYear();
           let yearMatch = false;
           if (currentYear <= 2025) {
@@ -269,6 +269,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
           const wardMatch = selectedWard ? h.ward === selectedWard : true;
           return yearMatch && wardMatch;
       });
+      return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [history, selectedWard, currentYear]);
 
   const formatDate = (isoString: string) => {

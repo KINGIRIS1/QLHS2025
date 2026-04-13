@@ -132,7 +132,7 @@ const MortgageModal: React.FC<MortgageModalProps> = ({ isOpen, onClose, record, 
             <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-4 border-b bg-yellow-50 rounded-t-xl">
                     <h3 className="font-bold text-lg text-yellow-800 flex items-center gap-2">
-                        <DollarSign size={20} /> Quản lý Thế chấp - {record.so_hieu}
+                        <DollarSign size={20} /> Quản lý Giao dịch bảo đảm - {record.so_hieu}
                     </h3>
                     <button onClick={onClose} className="text-gray-500 hover:text-red-600">
                         <X size={24} />
@@ -146,7 +146,7 @@ const MortgageModal: React.FC<MortgageModalProps> = ({ isOpen, onClose, record, 
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
                                 <span className="bg-yellow-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
-                                Thế chấp
+                                Giao dịch bảo đảm
                             </h4>
                             <div className="space-y-3">
                                 <div>
@@ -168,7 +168,7 @@ const MortgageModal: React.FC<MortgageModalProps> = ({ isOpen, onClose, record, 
                                     <input type="text" value={mNumber} onChange={e => setMNumber(e.target.value)} className="w-full border rounded p-2 text-sm" placeholder="Nhập số thế chấp..." />
                                 </div>
                                 <button onClick={handleAddMortgage} disabled={loading} className="w-full bg-yellow-600 text-white py-2 rounded font-medium hover:bg-yellow-700 disabled:opacity-50">
-                                    Thêm Thế chấp
+                                    Thêm Giao dịch bảo đảm
                                 </button>
                             </div>
                         </div>
@@ -235,7 +235,7 @@ const MortgageModal: React.FC<MortgageModalProps> = ({ isOpen, onClose, record, 
                         )}
 
                         <div className="bg-white p-4 rounded-lg border border-gray-200 flex-1 flex flex-col">
-                            <h4 className="font-bold text-gray-700 mb-3 border-b pb-2">Lịch sử Thế chấp / Xóa thế chấp</h4>
+                            <h4 className="font-bold text-gray-700 mb-3 border-b pb-2">Lịch sử Giao dịch bảo đảm / Xóa thế chấp</h4>
                             <div className="flex-1 overflow-y-auto space-y-3">
                                 {mortgages.length === 0 ? (
                                     <p className="text-sm text-gray-500 italic text-center py-4">Chưa có dữ liệu</p>
@@ -246,7 +246,7 @@ const MortgageModal: React.FC<MortgageModalProps> = ({ isOpen, onClose, record, 
                                                 <X size={16} />
                                             </button>
                                             <div className="font-bold text-sm mb-1">
-                                                {m.type === 'mortgage' ? 'Thế chấp' : 'Xóa thế chấp'}
+                                                {m.type === 'mortgage' ? 'Giao dịch bảo đảm' : 'Xóa thế chấp'}
                                             </div>
                                             <div className="text-xs text-gray-600 space-y-1">
                                                 <p><span className="font-medium">Ngày:</span> {m.date.split('-').reverse().join('/')}</p>

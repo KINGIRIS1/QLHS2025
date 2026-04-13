@@ -182,7 +182,7 @@ const startServer = async () => {
 
     if (process.env.NODE_ENV === 'production') {
         const distPath = path.join(__dirname, 'dist');
-        server.get('*', (req, res) => {
+        server.get('*all', (req, res) => {
             res.sendFile(path.join(distPath, 'index.html'));
         });
     }

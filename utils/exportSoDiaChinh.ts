@@ -255,7 +255,7 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
             const dateParts = m.date.split('-');
             const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : m.date;
             const text = m.type === 'mortgage' 
-                ? `Thế chấp tại ${m.bank}, số ${m.number}`
+                ? `Đăng ký thế chấp tại ${m.bank}, số ${m.number}`
                 : `Xóa thế chấp tại ${m.bank}, số ${m.number}`;
             
             return new TableRow({

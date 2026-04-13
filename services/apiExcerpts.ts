@@ -18,7 +18,7 @@ export const fetchExcerptHistory = async (): Promise<any[]> => {
 export const saveExcerptRecord = async (record: any): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { id, ...recordData } = record;
+        const recordData = { ...record };
         // Loại bỏ các giá trị undefined để tránh lỗi Supabase
         Object.keys(recordData).forEach(key => {
             if (recordData[key] === undefined) {
@@ -80,7 +80,7 @@ export const fetchTrichDoHistory = async (): Promise<any[]> => {
 export const saveTrichDoRecord = async (record: any): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { id, ...recordData } = record;
+        const recordData = { ...record };
         // Loại bỏ các giá trị undefined để tránh lỗi Supabase
         Object.keys(recordData).forEach(key => {
             if (recordData[key] === undefined) {

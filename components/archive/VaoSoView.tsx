@@ -663,36 +663,40 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
                             <FileSpreadsheet size={16}/> Xuất Excel
                         </button>
-                        <button 
-                            onClick={() => {
-                                if (selectedIds.size === 1) {
-                                    const rec = records.find(r => selectedIds.has(r.id));
-                                    if (rec) {
-                                        setSelectedMortgageRecord(rec);
-                                        setShowMortgageModal(true);
+                        {activeTab === 'all' && (
+                            <>
+                                <button 
+                                    onClick={() => {
+                                        if (selectedIds.size === 1) {
+                                            const rec = records.find(r => selectedIds.has(r.id));
+                                            if (rec) {
+                                                setSelectedMortgageRecord(rec);
+                                                setShowMortgageModal(true);
+                                            }
+                                        } else {
+                                            alert("Vui lòng chọn 1 hồ sơ để quản lý giao dịch bảo đảm.");
+                                        }
+                                    }} 
+                                    disabled={selectedIds.size !== 1}
+                                    className="flex items-center gap-2 bg-yellow-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-yellow-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span className="font-bold text-lg leading-none">$</span> Giao dịch bảo đảm
+                                </button>
+                                <button onClick={() => {
+                                    if (selectedIds.size > 0) {
+                                        const selectedRecords = records.filter(r => selectedIds.has(r.id));
+                                        exportSoDiaChinh(selectedRecords);
+                                    } else {
+                                        setShowExportSoDiaChinhModal(true);
                                     }
-                                } else {
-                                    alert("Vui lòng chọn 1 hồ sơ để quản lý giao dịch bảo đảm.");
-                                }
-                            }} 
-                            disabled={selectedIds.size !== 1}
-                            className="flex items-center gap-2 bg-yellow-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-yellow-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span className="font-bold text-lg leading-none">$</span> Giao dịch bảo đảm
-                        </button>
-                        <button onClick={() => {
-                            if (selectedIds.size > 0) {
-                                const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                                exportSoDiaChinh(selectedRecords);
-                            } else {
-                                setShowExportSoDiaChinhModal(true);
-                            }
-                        }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
-                            <FileText size={16}/> Xuất Sổ địa chính
-                        </button>
-                        <button onClick={() => setShowExportSoMucKeModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm">
-                            <FileText size={16}/> Xuất Sổ mục kê
-                        </button>
+                                }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
+                                    <FileText size={16}/> Xuất Sổ địa chính
+                                </button>
+                                <button onClick={() => setShowExportSoMucKeModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm">
+                                    <FileText size={16}/> Xuất Sổ mục kê
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

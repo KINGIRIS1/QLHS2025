@@ -6,6 +6,7 @@ interface TopNavigationProps {
   currentView: string;
   setCurrentView: (view: string) => void;
   currentUser: UserType;
+  currentDepartment?: string;
   onLogout: () => void;
   isGeneratingReport?: boolean;
   onOpenAccountSettings: () => void;
@@ -20,6 +21,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   currentView, 
   setCurrentView, 
   currentUser, 
+  currentDepartment,
   onLogout,
   isGeneratingReport = false,
   unreadMessagesCount,
@@ -35,13 +37,28 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'dangky_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'records_group', 'tools_group'];
-  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'records_group', 'tools_group'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'dangky_records', 'receive_group', 'records_group', 'reports', 'tools_group', 'management_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'records_group', 'tools_group', 'management_group'];
+  
+  let employeeAllowedViews: string[] = [];
+  if (currentDepartment === 'Tổ đo đạc') {
+    employeeAllowedViews = ['all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group'];
+  } else if (currentDepartment === 'Tổ Lưu trữ') {
+    employeeAllowedViews = ['archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
+  } else if (currentDepartment === 'Tổ Đăng ký') {
+    employeeAllowedViews = ['dangky_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
+  } else if (!currentDepartment) {
+    // If department is not loaded yet or empty, show minimal views
+    employeeAllowedViews = ['personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
+  } else {
+    // Fallback for other departments
+    employeeAllowedViews = ['personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
+  }
 
   // Define menu structure
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
+    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: true, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
     
     // "Tiếp nhận" tab group
     {

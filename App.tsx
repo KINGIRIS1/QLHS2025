@@ -131,6 +131,9 @@ function App() {
   const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
   const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
 
+  const currentEmployee = employees.find(e => e.id === currentUser?.employeeId);
+  const currentDepartment = currentEmployee?.department || '';
+
   // --- UPDATE HANDLERS ---
   
   // Lắng nghe sự kiện update từ Electron
@@ -463,7 +466,21 @@ function App() {
       exportReturnedListToExcel(recordFilterProps.filteredRecords, recordFilterProps.filterFromDate, recordFilterProps.filterToDate, recordFilterProps.filterWard);
   };
 
-  if (!currentUser) return <Login onLogin={setCurrentUser} users={users} />;
+  const handleLogin = (user: User) => {
+      setCurrentUser(user);
+      if (user.role === UserRole.EMPLOYEE) {
+          const emp = employees.find(e => e.id === user.employeeId);
+          const dept = emp?.department;
+          if (dept === 'Tổ đo đạc') setCurrentView('all_records');
+          else if (dept === 'Tổ Lưu trữ') setCurrentView('archive_records');
+          else if (dept === 'Tổ Đăng ký') setCurrentView('dangky_records');
+          else setCurrentView('personal_profile');
+      } else {
+          setCurrentView('dashboard');
+      }
+  };
+
+  if (!currentUser) return <Login onLogin={handleLogin} users={users} />;
 
   if (isMobile) {
     return (
@@ -563,6 +580,7 @@ function App() {
   return (
     <MainLayout
         currentUser={currentUser}
+        currentDepartment={currentDepartment}
         currentView={currentView}
         setCurrentView={setCurrentView}
         onLogout={() => setCurrentUser(null)}

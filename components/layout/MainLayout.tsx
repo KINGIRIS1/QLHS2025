@@ -8,6 +8,7 @@ import UpdateRequiredModal from '../UpdateRequiredModal';
 interface MainLayoutProps {
     children: React.ReactNode;
     currentUser: User | null;
+    currentDepartment?: string;
     currentView: string;
     setCurrentView: (view: string) => void;
     onLogout: () => void;
@@ -39,6 +40,7 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({
     children,
     currentUser,
+    currentDepartment,
     currentView,
     setCurrentView,
     onLogout,
@@ -174,6 +176,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     currentView={currentView}
                     setCurrentView={setCurrentView}
                     currentUser={currentUser}
+                    currentDepartment={currentDepartment}
                     onLogout={onLogout}
                     mobileOpen={isMobileMenuOpen}
                     setMobileOpen={setIsMobileMenuOpen}

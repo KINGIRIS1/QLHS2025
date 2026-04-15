@@ -101,6 +101,25 @@ const UserManagement: React.FC<UserManagementProps> = ({
       XLSX.writeFile(wb, "Mau_Nhap_Tai_Khoan.xlsx");
   };
 
+  const handleExportExcel = () => {
+      const headers = ["USERNAME", "DISPLAY_NAME", "ROLE", "EMPLOYEE_ID", "EMPLOYEE_NAME"];
+      const data = filteredUsers.map(user => [
+          user.username,
+          user.name,
+          user.role,
+          user.employeeId || "",
+          getEmployeeName(user.employeeId)
+      ]);
+      
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      
+      ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Tai_Khoan");
+      XLSX.writeFile(wb, `DanhSachTaiKhoan_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -202,6 +221,12 @@ const UserManagement: React.FC<UserManagementProps> = ({
                         className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded-xl hover:bg-green-700 font-medium text-sm shadow-sm transition-colors whitespace-nowrap"
                     >
                         <FileSpreadsheet size={14} /> Nhập
+                    </button>
+                    <button 
+                        onClick={handleExportExcel}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-xl hover:bg-indigo-700 font-medium text-sm shadow-sm transition-colors whitespace-nowrap"
+                    >
+                        <Download size={14} /> Xuất
                     </button>
                     <button
                         onClick={() => { setEditingUser(null); setIsModalOpen(true); }}

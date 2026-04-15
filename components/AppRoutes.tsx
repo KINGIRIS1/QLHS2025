@@ -121,6 +121,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const isSubadmin = currentUser.role === UserRole.SUBADMIN;
     const canPerformAction = isAdmin || isSubadmin || currentUser.role === UserRole.TEAM_LEADER || currentUser.role === UserRole.ONEDOOR;
+    
+    const isDoDacEmployee = currentUser.role === UserRole.EMPLOYEE && 
+        (employees.find(e => e.id === currentUser.employeeId)?.department || '').trim().toLowerCase().includes('đo đạc');
 
     const [showColumnSelector, setShowColumnSelector] = React.useState(false);
 
@@ -278,7 +281,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             </div>
                          )}
 
-                         {canPerformAction && (currentView === 'all_records' || currentView === 'other_records') && (
+                         {(canPerformAction || isDoDacEmployee) && (currentView === 'all_records' || currentView === 'other_records') && (
                             <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                                 <UserIcon size={16} className="text-gray-500" />
                                 <select value={props.filterEmployee} onChange={(e) => props.setFilterEmployee(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[120px]">

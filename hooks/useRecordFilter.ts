@@ -153,6 +153,15 @@ export const useRecordFilter = (
             else result = result.filter(r => r.assignedTo === filterEmployee);
         }
 
+        // Restrict EMPLOYEE to their own records, UNLESS they are in 'Tổ đo đạc'
+        if (currentUser && currentUser.role === UserRole.EMPLOYEE) {
+            const emp = employees.find(e => e.id === currentUser.employeeId);
+            const dept = (emp?.department || '').trim().toLowerCase();
+            if (!dept.includes('đo đạc')) {
+                result = result.filter(r => r.assignedTo === currentUser.employeeId);
+            }
+        }
+
         // Date Filters (General for other views)
         if (currentView !== 'handover_list') {
             if (filterSpecificDate) {

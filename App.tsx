@@ -470,10 +470,10 @@ function App() {
       setCurrentUser(user);
       if (user.role === UserRole.EMPLOYEE) {
           const emp = employees.find(e => e.id === user.employeeId);
-          const dept = emp?.department;
-          if (dept === 'Tổ đo đạc') setCurrentView('all_records');
-          else if (dept === 'Tổ Lưu trữ') setCurrentView('archive_records');
-          else if (dept === 'Tổ Đăng ký') setCurrentView('dangky_records');
+          const dept = (emp?.department || '').trim().toLowerCase();
+          if (dept.includes('đo đạc')) setCurrentView('all_records');
+          else if (dept.includes('lưu trữ')) setCurrentView('archive_records');
+          else if (dept.includes('đăng ký')) setCurrentView('dangky_records');
           else setCurrentView('personal_profile');
       } else {
           setCurrentView('dashboard');

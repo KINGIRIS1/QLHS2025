@@ -41,13 +41,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'records_group', 'tools_group', 'management_group'];
   
   let employeeAllowedViews: string[] = [];
-  if (currentDepartment === 'Tổ đo đạc') {
+  const normalizedDept = (currentDepartment || '').trim().toLowerCase();
+
+  if (normalizedDept.includes('đo đạc')) {
     employeeAllowedViews = ['all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group'];
-  } else if (currentDepartment === 'Tổ Lưu trữ') {
+  } else if (normalizedDept.includes('lưu trữ')) {
     employeeAllowedViews = ['archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
-  } else if (currentDepartment === 'Tổ Đăng ký') {
+  } else if (normalizedDept.includes('đăng ký')) {
     employeeAllowedViews = ['dangky_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
-  } else if (!currentDepartment) {
+  } else if (!normalizedDept) {
     // If department is not loaded yet or empty, show minimal views
     employeeAllowedViews = ['personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group'];
   } else {

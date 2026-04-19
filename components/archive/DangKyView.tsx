@@ -122,11 +122,19 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             if (currentUser?.role === UserRole.EMPLOYEE) {
                 const emp = employees.find(e => e.id === currentUser.employeeId);
                 if (emp && emp.managedWards && emp.managedWards.length > 0) {
-                    const normalizedManagedWards = emp.managedWards.map(w => removeVietnameseTones(w).toLowerCase());
+                    const normalizeWard = (w: string) => {
+                        let str = removeVietnameseTones(w).toLowerCase();
+                        // Loại bỏ các từ khóa phổ biến để so sánh chính xác cốt lõi
+                        str = str.replace(/phuong|xa|thi tran|tt\.|p\.|x\./g, '');
+                        // Xóa sạch mọi khoảng trắng và ký tự đặc biệt
+                        return str.replace(/[^a-z0-9]/g, '');
+                    };
+                    const normalizedManagedWards = emp.managedWards.map(normalizeWard).filter(w => w.length > 0);
                     list = list.filter(r => {
-                        const ward = r.data?.dia_danh;
+                        const ward = r.data?.dia_danh || '';
                         if (!ward) return false;
-                        const normalizedWard = removeVietnameseTones(ward).toLowerCase();
+                        const normalizedWard = normalizeWard(ward);
+                        if (!normalizedWard) return false;
                         return normalizedManagedWards.some(mw => normalizedWard.includes(mw) || mw.includes(normalizedWard));
                     });
                 } else if (emp) {
@@ -146,11 +154,13 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
 
         // Filter by Ward
         if (filterWard) {
-            const normalizedFilterWard = removeVietnameseTones(filterWard).toLowerCase();
+            const normalizeWardStr = (w: string) => removeVietnameseTones(w).toLowerCase().replace(/phuong|xa|thi tran|tt\.|p\.|x\./g, '').replace(/[^a-z0-9]/g, '');
+            const normalizedFilterWard = normalizeWardStr(filterWard);
             list = list.filter(r => {
                 if (!r.data?.dia_danh) return false;
-                const normalizedRecordWard = removeVietnameseTones(r.data.dia_danh).toLowerCase();
-                return normalizedRecordWard.includes(normalizedFilterWard);
+                const normalizedRecordWard = normalizeWardStr(r.data.dia_danh);
+                if (!normalizedRecordWard || !normalizedFilterWard) return false;
+                return normalizedRecordWard.includes(normalizedFilterWard) || normalizedFilterWard.includes(normalizedRecordWard);
             });
         }
 

@@ -3,7 +3,7 @@ import { User, Employee, UserRole } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
 import { fetchEmployees, fetchUsers } from '../../services/apiPeople';
 import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload } from 'lucide-react';
-import { confirmAction, toTitleCase } from '../../utils/appHelpers';
+import { confirmAction, toTitleCase, removeVietnameseTones } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 import DeleteAllModal from './DeleteAllModal';
 import AssignModal from '../AssignModal';
@@ -122,9 +122,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             if (currentUser?.role === UserRole.EMPLOYEE) {
                 const emp = employees.find(e => e.id === currentUser.employeeId);
                 if (emp && emp.managedWards && emp.managedWards.length > 0) {
+                    const normalizedManagedWards = emp.managedWards.map(w => removeVietnameseTones(w).toLowerCase());
                     list = list.filter(r => {
                         const ward = r.data?.dia_danh;
-                        return ward && emp.managedWards.includes(ward);
+                        if (!ward) return false;
+                        const normalizedWard = removeVietnameseTones(ward).toLowerCase();
+                        return normalizedManagedWards.some(mw => normalizedWard.includes(mw) || mw.includes(normalizedWard));
                     });
                 } else if (emp) {
                     // Employee has no managed wards assigned, show nothing
@@ -142,7 +145,14 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         if (toDate) list = list.filter(r => r.data?.ngay_nhan <= toDate);
 
         // Filter by Ward
-        if (filterWard) list = list.filter(r => r.data?.dia_danh === filterWard);
+        if (filterWard) {
+            const normalizedFilterWard = removeVietnameseTones(filterWard).toLowerCase();
+            list = list.filter(r => {
+                if (!r.data?.dia_danh) return false;
+                const normalizedRecordWard = removeVietnameseTones(r.data.dia_danh).toLowerCase();
+                return normalizedRecordWard.includes(normalizedFilterWard);
+            });
+        }
 
         // Filter by Assignee
         if (filterAssignee) {

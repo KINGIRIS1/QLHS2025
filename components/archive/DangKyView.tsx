@@ -337,8 +337,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         loadData();
     };
 
-    const handleBatchReturn = async (reason: string) => {
-        if (selectedIds.size === 0 || !returnTargetStatus) return;
+    const handleBatchReturn = async (reason: string, targetStatus: string = returnTargetStatus) => {
+        if (selectedIds.size === 0 || !targetStatus) return;
         
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
@@ -354,7 +354,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
 
             await saveArchiveRecord({
                 ...record,
-                status: returnTargetStatus as any,
+                status: targetStatus as any,
                 data: {
                     ...record.data,
                     history
@@ -736,8 +736,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
 
                         {activeTab === 'gcn' && selectedIds.size > 0 && (
                             <>
-                                <button onClick={() => { setReturnTargetStatus('dong_thue'); setShowReturnModal(true); }} className="flex items-center gap-2 bg-red-500 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-600 shadow-sm animate-pulse">
-                                    <X size={16}/> Trả về Đóng thuế ({selectedIds.size})
+                                <button onClick={() => { setReturnTargetStatus('ky_gcn_return'); setShowReturnModal(true); }} className="flex items-center gap-2 bg-red-500 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-600 shadow-sm animate-pulse">
+                                    <X size={16}/> Trả về bước trước ({selectedIds.size})
                                 </button>
                                 <button onClick={handleMoveToVaoSo} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
                                     <CheckCircle2 size={16}/> Chuyển Vào số GCN ({selectedIds.size})
@@ -942,6 +942,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 isOpen={showReturnModal}
                 onClose={() => setShowReturnModal(false)}
                 onConfirm={handleBatchReturn}
+                targetOptions={returnTargetStatus === 'ky_gcn_return' ? [
+                    { value: 'dong_thue', label: 'Đã đóng thuế' },
+                    { value: 'chuyen_thue', label: 'Đã chuyển thuế' },
+                    { value: 'tham_tra_thue', label: 'Thẩm tra thuế' },
+                    { value: 'xu_ly', label: 'Xử lý' }
+                ] : undefined}
             />
 
             <AssignModal

@@ -9,6 +9,7 @@ import DeleteAllModal from './DeleteAllModal';
 import AssignModal from '../AssignModal';
 
 import RecordDetailModal from './RecordDetailModal';
+import ReturnReasonModal from './ReturnReasonModal';
 
 interface DangKyViewProps {
     currentUser: User;
@@ -54,6 +55,10 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    
+    // Return States
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const [returnTargetStatus, setReturnTargetStatus] = useState<string>('');
     
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<DangKyFormData>({
@@ -329,6 +334,36 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         }
 
         setSelectedIds(new Set());
+        loadData();
+    };
+
+    const handleBatchReturn = async (reason: string) => {
+        if (selectedIds.size === 0 || !returnTargetStatus) return;
+        
+        for (const id of Array.from(selectedIds)) {
+            const record = records.find(r => r.id === id);
+            if (!record) continue;
+            
+            const history = record.data?.history || [];
+            history.push({
+                action: `Trả về bước trước`,
+                content: `Lý do: ${reason}`,
+                timestamp: new Date().toISOString(),
+                user: currentUser.name
+            });
+
+            await saveArchiveRecord({
+                ...record,
+                status: returnTargetStatus as any,
+                data: {
+                    ...record.data,
+                    history
+                }
+            });
+        }
+
+        setSelectedIds(new Set());
+        setShowReturnModal(false);
         loadData();
     };
 
@@ -677,9 +712,14 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                         )}
 
                         {activeTab === 'thue' && thueSubTab === 'tham_tra_thue' && selectedIds.size > 0 && (
-                            <button onClick={() => openAssignModal('chuyen_thue')} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm animate-pulse">
-                                <Send size={16}/> Trình Giám đốc/Phó giám đốc ({selectedIds.size})
-                            </button>
+                            <>
+                                <button onClick={() => { setReturnTargetStatus('xu_ly'); setShowReturnModal(true); }} className="flex items-center gap-2 bg-red-500 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-600 shadow-sm animate-pulse">
+                                    <X size={16}/> Trả về Xử lý ({selectedIds.size})
+                                </button>
+                                <button onClick={() => openAssignModal('chuyen_thue')} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm animate-pulse">
+                                    <Send size={16}/> Trình Giám đốc/Phó giám đốc ({selectedIds.size})
+                                </button>
+                            </>
                         )}
 
                         {activeTab === 'thue' && thueSubTab === 'chuyen_thue' && selectedIds.size > 0 && (
@@ -695,9 +735,14 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                         )}
 
                         {activeTab === 'gcn' && selectedIds.size > 0 && (
-                            <button onClick={handleMoveToVaoSo} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
-                                <CheckCircle2 size={16}/> Chuyển Vào số GCN ({selectedIds.size})
-                            </button>
+                            <>
+                                <button onClick={() => { setReturnTargetStatus('dong_thue'); setShowReturnModal(true); }} className="flex items-center gap-2 bg-red-500 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-600 shadow-sm animate-pulse">
+                                    <X size={16}/> Trả về Đóng thuế ({selectedIds.size})
+                                </button>
+                                <button onClick={handleMoveToVaoSo} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
+                                    <CheckCircle2 size={16}/> Chuyển Vào số GCN ({selectedIds.size})
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -891,6 +936,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 onConfirm={handleDeleteAll}
                 currentUser={currentUser}
                 title="Đăng ký"
+            />
+            
+            <ReturnReasonModal
+                isOpen={showReturnModal}
+                onClose={() => setShowReturnModal(false)}
+                onConfirm={handleBatchReturn}
             />
 
             <AssignModal

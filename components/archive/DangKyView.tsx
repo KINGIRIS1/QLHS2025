@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, Employee } from '../../types';
+import { User, Employee, UserRole } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
 import { fetchEmployees, fetchUsers } from '../../services/apiPeople';
 import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload } from 'lucide-react';
@@ -118,6 +118,19 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             // Show all
         } else if (activeTab === 'xu_ly') {
             list = list.filter(r => r.status === 'xu_ly');
+            // Restrict EMPLOYEE to see only records from their assigned wards
+            if (currentUser?.role === UserRole.EMPLOYEE) {
+                const emp = employees.find(e => e.id === currentUser.employeeId);
+                if (emp && emp.managedWards && emp.managedWards.length > 0) {
+                    list = list.filter(r => {
+                        const ward = r.data?.dia_danh;
+                        return ward && emp.managedWards.includes(ward);
+                    });
+                } else if (emp) {
+                    // Employee has no managed wards assigned, show nothing
+                    list = [];
+                }
+            }
         } else if (activeTab === 'thue') {
             list = list.filter(r => r.status === thueSubTab);
         } else if (activeTab === 'gcn') {

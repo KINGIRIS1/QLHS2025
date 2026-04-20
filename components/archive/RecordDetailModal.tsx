@@ -15,7 +15,7 @@ interface RecordDetailModalProps {
 const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
         'tiep_nhan': 'Tiếp nhận',
-        'xu_ly': 'Xử lý',
+        'xu_ly': 'Xử lý hồ sơ',
         'tham_tra_thue': 'Thẩm tra thuế',
         'chuyen_thue': 'Chuyển thuế',
         'dong_thue': 'Đóng thuế',
@@ -220,7 +220,17 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-green-600 font-bold uppercase">Trạng thái</p>
-                                            <p className="font-bold text-gray-900 text-sm">{getStatusText(record.status) || '---'}</p>
+                                            <p className={`font-bold text-sm ${history.length > 0 && history[history.length - 1].action?.startsWith('Trả về') ? 'text-red-600' : 'text-gray-900'}`}>
+                                                {history.length > 0 && history[history.length - 1].action?.startsWith('Trả về') 
+                                                    ? (
+                                                        record.status === 'xu_ly' ? 'Trả Xử lý hồ sơ' :
+                                                        record.status === 'tham_tra_thue' ? 'Trả Thẩm tra thuế' :
+                                                        record.status === 'chuyen_thue' ? 'Trả Đã chuyển thuế' :
+                                                        record.status === 'dong_thue' ? 'Trả Đã đóng thuế' : 
+                                                        `Trả ${getStatusText(record.status)}`
+                                                    )
+                                                    : (getStatusText(record.status) || '---')}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>

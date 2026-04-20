@@ -580,8 +580,23 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         setShowAssignModal(false);
     };
 
-    const getStatusLabel = (status: string) => {
-        switch(status) {
+    const getStatusLabel = (record: ArchiveRecord) => {
+        const history = record.data?.history || [];
+        const isReturned = history.length > 0 && history[history.length - 1].action?.startsWith('Trả về');
+        
+        let label = '';
+        if (isReturned) {
+            switch (record.status) {
+                case 'xu_ly': label = 'Trả Xử lý hồ sơ'; break;
+                case 'tham_tra_thue': label = 'Trả Thẩm tra thuế'; break;
+                case 'chuyen_thue': label = 'Trả Đã chuyển thuế'; break;
+                case 'dong_thue': label = 'Trả Đã đóng thuế'; break;
+                default: label = `Trả ${record.status}`; break;
+            }
+            return <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">{label}</span>;
+        }
+
+        switch(record.status) {
             case 'tiep_nhan': return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">Tiếp nhận</span>;
             case 'xu_ly': return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Xử lý</span>;
             case 'tham_tra_thue': return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">Thẩm tra thuế</span>;
@@ -589,7 +604,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             case 'dong_thue': return <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">Đóng thuế</span>;
             case 'ky_gcn': return <span className="px-2 py-1 bg-teal-100 text-teal-700 rounded text-xs font-medium">Ký GCN</span>;
             case 'hoan_thanh': return <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Hoàn thành</span>;
-            default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">{status}</span>;
+            default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">{record.status}</span>;
         }
     };
 
@@ -813,7 +828,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                                         <td className="p-3 text-gray-600">{r.trich_yeu}</td>
                                         <td className="p-3 text-gray-600">{r.data?.ngay_nhan ? r.data.ngay_nhan.split('-').reverse().join('/') : ''}</td>
                                         <td className="p-3 text-gray-600">{r.data?.dia_danh}</td>
-                                        <td className="p-3">{getStatusLabel(r.status)}</td>
+                                        <td className="p-3">{getStatusLabel(r)}</td>
                                         <td className="p-3">
                                             <div className="flex items-center justify-center gap-1">
                                                 <button onClick={() => { setDetailRecord(r); setShowDetailModal(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded" title="Xem chi tiết"><FileText size={14}/></button>
@@ -974,12 +989,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             <ReturnReasonModal
                 isOpen={showReturnModal}
                 onClose={() => setShowReturnModal(false)}
-                onConfirm={handleBatchReturn}
+                onConfirm={(reason, overrideTarget) => handleBatchReturn(reason, overrideTarget || returnTargetStatus)}
                 targetOptions={returnTargetStatus === 'ky_gcn_return' ? [
                     { value: 'dong_thue', label: 'Đã đóng thuế' },
                     { value: 'chuyen_thue', label: 'Đã chuyển thuế' },
                     { value: 'tham_tra_thue', label: 'Thẩm tra thuế' },
-                    { value: 'xu_ly', label: 'Xử lý' }
+                    { value: 'xu_ly', label: 'Xử lý hồ sơ' }
                 ] : undefined}
             />
 

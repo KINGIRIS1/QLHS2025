@@ -16,6 +16,7 @@ const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
         'tiep_nhan': 'Tiếp nhận',
         'xu_ly': 'Xử lý',
+        'tham_tra_thue': 'Thẩm tra thuế',
         'chuyen_thue': 'Chuyển thuế',
         'dong_thue': 'Đóng thuế',
         'ky_gcn': 'Ký GCN',
@@ -275,7 +276,8 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                                     <div className="flex-1 pt-1">
                                                         <p className="text-sm font-bold text-gray-700 uppercase">{h.action && h.action.startsWith('Chuyển trạng thái: ') ? `Chuyển trạng thái: ${getStatusText(h.action.replace('Chuyển trạng thái: ', ''))}` : h.action}</p>
                                                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-500">
-                                                            <span className="flex items-center gap-1"><User size={12} /> {getEmployeeName(h.user)} {h.assignedTo ? `-> ${getEmployeeName(h.assignedTo)}` : ''}</span>
+                                                            <span className="flex items-center gap-1"><User size={12} /> {getEmployeeName(h.user)} {h.assignedTo ? `> ${getEmployeeName(h.assignedTo)}` : ''}</span>
+                                                            {h.content && <span className="flex items-start gap-1 p-2 bg-red-50 text-red-700 rounded border border-red-100">{h.content}</span>}
                                                             <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(h.timestamp).toLocaleString('vi-VN')}</span>
                                                         </div>
                                                     </div>

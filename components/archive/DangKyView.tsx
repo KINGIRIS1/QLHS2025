@@ -340,16 +340,47 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const handleBatchReturn = async (reason: string, targetStatus: string = returnTargetStatus) => {
         if (selectedIds.size === 0 || !targetStatus) return;
         
+        const getReturnStatusLabel = (s: string) => {
+            switch(s) {
+                case 'dong_thue': return 'Đã đóng thuế';
+                case 'chuyen_thue': return 'Đã chuyển thuế';
+                case 'tham_tra_thue': return 'Thẩm tra thuế';
+                case 'xu_ly': return 'Xử lý hồ sơ';
+                case 'ky_gcn': return 'Ký GCN';
+                default: return 'bước trước';
+            }
+        };
+
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
             
             const history = record.data?.history || [];
+            
+            // Tìm người xử lý ở bước đích để gán lại (nếu có)
+            let previousAssignee = undefined;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const prev = history[i];
+                if (prev.action && prev.action.includes(targetStatus) && prev.assignedTo) {
+                    previousAssignee = prev.assignedTo;
+                    break;
+                }
+            }
+            if (!previousAssignee) {
+                for (let i = history.length - 1; i >= 0; i--) {
+                    if (history[i].assignedTo) {
+                        previousAssignee = history[i].assignedTo;
+                        break;
+                    }
+                }
+            }
+
             history.push({
-                action: `Trả về bước trước`,
-                content: `Lý do: ${reason}`,
+                action: `Trả về ${getReturnStatusLabel(targetStatus)}`,
+                content: `Lý do trả: ${reason}`,
                 timestamp: new Date().toISOString(),
-                user: currentUser.name
+                user: currentUser.name,
+                ...(previousAssignee ? { assignedTo: previousAssignee } : {})
             });
 
             await saveArchiveRecord({
@@ -357,7 +388,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 status: targetStatus as any,
                 data: {
                     ...record.data,
-                    history
+                    history,
+                    ...(previousAssignee ? { assigned_to: previousAssignee } : {})
                 }
             });
         }
@@ -552,6 +584,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         switch(status) {
             case 'tiep_nhan': return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">Tiếp nhận</span>;
             case 'xu_ly': return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Xử lý</span>;
+            case 'tham_tra_thue': return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">Thẩm tra thuế</span>;
             case 'chuyen_thue': return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-medium">Chuyển thuế</span>;
             case 'dong_thue': return <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">Đóng thuế</span>;
             case 'ky_gcn': return <span className="px-2 py-1 bg-teal-100 text-teal-700 rounded text-xs font-medium">Ký GCN</span>;

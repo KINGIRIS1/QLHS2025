@@ -31,16 +31,30 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' |
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
     try {
-        const { data, error } = await supabase
-            .from('archive_records')
-            .select('*')
-            .eq('type', type)
-            .order('created_at', { ascending: false })
-            .limit(1000); // Giới hạn 1000 bản ghi mới nhất
+        let allData: ArchiveRecord[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (error) throw error;
-        
-        return (data || []) as ArchiveRecord[];
+        while (hasMore) {
+            const { data, error } = await supabase
+                .from('archive_records')
+                .select('*')
+                .eq('type', type)
+                .order('created_at', { ascending: false })
+                .range(page * pageSize, (page + 1) * pageSize - 1);
+
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                allData = [...allData, ...data as ArchiveRecord[]];
+                if (data.length < pageSize) hasMore = false;
+                else page++;
+            } else {
+                hasMore = false;
+            }
+        }
+        return allData;
     } catch (error) {
         logError(`fetchArchiveRecords-${type}`, error);
         return MOCK_ARCHIVE.filter(r => r.type === type);

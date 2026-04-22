@@ -24,25 +24,30 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
 
   try {
     let allRecords: any[] = [];
+    let from = 0;
+    const step = 1000;
+    let hasMore = true;
     let retryCount = 0;
     const maxRetries = 1;
 
-    while (retryCount <= maxRetries) {
+    while (hasMore) {
         try {
             const { data, error } = await supabase
                 .from('records')
                 .select('*')
                 .order('receivedDate', { ascending: false })
                 .order('id', { ascending: true }) 
-                .limit(1000); // Giới hạn 1000 bản ghi mới nhất để tối ưu Egress
+                .range(from, from + step - 1);
 
             if (error) throw error;
 
-            if (data) {
-                allRecords = data;
+            if (data && data.length > 0) {
+                allRecords = [...allRecords, ...data];
+                from += step;
+                if (data.length < step) hasMore = false;
+            } else {
+                hasMore = false;
             }
-            break; // Success, break retry loop
-
         } catch (fetchError: any) {
             if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
                 console.warn(`Lỗi fetchRecords, đang thử lại lần ${retryCount + 1}...`);

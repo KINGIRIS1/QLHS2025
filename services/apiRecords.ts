@@ -24,30 +24,25 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
 
   try {
     let allRecords: any[] = [];
-    let from = 0;
-    const step = 1000;
-    let hasMore = true;
     let retryCount = 0;
     const maxRetries = 1;
 
-    while (hasMore) {
+    while (retryCount <= maxRetries) {
         try {
             const { data, error } = await supabase
                 .from('records')
                 .select('*')
                 .order('receivedDate', { ascending: false })
                 .order('id', { ascending: true }) 
-                .range(from, from + step - 1);
+                .limit(1000); // Giới hạn 1000 bản ghi mới nhất để tối ưu Egress
 
             if (error) throw error;
 
-            if (data && data.length > 0) {
-                allRecords = [...allRecords, ...data];
-                from += step;
-                if (data.length < step) hasMore = false;
-            } else {
-                hasMore = false;
+            if (data) {
+                allRecords = data;
             }
+            break; // Success, break retry loop
+
         } catch (fetchError: any) {
             if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
                 console.warn(`Lỗi fetchRecords, đang thử lại lần ${retryCount + 1}...`);
@@ -139,24 +134,19 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
         if (rawCodes.length === 0) return { success: true, count: 0 };
 
         let allDbRecords: any[] = [];
-        let from = 0;
-        const step = 1000;
-        let hasMore = true;
-
-        while (hasMore) {
+        
+        // Chunk the codes into groups of 500 to avoid overly large queries
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < rawCodes.length; i += CHUNK_SIZE) {
+            const chunk = rawCodes.slice(i, i + CHUNK_SIZE);
             const { data, error } = await supabase
                 .from('records')
                 .select('*')
-                .range(from, from + step - 1);
-            
+                .in('code', chunk);
+                
             if (error) throw error;
-
-            if (data && data.length > 0) {
+            if (data) {
                 allDbRecords = [...allDbRecords, ...data];
-                from += step;
-                if (data.length < step) hasMore = false;
-            } else {
-                hasMore = false;
             }
         }
 

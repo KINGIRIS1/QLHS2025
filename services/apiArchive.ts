@@ -19,17 +19,97 @@ export interface ArchiveRecord {
 // Mock Data Stores
 let MOCK_ARCHIVE: ArchiveRecord[] = [];
 
+// In-Memory Cache for fetched records to solve high egress without breaking UI
+let CACHED_ARCHIVE_RECORDS: Record<string, ArchiveRecord[]> = {
+    saoluc: [], vaoso: [], congvan: [], dangky: []
+};
+let IS_CACHED_LOADED: Record<string, boolean> = {
+    saoluc: false, vaoso: false, congvan: false, dangky: false
+};
+let IS_REALTIME_ARCHIVE_SUBSCRIBED = false;
+
 const CACHE_KEY_ARCHIVE = 'offline_archive_records';
+
+// Function to clear cache (e.g. for refresh button)
+export const clearArchiveCache = (type?: 'saoluc' | 'vaoso' | 'congvan' | 'dangky') => {
+    if (type) {
+        IS_CACHED_LOADED[type] = false;
+        CACHED_ARCHIVE_RECORDS[type] = [];
+    } else {
+        IS_CACHED_LOADED = { saoluc: false, vaoso: false, congvan: false, dangky: false };
+        CACHED_ARCHIVE_RECORDS = { saoluc: [], vaoso: [], congvan: [], dangky: [] };
+    }
+};
+
+export const initRealtimeArchive = () => {
+    if (!isConfigured || IS_REALTIME_ARCHIVE_SUBSCRIBED) return;
+    IS_REALTIME_ARCHIVE_SUBSCRIBED = true;
+
+    supabase.channel('public:archive_records')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'archive_records' }, (payload) => {
+            let changed = false;
+            let typeChanged: string | null = null;
+
+            if (payload.eventType === 'INSERT') {
+                const newRec = payload.new as ArchiveRecord;
+                typeChanged = newRec.type;
+                if (IS_CACHED_LOADED[newRec.type]) {
+                    const arr = CACHED_ARCHIVE_RECORDS[newRec.type];
+                    if (!arr.find(r => r.id === newRec.id)) {
+                        arr.unshift(newRec);
+                        changed = true;
+                    }
+                }
+            } else if (payload.eventType === 'UPDATE') {
+                const newRec = payload.new as ArchiveRecord;
+                typeChanged = newRec.type;
+                if (IS_CACHED_LOADED[newRec.type]) {
+                    const arr = CACHED_ARCHIVE_RECORDS[newRec.type];
+                    const idx = arr.findIndex(r => r.id === newRec.id);
+                    if (idx !== -1) {
+                        arr[idx] = newRec;
+                        changed = true;
+                    } else {
+                        arr.unshift(newRec);
+                        changed = true;
+                    }
+                }
+            } else if (payload.eventType === 'DELETE') {
+                const oldRec = payload.old;
+                // Finding which type it belongs to
+                Object.keys(CACHED_ARCHIVE_RECORDS).forEach(type => {
+                    const arr = CACHED_ARCHIVE_RECORDS[type];
+                    const beforeLen = arr.length;
+                    CACHED_ARCHIVE_RECORDS[type] = arr.filter(r => r.id !== oldRec.id);
+                    if (CACHED_ARCHIVE_RECORDS[type].length < beforeLen) {
+                        changed = true;
+                        typeChanged = type;
+                    }
+                });
+            }
+
+            if (changed && typeChanged) {
+                // Dispatch custom event to notify React components
+                window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: typeChanged } }));
+            }
+        })
+        .subscribe();
+};
 
 // --- API ---
 
-export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky'): Promise<ArchiveRecord[]> => {
+export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky', forceUpdate: boolean = false): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-        // Nếu cache rỗng và chưa có mock in-mem, dùng mảng rỗng. Nếu mock có data thì dùng mock (để sync trong session)
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
+    
+    // Return from memory cache to save egress!
+    if (!forceUpdate && IS_CACHED_LOADED[type]) {
+        return [...CACHED_ARCHIVE_RECORDS[type]];
+    }
+
     try {
         let allData: ArchiveRecord[] = [];
         let page = 0;
@@ -54,7 +134,11 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' |
                 hasMore = false;
             }
         }
-        return allData;
+        
+        CACHED_ARCHIVE_RECORDS[type] = allData;
+        IS_CACHED_LOADED[type] = true;
+        
+        return [...allData];
     } catch (error) {
         logError(`fetchArchiveRecords-${type}`, error);
         return MOCK_ARCHIVE.filter(r => r.type === type);
@@ -101,6 +185,14 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             }).eq('id', record.id).select().single();
             
             if (error) throw error;
+            
+            // Mutate cache
+            if (IS_CACHED_LOADED[data.type]) {
+                const arr = CACHED_ARCHIVE_RECORDS[data.type];
+                const index = arr.findIndex(r => r.id === data.id);
+                if (index !== -1) arr[index] = data as ArchiveRecord;
+            }
+            
             return data as ArchiveRecord;
         } else {
             // Khi Insert: KHÔNG tự sinh ID bằng Math.random() vì DB dùng UUID.
@@ -109,6 +201,12 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             
             const { data, error } = await supabase.from('archive_records').insert([payload]).select().single();
             if (error) throw error;
+            
+            // Mutate cache
+            if (IS_CACHED_LOADED[data.type]) {
+                CACHED_ARCHIVE_RECORDS[data.type].unshift(data as ArchiveRecord);
+            }
+            
             return data as ArchiveRecord;
         }
     } catch (error: any) {
@@ -131,8 +229,17 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
         return true;
     }
     try {
-        const { error } = await supabase.from('archive_records').delete().eq('id', id);
-        if (error) throw error;
+        const { data, error } = await supabase.from('archive_records').delete().eq('id', id).select().single();
+        if (error) {
+            // It might fail to select if it was already deleted, just fallback to return true unless it's a real error
+            // Fallback: we should just update cache based on id removal across all types
+            Object.keys(CACHED_ARCHIVE_RECORDS).forEach(t => {
+                CACHED_ARCHIVE_RECORDS[t] = CACHED_ARCHIVE_RECORDS[t].filter(r => r.id !== id);
+            });
+        } else if (data) {
+            const arr = CACHED_ARCHIVE_RECORDS[data.type as string];
+            if (arr) CACHED_ARCHIVE_RECORDS[data.type as string] = arr.filter(r => r.id !== id);
+        }
         return true;
     } catch (error) {
         logError("deleteArchiveRecord", error);
@@ -151,6 +258,9 @@ export const deleteAllArchiveRecordsByType = async (type: string): Promise<boole
     try {
         const { error } = await supabase.from('archive_records').delete().eq('type', type);
         if (error) throw error;
+        
+        CACHED_ARCHIVE_RECORDS[type] = [];
+        
         return true;
     } catch (error) {
         logError("deleteAllArchiveRecordsByType", error);
@@ -187,8 +297,16 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
             return p;
         });
 
-        const { error } = await supabase.from('archive_records').insert(payload);
+        const { data, error } = await supabase.from('archive_records').insert(payload).select();
         if (error) throw error;
+        
+        if (data) {
+            data.forEach((r: any) => {
+                const arr = CACHED_ARCHIVE_RECORDS[r.type];
+                if (arr) arr.unshift(r as ArchiveRecord);
+            });
+        }
+        
         return true;
     } catch (error) {
         logError("importArchiveRecords", error);
@@ -238,10 +356,22 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             }
 
             const payload = { ...updates, data: mergedData };
-            return supabase.from('archive_records').update(payload).eq('id', r.id);
+            return supabase.from('archive_records').update(payload).eq('id', r.id).select().single();
         });
 
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        
+        results.forEach(res => {
+            if (res.data) {
+                const type = res.data.type;
+                if (IS_CACHED_LOADED[type]) {
+                    const arr = CACHED_ARCHIVE_RECORDS[type];
+                    const idx = arr.findIndex(x => x.id === res.data.id);
+                    if (idx !== -1) arr[idx] = res.data as ArchiveRecord;
+                }
+            }
+        });
+        
         return true;
     } catch (error) {
         logError("updateArchiveRecordsBatch", error);

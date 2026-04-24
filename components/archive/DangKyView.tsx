@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, Employee, UserRole } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
 import { fetchEmployees, fetchUsers } from '../../services/apiPeople';
 import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload } from 'lucide-react';
 import { confirmAction, toTitleCase, removeVietnameseTones } from '../../utils/appHelpers';
@@ -86,6 +86,17 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     useEffect(() => {
         loadData();
         loadEmployees();
+
+        initRealtimeArchive();
+        
+        const handleArchiveUpdate = (e: any) => {
+            if (e.detail?.type === 'dangky') {
+                loadData();
+            }
+        };
+        
+        window.addEventListener('archive_realtime_update', handleArchiveUpdate);
+        return () => window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
     }, []);
 
     const loadData = async () => {
@@ -271,11 +282,15 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             }
         }
 
-        await saveArchiveRecord(record);
+        const saved = await saveArchiveRecord(record);
+        if (saved) {
+            if (editingId) setRecords(prev => prev.map(r => r.id === saved.id ? saved : r));
+            else setRecords(prev => [saved, ...prev]);
+        }
         setIsFormOpen(false);
         setEditingId(null);
         resetForm();
-        loadData();
+        // loadData(); // Disabled to reduce egress
     };
 
     const handleEdit = (r: ArchiveRecord) => {
@@ -303,13 +318,15 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const handleDelete = async (id: string) => {
         if (await confirmAction('Bạn có chắc chắn muốn xóa hồ sơ này?')) {
             await deleteArchiveRecord(id);
-            loadData();
+            setRecords(prev => prev.filter(r => r.id !== id));
+            // loadData();
         }
     };
 
     const handleBatchStatusChange = async (newStatus: string, assignedTo?: string) => {
         if (selectedIds.size === 0) return;
         
+        const updatedRecords: ArchiveRecord[] = [];
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
@@ -322,7 +339,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 assignedTo: assignedTo
             });
 
-            await saveArchiveRecord({
+            const saved = await saveArchiveRecord({
                 ...record,
                 status: newStatus as any,
                 data: {
@@ -331,10 +348,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     ...(assignedTo ? { assigned_to: assignedTo } : {})
                 }
             });
+            if (saved) updatedRecords.push(saved);
         }
 
+        setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
         setSelectedIds(new Set());
-        loadData();
+        // loadData();
     };
 
     const handleBatchReturn = async (reason: string, targetStatus: string = returnTargetStatus) => {
@@ -351,6 +370,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             }
         };
 
+        const updatedRecords: ArchiveRecord[] = [];
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
@@ -383,7 +403,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 ...(previousAssignee ? { assignedTo: previousAssignee } : {})
             });
 
-            await saveArchiveRecord({
+            const saved = await saveArchiveRecord({
                 ...record,
                 status: targetStatus as any,
                 data: {
@@ -392,16 +412,19 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     ...(previousAssignee ? { assigned_to: previousAssignee } : {})
                 }
             });
+            if (saved) updatedRecords.push(saved);
         }
 
+        setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
         setSelectedIds(new Set());
         setShowReturnModal(false);
-        loadData();
+        // loadData();
     };
 
     const handleMoveToVaoSo = async () => {
         if (selectedIds.size === 0) return;
         
+        const updatedRecords: ArchiveRecord[] = [];
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
@@ -432,7 +455,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 user: currentUser.name,
             });
 
-            await saveArchiveRecord({
+            const saved = await saveArchiveRecord({
                 ...record,
                 status: 'hoan_thanh',
                 data: {
@@ -440,10 +463,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     history
                 }
             });
+            if (saved) updatedRecords.push(saved);
         }
 
+        setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
         setSelectedIds(new Set());
-        loadData();
+        // loadData();
         alert(`Đã chuyển ${selectedIds.size} hồ sơ sang Vào số GCN`);
     };
 

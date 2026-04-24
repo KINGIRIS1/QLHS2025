@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
 import { User } from '../../types';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Download, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
@@ -82,6 +82,17 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     useEffect(() => {
         loadData();
+        
+        initRealtimeArchive();
+        
+        const handleArchiveUpdate = (e: any) => {
+            if (e.detail?.type === 'vaoso') {
+                loadData();
+            }
+        };
+        
+        window.addEventListener('archive_realtime_update', handleArchiveUpdate);
+        return () => window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
     }, []);
 
     const loadData = async () => {

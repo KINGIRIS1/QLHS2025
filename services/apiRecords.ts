@@ -16,10 +16,60 @@ const RECORD_DB_COLUMNS = [
     'needsMapCorrection' // Cột mới
 ];
 
-export const fetchRecords = async (): Promise<RecordFile[]> => {
+let CACHED_RECORDS: RecordFile[] = [];
+let IS_CACHED_RECORDS_LOADED = false;
+let IS_REALTIME_SUBSCRIBED = false;
+
+// Function to clear cache
+export const clearRecordsCache = () => {
+    IS_CACHED_RECORDS_LOADED = false;
+    CACHED_RECORDS = [];
+};
+
+export const initRealtimeRecords = () => {
+    if (!isConfigured || IS_REALTIME_SUBSCRIBED) return;
+    IS_REALTIME_SUBSCRIBED = true;
+
+    supabase.channel('public:records')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'records' }, (payload) => {
+            let changed = false;
+            if (payload.eventType === 'INSERT') {
+                if (!CACHED_RECORDS.find(r => r.id === payload.new.id)) {
+                    CACHED_RECORDS.unshift(payload.new as RecordFile);
+                    changed = true;
+                }
+            } else if (payload.eventType === 'UPDATE') {
+                const idx = CACHED_RECORDS.findIndex(r => r.id === payload.new.id);
+                if (idx !== -1) {
+                    CACHED_RECORDS[idx] = payload.new as RecordFile;
+                    changed = true;
+                } else {
+                    CACHED_RECORDS.unshift(payload.new as RecordFile);
+                    changed = true;
+                }
+            } else if (payload.eventType === 'DELETE') {
+                const beforeLen = CACHED_RECORDS.length;
+                CACHED_RECORDS = CACHED_RECORDS.filter(r => r.id !== payload.old.id);
+                if (CACHED_RECORDS.length < beforeLen) changed = true;
+            }
+
+            if (changed) {
+                // Dispatch custom event to notify React components
+                window.dispatchEvent(new CustomEvent('records_realtime_update'));
+            }
+        })
+        .subscribe();
+};
+
+export const fetchRecords = async (forceUpdate: boolean = false): Promise<RecordFile[]> => {
   if (!isConfigured) {
       console.warn("Supabase chưa được cấu hình. Đang dùng dữ liệu Cache/Mock.");
       return getFromCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
+  }
+
+  // Return from cache to save egress!
+  if (!forceUpdate && IS_CACHED_RECORDS_LOADED) {
+      return [...CACHED_RECORDS];
   }
 
   try {
@@ -67,7 +117,11 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
     
     console.log(`[Fetch] Total fetched: ${uniqueRecords.length}`);
     saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
-    return uniqueRecords as RecordFile[];
+    
+    CACHED_RECORDS = uniqueRecords as RecordFile[];
+    IS_CACHED_RECORDS_LOADED = true;
+    
+    return CACHED_RECORDS;
 
   } catch (error) {
     logError("fetchRecords", error);
@@ -81,7 +135,12 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
         const { data, error } = await supabase.from('records').insert([payload]).select();
         if (error) throw error;
-        return data?.[0] as RecordFile;
+        
+        if (data?.[0]) {
+            if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(data[0] as RecordFile);
+            return data[0] as RecordFile;
+        }
+        return null;
     } catch (error) {
         logError("createRecordApi", error);
         return null;
@@ -94,7 +153,15 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
         const { data, error } = await supabase.from('records').update(payload).eq('id', record.id).select();
         if (error) throw error;
-        return data?.[0] as RecordFile;
+        
+        if (data?.[0]) {
+            if (IS_CACHED_RECORDS_LOADED) {
+                const idx = CACHED_RECORDS.findIndex(r => r.id === data[0].id);
+                if (idx !== -1) CACHED_RECORDS[idx] = data[0] as RecordFile;
+            }
+            return data[0] as RecordFile;
+        }
+        return null;
     } catch (error) {
         logError("updateRecordApi", error);
         return null;
@@ -104,8 +171,14 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
 export const deleteRecordApi = async (id: string): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { error } = await supabase.from('records').delete().eq('id', id);
-        if (error) throw error;
+        const { error, data } = await supabase.from('records').delete().eq('id', id).select().single();
+        
+        if (error) {
+           if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS = CACHED_RECORDS.filter(r => r.id !== id);
+        } else if (data) {
+           if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS = CACHED_RECORDS.filter(r => r.id !== id);
+        }
+        
         return true;
     } catch (error) {
         logError("deleteRecordApi", error);
@@ -117,8 +190,12 @@ export const createRecordsBatchApi = async (records: RecordFile[]): Promise<bool
     if (!isConfigured) return true;
     try {
         const payload = records.map(r => sanitizeData(r, RECORD_DB_COLUMNS));
-        const { error } = await supabase.from('records').insert(payload);
+        const { error, data } = await supabase.from('records').insert(payload).select();
         if (error) throw error;
+        
+        if (data && IS_CACHED_RECORDS_LOADED) {
+            CACHED_RECORDS = [...(data as RecordFile[]), ...CACHED_RECORDS];
+        }
         return true;
     } catch (error) {
         logError("createRecordsBatchApi", error);
@@ -193,8 +270,15 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
         });
 
         if (updatesToPush.length > 0) {
-            const { error: upsertError } = await supabase.from('records').upsert(updatesToPush);
+            const { error: upsertError, data } = await supabase.from('records').upsert(updatesToPush).select();
             if (upsertError) throw upsertError;
+            
+            if (data && IS_CACHED_RECORDS_LOADED) {
+               data.forEach((r: any) => {
+                   const idx = CACHED_RECORDS.findIndex(c => c.id === r.id);
+                   if (idx !== -1) CACHED_RECORDS[idx] = r as RecordFile;
+               });
+            }
         }
 
         return { success: true, count: updateCount };

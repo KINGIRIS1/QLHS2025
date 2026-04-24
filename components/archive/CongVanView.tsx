@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
@@ -64,6 +64,17 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     useEffect(() => {
         loadData();
         loadEmployees();
+
+        initRealtimeArchive();
+        
+        const handleArchiveUpdate = (e: any) => {
+            if (e.detail?.type === 'congvan') {
+                loadData();
+            }
+        };
+        
+        window.addEventListener('archive_realtime_update', handleArchiveUpdate);
+        return () => window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
     }, []);
 
     const loadData = async () => {
@@ -291,9 +302,21 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         };
         
         await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+        
+        setRecords(prev => prev.map(r => selectedIds.has(r.id) ? { 
+            ...r, 
+            status: 'assigned' as any,
+            data: { 
+                ...r.data, 
+                assigned_to: employeeId, 
+                assigned_date: updates.data.assigned_date,
+                history: [...(r.data?.history || []), historyEntry] 
+            } 
+        } : r));
+
         setShowAssignModal(false);
         setSelectedIds(new Set());
-        loadData();
+        // loadData();
     };
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,7 +352,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         });
 
         if (success) {
-            await loadData();
+            if (editingId) setRecords(prev => prev.map(r => r.id === success.id ? success : r));
+            else setRecords(prev => [success, ...prev]);
+            // await loadData();
             setIsFormOpen(false);
             setEditingId(null);
             setFormData({ type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: '' });
@@ -367,12 +392,13 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
-            await saveArchiveRecord({ 
+            const saved = await saveArchiveRecord({ 
                 ...record, 
                 status: newStatus,
                 data: { ...record.data, history: newHistory }
             });
-            loadData();
+            if (saved) setRecords(prev => prev.map(r => r.id === saved.id ? saved : r));
+            // loadData();
         }
     };
 

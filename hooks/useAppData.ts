@@ -4,7 +4,8 @@ import { RecordFile, Employee, User, RecordStatus, Holiday } from '../types';
 import { 
     fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
-    saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi
+    saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi,
+    initRealtimeRecords
 } from '../services/api';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 
@@ -74,6 +75,20 @@ export const useAppData = (currentUser: User | null) => {
     useEffect(() => {
         loadData();
         // Removed setInterval to reduce PostgREST egress
+        
+        // Bật realtime và lắng nghe thay đổi
+        initRealtimeRecords();
+        
+        const handleRecordsUpdate = () => {
+            // Re-fetch from memory cache (sẽ không tốn egress vì cache mới được update bởi Realtime)
+            loadData();
+        };
+        
+        window.addEventListener('records_realtime_update', handleRecordsUpdate);
+        
+        return () => {
+            window.removeEventListener('records_realtime_update', handleRecordsUpdate);
+        };
     }, [loadData]);
 
     // --- Record Handlers ---

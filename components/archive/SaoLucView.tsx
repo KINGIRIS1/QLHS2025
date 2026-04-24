@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, AlertTriangle } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
@@ -89,6 +89,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     useEffect(() => {
         loadData();
         loadEmployees();
+
+        initRealtimeArchive();
+        
+        const handleArchiveUpdate = (e: any) => {
+            if (e.detail?.type === 'saoluc') {
+                loadData();
+            }
+        };
+        
+        window.addEventListener('archive_realtime_update', handleArchiveUpdate);
+        return () => window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
     }, []);
 
     const loadData = async () => {

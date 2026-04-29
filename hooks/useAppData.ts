@@ -79,9 +79,10 @@ export const useAppData = (currentUser: User | null) => {
         // Bật realtime và lắng nghe thay đổi
         initRealtimeRecords();
         
-        const handleRecordsUpdate = () => {
-            // Re-fetch from memory cache (sẽ không tốn egress vì cache mới được update bởi Realtime)
-            loadData();
+        const handleRecordsUpdate = async () => {
+            // Lấy trực tiếp từ cache (đã được update bởi Realtime) và gán luôn để UI phản hồi tức thì
+            const freshRecords = await fetchRecords();
+            setRecords(freshRecords);
         };
         
         window.addEventListener('records_realtime_update', handleRecordsUpdate);

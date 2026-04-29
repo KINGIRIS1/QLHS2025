@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, CheckCircle } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
@@ -30,10 +30,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   // State cho Ghi chú cá nhân
   const [personalNote, setPersonalNote] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [noteSaveStatus, setNoteSaveStatus] = useState<'success' | 'error' | ''>('');
 
   // State cho Nhắc nhở
   const [reminderDate, setReminderDate] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
+  const [reminderSaveStatus, setReminderSaveStatus] = useState<'success' | 'error' | ''>('');
 
   // State cho giá hợp đồng
   const [contractPrice, setContractPrice] = useState<number | null>(null);
@@ -134,19 +136,23 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   const handleSavePersonalNote = async () => {
       setIsSavingNote(true);
+      setNoteSaveStatus('');
       const updatedRecord = { ...record, personalNotes: personalNote };
       const result = await updateRecordApi(updatedRecord);
       setIsSavingNote(false);
       
       if (result) {
-          alert('Đã lưu ghi chú cá nhân thành công!');
+          setNoteSaveStatus('success');
+          setTimeout(() => setNoteSaveStatus(''), 2500);
       } else {
-          alert('Lỗi khi lưu ghi chú.');
+          setNoteSaveStatus('error');
+          setTimeout(() => setNoteSaveStatus(''), 2500);
       }
   };
 
   const handleSaveReminder = async () => {
       setIsSavingReminder(true);
+      setReminderSaveStatus('');
       
       // Nếu user xóa trắng input -> xóa nhắc nhở
       const newReminderDate = reminderDate ? new Date(reminderDate).toISOString() : null;
@@ -162,10 +168,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       setIsSavingReminder(false);
       
       if (result) {
-          alert('Đã lưu lịch nhắc nhở!');
-          // Cập nhật lại record local nếu cần thiết (thường App sẽ auto refresh)
+          setReminderSaveStatus('success');
+          setTimeout(() => setReminderSaveStatus(''), 2500);
       } else {
-          alert('Lỗi khi lưu nhắc nhở.');
+          setReminderSaveStatus('error');
+          setTimeout(() => setReminderSaveStatus(''), 2500);
       }
   };
 
@@ -502,9 +509,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             <button 
                                 onClick={handleSaveReminder} 
                                 disabled={isSavingReminder}
-                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
+                                className={`text-[10px] text-white px-3 py-1.5 rounded flex items-center gap-1 font-bold transition-all disabled:opacity-50 ${reminderSaveStatus === 'success' ? 'bg-green-600 hover:bg-green-700' : reminderSaveStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                             >
-                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
+                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : reminderSaveStatus === 'success' ? <CheckCircle size={10} /> : <Save size={10} />}
+                                {reminderSaveStatus === 'success' ? 'Đã lưu' : reminderSaveStatus === 'error' ? 'Lỗi' : 'Lưu'}
                             </button>
                         </div>
                         <input 
@@ -525,10 +533,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             <button 
                                 onClick={handleSavePersonalNote} 
                                 disabled={isSavingNote}
-                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
+                                className={`text-[10px] text-white px-3 py-1.5 rounded flex items-center gap-1 font-bold transition-all disabled:opacity-50 ${noteSaveStatus === 'success' ? 'bg-green-600 hover:bg-green-700' : noteSaveStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                             >
-                                {isSavingNote ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
-                                Lưu
+                                {isSavingNote ? <Loader2 size={10} className="animate-spin" /> : noteSaveStatus === 'success' ? <CheckCircle size={10} /> : <Save size={10} />}
+                                {noteSaveStatus === 'success' ? 'Đã lưu' : noteSaveStatus === 'error' ? 'Lỗi' : 'Lưu'}
                             </button>
                         </div>
                         <textarea

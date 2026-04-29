@@ -8,7 +8,7 @@ import {
   CheckCircle2, Circle, Send, FileSignature, CheckSquare, 
   CalendarClock, FileCheck, Calculator, Loader2, StickyNote, 
   Save, Bell, Printer, Pencil, Trash2, Info, ChevronLeft,
-  Phone, Calendar, Hash
+  Phone, Calendar, Hash, CheckCircle
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
@@ -37,8 +37,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   
   const [personalNote, setPersonalNote] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [noteSaveStatus, setNoteSaveStatus] = useState<'success' | 'error' | ''>('');
   const [reminderDate, setReminderDate] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
+  const [reminderSaveStatus, setReminderSaveStatus] = useState<'success' | 'error' | ''>('');
   const [contractPrice, setContractPrice] = useState<number | null>(null);
   const [contractSplitItems, setContractSplitItems] = useState<SplitItem[] | null>(null);
   const [liquidationInfo, setLiquidationInfo] = useState<{ amount: number, content: string } | null>(null);
@@ -109,17 +111,31 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
   const handleSavePersonalNote = async () => {
     setIsSavingNote(true);
+    setNoteSaveStatus('');
     const result = await updateRecordApi({ ...record, personalNotes: personalNote });
     setIsSavingNote(false);
-    alert(result ? 'Đã lưu ghi chú!' : 'Lỗi khi lưu.');
+    if (result) {
+        setNoteSaveStatus('success');
+        setTimeout(() => setNoteSaveStatus(''), 2500);
+    } else {
+        setNoteSaveStatus('error');
+        setTimeout(() => setNoteSaveStatus(''), 2500);
+    }
   };
 
   const handleSaveReminder = async () => {
     setIsSavingReminder(true);
+    setReminderSaveStatus('');
     const newReminderDate = reminderDate ? new Date(reminderDate).toISOString() : null;
     const result = await updateRecordApi({ ...record, reminderDate: newReminderDate as string, lastRemindedAt: null as any });
     setIsSavingReminder(false);
-    alert(result ? 'Đã lưu nhắc nhở!' : 'Lỗi khi lưu.');
+    if (result) {
+        setReminderSaveStatus('success');
+        setTimeout(() => setReminderSaveStatus(''), 2500);
+    } else {
+        setReminderSaveStatus('error');
+        setTimeout(() => setReminderSaveStatus(''), 2500);
+    }
   };
 
   const handlePrintReceipt = async () => {
@@ -521,9 +537,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <button 
                   onClick={handleSaveReminder} 
                   disabled={isSavingReminder}
-                  className="text-[10px] bg-blue-600 text-white px-4 py-2 rounded-xl font-bold active:scale-95 transition-all disabled:opacity-50"
+                  className={`flex items-center gap-1 text-[10px] text-white px-4 py-2 rounded-xl font-bold active:scale-95 transition-all disabled:opacity-50 ${reminderSaveStatus === 'success' ? 'bg-green-600' : reminderSaveStatus === 'error' ? 'bg-red-600' : 'bg-blue-600'}`}
                 >
-                  {isSavingReminder ? <Loader2 size={12} className="animate-spin" /> : 'Lưu'}
+                  {isSavingReminder ? <Loader2 size={12} className="animate-spin" /> : reminderSaveStatus === 'success' ? <CheckCircle size={12} /> : null}
+                  {reminderSaveStatus === 'success' ? 'Đã lưu' : reminderSaveStatus === 'error' ? 'Lỗi' : 'Lưu'}
                 </button>
               </div>
               <input 
@@ -543,9 +560,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <button 
                   onClick={handleSavePersonalNote} 
                   disabled={isSavingNote}
-                  className="text-[10px] bg-blue-600 text-white px-4 py-2 rounded-xl font-bold active:scale-95 transition-all disabled:opacity-50"
+                  className={`flex items-center gap-1 text-[10px] text-white px-4 py-2 rounded-xl font-bold active:scale-95 transition-all disabled:opacity-50 ${noteSaveStatus === 'success' ? 'bg-green-600' : noteSaveStatus === 'error' ? 'bg-red-600' : 'bg-blue-600'}`}
                 >
-                  {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : 'Lưu'}
+                  {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : noteSaveStatus === 'success' ? <CheckCircle size={12} /> : null}
+                  {noteSaveStatus === 'success' ? 'Đã lưu' : noteSaveStatus === 'error' ? 'Lỗi' : 'Lưu'}
                 </button>
               </div>
               <textarea

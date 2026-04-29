@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
-import { X, Clock, User, FileText, MapPin, Calendar, Save, MessageSquare } from 'lucide-react';
+import { X, Clock, User, FileText, MapPin, Calendar, Save, MessageSquare, CheckCircle, Loader2 } from 'lucide-react';
 import { Employee } from '../../types';
 
 interface RecordDetailModalProps {
@@ -29,6 +29,7 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
     const [personalNote, setPersonalNote] = useState('');
     const [internalNote, setInternalNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'success' | 'error' | ''>('');
 
     useEffect(() => {
         if (record && isOpen) {
@@ -51,9 +52,12 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
     const handleSaveNotes = async () => {
         if (!record) return;
         setIsSaving(true);
+        setSaveStatus('');
         try {
-            const personalNotes = record.data?.personal_notes || {};
-            personalNotes[currentUser?.username] = personalNote;
+            const personalNotes = typeof record.data?.personal_notes === 'object' && record.data?.personal_notes !== null ? { ...record.data.personal_notes } : {};
+            if (currentUser?.username) {
+                personalNotes[currentUser.username] = personalNote;
+            }
 
             const { history, ...restData } = record.data || {};
             const updatedData = {
@@ -63,12 +67,15 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
             };
 
             await updateArchiveRecordsBatch([record.id], { data: updatedData });
+            setSaveStatus('success');
+            setTimeout(() => setSaveStatus(''), 2500);
             if (onUpdateRecord) {
                 onUpdateRecord();
             }
         } catch (error) {
             console.error("Lỗi khi lưu ghi chú:", error);
-            alert("Không thể lưu ghi chú. Vui lòng thử lại.");
+            setSaveStatus('error');
+            setTimeout(() => setSaveStatus(''), 2500);
         } finally {
             setIsSaving(false);
         }
@@ -166,9 +173,10 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                                     <button 
                                         onClick={handleSaveNotes}
                                         disabled={isSaving}
-                                        className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                                        className={`flex items-center gap-1 text-white px-3 py-1 rounded text-[10px] font-bold transition-all disabled:opacity-50 ${saveStatus === 'success' ? 'bg-green-600 hover:bg-green-700' : saveStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                     >
-                                        <Save size={12} /> Lưu
+                                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={12} /> : <Save size={12} />}
+                                        {saveStatus === 'success' ? 'Đã lưu' : saveStatus === 'error' ? 'Lỗi' : 'Lưu'}
                                     </button>
                                 </div>
                                 <textarea

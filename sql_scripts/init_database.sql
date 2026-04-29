@@ -209,6 +209,27 @@ CREATE TABLE archive_records (
     data JSON -- Lưu các trường mở rộng khác
 );
 
+-- 9. BẢNG QUẢN LÝ HỒ SƠ NGĂN CHẶN
+CREATE TABLE blocking_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owners JSONB,
+    "issueNumber" TEXT,
+    "certNumber" TEXT,
+    "issueDate" TEXT,
+    plots JSONB,
+    hamlet TEXT,
+    "oldCommune" TEXT,
+    "newCommune" TEXT,
+    "blockingDocuments" JSONB,
+    "unblockDoc" TEXT,
+    notes TEXT,
+    "isUnblocked" BOOLEAN DEFAULT false,
+    "createdBy" TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    attached_files JSONB,
+    unblock_attached_files JSONB
+);
+
 -- ==========================================
 -- 7. BẢNG TIỆN ÍCH (Tab Tiện ích)
 -- ==========================================

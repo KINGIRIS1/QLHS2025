@@ -101,6 +101,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
+        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: true },
         { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
         { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: true },
       ]

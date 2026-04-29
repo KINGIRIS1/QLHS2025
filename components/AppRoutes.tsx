@@ -20,6 +20,7 @@ import ArchiveRecords from './ArchiveRecords';
 import SystemView from './SystemView';
 
 import DangKyView from './archive/DangKyView';
+import BlockingRecordsView from './BlockingRecordsView';
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send } from 'lucide-react';
@@ -458,6 +459,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     users={users}
                     onResetUnread={() => props.setUnreadMessages(0)}
                     notificationEnabled={props.notificationEnabled}
+                />
+            );
+        case 'blocking_records':
+            return (
+                <BlockingRecordsView 
+                    currentUser={currentUser}
                 />
             );
         case 'work_schedule':

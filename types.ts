@@ -211,3 +211,43 @@ export interface WorkSchedule {
 // Interface Notification (Chuyển từ UtilitiesView sang đây để tránh Circular Dependency)
 export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
+
+// --- Thêm cho phần Ngăn Chặn ---
+export interface BlockingDocument {
+  docNumber: string;
+  date: string;
+  agency: string;
+  note: string;
+}
+
+export interface PlotData {
+  oldMapSheetNumber: string;
+  newMapSheetNumber: string;
+  oldPlotNumber: string;
+  newPlotNumber: string;
+  oldArea: number;
+  newArea: number;
+  plotNumber?: string;
+}
+
+export interface LandRecord {
+  id: string; // Trong DB sẽ có ID
+  owners: string[];
+  issueNumber: string;
+  certNumber: string;
+  issueDate: string;
+  plots: PlotData[];
+  hamlet: string;
+  oldCommune: string;
+  newCommune: string;
+  blockingDocuments: BlockingDocument[];
+  unblockDoc: string;
+  notes: string;
+  isUnblocked: boolean;
+  createdBy: string;
+  created_at?: string;
+  attached_files?: { id: string; url: string; name: string }[];
+  unblock_attached_files?: { id: string; url: string; name: string }[];
+}
+
+export type LandRecordFormData = Omit<LandRecord, 'id' | 'created_at'> & { id?: string };

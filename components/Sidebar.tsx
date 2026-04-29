@@ -41,13 +41,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   const hasManagerRights = isAdmin || isSubadmin || isTeamLeader;
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'dangky_records'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records'];
-  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records'];
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'dangky_records', 'blocking_records'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'blocking_records'];
+  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'blocking_records'];
 
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
     { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: true, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
+    { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: true },
     { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true }, 
     { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
     { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },

@@ -52,12 +52,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setOnlineUsers(users);
       };
 
-      presenceChannel.on('presence', { event: 'sync' }, updatePresence);
+      window.addEventListener('presence_state_changed', updatePresence);
       
       updatePresence();
       const interval = setInterval(updatePresence, 3000);
 
       return () => {
+          window.removeEventListener('presence_state_changed', updatePresence);
           clearInterval(interval);
       };
   }, []);

@@ -52,11 +52,19 @@ export const presenceChannel = supabase.channel('online_users', {
 
 let isPresenceSubscribed = false;
 let globalPresenceStatus = 'CLOSED';
+export let globalPresenceState: any = {};
 
 // Register global broadcast listener here
 presenceChannel.on('broadcast', { event: 'force_update' }, (payload) => {
     console.log("[DEBUG] Global broadcast received", payload);
     window.dispatchEvent(new CustomEvent('system_update_available_broadcast', { detail: payload }));
+});
+
+// Register presence listener BEFORE subscribing
+presenceChannel.on('presence', { event: 'sync' }, () => {
+    globalPresenceState = presenceChannel.presenceState();
+    console.log("[DEBUG] Presence sync", globalPresenceState);
+    window.dispatchEvent(new CustomEvent('presence_state_changed'));
 });
 
 if (typeof window !== 'undefined' && isConfigured) {

@@ -4,7 +4,7 @@ import TopNavigation from '../TopNavigation';
 import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings } from 'lucide-react';
 import { User, UserRole } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
-import { supabase, isConfigured } from '../../services/supabaseClient';
+import { supabase, isConfigured, presenceChannel } from '../../services/supabaseClient';
 import { APP_VERSION } from '../../constants';
 
 interface MainLayoutProps {
@@ -70,15 +70,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     useEffect(() => {
         if (!currentUser || !isConfigured) return;
 
-        let presenceChannel = supabase.getChannels().find(c => c.topic === 'realtime:online_users');
-        if (!presenceChannel) {
-            presenceChannel = supabase.channel('online_users');
-        }
-
-        // We only want to add the broadcast listener once per channel instance if possible,
-        // but since this runs once per mount, it's safer to just set it up.
-        // Actually, since presenceChannel could be shared, let's keep track if we subscribed.
-        
         const handleBroadcast = ({ payload }: any) => {
             if (payload.target === 'all' || payload.target === currentUser.username) {
                 window.location.reload(); 
@@ -89,7 +80,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 
         const joinAndTrack = async (status: string) => {
             if (status === 'SUBSCRIBED') {
-                await presenceChannel!.track({
+                await presenceChannel.track({
                     username: currentUser.username,
                     name: currentUser.name,
                     version: APP_VERSION,
@@ -98,7 +89,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             }
         };
 
-        // If it's already joined, track immediately
         if (presenceChannel.state === 'joined') {
             joinAndTrack('SUBSCRIBED');
         } else {
@@ -106,10 +96,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         }
 
         return () => {
-            if (presenceChannel) {
-                presenceChannel.untrack();
-                // presenceChannel.unsubscribe() might kill it for other components, so we just untrack
-            }
+            // We just untrack to keep channel alive
+            presenceChannel.untrack();
         };
     }, [currentUser]);
 

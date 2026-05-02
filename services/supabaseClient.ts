@@ -40,3 +40,6 @@ export const supabase = createClient(urlToUse, keyToUse, {
         schema: 'public',
     }
 });
+
+// Single shared channel for online presence
+export const presenceChannel = supabase.channel('online_users');

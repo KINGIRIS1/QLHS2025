@@ -5,7 +5,7 @@ import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
-import { supabase } from '../services/supabaseClient';
+import { supabase, presenceChannel } from '../services/supabaseClient';
 
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
@@ -43,14 +43,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       loadHolidays();
       loadUpdateConfig();
 
-      let channel = supabase.getChannels().find(c => c.topic === 'realtime:online_users');
-      if (!channel) {
-          channel = supabase.channel('online_users');
-          channel.subscribe();
-      }
-
       const updatePresence = () => {
-          const state = channel.presenceState();
+          const state = presenceChannel.presenceState();
           const users: any[] = [];
           for (const presences of Object.values(state)) {
               if (presences.length > 0) users.push(presences[presences.length - 1]);
@@ -58,24 +52,26 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setOnlineUsers(users);
       };
 
-      channel.on('presence', { event: 'sync' }, updatePresence);
-      
-      // Initial state
-      if (channel.state === 'joined') {
-          updatePresence();
+      updatePresence();
+      const interval = setInterval(updatePresence, 2000);
+
+      // Ensure channel is subscribed in case MainLayout hasn't for some reason
+      if (presenceChannel.state !== 'joined') {
+          presenceChannel.subscribe();
       }
+
+      return () => {
+          clearInterval(interval);
+      };
   }, []);
 
   const handleForceUpdate = (username: string) => {
       if (confirm(`Bạn có chắc muốn ép user ${username === 'all' ? 'tất cả' : username} nhận thông báo cập nhật?`)) {
-          const channel = supabase.getChannels().find(c => c.topic === 'realtime:online_users');
-          if (channel) {
-              channel.send({
-                  type: 'broadcast',
-                  event: 'force_update',
-                  payload: { target: username }
-              });
-          }
+          presenceChannel.send({
+              type: 'broadcast',
+              event: 'force_update',
+              payload: { target: username }
+          });
       }
   };
 

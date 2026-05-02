@@ -116,9 +116,6 @@ export const useAppData = (currentUser: User | null) => {
                         setIsUpdateAvailable(true);
                         setLatestVersion(payload.version);
                         if (payload.url) setUpdateUrl(payload.url);
-                    } else {
-                        // Admin ép kiểm tra nhưng trùng phiên bản
-                        window.dispatchEvent(new CustomEvent('app_toast', { detail: { type: 'success', message: 'Hệ thống vừa kiểm tra cập nhật nhưng bạn đang dùng bản mới nhất!' } }));
                     }
                 } else {
                     // Fallback to fetch if payload doesn't contain version info
@@ -127,8 +124,6 @@ export const useAppData = (currentUser: User | null) => {
                             setIsUpdateAvailable(true);
                             setLatestVersion(info.version);
                             if (info.url) setUpdateUrl(info.url);
-                        } else if (info && info.version === APP_VERSION) {
-                            window.dispatchEvent(new CustomEvent('app_toast', { detail: { type: 'success', message: 'Hệ thống vừa kiểm tra cập nhật nhưng bạn đang dùng bản mới nhất!' } }));
                         }
                     });
                 }

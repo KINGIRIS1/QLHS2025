@@ -64,11 +64,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   const handleForceUpdate = (username: string) => {
       if (confirm(`Bạn có chắc muốn ép user ${username === 'all' ? 'tất cả' : username} nhận thông báo cập nhật?`)) {
-          presenceChannel.send({
-              type: 'broadcast',
-              event: 'force_update',
-              payload: { target: username }
-          });
+          try {
+              presenceChannel.send({
+                  type: 'broadcast',
+                  event: 'force_update',
+                  payload: { target: username, version: manualVersion.trim(), url: manualUrl.trim() }
+              });
+              alert('Đã gửi hiệu lệnh.');
+          } catch (e) {
+              alert('Không thể gửi hiệu lệnh broadcast. Lỗi: ' + e);
+          }
       }
   };
 
@@ -125,12 +130,19 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       const success = await saveUpdateInfo(manualVersion.trim(), manualUrl.trim());
       setIsSavingUpdate(false);
       if (success) {
+          // Trigger update on current client immediately
+          window.dispatchEvent(new CustomEvent('system_update_available'));
+          
           // Send broadcast to notify all clients
-          presenceChannel.send({
-              type: 'broadcast',
-              event: 'force_update',
-              payload: { target: 'all' }
-          });
+          try {
+              presenceChannel.send({
+                  type: 'broadcast',
+                  event: 'force_update',
+                  payload: { target: 'all', version: manualVersion.trim(), url: manualUrl.trim() }
+              });
+          } catch (err) {
+              console.error("Broadcast failed", err);
+          }
           alert(`Đã phát hành phiên bản ${manualVersion}!\nTất cả người dùng sẽ nhận được thông báo cập nhật sau vài giây.`);
       } else {
           alert("Lỗi khi lưu cấu hình cập nhật. Vui lòng thử lại.");

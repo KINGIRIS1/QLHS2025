@@ -70,14 +70,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     useEffect(() => {
         if (!currentUser || !isConfigured) return;
 
-        const handleBroadcast = ({ payload }: any) => {
-            if (payload.target === 'all' || payload.target === currentUser.username) {
-                window.dispatchEvent(new CustomEvent('system_update_available'));
-            }
-        };
-
-        presenceChannel.on('broadcast', { event: 'force_update' }, handleBroadcast);
-
         trackPresence(currentUser, APP_VERSION);
 
         return () => {

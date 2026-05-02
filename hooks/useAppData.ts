@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RecordFile, Employee, User, RecordStatus, Holiday } from '../types';
 import { 
     fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
@@ -71,6 +71,11 @@ export const useAppData = (currentUser: User | null) => {
         }
     }, []);
 
+    const currentUserRef = useRef(currentUser);
+    useEffect(() => {
+        currentUserRef.current = currentUser;
+    }, [currentUser]);
+
     // Initial Load
     useEffect(() => {
         loadData();
@@ -87,17 +92,56 @@ export const useAppData = (currentUser: User | null) => {
         
         const handleSystemUpdate = async () => {
             const updateInfo = await fetchUpdateInfo();
+            console.log("[DEBUG] handleSystemUpdate:", updateInfo, "APP_VERSION:", APP_VERSION);
             if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
+                console.log("[DEBUG] Triggering setIsUpdateAvailable");
                 setIsUpdateAvailable(true);
                 setLatestVersion(updateInfo.version);
                 setUpdateUrl(updateInfo.url);
             }
         };
         
+        // Initial check on mount
+        handleSystemUpdate();
+        
+        // Check periodically
+        const updateInterval = setInterval(handleSystemUpdate, 5 * 60 * 1000);
+        
+        const handleBroadcast = (e: any) => {
+            const { payload } = e.detail;
+            console.log("[DEBUG] Broadcast event received in useAppData", payload);
+            if (payload && (payload.target === 'all' || (currentUserRef.current && payload.target === currentUserRef.current.username))) {
+                if (payload.version) {
+                    if (payload.version !== APP_VERSION) {
+                        setIsUpdateAvailable(true);
+                        setLatestVersion(payload.version);
+                        if (payload.url) setUpdateUrl(payload.url);
+                    } else {
+                        // Admin ép kiểm tra nhưng trùng phiên bản
+                        window.dispatchEvent(new CustomEvent('app_toast', { detail: { type: 'success', message: 'Hệ thống vừa kiểm tra cập nhật nhưng bạn đang dùng bản mới nhất!' } }));
+                    }
+                } else {
+                    // Fallback to fetch if payload doesn't contain version info
+                    fetchUpdateInfo().then(info => {
+                        if (info && info.version && info.version !== APP_VERSION) {
+                            setIsUpdateAvailable(true);
+                            setLatestVersion(info.version);
+                            if (info.url) setUpdateUrl(info.url);
+                        } else if (info && info.version === APP_VERSION) {
+                            window.dispatchEvent(new CustomEvent('app_toast', { detail: { type: 'success', message: 'Hệ thống vừa kiểm tra cập nhật nhưng bạn đang dùng bản mới nhất!' } }));
+                        }
+                    });
+                }
+            }
+        };
+        
+        window.addEventListener('system_update_available_broadcast', handleBroadcast);
         window.addEventListener('records_realtime_update', handleRecordsUpdate);
         window.addEventListener('system_update_available', handleSystemUpdate);
         
         return () => {
+            clearInterval(updateInterval);
+            window.removeEventListener('system_update_available_broadcast', handleBroadcast);
             window.removeEventListener('records_realtime_update', handleRecordsUpdate);
             window.removeEventListener('system_update_available', handleSystemUpdate);
         };

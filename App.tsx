@@ -23,6 +23,7 @@ import { useGlobalChatListener } from './hooks/useGlobalChatListener';
 import { useIsMobile } from './hooks/useIsMobile';
 import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
+import UpdateRequiredModal from './components/UpdateRequiredModal';
 
 function App() {
   const isMobile = useIsMobile(768);
@@ -76,6 +77,17 @@ function App() {
   const [updateSpeed, setUpdateSpeed] = useState(0); // Bytes per second
   const [updateDeferred, setUpdateDeferred] = useState(false); // Đã chọn cập nhật sau 10p chưa
 
+  // Reset deferred state when an explicit broadcast arrives
+  useEffect(() => {
+      const handleResetDeferred = () => setUpdateDeferred(false);
+      window.addEventListener('system_update_available_broadcast', handleResetDeferred);
+      window.addEventListener('system_update_available', handleResetDeferred);
+      return () => {
+          window.removeEventListener('system_update_available_broadcast', handleResetDeferred);
+          window.removeEventListener('system_update_available', handleResetDeferred);
+      };
+  }, []);
+
   // Toast effect
   useEffect(() => {
       if (toast) {
@@ -83,6 +95,15 @@ function App() {
           return () => clearTimeout(timer);
       }
   }, [toast]);
+
+  // Lắng nghe sự kiện app_toast global
+  useEffect(() => {
+      const handleAppToast = (e: any) => {
+          if (e.detail) setToast(e.detail);
+      };
+      window.addEventListener('app_toast', handleAppToast);
+      return () => window.removeEventListener('app_toast', handleAppToast);
+  }, []);
 
   // Electron Nav Listener
   useEffect(() => {
@@ -480,12 +501,37 @@ function App() {
       }
   };
 
-  if (!currentUser) return <Login onLogin={handleLogin} users={users} />;
+  if (!currentUser) {
+      return (
+          <>
+            <UpdateRequiredModal 
+                visible={isUpdateAvailable && !updateDeferred}
+                version={latestVersion}
+                downloadStatus={updateStatus}
+                progress={updateProgress}
+                downloadSpeed={updateSpeed}
+                onUpdateNow={handleUpdateNow}
+                onUpdateLater={handleUpdateLater}
+            />
+            <Login onLogin={handleLogin} users={users} />
+          </>
+      );
+  }
 
   if (isMobile) {
     return (
-      <MobileLayout
-        currentUser={currentUser}
+      <>
+        <UpdateRequiredModal 
+            visible={isUpdateAvailable && !updateDeferred}
+            version={latestVersion}
+            downloadStatus={updateStatus}
+            progress={updateProgress}
+            downloadSpeed={updateSpeed}
+            onUpdateNow={handleUpdateNow}
+            onUpdateLater={handleUpdateLater}
+        />
+        <MobileLayout
+          currentUser={currentUser}
         currentView={currentView}
         setCurrentView={setCurrentView}
         onLogout={() => setCurrentUser(null)}
@@ -574,6 +620,7 @@ function App() {
             </div>
         )}
       </MobileLayout>
+      </>
     );
   }
 

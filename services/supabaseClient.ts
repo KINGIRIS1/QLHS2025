@@ -51,6 +51,37 @@ export const presenceChannel = supabase.channel('online_users', {
 });
 
 let isPresenceSubscribed = false;
+let globalPresenceStatus = 'CLOSED';
+
+// Register global broadcast listener here
+presenceChannel.on('broadcast', { event: 'force_update' }, (payload) => {
+    console.log("[DEBUG] Global broadcast received", payload);
+    window.dispatchEvent(new CustomEvent('system_update_available_broadcast', { detail: payload }));
+});
+
+if (typeof window !== 'undefined' && isConfigured) {
+    presenceChannel.subscribe((status) => {
+        globalPresenceStatus = status;
+        console.log("[DEBUG] global presenceChannel status:", status);
+    });
+    isPresenceSubscribed = true;
+
+    // Lắng nghe sự thay đổi của bảng system_settings để ép hiện popup ngay lập tức
+    supabase.channel('system_settings_changes')
+        .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'system_settings' },
+            (payload: any) => {
+                const row = payload.new;
+                if (row && row.key === 'app_version') {
+                    console.log("[DEBUG] app_version changed in DB", row);
+                    // Bắn event để hook useAppData gọi fetchUpdateInfo() và hiện popup ngay
+                    window.dispatchEvent(new CustomEvent('system_update_available'));
+                }
+            }
+        )
+        .subscribe();
+}
 
 export const trackPresence = async (user: any, version: string) => {
     if (!user) return;
@@ -64,30 +95,30 @@ export const trackPresence = async (user: any, version: string) => {
                 version: version,
                 onlineAt: new Date().toISOString()
             });
+            console.log("[DEBUG] tracked presence success");
         } catch (e) {
             console.error('Error tracking presence', e);
         }
     };
 
-    if (presenceChannel.state === 'joined') {
+    if (globalPresenceStatus === 'SUBSCRIBED') {
         await doTrack();
-    } else if (!isPresenceSubscribed) {
-        isPresenceSubscribed = true;
-        presenceChannel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await doTrack();
-            }
-        });
     } else {
-        // If it's already subscribing but not joined yet, we can simply poll until joined and then track
+        // Poll for subscription status
         const checkInterval = setInterval(async () => {
-            if (presenceChannel.state === 'joined') {
+            if (globalPresenceStatus === 'SUBSCRIBED') {
                 clearInterval(checkInterval);
                 await doTrack();
             }
         }, 500);
         
         // Safety timeout
-        setTimeout(() => clearInterval(checkInterval), 10000);
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            if (globalPresenceStatus !== 'SUBSCRIBED') {
+                 console.log("[DEBUG] Force tracking presence after timeout");
+                 doTrack();
+            }
+        }, 8000);
     }
 };

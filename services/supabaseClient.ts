@@ -42,4 +42,52 @@ export const supabase = createClient(urlToUse, keyToUse, {
 });
 
 // Single shared channel for online presence
-export const presenceChannel = supabase.channel('online_users');
+export const presenceChannel = supabase.channel('online_users', {
+    config: {
+        broadcast: {
+            self: true
+        }
+    }
+});
+
+let isPresenceSubscribed = false;
+
+export const trackPresence = async (user: any, version: string) => {
+    if (!user) return;
+    
+    // Function to actually track
+    const doTrack = async () => {
+        try {
+            await presenceChannel.track({
+                username: user.username,
+                name: user.name,
+                version: version,
+                onlineAt: new Date().toISOString()
+            });
+        } catch (e) {
+            console.error('Error tracking presence', e);
+        }
+    };
+
+    if (presenceChannel.state === 'joined') {
+        await doTrack();
+    } else if (!isPresenceSubscribed) {
+        isPresenceSubscribed = true;
+        presenceChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await doTrack();
+            }
+        });
+    } else {
+        // If it's already subscribing but not joined yet, we can simply poll until joined and then track
+        const checkInterval = setInterval(async () => {
+            if (presenceChannel.state === 'joined') {
+                clearInterval(checkInterval);
+                await doTrack();
+            }
+        }, 500);
+        
+        // Safety timeout
+        setTimeout(() => clearInterval(checkInterval), 10000);
+    }
+};

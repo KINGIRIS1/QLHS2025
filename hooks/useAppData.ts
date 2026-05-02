@@ -85,10 +85,21 @@ export const useAppData = (currentUser: User | null) => {
             setRecords(freshRecords);
         };
         
+        const handleSystemUpdate = async () => {
+            const updateInfo = await fetchUpdateInfo();
+            if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
+                setIsUpdateAvailable(true);
+                setLatestVersion(updateInfo.version);
+                setUpdateUrl(updateInfo.url);
+            }
+        };
+        
         window.addEventListener('records_realtime_update', handleRecordsUpdate);
+        window.addEventListener('system_update_available', handleSystemUpdate);
         
         return () => {
             window.removeEventListener('records_realtime_update', handleRecordsUpdate);
+            window.removeEventListener('system_update_available', handleSystemUpdate);
         };
     }, [loadData]);
 

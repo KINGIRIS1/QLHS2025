@@ -4,7 +4,7 @@ import TopNavigation from '../TopNavigation';
 import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings } from 'lucide-react';
 import { User, UserRole } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
-import { supabase, isConfigured, presenceChannel } from '../../services/supabaseClient';
+import { supabase, isConfigured, presenceChannel, trackPresence } from '../../services/supabaseClient';
 import { APP_VERSION } from '../../constants';
 
 interface MainLayoutProps {
@@ -72,31 +72,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 
         const handleBroadcast = ({ payload }: any) => {
             if (payload.target === 'all' || payload.target === currentUser.username) {
-                window.location.reload(); 
+                window.dispatchEvent(new CustomEvent('system_update_available'));
             }
         };
 
         presenceChannel.on('broadcast', { event: 'force_update' }, handleBroadcast);
 
-        const joinAndTrack = async (status: string) => {
-            if (status === 'SUBSCRIBED') {
-                await presenceChannel.track({
-                    username: currentUser.username,
-                    name: currentUser.name,
-                    version: APP_VERSION,
-                    onlineAt: new Date().toISOString()
-                });
-            }
-        };
-
-        if (presenceChannel.state === 'joined') {
-            joinAndTrack('SUBSCRIBED');
-        } else {
-            presenceChannel.subscribe(joinAndTrack);
-        }
+        trackPresence(currentUser, APP_VERSION);
 
         return () => {
-            // We just untrack to keep channel alive
             presenceChannel.untrack();
         };
     }, [currentUser]);

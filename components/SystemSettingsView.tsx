@@ -52,13 +52,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setOnlineUsers(users);
       };
 
+      presenceChannel.on('presence', { event: 'sync' }, updatePresence);
+      
       updatePresence();
-      const interval = setInterval(updatePresence, 2000);
-
-      // Ensure channel is subscribed in case MainLayout hasn't for some reason
-      if (presenceChannel.state !== 'joined') {
-          presenceChannel.subscribe();
-      }
+      const interval = setInterval(updatePresence, 3000);
 
       return () => {
           clearInterval(interval);
@@ -128,6 +125,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       const success = await saveUpdateInfo(manualVersion.trim(), manualUrl.trim());
       setIsSavingUpdate(false);
       if (success) {
+          // Send broadcast to notify all clients
+          presenceChannel.send({
+              type: 'broadcast',
+              event: 'force_update',
+              payload: { target: 'all' }
+          });
           alert(`Đã phát hành phiên bản ${manualVersion}!\nTất cả người dùng sẽ nhận được thông báo cập nhật sau vài giây.`);
       } else {
           alert("Lỗi khi lưu cấu hình cập nhật. Vui lòng thử lại.");

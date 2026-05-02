@@ -1,28 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { LandRecord, LandRecordFormData, BlockingDocument, User, PlotData } from '../types';
+import { supabase, isConfigured } from '../services/supabaseClient';
 import { Plus, Trash2, X, Save, AlertCircle, FileText, Paperclip, Loader2, Download } from 'lucide-react';
 import JSZip from 'jszip';
 
 interface RecordFormProps {
   initialData?: LandRecord;
   currentUser: User; // Thêm prop này để biết ai đang nhập
-  onSubmit: (data: LandRecordFormData) => void;
+  onSubmit: (data: LandRecordFormData) => Promise<void> | void;
   onCancel: () => void;
 }
 
 // Dữ liệu danh sách xã/phường (Giống như trong App.tsx để đồng bộ)
 const PREDEFINED_NEW_COMMUNES = [
-  'Bình Long',
-  'An Lộc'
+  'Chơn Thành',
+  'Minh Hưng',
+  'Nha Bích'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
 const PREDEFINED_OLD_COMMUNES = [
-  'Hưng Chiến',
-  'An Lộc',
-  'Thanh Lương',
-  'Phú Thịnh',
-  'Thanh Phú',
-  'Phú Đức'
+  'Hưng Long',
+  'Minh Thành',
+  'Thành Tâm',
+  'Nha Bích',
+  'Minh Lập',
+  'Minh Thắng',
+  'Minh Hưng',
+  'Minh Long'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
 const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSubmit, onCancel }) => {
@@ -156,10 +160,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     }
   };
 
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const [uploadingUnblockFile, setUploadingUnblockFile] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingUnblockFiles, setPendingUnblockFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleUnblockFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUnblockFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -168,51 +173,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       return;
     }
 
-    setUploadingUnblockFile(true);
-    try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64data = (reader.result as string).split(',')[1];
-          resolve(base64data);
-        };
-      });
-      reader.readAsDataURL(file);
-      const base64 = await base64Promise;
-
-      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXbQyjKR4_BDAR33LMdxZldWmj7pJY4TDV4D6cLRWBNLP0QTcFKGR_eaOcKojZObNAtQ/exec';
-
-      const response = await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            fileName: file.name,
-            mimeType: file.type,
-            base64: base64
-          }),
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8', // Dùng text/plain để tránh lỗi CORS Preflight
-          }
-      });
-
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-          const newFile = { id: result.fileId, url: result.fileUrl, name: result.fileName };
-          setFormData(prev => ({
-              ...prev,
-              unblock_attached_files: [...(prev.unblock_attached_files || []), newFile]
-          }));
-          alert('Tải file đính kèm giải tỏa thành công!');
-      } else {
-          throw new Error(result.error || result.message);
-      }
-    } catch (error) {
-        console.error("Lỗi upload file giải tỏa:", error);
-        alert('Có lỗi xảy ra khi tải file lên!');
-    } finally {
-        setUploadingUnblockFile(false);
-        e.target.value = '';
-    }
+    setPendingUnblockFiles(prev => [...prev, file]);
+    e.target.value = '';
   };
 
   const removeUnblockFile = (indexToRemove: number) => {
@@ -221,8 +183,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       unblock_attached_files: prev.unblock_attached_files?.filter((_, idx) => idx !== indexToRemove)
     }));
   };
+  
+  const removePendingUnblockFile = (index: number) => {
+    setPendingUnblockFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -231,52 +197,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       return;
     }
 
-    setUploadingFile(true);
-    try {
-      // Chuyển file PDF thành Base64 trực tiếp (không nén ZIP)
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64data = (reader.result as string).split(',')[1];
-          resolve(base64data);
-        };
-      });
-      reader.readAsDataURL(file);
-      const base64 = await base64Promise;
-
-      // Gửi lên Google Apps Script
-      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXbQyjKR4_BDAR33LMdxZldWmj7pJY4TDV4D6cLRWBNLP0QTcFKGR_eaOcKojZObNAtQ/exec'; 
-      
-      const response = await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          fileName: file.name,
-          mimeType: file.type,
-          base64: base64
-        }),
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8', // Dùng text/plain để tránh lỗi CORS
-        }
-      });
-      
-      const result = await response.json();
-      if (result.status === 'success') {
-        const newFile = { id: result.fileId, url: result.fileUrl, name: result.fileName };
-        setFormData(prev => ({
-          ...prev,
-          attached_files: [...(prev.attached_files || []), newFile]
-        }));
-        alert('Đã tải lên và đính kèm file thành công!');
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error: any) {
-      console.error('Lỗi upload:', error);
-      alert('Lỗi khi tải file lên: ' + error.message);
-    } finally {
-      setUploadingFile(false);
-      e.target.value = ''; // Reset input
-    }
+    setPendingFiles(prev => [...prev, file]);
+    e.target.value = ''; // Reset input
   };
 
   const removeFile = (index: number) => {
@@ -287,9 +209,56 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    setIsSubmitting(true);
+
+    try {
+      let finalFormData = { ...formData };
+      
+      // Upload pending blocked files
+      if (pendingFiles.length > 0) {
+        if (!isConfigured) throw new Error("Vui lòng cấu hình Supabase để tải file lên.");
+        const uploadedFiles = [];
+        for (const file of pendingFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `blocking_docs/${fileName}`;
+          const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
+          if (error) throw new Error(error.message);
+          const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
+          uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+        }
+        finalFormData.attached_files = [...(finalFormData.attached_files || []), ...uploadedFiles];
+      }
+
+      // Upload pending unblock files
+      if (pendingUnblockFiles.length > 0) {
+        if (!isConfigured) throw new Error("Vui lòng cấu hình Supabase để tải file lên.");
+        const uploadedFiles = [];
+        for (const file of pendingUnblockFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `unblock_docs/${fileName}`;
+          const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
+          if (error) throw new Error(error.message);
+          const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
+          uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+        }
+        finalFormData.unblock_attached_files = [...(finalFormData.unblock_attached_files || []), ...uploadedFiles];
+      }
+      
+      await onSubmit(finalFormData);
+    } catch (error: any) {
+      console.error("Lỗi khi tải file hoặc lưu dữ liệu:", error);
+      alert('Có lỗi xảy ra: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -620,25 +589,43 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                         <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (Chỉ hỗ trợ PDF)</label>
                         
                         <div className="flex items-center gap-3 mb-3">
-                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors ${uploadingFile ? 'bg-gray-200 text-gray-500' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}`}>
-                                {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
-                                {uploadingFile ? 'Đang tải lên...' : 'Chọn file PDF'}
-                                <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={uploadingFile} />
+                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}`}>
+                                <Paperclip size={16} />
+                                Chọn file PDF
+                                <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} />
                             </label>
                         </div>
 
                         {/* Hiển thị danh sách file đã đính kèm */}
                         {formData.attached_files && formData.attached_files.length > 0 && (
-                            <div className="space-y-2">
+                            <div className="space-y-2 mt-2">
                                 {formData.attached_files.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between bg-gray-50 p-2 border border-gray-200 rounded-sm text-sm">
                                         <div className="flex items-center gap-2 text-gray-700">
                                             <Paperclip size={14} className="text-gray-400" />
-                                            <a href={`https://drive.google.com/uc?export=download&id=${file.id}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
                                                 {file.name}
                                             </a>
                                         </div>
                                         <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 p-1">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {/* pending files */}
+                        {pendingFiles.length > 0 && (
+                            <div className="space-y-2 mt-2">
+                                {pendingFiles.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between bg-yellow-50 p-2 border border-yellow-200 rounded-sm text-sm">
+                                        <div className="flex items-center gap-2 text-yellow-700">
+                                            {isSubmitting ? <Loader2 size={14} className="text-yellow-600 animate-spin" /> : <Paperclip size={14} className="text-yellow-600" />}
+                                            <span>
+                                                {file.name} <em className="text-[10px] text-yellow-600">(Chờ tải lên...)</em>
+                                            </span>
+                                        </div>
+                                        <button type="button" onClick={() => removePendingFile(index)} className="text-red-500 hover:text-red-700 p-1" disabled={isSubmitting}>
                                             <X size={16} />
                                         </button>
                                     </div>
@@ -683,25 +670,43 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                         </div>
 
                         <div className="flex items-center gap-3 mb-3">
-                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors ${uploadingUnblockFile ? 'bg-gray-200 text-gray-500' : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}`}>
-                                {uploadingUnblockFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
-                                {uploadingUnblockFile ? 'Đang tải lên...' : 'Đính kèm file giải tỏa (PDF)'}
-                                <input type="file" accept=".pdf" className="hidden" onChange={handleUnblockFileUpload} disabled={uploadingUnblockFile} />
+                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}`}>
+                                <Paperclip size={16} />
+                                Đính kèm file giải tỏa (PDF)
+                                <input type="file" accept=".pdf" className="hidden" onChange={handleUnblockFileUpload} />
                             </label>
                         </div>
 
                         {/* Hiển thị danh sách file giải tỏa đính kèm */}
                         {formData.unblock_attached_files && formData.unblock_attached_files.length > 0 && (
-                            <div className="space-y-2">
+                            <div className="space-y-2 mt-2">
                                 {formData.unblock_attached_files.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between bg-green-50 p-2 border border-green-200 rounded-sm text-sm">
                                         <div className="flex items-center gap-2 text-green-800">
                                             <Paperclip size={14} className="text-green-600" />
-                                            <a href={`https://drive.google.com/uc?export=download&id=${file.id}`} target="_blank" rel="noopener noreferrer" className="hover:text-green-900 hover:underline">
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-green-900 hover:underline">
                                                 {file.name}
                                             </a>
                                         </div>
                                         <button type="button" onClick={() => removeUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {/* pending unblock files */}
+                        {pendingUnblockFiles.length > 0 && (
+                            <div className="space-y-2 mt-2">
+                                {pendingUnblockFiles.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between bg-yellow-50 p-2 border border-yellow-200 rounded-sm text-sm">
+                                        <div className="flex items-center gap-2 text-yellow-700">
+                                            {isSubmitting ? <Loader2 size={14} className="text-yellow-600 animate-spin" /> : <Paperclip size={14} className="text-yellow-600" />}
+                                            <span>
+                                                {file.name} <em className="text-[10px] text-yellow-600">(Chờ tải lên...)</em>
+                                            </span>
+                                        </div>
+                                        <button type="button" onClick={() => removePendingUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1" disabled={isSubmitting}>
                                             <X size={16} />
                                         </button>
                                     </div>
@@ -727,9 +732,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
           <button
             type="submit"
             form="recordForm"
-            className="px-5 py-2 bg-[#00507d] text-white rounded-sm hover:bg-[#003b5c] transition-colors text-sm font-bold uppercase shadow-sm flex items-center gap-2"
+            disabled={isSubmitting}
+            className={`px-5 py-2 text-white rounded-sm transition-colors text-sm font-bold uppercase shadow-sm flex items-center gap-2 ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#00507d] hover:bg-[#003b5c]'}`}
           >
-            <Save size={16} /> Lưu Dữ Liệu
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+            {isSubmitting ? 'ĐANG LƯU...' : 'LƯU DỮ LIỆU'}
           </button>
         </div>
       </div>

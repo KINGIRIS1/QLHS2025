@@ -1,9 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TopNavigation from '../TopNavigation';
 import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings } from 'lucide-react';
 import { User, UserRole } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
+import { supabase, isConfigured } from '../../services/supabaseClient';
+import { APP_VERSION } from '../../constants';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -65,6 +67,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
+    useEffect(() => {
+        if (!currentUser || !isConfigured) return;
+
+        const presenceChannel = supabase.channel('online_users');
+
+        presenceChannel
+            .on('broadcast', { event: 'force_update' }, ({ payload }) => {
+                if (payload.target === 'all' || payload.target === currentUser.username) {
+                    window.location.reload(); 
+                }
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await presenceChannel.track({
+                        username: currentUser.username,
+                        name: currentUser.name,
+                        version: APP_VERSION,
+                        onlineAt: new Date().toISOString()
+                    });
+                }
+            });
+
+        return () => {
+            presenceChannel.unsubscribe();
+        };
+    }, [currentUser]);
+
     if (!currentUser) return <>{children}</>;
 
     return (
@@ -87,10 +116,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     <div className="bg-white/10 p-1.5 rounded-lg">
                         <ShieldCheck size={24} className="text-white" />
                     </div>
-                    <div className="flex flex-col leading-tight">
-                        <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và</h1>
-                        <span className="font-bold text-sm uppercase tracking-wide">quản lý hồ sơ</span>
-                        <span className="text-[10px] text-blue-200 font-normal">Chi nhánh Chơn Thành</span>
+                    <div className="flex flex-col items-center text-center leading-tight">
+                        <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và quản lý hồ sơ</h1>
+                        <span className="font-bold text-sm uppercase tracking-wide">văn phòng đăng ký đất đai tỉnh đồng nai</span>
+                        <span className="font-bold text-sm uppercase tracking-wide">chi nhánh chơn thành</span>
                     </div>
                 </div>
 
@@ -137,18 +166,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                         </div>
                                         Cài đặt tài khoản
                                     </button>
-                                    <button 
-                                        onClick={() => {
-                                            setCurrentView('system_dashboard');
-                                            setIsUserMenuOpen(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
-                                    >
-                                        <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
-                                            <Settings size={16} />
-                                        </div>
-                                        Cài đặt hệ thống
-                                    </button>
+                                    {currentUser?.role === UserRole.ADMIN && (
+                                        <button 
+                                            onClick={() => {
+                                                setCurrentView('system_dashboard');
+                                                setIsUserMenuOpen(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                        >
+                                            <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
+                                                <Settings size={16} />
+                                            </div>
+                                            Cài đặt hệ thống
+                                        </button>
+                                    )}
                                     <div className="h-px bg-gray-100 my-1 mx-2"></div>
                                     <button 
                                         onClick={() => {

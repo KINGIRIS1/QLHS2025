@@ -472,7 +472,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   };
 
   const handleCropConfirm = (blob: Blob) => {
-      const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+      const timestamp = new Date().toISOString().replace(/-/g, "").replace(/:/g, "").replace(/\./g, "");
       const screenshotFile = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
       setFile(screenshotFile);
       setScreenshotImg(null);

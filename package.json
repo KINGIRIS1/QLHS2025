@@ -6,7 +6,7 @@
   "author": "DonViHanhChinh",
   "description": "Phan mem quan ly ho so dia chinh",
   "scripts": {
-    "dev": "concurrently \"vite\" \"npm run electron:dev\"",
+    "dev": "tsx server.ts",
     "server": "node server/index.js",
     "build": "tsc && vite build",
     "lint": "tsc --noEmit",

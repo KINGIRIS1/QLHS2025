@@ -587,7 +587,7 @@ function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         isGeneratingReport={isGeneratingReport}
-        isUpdateAvailable={false} 
+        isUpdateAvailable={isUpdateAvailable} 
         latestVersion={latestVersion}
         updateUrl={updateUrl}
         unreadMessages={unreadMessages}

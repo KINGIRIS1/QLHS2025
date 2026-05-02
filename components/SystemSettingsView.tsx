@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
+import { supabase } from '../services/supabaseClient';
 
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
@@ -25,6 +26,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [manualUrl, setManualUrl] = useState('');
   const [isSavingUpdate, setIsSavingUpdate] = useState(false);
 
+  // Online Users State
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+
   // Holiday States
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   // Form thêm mới ngày lễ
@@ -38,7 +42,31 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   useEffect(() => {
       loadHolidays();
       loadUpdateConfig();
+
+      const channel = supabase.channel('online_users');
+      channel.on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState();
+          const users: any[] = [];
+          for (const presences of Object.values(state)) {
+              if (presences.length > 0) users.push(presences[presences.length - 1]);
+          }
+          setOnlineUsers(users);
+      }).subscribe();
+
+      return () => {
+          channel.unsubscribe();
+      };
   }, []);
+
+  const handleForceUpdate = (username: string) => {
+      if (confirm(`Bạn có chắc muốn ép user ${username === 'all' ? 'tất cả' : username} nhận thông báo cập nhật?`)) {
+          supabase.channel('online_users').send({
+              type: 'broadcast',
+              event: 'force_update',
+              payload: { target: username }
+          });
+      }
+  };
 
   const loadHolidays = async () => {
       const data = await fetchHolidays();
@@ -210,6 +238,68 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             <button onClick={handleSaveUpdateConfig} disabled={isSavingUpdate} className="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-900 text-sm font-medium shadow-lg transition-all active:scale-95">
                                 {isSavingUpdate ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Phát hành phiên bản
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Online Users Updates Config */}
+                    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="font-black text-gray-700 flex items-center gap-2 tracking-tight">
+                                <Users size={18} className="text-teal-500" /> Trạng thái phiên bản Users
+                            </h3>
+                            <button onClick={() => handleForceUpdate('all')} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl font-bold text-sm transition-colors">
+                                <Send size={16} /> Ép tất cả cập nhật
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto rounded-xl border border-gray-100">
+                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                <thead className="bg-slate-50 text-slate-500 font-bold">
+                                    <tr>
+                                        <th className="px-4 py-3 border-b border-gray-100">User</th>
+                                        <th className="px-4 py-3 border-b border-gray-100">Tên</th>
+                                        <th className="px-4 py-3 border-b border-gray-100 text-center">Version</th>
+                                        <th className="px-4 py-3 border-b border-gray-100 text-center">Trạng thái</th>
+                                        <th className="px-4 py-3 border-b border-gray-100 text-right">Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {onlineUsers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
+                                                Không có user nào đang online
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        onlineUsers.map((user, idx) => {
+                                            const isOutdated = user.version !== manualVersion && manualVersion !== '';
+                                            return (
+                                                <tr key={idx} className="border-b border-gray-50 hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3 font-medium text-slate-800">{user.username}</td>
+                                                    <td className="px-4 py-3 text-slate-600">{user.name}</td>
+                                                    <td className="px-4 py-3 text-center font-mono text-xs font-bold text-blue-600">{user.version}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        {isOutdated ? (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-orange-100 text-orange-700">Cũ</span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-green-100 text-green-700">Mới nhất</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        {isOutdated && (
+                                                            <button 
+                                                                onClick={() => handleForceUpdate(user.username)}
+                                                                className="text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 transition-colors"
+                                                            >
+                                                                Gửi yêu cầu Cập nhật
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>

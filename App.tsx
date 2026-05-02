@@ -78,8 +78,22 @@ function App() {
   const [updateDeferred, setUpdateDeferred] = useState(false); // Đã chọn cập nhật sau 10p chưa
 
   // Reset deferred state when an explicit broadcast arrives
+  const currentUserRef = useRef(currentUser);
   useEffect(() => {
-      const handleResetDeferred = () => setUpdateDeferred(false);
+      currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+      const handleResetDeferred = (e: any) => {
+          if (e.type === 'system_update_available') {
+              setUpdateDeferred(false);
+          } else if (e.type === 'system_update_available_broadcast') {
+              const payload = e.detail;
+              if (payload && (payload.target === 'all' || (currentUserRef.current && payload.target === currentUserRef.current.username))) {
+                  setUpdateDeferred(false);
+              }
+          }
+      };
       window.addEventListener('system_update_available_broadcast', handleResetDeferred);
       window.addEventListener('system_update_available', handleResetDeferred);
       return () => {

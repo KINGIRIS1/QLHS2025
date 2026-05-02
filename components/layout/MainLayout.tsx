@@ -70,27 +70,46 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     useEffect(() => {
         if (!currentUser || !isConfigured) return;
 
-        const presenceChannel = supabase.channel('online_users');
+        let presenceChannel = supabase.getChannels().find(c => c.topic === 'realtime:online_users');
+        if (!presenceChannel) {
+            presenceChannel = supabase.channel('online_users');
+        }
 
-        presenceChannel
-            .on('broadcast', { event: 'force_update' }, ({ payload }) => {
-                if (payload.target === 'all' || payload.target === currentUser.username) {
-                    window.location.reload(); 
-                }
-            })
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({
-                        username: currentUser.username,
-                        name: currentUser.name,
-                        version: APP_VERSION,
-                        onlineAt: new Date().toISOString()
-                    });
-                }
-            });
+        // We only want to add the broadcast listener once per channel instance if possible,
+        // but since this runs once per mount, it's safer to just set it up.
+        // Actually, since presenceChannel could be shared, let's keep track if we subscribed.
+        
+        const handleBroadcast = ({ payload }: any) => {
+            if (payload.target === 'all' || payload.target === currentUser.username) {
+                window.location.reload(); 
+            }
+        };
+
+        presenceChannel.on('broadcast', { event: 'force_update' }, handleBroadcast);
+
+        const joinAndTrack = async (status: string) => {
+            if (status === 'SUBSCRIBED') {
+                await presenceChannel!.track({
+                    username: currentUser.username,
+                    name: currentUser.name,
+                    version: APP_VERSION,
+                    onlineAt: new Date().toISOString()
+                });
+            }
+        };
+
+        // If it's already joined, track immediately
+        if (presenceChannel.state === 'joined') {
+            joinAndTrack('SUBSCRIBED');
+        } else {
+            presenceChannel.subscribe(joinAndTrack);
+        }
 
         return () => {
-            presenceChannel.unsubscribe();
+            if (presenceChannel) {
+                presenceChannel.untrack();
+                // presenceChannel.unsubscribe() might kill it for other components, so we just untrack
+            }
         };
     }, [currentUser]);
 

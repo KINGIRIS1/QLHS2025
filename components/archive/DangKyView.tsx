@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, Employee, UserRole } from '../../types';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
+import { supabase } from '../../services/supabaseClient';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive, rawUpsertArchiveRecords } from '../../services/apiArchive';
 import { fetchEmployees, fetchUsers } from '../../services/apiPeople';
 import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload } from 'lucide-react';
 import { confirmAction, toTitleCase, removeVietnameseTones } from '../../utils/appHelpers';
@@ -84,34 +85,40 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        loadData();
-        loadEmployees();
-
+        loadAllData();
         initRealtimeArchive();
         
         const handleArchiveUpdate = (e: any) => {
             if (e.detail?.type === 'dangky') {
-                loadData();
+                loadAllData();
             }
         };
         
         window.addEventListener('archive_realtime_update', handleArchiveUpdate);
         return () => window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
-    }, []);
+    }, [currentUser]);
 
-    const loadData = async () => {
-        const data = await fetchArchiveRecords('dangky');
+    const loadAllData = async () => {
+        const emps = await fetchEmployees();
+        setEmployees(emps);
+        
+        let allowedWards: string[] | undefined = undefined;
+        if (currentUser?.role === 'EMPLOYEE') {
+            const emp = emps.find(e => e.id === currentUser.employeeId);
+            if (emp && emp.managedWards && emp.managedWards.length > 0) {
+                allowedWards = emp.managedWards;
+            } else {
+                allowedWards = ['___NONE___']; // Rỗng thì không thấy gì
+            }
+        }
+        
+        const data = await fetchArchiveRecords('dangky', true, allowedWards); // Force update to get fresh data with new filter
         setRecords(data);
-    };
-
-    const loadEmployees = async () => {
-        const data = await fetchEmployees();
-        setEmployees(data);
     };
 
     const handleDeleteAll = async () => {
         await deleteAllArchiveRecordsByType('dangky');
-        loadData();
+        loadAllData();
     };
 
     const filteredEmployeesForAssign = useMemo(() => {
@@ -326,20 +333,22 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const handleBatchStatusChange = async (newStatus: string, assignedTo?: string) => {
         if (selectedIds.size === 0) return;
         
+        const timestamp = new Date().toISOString();
         const updatedRecords: ArchiveRecord[] = [];
+        
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
             
-            const history = record.data?.history || [];
+            const history = record.data?.history ? [...record.data.history] : [];
             history.push({
                 action: `Chuyển trạng thái: ${newStatus}`,
-                timestamp: new Date().toISOString(),
+                timestamp: timestamp,
                 user: currentUser.name,
                 assignedTo: assignedTo
             });
 
-            const saved = await saveArchiveRecord({
+            updatedRecords.push({
                 ...record,
                 status: newStatus as any,
                 data: {
@@ -348,12 +357,17 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     ...(assignedTo ? { assigned_to: assignedTo } : {})
                 }
             });
-            if (saved) updatedRecords.push(saved);
         }
 
-        setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
-        setSelectedIds(new Set());
-        // loadData();
+        const success = await rawUpsertArchiveRecords(updatedRecords);
+        if (success) {
+            setSelectedIds(new Set());
+            // local UI replace to save full reload
+            setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
+            alert('Cập nhật trạng thái thành công!');
+        } else {
+            alert('Có lỗi xảy ra trong quá trình cập nhật trạng thái đồng loạt.');
+        }
     };
 
     const handleBatchReturn = async (reason: string, targetStatus: string = returnTargetStatus) => {
@@ -370,12 +384,13 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             }
         };
 
+        const timestamp = new Date().toISOString();
         const updatedRecords: ArchiveRecord[] = [];
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
             
-            const history = record.data?.history || [];
+            const history = record.data?.history ? [...record.data.history] : [];
             
             // Tìm người xử lý ở bước đích để gán lại (nếu có)
             let previousAssignee = undefined;
@@ -398,12 +413,12 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             history.push({
                 action: `Trả về ${getReturnStatusLabel(targetStatus)}`,
                 content: `Lý do trả: ${reason}`,
-                timestamp: new Date().toISOString(),
+                timestamp: timestamp,
                 user: currentUser.name,
                 ...(previousAssignee ? { assignedTo: previousAssignee } : {})
             });
 
-            const saved = await saveArchiveRecord({
+            updatedRecords.push({
                 ...record,
                 status: targetStatus as any,
                 data: {
@@ -412,25 +427,31 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     ...(previousAssignee ? { assigned_to: previousAssignee } : {})
                 }
             });
-            if (saved) updatedRecords.push(saved);
         }
 
-        setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
-        setSelectedIds(new Set());
-        setShowReturnModal(false);
-        // loadData();
+        const success = await rawUpsertArchiveRecords(updatedRecords);
+        if (success) {
+            setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
+            setSelectedIds(new Set());
+            setShowReturnModal(false);
+            alert('Đã trả hồ sơ thành công!');
+        } else {
+            alert('Có lỗi khi trả hồ sơ đồng loạt.');
+        }
     };
 
     const handleMoveToVaoSo = async () => {
         if (selectedIds.size === 0) return;
         
-        const updatedRecords: ArchiveRecord[] = [];
+        const timestamp = new Date().toISOString();
+        const vaosoPayloads: Partial<ArchiveRecord>[] = [];
+        const recordUpdates: any[] = [];
+        
         for (const id of Array.from(selectedIds)) {
             const record = records.find(r => r.id === id);
             if (!record) continue;
 
-            // Create a new record for Vao So
-            await saveArchiveRecord({
+            vaosoPayloads.push({
                 type: 'vaoso',
                 status: 'completed',
                 so_hieu: record.so_hieu,
@@ -447,15 +468,14 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 }
             });
 
-            // Update the current record status to hoan_thanh
-            const history = record.data?.history || [];
+            const history = record.data?.history ? [...record.data.history] : [];
             history.push({
                 action: `Chuyển sang Vào số GCN`,
-                timestamp: new Date().toISOString(),
+                timestamp: timestamp,
                 user: currentUser.name,
             });
 
-            const saved = await saveArchiveRecord({
+            recordUpdates.push({
                 ...record,
                 status: 'hoan_thanh',
                 data: {
@@ -463,13 +483,27 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     history
                 }
             });
-            if (saved) updatedRecords.push(saved);
         }
 
-        setRecords(prev => prev.map(r => updatedRecords.find(u => u.id === r.id) || r));
-        setSelectedIds(new Set());
-        // loadData();
-        alert(`Đã chuyển ${selectedIds.size} hồ sơ sang Vào số GCN`);
+        try {
+            // Bước 1: Bulk insert Vào Số
+            const insertSuccess = await importArchiveRecords(vaosoPayloads);
+            if (!insertSuccess) {
+                throw new Error("Lỗi khi tạo bản ghi Vào Số. Đã dừng thao tác.");
+            }
+
+            // Bước 2: Bulk update Đăng Ký
+            const updateSuccess = await rawUpsertArchiveRecords(recordUpdates);
+            if (!updateSuccess) {
+                throw new Error("Lỗi khi cập nhật trạng thái hồ sơ Đăng ký. Dữ liệu có thể bị bất đồng bộ!");
+            }
+
+            setRecords(prev => prev.map(r => recordUpdates.find(u => u.id === r.id) || r));
+            setSelectedIds(new Set());
+            alert(`Đã chuyển ${recordUpdates.length} hồ sơ sang Vào số GCN`);
+        } catch (err: any) {
+            alert(err.message || 'Có lỗi xảy ra trong quá trình chuyển Into Sổ.');
+        }
     };
 
     const handleImportClick = () => {
@@ -536,15 +570,34 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 }
 
                 const rows = data.slice(headerRowIdx + 1);
-                const newRecords: Partial<ArchiveRecord>[] = [];
+                
+                // Collect so_hieu to check duplicates
+                const soHieuList = rows.map((r: any) => r[0] ? r[0].toString().trim() : '').filter(Boolean);
+                const { data: existingIds } = await supabase.from('archive_records').select('so_hieu').in('so_hieu', soHieuList).eq('type', 'dangky');
+                const existingSet: Set<string> = new Set(existingIds?.map((x: any) => x.so_hieu) || []);
 
-                for (const row of rows as any[]) {
+                const newRecords: Partial<ArchiveRecord>[] = [];
+                const errors: string[] = [];
+
+                for (let i = 0; i < rows.length; i++) {
+                    const row: any = rows[i];
                     if (!row || row.length === 0 || !row[0]) continue;
+
+                    const soHieu = row[0]?.toString()?.trim() || '';
+                    if (!soHieu) {
+                        errors.push(`Dòng ${i + headerRowIdx + 2}: Trống Mã hồ sơ`);
+                        continue;
+                    }
+
+                    if (existingSet.has(soHieu)) {
+                        errors.push(`Dòng ${i + headerRowIdx + 2}: Mã hồ sơ "${soHieu}" đã tồn tại`);
+                        continue;
+                    }
 
                     newRecords.push({
                         type: 'dangky',
                         status: 'tiep_nhan',
-                        so_hieu: row[0]?.toString() || '',
+                        so_hieu: soHieu,
                         noi_nhan_gui: row[2]?.toString() || '', // Chủ sử dụng
                         trich_yeu: row[4]?.toString() || '', // Loại biến động
                         ngay_thang: parseExcelDate(row[5]),
@@ -566,16 +619,28 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     });
                 }
 
+                if (errors.length > 0) {
+                    const msg = `Phát hiện ${errors.length} lỗi trong file Excel:\n` + 
+                                errors.slice(0, 10).join('\n') + 
+                                (errors.length > 10 ? `\n... và ${errors.length - 10} lỗi khác.` : '') + 
+                                `\n\nBạn có muốn bỏ qua các lỗi này và tiếp tục import ${newRecords.length} hồ sơ hợp lệ không?`;
+                    
+                    if (!window.confirm(msg)) {
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        return;
+                    }
+                }
+
                 if (newRecords.length > 0) {
                     const success = await importArchiveRecords(newRecords);
                     if (success) {
                         alert(`Đã import thành công ${newRecords.length} hồ sơ.`);
-                        loadData();
+                        loadAllData();
                     } else {
                         alert('Có lỗi xảy ra khi import.');
                     }
                 } else {
-                    alert('Không tìm thấy dữ liệu hợp lệ trong file.');
+                    alert('Không tìm thấy dữ liệu hợp lệ trong file hoặc tất cả đều bị trùng/lỗi.');
                 }
             } catch (error) {
                 console.error("Import error", error);
@@ -1038,7 +1103,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 onClose={() => setShowDetailModal(false)}
                 record={detailRecord}
                 currentUser={currentUser}
-                onUpdateRecord={loadData}
+                onUpdateRecord={loadAllData}
                 employees={employees}
             />
         </div>

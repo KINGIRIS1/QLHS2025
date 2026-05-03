@@ -98,11 +98,16 @@ export const initRealtimeArchive = () => {
 
 // --- API ---
 
-export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky', forceUpdate: boolean = false): Promise<ArchiveRecord[]> => {
+export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky', forceUpdate: boolean = false, allowedWards?: string[]): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
-        return MOCK_ARCHIVE.filter(r => r.type === type);
+        let list = MOCK_ARCHIVE.filter(r => r.type === type);
+        // Tạm lọc offline
+        if (allowedWards && allowedWards.length > 0) {
+            list = list.filter(r => allowedWards.some(w => r.data?.dia_danh?.includes(w)));
+        }
+        return list;
     }
     
     // Return from memory cache to save egress!
@@ -116,11 +121,16 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' |
         const pageSize = 1000;
         let hasMore = true;
 
+        let baseQuery = supabase.from('archive_records').select('*').eq('type', type);
+        
+        // CHỐNG RÒ RỈ DỮ LIỆU: Filter phía Server!
+        if (allowedWards && allowedWards.length > 0) {
+            const orConditions = allowedWards.map(w => `data->>dia_danh.ilike.%${w}%`).join(',');
+            baseQuery = baseQuery.or(orConditions);
+        }
+
         while (hasMore) {
-            const { data, error } = await supabase
-                .from('archive_records')
-                .select('*')
-                .eq('type', type)
+            const { data, error } = await baseQuery
                 .order('created_at', { ascending: false })
                 .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -172,6 +182,24 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         
         // Xử lý ngày tháng: Nếu rỗng thì set null để tránh lỗi định dạng DATE của PostgreSQL
         if (payload.ngay_thang === '') payload.ngay_thang = null;
+        
+        // KIỂM TRA TRÙNG LẶP SỐ HIỆU (Chống Lỗ hổng 4)
+        if (payload.so_hieu && payload.so_hieu.trim() !== '') {
+            let query = supabase.from('archive_records')
+                .select('id')
+                .eq('type', payload.type)
+                .eq('so_hieu', payload.so_hieu.trim());
+            
+            if (record.id) {
+                query = query.neq('id', record.id);
+            }
+            
+            const { data: existing, error: errCheck } = await query.limit(1);
+            if (errCheck) throw errCheck;
+            if (existing && existing.length > 0) {
+                throw new Error("Mã hồ sơ / Số hiệu đã tồn tại trong hệ thống!");
+            }
+        }
 
         if (record.id) {
             const { data, error } = await supabase.from('archive_records').update({ 
@@ -340,12 +368,12 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         
         const { data: currentRecords, error: fetchError } = await supabase
             .from('archive_records')
-            .select('id, data')
+            .select('*')
             .in('id', ids);
             
         if (fetchError) throw fetchError;
 
-        const promises = currentRecords.map(r => {
+        const upsertPayloads = currentRecords.map(r => {
             let mergedData = { ...r.data, ...(updates.data || {}) };
 
             // Special handling for history: append instead of replace if updates.data.history exists
@@ -355,22 +383,27 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
                 mergedData.history = [...oldHistory, ...updates.data.history];
             }
 
-            const payload = { ...updates, data: mergedData };
-            return supabase.from('archive_records').update(payload).eq('id', r.id).select().single();
+            return { ...r, ...updates, data: mergedData };
         });
 
-        const results = await Promise.all(promises);
-        
-        results.forEach(res => {
-            if (res.data) {
-                const type = res.data.type;
+        // Use bulk upsert to save all in 1 request
+        const { data: results, error: upsertError } = await supabase
+            .from('archive_records')
+            .upsert(upsertPayloads)
+            .select();
+            
+        if (upsertError) throw upsertError;
+
+        if (results) {
+            results.forEach(res => {
+                const type = res.type;
                 if (IS_CACHED_LOADED[type]) {
                     const arr = CACHED_ARCHIVE_RECORDS[type];
-                    const idx = arr.findIndex(x => x.id === res.data.id);
-                    if (idx !== -1) arr[idx] = res.data as ArchiveRecord;
+                    const idx = arr.findIndex(x => x.id === res.id);
+                    if (idx !== -1) arr[idx] = res as ArchiveRecord;
                 }
-            }
-        });
+            });
+        }
         
         return true;
     } catch (error) {
@@ -378,6 +411,29 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         return false;
     }
 };
+
+export const rawUpsertArchiveRecords = async (records: any[]): Promise<boolean> => {
+    if (!isConfigured) return false;
+    try {
+        const { data, error } = await supabase.from('archive_records').upsert(records).select();
+        if (error) throw error;
+        // Mutate cache manually if needed or let real-time handle it
+        if (data) {
+            data.forEach(res => {
+                const type = res.type;
+                if (IS_CACHED_LOADED[type]) {
+                    const arr = CACHED_ARCHIVE_RECORDS[type];
+                    const idx = arr.findIndex((x:any) => x.id === res.id);
+                    if (idx !== -1) arr[idx] = res as ArchiveRecord;
+                }
+            });
+        }
+        return true;
+    } catch (e) {
+        logError("rawUpsertArchiveRecords", e);
+        return false;
+    }
+}
 
 export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string): Promise<string[]> => {
     if (!isConfigured) {

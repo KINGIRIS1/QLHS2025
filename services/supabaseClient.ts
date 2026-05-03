@@ -56,7 +56,6 @@ export let globalPresenceState: any = {};
 
 // Register global broadcast listener here
 presenceChannel.on('broadcast', { event: 'force_update' }, (payload) => {
-    console.log("[DEBUG] Global broadcast received", payload);
     window.dispatchEvent(new CustomEvent('system_update_available_broadcast', { detail: payload }));
 });
 

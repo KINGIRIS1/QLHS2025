@@ -108,9 +108,11 @@ export const useAppData = (currentUser: User | null) => {
         const updateInterval = setInterval(handleSystemUpdate, 5 * 60 * 1000);
         
         const handleBroadcast = (e: any) => {
-            const { payload } = e.detail;
-            console.log("[DEBUG] Broadcast event received in useAppData", payload);
+            const rawPayload = e.detail;
+            const payload = rawPayload && rawPayload.payload ? rawPayload.payload : rawPayload;
+            
             if (payload && (payload.target === 'all' || (currentUserRef.current && payload.target === currentUserRef.current.username))) {
+                console.log(`[DEBUG] Update request received for target: ${payload.target}`);
                 if (payload.version) {
                     if (payload.version !== APP_VERSION) {
                         setIsUpdateAvailable(true);

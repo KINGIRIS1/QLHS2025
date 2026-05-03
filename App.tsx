@@ -88,7 +88,8 @@ function App() {
           if (e.type === 'system_update_available') {
               setUpdateDeferred(false);
           } else if (e.type === 'system_update_available_broadcast') {
-              const payload = e.detail;
+              const rawPayload = e.detail;
+              const payload = rawPayload && rawPayload.payload ? rawPayload.payload : rawPayload;
               if (payload && (payload.target === 'all' || (currentUserRef.current && payload.target === currentUserRef.current.username))) {
                   setUpdateDeferred(false);
               }

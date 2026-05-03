@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "electron:dev": "wait-on tcp:5173 && electron .",
     "electron:build": "npm run build && electron-builder --win --x64 -p never",
-    "start": "node server.ts"
+    "start": "tsx server.ts"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

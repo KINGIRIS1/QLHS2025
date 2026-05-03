@@ -271,7 +271,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 <Users size={18} className="text-teal-500" /> Trạng thái phiên bản Users
                             </h3>
                             <button onClick={() => handleForceUpdate('all')} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl font-bold text-sm transition-colors">
-                                <Send size={16} /> Ép tất cả cập nhật
+                                <Send size={16} /> Yêu cầu tất cả User cập nhật
                             </button>
                         </div>
                         <div className="overflow-x-auto rounded-xl border border-gray-100">

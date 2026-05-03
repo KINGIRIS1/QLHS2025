@@ -54,7 +54,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   useEffect(() => {
     if (!initialData) {
         const newCode = generateCode(processingWard, formData.receivedDate || '');
-        setFormData(prev => ({ ...prev, code: newCode }));
+        if (formData.code !== newCode) {
+            setFormData(prev => ({ ...prev, code: newCode }));
+        }
     }
   }, [processingWard, formData.receivedDate, records, initialData]);
 

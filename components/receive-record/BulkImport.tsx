@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx-js-style';
-import { RecordFile, RecordStatus } from '../../types';
+import { RecordFile, RecordStatus, User, Employee } from '../../types';
 import { RECORD_TYPES } from '../../constants';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
@@ -11,6 +11,8 @@ interface BulkImportProps {
   calculateDeadline: (type: string, date: string) => string;
   calculateNextCode: (ward: string, date: string, existingCodes: string[]) => string;
   onPreview: (record: Partial<RecordFile>) => void;
+  currentUser: User;
+  employees: Employee[];
 }
 
 interface BulkRecordItem extends Partial<RecordFile> {
@@ -18,9 +20,12 @@ interface BulkRecordItem extends Partial<RecordFile> {
     isSaved: boolean;
 }
 
-const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calculateNextCode, onPreview }) => {
+const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calculateNextCode, onPreview, currentUser, employees }) => {
   const [bulkRecords, setBulkRecords] = useState<BulkRecordItem[]>([]);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
+
+  const linkedEmp = employees.find(e => e.id === currentUser.employeeId);
+  const processingWard = linkedEmp?.managedWards?.[0] || 'Chơn Thành';
 
   const handleDownloadTemplate = () => {
       const wb = XLSX.utils.book_new();
@@ -153,9 +158,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       setBulkRecords(prev => {
           const newList = [...prev];
           const record = newList[index];
-          if (!record.ward) { alert("Vui lòng nhập Xã/Phường trước khi tạo mã."); return prev; }
           const existingBulkCodes = newList.map(r => r.code || '').filter(c => c !== '');
-          const newCode = calculateNextCode(record.ward, record.receivedDate || '', existingBulkCodes);
+          const newCode = calculateNextCode(processingWard, record.receivedDate || '', existingBulkCodes);
           newList[index] = { ...record, code: newCode };
           return newList;
       });

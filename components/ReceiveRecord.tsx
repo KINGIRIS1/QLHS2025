@@ -113,10 +113,11 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     
     records.forEach(r => {
         if (!r.code) return;
-        const parts = r.code.split('-');
+        const cleanCode = r.code.trim().toUpperCase();
+        const parts = cleanCode.split('-');
         if (parts.length === 3) {
             const [rPrefix, rSeq, rSuffix] = parts;
-            if (rPrefix === datePrefix && rSuffix === suffix) {
+            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
                 const seqNum = parseInt(rSeq, 10);
                 if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
             }
@@ -125,10 +126,11 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
     existingCodes.forEach(code => {
         if (!code) return;
-        const parts = code.split('-');
+        const cleanCode = code.trim().toUpperCase();
+        const parts = cleanCode.split('-');
         if (parts.length === 3) {
             const [rPrefix, rSeq, rSuffix] = parts;
-            if (rPrefix === datePrefix && rSuffix === suffix) {
+            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
                 const seqNum = parseInt(rSeq, 10);
                 if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
             }
@@ -397,6 +399,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 calculateDeadline={calculateDeadline}
                 calculateNextCode={(w, d, exist) => calculateNextCode(w, d, exist)}
                 onPreview={handlePreviewDocx}
+                currentUser={currentUser}
+                employees={employees}
             />
         )}
 

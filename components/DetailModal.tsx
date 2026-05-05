@@ -7,6 +7,7 @@ import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
+import PhieuXinLoiModal from './PhieuXinLoiModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 
 interface DetailModalProps {
@@ -23,6 +24,7 @@ interface DetailModalProps {
 export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, currentUser, onEdit, onDelete, onCreateLiquidation }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [showSystemReceipt, setShowSystemReceipt] = useState(false);
+  const [showPhieuXinLoi, setShowPhieuXinLoi] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -230,12 +232,15 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
+    const donViWard = employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
+
     const printData = {
         // --- ENGLISH RAW KEYS (Requested) ---
         code: val(record.code),
         customerName: val(record.customerName),
         landPlot: val(record.landPlot),
         mapSheet: val(record.mapSheet),
+        DON_VI_TIEP_NHAN: val(getFullWard(donViWard)).toUpperCase(),
         
         // --- VIETNAMESE KEYS (Formatted per request) ---
         XAPHUONG: val(getNormalizedWard(record.ward)),
@@ -323,7 +328,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành",
-        NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(record.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
+        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${getFullWard(donViWard).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
 
     if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
@@ -409,14 +414,22 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 )}
 
                 {canPrintReceipt && (
-                    <button 
-                        onClick={handlePrintReceipt}
-                        disabled={isProcessing}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50"
-                    >
-                        {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                        In biên nhận
-                    </button>
+                    <>
+                        <button 
+                            onClick={handlePrintReceipt}
+                            disabled={isProcessing}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50"
+                        >
+                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                            In biên nhận
+                        </button>
+                        <button 
+                            onClick={() => setShowPhieuXinLoi(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 rounded hover:bg-yellow-50 transition-colors text-sm font-medium"
+                        >
+                            <FileText size={16} /> Phiếu xin lỗi
+                        </button>
+                    </>
                 )}
                 
                 {canPerformAction && onEdit && (
@@ -728,8 +741,15 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         {showSystemReceipt && (
             <SystemReceiptTemplate
                 data={record}
-                receivingWard={record.ward || ''}
+                receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
                 onClose={() => setShowSystemReceipt(false)}
+            />
+        )}
+        {showPhieuXinLoi && (
+            <PhieuXinLoiModal
+                data={record}
+                receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
+                onClose={() => setShowPhieuXinLoi(false)}
             />
         )}
       </div>

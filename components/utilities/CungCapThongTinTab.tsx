@@ -381,7 +381,7 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
                 <table style="width: 100%; text-align: center; font-weight: bold; border-collapse: collapse; margin-bottom: 0px; font-size: 11pt; border: none;">
                     <tr style="vertical-align: top;">
                         <td style="width: 45%; padding: 0;">
-                            <p style="margin: 0;">VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI</p>
+                            <p style="margin: 0;">VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI</p>
                             <p style="margin: 0;">CHI NHÁNH CHƠN THÀNH</p>
                             ${lineLeftHtml}
                         </td>

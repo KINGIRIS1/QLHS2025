@@ -9,6 +9,7 @@ import { fetchArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
+import LateRecordsView from './report/LateRecordsView';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -38,7 +39,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -429,6 +430,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <CalendarDays size={16}/> Thống kê theo ngày
                 </button>
                 <button 
+                    onClick={() => setActiveTab('late_records')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'late_records' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <AlertTriangle size={16}/> Hồ sơ trễ hạn
+                </button>
+                <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
@@ -549,6 +556,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         toDate={toDate}
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
+                    />
+                )}
+
+                {activeTab === 'late_records' && (
+                    <LateRecordsView
+                        records={activeRecords}
+                        employees={activeEmployees}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                        wards={wards}
                     />
                 )}
 

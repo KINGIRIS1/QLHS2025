@@ -29,7 +29,7 @@ const DEFAULT_BDDC_CAUSE = "Khi đo đạc lập bản đồ địa chính khôn
 
 const DEFAULT_ISSUING_AUTHORITIES = [
     "Sở Tài nguyên và Môi trường tỉnh Bình Phước",
-    "Văn phòng Đăng ký Đất đai tỉnh Đồng Nai - Chi nhánh Chơn Thành",
+    "Văn phòng Đăng ký Đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành",
     "Chi nhánh Văn phòng Đăng ký Đất đai thị xã Chơn Thành",
     "UBND huyện Chơn Thành",
     "UBND huyện Bình Long (cũ)"
@@ -433,7 +433,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         <p style="${indentStyle} margin-bottom: 5px;"><b>Nguyên nhân:</b></p>
         <p style="${indentStyle} margin-bottom: 5px;">${bddcCauseText}.</p>
         <p style="${indentStyle} margin-bottom: 5px;">Nay chủ sử dụng đất và các chủ sử dụng đất giáp ranh tiến hành cắm mốc xác định lại ranh giới theo hiện trạng, cam kết không tranh chấp.</p>
-        <p style="${indentStyle} margin-bottom: 12px;">Do đó, Kiến nghị Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành cấp đổi GCNQSDĐ cho ${daiTuNhanXung}, đồng thời chỉnh lý bản đồ địa chính năm 2024 theo hiện trạng sử dụng đất thực tế.</p>
+        <p style="${indentStyle} margin-bottom: 12px;">Do đó, Kiến nghị Văn phòng Đăng ký đất đai thành phố Đồng Nai – Chi nhánh Chơn Thành cấp đổi GCNQSDĐ cho ${daiTuNhanXung}, đồng thời chỉnh lý bản đồ địa chính năm 2024 theo hiện trạng sử dụng đất thực tế.</p>
         `
         : "";
 
@@ -586,7 +586,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     const textDienTich = `, diện tích: <b>${dienTichHienThi} m²</b>`;
 
     const textMap2024 = `Theo bản đồ địa chính mới được Sở Tài nguyên và Môi trường ký duyệt ngày 10/10/2024 thuộc thửa đất số <b>${formData.SO_THUA_MOI || '...'}</b>, tờ bản đồ số <b>${formData.SO_TO_MOI || '...'}</b>${textDienTich}.`;
-    const textCV106 = `Theo Công văn số 106/VPĐK-KTĐC ngày 08/07/2025 của Văn phòng Đăng ký Đất đai tỉnh Đồng Nai thuộc thửa đất số <b>${formData.SO_THUA_MOI || '...'}</b>, tờ bản đồ số <b>${formData.SO_TO_106}</b>${textDienTich}.`;
+    const textCV106 = `Theo Công văn số 106/VPĐK-KTĐC ngày 08/07/2025 của Văn phòng Đăng ký Đất đai thành phố Đồng Nai thuộc thửa đất số <b>${formData.SO_THUA_MOI || '...'}</b>, tờ bản đồ số <b>${formData.SO_TO_106}</b>${textDienTich}.`;
 
     let canCuBanDoHtml = `<p style="${indentStyle} margin-bottom: 8px;">${textMap2024}</p>`;
     
@@ -615,7 +615,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         ${ownersHtmlFull}
         
         <p style="margin-bottom: 5px;"><b>A. THÀNH PHẦN GỒM:</b></p>
-        <p style="margin-bottom: 5px;"><b>I. Đại diện Văn phòng Đăng ký đất đai tỉnh Đồng Nai – Chi nhánh Chơn Thành:</b></p>
+        <p style="margin-bottom: 5px;"><b>I. Đại diện Văn phòng Đăng ký đất đai thành phố Đồng Nai – Chi nhánh Chơn Thành:</b></p>
         <p style="margin-bottom: 5px;">1. ........................................................... - Chức vụ: ...........................................</p>
         <p style="margin-bottom: 10px;">2. Ông: <b>${toTitleCase(currentUser.name)}</b> - Chức vụ: Nhân viên</p>
 
@@ -629,7 +629,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
         <p style="margin-bottom: 8px;"><b>B. NỘI DUNG:</b></p>
         <p style="${indentStyle} margin-bottom: 8px;">Tiến hành đo đạc, kiểm tra, xác minh ranh giới, mốc giới thửa đất ngoài thực địa đối với khu đất:</p>
-        <p style="${indentStyle} margin-bottom: 8px;">Thửa đất số <b>${formData.SO_THUA_MOI || '...'}</b>, tờ bản đồ số <b>${toBanDoMoTa}</b>, tọa lạc tại ${formData.DIA_CHI_THUA}, ${formData.PHUONG}, tỉnh Đồng Nai.</p>
+        <p style="${indentStyle} margin-bottom: 8px;">Thửa đất số <b>${formData.SO_THUA_MOI || '...'}</b>, tờ bản đồ số <b>${toBanDoMoTa}</b>, tọa lạc tại ${formData.DIA_CHI_THUA}, ${formData.PHUONG}, thành phố Đồng Nai.</p>
 
         <p style="${indentStyle} margin-bottom: 8px;"><b>1. Về hồ sơ thửa đất:</b></p>
         <p style="${indentStyle} margin-bottom: 8px;">Khu đất đã được cấp GCNQSDĐ số phát hành <b>${formData.SO_GCN}</b> vào sổ cấp GCN số <b>${formData.SO_VAO_SO}</b> do <b>${formData.DV_CAP_GCN}</b> cấp ngày <b>${formattedNgayCap}</b>, thửa đất số ${formData.SO_THUA_CU}, tờ bản đồ số ${formData.SO_TO_CU}, diện tích ${formData.DT_CU} m² ${areaBreakdown}.</p>

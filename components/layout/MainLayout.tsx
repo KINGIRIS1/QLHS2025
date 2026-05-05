@@ -101,7 +101,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                     <div className="flex flex-col items-center text-center leading-tight">
                         <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và quản lý hồ sơ</h1>
-                        <span className="font-bold text-sm uppercase tracking-wide">văn phòng đăng ký đất đai tỉnh đồng nai</span>
+                        <span className="font-bold text-sm uppercase tracking-wide">văn phòng đăng ký đất đai thành phố đồng nai</span>
                         <span className="font-bold text-sm uppercase tracking-wide">chi nhánh chơn thành</span>
                     </div>
                 </div>

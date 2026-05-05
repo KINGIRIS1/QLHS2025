@@ -48,7 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
-    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: true, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
+    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
     { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true }, 
     { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
     { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },

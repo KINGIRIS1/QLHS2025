@@ -40,7 +40,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                                             new Paragraph({
                                                 alignment: AlignmentType.CENTER,
                                                 children: [
-                                                    new TextRun({ text: "VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI", font: "Times New Roman", size: 26, bold: true }),
+                                                    new TextRun({ text: "VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI", font: "Times New Roman", size: 26, bold: true }),
                                                 ],
                                             }),
                                             new Paragraph({
@@ -58,7 +58,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                                             new Paragraph({
                                                 alignment: AlignmentType.CENTER,
                                                 children: [
-                                                    new TextRun({ text: `${data.XA || ''}`.toUpperCase(), font: "Times New Roman", size: 26, bold: true, underline: {} }),
+                                                    new TextRun({ text: `${data.DON_VI_TIEP_NHAN || data.XA || ''}`, font: "Times New Roman", size: 26, bold: true, underline: {} }),
                                                 ],
                                             }),
                                         ],
@@ -200,7 +200,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                         spacing: { after: 80 },
                         indent: { left: 360 },
                         children: [
-                            new TextRun({ text: "4. ", font: "Times New Roman", size: 26 }),
+                            new TextRun({ text: `4. ${data.GIAY_TO_KHAC || ''}`, font: "Times New Roman", size: 26 }),
                         ],
                     }),
                     new Paragraph({

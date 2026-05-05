@@ -240,11 +240,14 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
+    const donViWard = employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
+
     const printData = {
         code: val(dataToUse.code),
         customerName: val(dataToUse.customerName),
         landPlot: val(dataToUse.landPlot),
         mapSheet: val(dataToUse.mapSheet),
+        DON_VI_TIEP_NHAN: val(getFullWard(donViWard)).toUpperCase(),
         
         XAPHUONG: val(getNormalizedWard(dataToUse.ward)),
         NGAYNHAN: dateFullString,
@@ -316,7 +319,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành",
-        NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(dataToUse.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
+        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${getFullWard(donViWard).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
     
     if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
@@ -423,7 +426,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       {showSystemReceipt && systemReceiptData && (
           <SystemReceiptTemplate
               data={systemReceiptData}
-              receivingWard={systemReceiptData.ward || ''}
+              receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
               onClose={() => setShowSystemReceipt(false)}
           />
       )}

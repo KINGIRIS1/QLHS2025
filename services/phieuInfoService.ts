@@ -179,9 +179,9 @@ export const generatePreviewData = (data: PhieuInfoData, planningConfigs: Planni
 
     if (data.To_106) {
         if (data.To_2024 && data.Thua_2024) {
-            dieuChinhThuaDat = `đã được điều chỉnh thành thửa đất số ${data.Thua_2024}, tờ bản đồ số ${data.To_2024} theo bản đồ địa chính năm 2024, và chuyển đổi thành tờ bản đồ số ${data.To_106} theo Công văn số 106/VPĐK-KTĐC ngày 08/07/2025 của Văn phòng Đăng ký đất đai tỉnh Đồng Nai, diện tích mới là ${dtMoiStr}.`;
+            dieuChinhThuaDat = `đã được điều chỉnh thành thửa đất số ${data.Thua_2024}, tờ bản đồ số ${data.To_2024} theo bản đồ địa chính năm 2024, và chuyển đổi thành tờ bản đồ số ${data.To_106} theo Công văn số 106/VPĐK-KTĐC ngày 08/07/2025 của Văn phòng Đăng ký đất đai thành phố Đồng Nai, diện tích mới là ${dtMoiStr}.`;
         } else {
-            dieuChinhThuaDat = `được chuyển đổi thành tờ bản đồ số ${data.To_106} theo Công văn số 106/VPĐK-KTĐC ngày 08/07/2025 của Văn phòng Đăng ký đất đai tỉnh Đồng Nai, diện tích mới là ${dtMoiStr}.`;
+            dieuChinhThuaDat = `được chuyển đổi thành tờ bản đồ số ${data.To_106} theo Công văn số 106/VPĐK-KTĐC ngày 08/07/2025 của Văn phòng Đăng ký đất đai thành phố Đồng Nai, diện tích mới là ${dtMoiStr}.`;
         }
     } else if (data.To_2024) {
         dieuChinhThuaDat = `đã được điều chỉnh thành thửa đất số ${data.Thua_2024 || '...'}, tờ bản đồ số ${data.To_2024} theo bản đồ địa chính năm 2024, diện tích mới là ${dtMoiStr}.`;

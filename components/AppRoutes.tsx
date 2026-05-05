@@ -450,17 +450,17 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     switch (currentView) {
         case 'dashboard':
             return <DashboardView records={records} />;
-        case 'internal_chat':
-            return (
-                <InternalChat
-                    currentUser={currentUser}
-                    wards={wards}
-                    employees={employees}
-                    users={users}
-                    onResetUnread={() => props.setUnreadMessages(0)}
-                    notificationEnabled={props.notificationEnabled}
-                />
-            );
+        // case 'internal_chat':
+        //     return (
+        //         <InternalChat
+        //             currentUser={currentUser}
+        //             wards={wards}
+        //             employees={employees}
+        //             users={users}
+        //             onResetUnread={() => props.setUnreadMessages(0)}
+        //             notificationEnabled={props.notificationEnabled}
+        //         />
+        //     );
         case 'blocking_records':
             return (
                 <BlockingRecordsView 

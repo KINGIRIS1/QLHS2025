@@ -13,6 +13,7 @@ import {
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
 import SystemReceiptTemplate from '../SystemReceiptTemplate';
+import PhieuXinLoiModal from '../PhieuXinLoiModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 
 interface MobileDetailModalProps {
@@ -31,6 +32,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [showSystemReceipt, setShowSystemReceipt] = useState(false);
+  const [showPhieuXinLoi, setShowPhieuXinLoi] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -176,11 +178,14 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
+    const donViWard = employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
+
     const printData = {
         code: val(record.code),
         customerName: val(record.customerName),
         landPlot: val(record.landPlot),
         mapSheet: val(record.mapSheet),
+        DON_VI_TIEP_NHAN: val(getFullWard(donViWard)).toUpperCase(),
         XAPHUONG: val(getNormalizedWard(record.ward)),
         NGAYNHAN: dateFullString,
         NGAY_NHAN: dateShortString, 
@@ -240,7 +245,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành",
-        NHAN_KET_QUA_TAI: `Trung tâm dịch vụ hành chính công ${getFullWard(record.ward).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
+        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${getFullWard(donViWard).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
     };
 
     if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
@@ -592,14 +597,22 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       {/* Footer Actions */}
       <div className="bg-white border-t border-slate-100 p-4 sticky bottom-0 z-10 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
         {canPrintReceipt && (
-          <button 
-            onClick={handlePrintReceipt}
-            disabled={isProcessing}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-50"
-          >
-            {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
-            In biên nhận
-          </button>
+          <>
+            <button 
+              onClick={handlePrintReceipt}
+              disabled={isProcessing}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
+              In biên nhận
+            </button>
+            <button 
+              onClick={() => setShowPhieuXinLoi(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-yellow-50 text-yellow-700 rounded-xl font-bold text-sm active:scale-95 transition-all"
+            >
+              <FileText size={18} /> Phiếu xin lỗi
+            </button>
+          </>
         )}
         {onCreateLiquidation && (
           <button
@@ -620,8 +633,15 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       {showSystemReceipt && (
           <SystemReceiptTemplate
               data={record}
-              receivingWard={record.ward || ''}
+              receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
               onClose={() => setShowSystemReceipt(false)}
+          />
+      )}
+      {showPhieuXinLoi && (
+          <PhieuXinLoiModal
+              data={record}
+              receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
+              onClose={() => setShowPhieuXinLoi(false)}
           />
       )}
     </div>

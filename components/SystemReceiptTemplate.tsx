@@ -150,7 +150,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         {/* Header */}
                         <div className="flex justify-between mb-6">
                             <div className="text-center" style={{ width: '48%' }}>
-                                <div className="font-bold" style={{ fontSize: '16px' }}>VĂN PHÒNG ĐKĐĐ TỈNH ĐỒNG NAI</div>
+                                <div className="font-bold" style={{ fontSize: '16px' }}>VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI</div>
                                 <div className="font-bold" style={{ fontSize: '16px' }}>CHI NHÁNH CHƠN THÀNH</div>
                                 <div className="whitespace-nowrap" style={{ fontSize: '15px' }}>TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG</div>
                                 <div className="font-bold underline" style={{ fontSize: '16px' }}>{wardName.toUpperCase()}</div>
@@ -184,7 +184,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div>1. {tp1Value}</div>
                             <div>2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)</div>
                             <div>3. Hợp đồng ủy quyền - {data.authorizedBy?.toUpperCase()}</div>
-                            <div>4. </div>
+                            <div>4. {data.otherDocs || ''}</div>
                             <div>Số lượng hồ sơ:.......1....(bộ)</div>
                             <div>Thời gian giải quyết hồ sơ theo quy định là: <span className="font-bold">{standardDays}</span> ngày làm việc</div>
                             <div>Thời gian nhận hồ sơ: ngày <span className="font-bold">{formatDateShort(rDate)}</span></div>

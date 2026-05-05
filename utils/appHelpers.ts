@@ -22,7 +22,16 @@ export function removeVietnameseTones(str: string): string {
 // Hàm chuyển đổi Title Case (Nguyễn Văn A)
 export function toTitleCase(str: string | null | undefined): string {
     if (!str) return '';
-    return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    let result = str.toLowerCase().replace(/(?:^|[\s,.\-(/])\S/g, function(a) { return a.toUpperCase(); });
+    
+    const lowerWords = ['Khu Phố', 'Xã', 'Phường', 'Tỉnh', 'Thành Phố', 'Thị Xã', 'Thị Trấn', 'Quận', 'Huyện', 'Ấp', 'Khóm', 'Tổ'];
+    
+    lowerWords.forEach(word => {
+        const regex = new RegExp(`(^|[\\s,.\\-(/])(${word})(?=[\\s,.\\-(/]|$)`, 'g');
+        result = result.replace(regex, (match, p1, p2) => p1 + p2.toLowerCase());
+    });
+    
+    return result;
 }
 
 // --- CONFIRM ACTION WRAPPER ---

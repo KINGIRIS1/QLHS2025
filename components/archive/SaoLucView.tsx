@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
-import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, AlertTriangle } from 'lucide-react';
+import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi, getSystemSetting, saveSystemSetting } from '../../services/api';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, AlertTriangle, Settings } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
@@ -22,6 +22,7 @@ interface SaoLucViewProps {
 interface SaoLucFormData {
     id?: string;
     so_hieu: string;        // Mã hồ sơ
+    so_sao_luc?: string;     // Số sao lục
     chu_su_dung: string;    // Chủ sử dụng (Map vào noi_nhan_gui)
     xa_phuong: string;      // Xã phường (Lưu trong data)
     to_ban_do: string;      // Tờ (Lưu trong data)
@@ -65,6 +66,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
         so_hieu: '',
+        so_sao_luc: '',
         chu_su_dung: '',
         xa_phuong: 'Chơn Thành',
         to_ban_do: '',
@@ -86,9 +88,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     // Delete All Modal State
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
+    // Settings State
+    const [soSaoLuc, setSoSaoLuc] = useState('');
+    const [isSavingSoSaoLuc, setIsSavingSoSaoLuc] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+
     useEffect(() => {
         loadData();
         loadEmployees();
+        loadSettings();
 
         initRealtimeArchive();
         
@@ -115,6 +123,28 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const loadEmployees = async () => {
         const data = await fetchEmployees();
         setEmployees(data);
+    };
+
+    const loadSettings = async () => {
+        const saoLuc = await getSystemSetting('so_sao_luc');
+        if (saoLuc) setSoSaoLuc(saoLuc);
+        else setSoSaoLuc('1');
+    };
+
+    const handleSaveSoSaoLuc = async () => {
+        if (!soSaoLuc.trim() || isNaN(Number(soSaoLuc))) {
+            alert("Vui lòng nhập một số hợp lệ.");
+            return;
+        }
+        setIsSavingSoSaoLuc(true);
+        const success = await saveSystemSetting('so_sao_luc', soSaoLuc.trim());
+        setIsSavingSoSaoLuc(false);
+        if (success) {
+            alert(`Đã lưu Số sao lục tiếp theo: ${soSaoLuc}`);
+            setShowSettings(false);
+        } else {
+            alert("Lỗi khi lưu Số sao lục. Vui lòng thử lại.");
+        }
     };
 
     const filteredRecords = useMemo(() => {
@@ -226,6 +256,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             ngay_thang: formData.ngay_nhan,     // Ngày nhận
             trich_yeu: formData.noi_dung,       // Nội dung
             data: {                             // Các trường mở rộng
+                so_sao_luc: formData.so_sao_luc,
                 xa_phuong: formData.xa_phuong,
                 to_ban_do: formData.to_ban_do,
                 thua_dat: formData.thua_dat,
@@ -251,6 +282,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const resetForm = () => {
         setFormData({
             so_hieu: '',
+            so_sao_luc: '',
             chu_su_dung: '',
             xa_phuong: 'Chơn Thành',
             to_ban_do: '',
@@ -284,6 +316,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         }
 
         if (await confirmAction(confirmMsg)) {
+            let soSaoLucValue = undefined;
+            if (newStatus === 'signed') {
+                const soStr = await getSystemSetting('so_sao_luc');
+                let num = parseInt(soStr || '1', 10);
+                if (isNaN(num)) num = 1;
+                soSaoLucValue = num.toString().padStart(4, '0');
+                await saveSystemSetting('so_sao_luc', (num + 1).toString());
+            }
+
             const historyEntry = {
                 action: actionName,
                 status: newStatus,
@@ -294,10 +335,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
+            const extraData: any = {};
+            if (soSaoLucValue) extraData.so_sao_luc = soSaoLucValue;
+
             await saveArchiveRecord({ 
                 ...record, 
                 status: newStatus,
-                data: { ...record.data, history: newHistory }
+                data: { ...record.data, ...extraData, history: newHistory }
             });
             loadData();
         }
@@ -317,21 +361,50 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         }
 
         if (await confirmAction(confirmMsg)) {
-            const historyEntry = {
-                action: actionName,
-                status: newStatus,
-                timestamp: new Date().toISOString(),
-                user: currentUser.name
-            };
-            
-            const updates = {
-                status: newStatus as any,
-                data: {
-                    history: [historyEntry]
-                }
-            };
-            
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            if (newStatus === 'signed') {
+                const soStr = await getSystemSetting('so_sao_luc');
+                let num = parseInt(soStr || '1', 10);
+                if (isNaN(num)) num = 1;
+                const currentSoSaoLuc = num;
+                await saveSystemSetting('so_sao_luc', (num + selectedIds.size).toString());
+                
+                const allSelected = records.filter(r => selectedIds.has(r.id));
+                const promises = allSelected.map((r, index) => {
+                    const historyEntry = {
+                        action: actionName,
+                        status: newStatus,
+                        timestamp: new Date().toISOString(),
+                        user: currentUser.name
+                    };
+                    const nextSoSaoLuc = (currentSoSaoLuc + index).toString().padStart(4, '0');
+                    return saveArchiveRecord({
+                        ...r,
+                        status: newStatus,
+                        data: {
+                            ...r.data,
+                            so_sao_luc: nextSoSaoLuc,
+                            history: [...(r.data?.history || []), historyEntry]
+                        }
+                    });
+                });
+                await Promise.all(promises);
+            } else {
+                const historyEntry = {
+                    action: actionName,
+                    status: newStatus,
+                    timestamp: new Date().toISOString(),
+                    user: currentUser.name
+                };
+                
+                const updates = {
+                    status: newStatus as any,
+                    data: {
+                        history: [historyEntry]
+                    }
+                };
+                
+                await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            }
             setSelectedIds(new Set());
             loadData();
         }
@@ -399,6 +472,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         setFormData({
             id: r.id,
             so_hieu: r.so_hieu,
+            so_sao_luc: r.data?.so_sao_luc || '',
             chu_su_dung: r.noi_nhan_gui,
             ngay_nhan: r.ngay_thang,
             noi_dung: r.trich_yeu,
@@ -606,9 +680,47 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             {/* Header */}
             <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        Sao lục hồ sơ
-                    </h2>
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            Sao lục hồ sơ
+                        </h2>
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowSettings(!showSettings)}
+                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                title="Cài đặt thông số"
+                            >
+                                <Settings size={18} />
+                            </button>
+                            
+                            {showSettings && (
+                                <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 p-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="font-bold text-sm text-gray-700">Cài đặt sao lục</h3>
+                                        <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-600"><X size={16}/></button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Số sao lục tiếp theo</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                                                value={soSaoLuc} 
+                                                onChange={(e) => setSoSaoLuc(e.target.value)} 
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={handleSaveSoSaoLuc} 
+                                            disabled={isSavingSoSaoLuc} 
+                                            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm font-medium transition-colors"
+                                        >
+                                            {isSavingSoSaoLuc ? 'Đang lưu...' : 'Lưu lại'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     <div className="relative flex-1 sm:w-64 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 
@@ -819,9 +931,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                         </div>
                         
                         <form onSubmit={handleSave} className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Mã hồ sơ <span className="text-red-500">*</span></label>
-                                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-700" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số HS..." />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Mã hồ sơ <span className="text-red-500">*</span></label>
+                                    <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-700" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số HS..." />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Số sao lục</label>
+                                    <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none font-bold text-teal-700" value={formData.so_sao_luc || ''} onChange={e => setFormData({...formData, so_sao_luc: e.target.value})} placeholder="Số sao lục..." />
+                                </div>
                             </div>
 
                             <div>
@@ -893,6 +1011,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                     </th>
                                     <th className="p-3 w-10 text-center">#</th>
                                     <th className="p-3 w-32 text-center">Mã HS</th>
+                                    {(subTab === 'all') && <th className="p-3 w-24 text-center">Số sao lục</th>}
                                     <th className="p-3 w-48 text-center">Chủ sử dụng</th>
                                     <th className="p-3 w-32 text-center">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
@@ -913,6 +1032,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                         </td>
                                         <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                         <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
+                                        {(subTab === 'all') && (
+                                            <td className="p-3 text-center font-bold text-teal-600">{r.data?.so_sao_luc || '-'}</td>
+                                        )}
                                         <td className="p-3 font-medium text-gray-800">{toTitleCase(r.noi_nhan_gui)}</td>
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>

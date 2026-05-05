@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { RecordFile } from '../types';
 import { getFullWard } from '../constants';
 import { Printer, X } from 'lucide-react';
+import { toTitleCase } from '../utils/appHelpers';
 
 interface PhieuXinLoiModalProps {
     data: Partial<RecordFile>;
@@ -23,8 +24,8 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
     const initialDDate = data.deadline ? new Date(data.deadline) : new Date();
 
     const [formState, setFormState] = useState({
-        customerName: data.customerName || '',
-        address: [data.address, getFullWard(data.ward || ''), 'thành phố Đồng Nai'].filter(Boolean).join(', '),
+        customerName: toTitleCase(data.customerName || ''),
+        address: toTitleCase([data.address, getFullWard(data.ward || ''), 'thành phố Đồng Nai'].filter(Boolean).join(', ')),
         phoneNumber: data.phoneNumber || '',
         receivedDate: formatForInput(initialRDate),
         recordType: data.recordType || '',
@@ -35,7 +36,12 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        let formattedValue = value;
+        if (name === 'customerName' || name === 'address') {
+            formattedValue = toTitleCase(value);
+        }
+        setFormState(prev => ({ ...prev, [name]: formattedValue }));
     };
 
     const handlePrint = () => {
@@ -199,9 +205,9 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
                             {/* Header */}
                             <div className="flex justify-between mb-6">
                                 <div className="text-center" style={{ width: '45%' }}>
-                                    <div className="font-bold whitespace-nowrap" style={{ fontSize: '15px' }}>VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI</div>
-                                    <div className="font-bold underline" style={{ fontSize: '16px' }}>CHI NHÁNH CHƠN THÀNH</div>
-                                    
+                                    <div className="whitespace-nowrap uppercase" style={{ fontSize: '15px' }}>VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI</div>
+                                    <div className="whitespace-nowrap uppercase" style={{ fontSize: '15px' }}>THÀNH PHỐ ĐỒNG NAI</div>
+                                    <div className="font-bold underline uppercase" style={{ fontSize: '16px' }}>CHI NHÁNH CHƠN THÀNH</div>
                                     <div className="mt-4" style={{ fontSize: '16px' }}>
                                         Số: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/PXL
                                     </div>
@@ -225,13 +231,13 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
                             </div>
 
                             <div className="space-y-2">
-                                <p className="indent">Ngày {formatDateShort(formState.receivedDate)}, Văn phòng Đăng ký đất đai - Chi nhánh Chơn Thành (gọi tắt là Chi nhánh Chơn Thành) tiếp nhận hồ sơ thuộc lĩnh vực đất đai ({formState.recordType || '...'}) của {prefixCus.toLowerCase()} {shortName}.</p>
+                                <p className="indent">Ngày {formatDateShort(formState.receivedDate)}, Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành (gọi tắt là Chi nhánh Chơn Thành) tiếp nhận hồ sơ thuộc lĩnh vực đất đai ({formState.recordType || '...'}) của {prefixCus.toLowerCase()} {shortName}.</p>
                                 <p style={{ paddingLeft: '40px' }}>Số biên nhận hồ sơ: {formState.code}</p>
                                 <p style={{ paddingLeft: '40px' }}>Ngày hẹn trả kết quả giải quyết hồ sơ: ngày {formatDateShort(formState.deadline)}</p>
                                 <p className="indent">Sau khi tiếp nhận hồ sơ của {prefixCus.toLowerCase()} {shortName}, Bộ phận tiếp nhận và trả kết quả {formState.wardName} đã chuyển hồ sơ cho Chi nhánh Chơn thành xem xét, giải quyết theo quy định.</p>
-                                <p className="indent">Tuy nhiên Văn phòng Đăng ký đất đai - Chi nhánh Chơn Thành chưa trả kết quả giải quyết hồ sơ của {prefixCus.toLowerCase()} {shortName} đúng thời hạn quy định ghi trên Giấy tiếp nhận hồ sơ và trả kết quả / Biên nhận hồ sơ.</p>
+                                <p className="indent">Tuy nhiên Văn phòng Đăng ký đất đai thành phố Đồng Nai- Chi nhánh Chơn Thành chưa trả kết quả giải quyết hồ sơ của {prefixCus.toLowerCase()} {shortName} đúng thời hạn quy định ghi trên Giấy tiếp nhận hồ sơ và trả kết quả / Biên nhận hồ sơ.</p>
                                 <p className="indent">Lý do: {formState.reason}.</p>
-                                <p className="indent">Văn phòng Đăng ký đất đai - Chi nhánh Chơn Thành gửi phiếu xin lỗi đến {prefixCus.toLowerCase()} {shortName}, rất mong nhận được sự thông cảm của ông (bà) vì sự chậm trễ này./.</p>
+                                <p className="indent">Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành gửi phiếu xin lỗi đến {prefixCus.toLowerCase()} {shortName}, rất mong nhận được sự thông cảm của ông (bà) vì sự chậm trễ này./.</p>
                             </div>
 
                             {/* Signatures */}

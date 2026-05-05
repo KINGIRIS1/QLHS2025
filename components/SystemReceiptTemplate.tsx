@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { RecordFile } from '../types';
 import { getFullWard } from '../constants';
 import { Printer } from 'lucide-react';
+import { toTitleCase } from '../utils/appHelpers';
 
 interface SystemReceiptTemplateProps {
     data: Partial<RecordFile>;
@@ -96,11 +97,6 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const wardName = getFullWard(receivingWard);
     const wardNameNoPrefix = wardName.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
 
-    const getTitleCase = (str: string) => {
-        if (!str) return '';
-        return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-    };
-
     const type = (data.recordType || '').toLowerCase();
     let standardDays = "30"; 
     if (type.includes('trích lục')) {
@@ -150,10 +146,11 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         {/* Header */}
                         <div className="flex justify-between mb-6">
                             <div className="text-center" style={{ width: '48%' }}>
-                                <div className="font-bold" style={{ fontSize: '16px' }}>VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI</div>
-                                <div className="font-bold" style={{ fontSize: '16px' }}>CHI NHÁNH CHƠN THÀNH</div>
+                                <div className="uppercase" style={{ fontSize: '16px' }}>VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI</div>
+                                <div className="uppercase" style={{ fontSize: '16px' }}>THÀNH PHỐ ĐỒNG NAI</div>
+                                <div className="font-bold underline uppercase" style={{ fontSize: '16px' }}>CHI NHÁNH CHƠN THÀNH</div>
                                 <div className="whitespace-nowrap" style={{ fontSize: '15px' }}>TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG</div>
-                                <div className="font-bold underline" style={{ fontSize: '16px' }}>{wardName.toUpperCase()}</div>
+                                <div className="font-bold underline uppercase" style={{ fontSize: '16px' }}>{wardName}</div>
                                 
                                 <div className="mt-4" style={{ fontSize: '16px' }}>
                                     Mã số hồ sơ: <span className="font-bold">{data.code}</span>
@@ -162,7 +159,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div className="text-center" style={{ width: '52%' }}>
                                 <div className="font-bold whitespace-nowrap" style={{ fontSize: '16px' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
                                 <div className="font-bold underline mb-2" style={{ fontSize: '16px' }}>Độc lập - Tự do - Hạnh phúc</div>
-                                <div className="italic mt-4" style={{ fontSize: '16px' }}>{getTitleCase(wardNameNoPrefix)}, {formatDateOnly(new Date())}</div>
+                                <div className="italic mt-4" style={{ fontSize: '16px' }}>{toTitleCase(wardNameNoPrefix)}, {formatDateOnly(rDate)}</div>
                             </div>
                         </div>
 
@@ -173,12 +170,12 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
 
                         {/* Content */}
                         <div className="space-y-2 indent">
-                            <div><span className="font-bold">Tiếp nhận hồ sơ của ông/bà: </span><span className="font-bold">{data.customerName}</span></div>
+                            <div><span className="font-bold">Tiếp nhận hồ sơ của ông/bà: </span><span className="font-bold">{toTitleCase(data.customerName)}</span></div>
                             <div>Số điện thoại: {data.phoneNumber}</div>
                             <div>Thửa đất số: {data.landPlot}</div>
                             <div>Tờ bản đồ số: {data.mapSheet}</div>
                             <div>Diện tích: {data.area}m<sup>2</sup></div>
-                            <div>Địa chỉ thửa đất: {data.address ? data.address + ' - ' : ''}{getFullWard(data.ward || '')}</div>
+                            <div>Địa chỉ thửa đất: {toTitleCase(data.address ? data.address + ' - ' : '')}{toTitleCase(getFullWard(data.ward || ''))}</div>
                             <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{data.recordType ? `${data.recordType} - ` : ''}{data.content}</span></div>
                             
                             <div>1. {tp1Value}</div>
@@ -189,7 +186,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div>Thời gian giải quyết hồ sơ theo quy định là: <span className="font-bold">{standardDays}</span> ngày làm việc</div>
                             <div>Thời gian nhận hồ sơ: ngày <span className="font-bold">{formatDateShort(rDate)}</span></div>
                             <div>Thời gian hẹn trả kết quả giải quyết hồ sơ: ngày <span className="font-bold">{formatDateShort(dDate)}</span></div>
-                            <div>Nhận kết quả tại: Trung tâm Phục vụ Hành chính công {getTitleCase(wardNameNoPrefix)}</div>
+                            <div>Nhận kết quả tại: Trung tâm Phục vụ Hành chính công {toTitleCase(wardNameNoPrefix)}</div>
                             <div>Vào Sổ theo dõi hồ sơ, Quyển số:.............Số thứ tự.........</div>
                             <div>Số điện thoại liên hệ: {sdtLienHe}</div>
                         </div>

@@ -1,15 +1,17 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { RecordFile, RecordStatus, User } from '../types';
+import { RecordFile, RecordStatus, User, Employee } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare, FileText } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
 import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../services/apiArchive';
+import PhieuXinLoiModal from './PhieuXinLoiModal';
 
 interface PersonalProfileProps {
   user: User;
+  employees?: Employee[];
   records: RecordFile[];
   onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
   onViewRecord: (record: RecordFile) => void;
@@ -34,7 +36,7 @@ function removeVietnameseTones(str: string): string {
     return str;
 }
 
-const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
+const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   // Thêm tab 'completed_work' và 'pending_sign'
   const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
@@ -47,6 +49,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
   });
 
   const [archiveRecords, setArchiveRecords] = useState<ArchiveRecord[]>([]);
+
+  const [showPhieuXinLoi, setShowPhieuXinLoi] = useState(false);
+  const [selectedRecordForPhieu, setSelectedRecordForPhieu] = useState<RecordFile | null>(null);
 
   useEffect(() => {
     const loadArchive = async () => {
@@ -558,6 +563,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
                                                 </button>
                                             )}
 
+                                            {/* Nút Phiếu xin lỗi */}
+                                            <button 
+                                                onClick={() => { setSelectedRecordForPhieu(r); setShowPhieuXinLoi(true); }}
+                                                className="px-2 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" 
+                                                title="Phiếu xin lỗi"
+                                            >
+                                                <FileText size={14} /> XL
+                                            </button>
+
                                             {/* Logic nút chuyển trạng thái theo từng Tab */}
                                             {activeTab === 'pending' && (
                                                 <button onClick={() => handleMarkAsDone(r)} title="Đánh dấu đã xong việc" className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
@@ -601,6 +615,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, records, onUpda
             </div>
         )}
       </div>
+      
+      {showPhieuXinLoi && selectedRecordForPhieu && (
+        <PhieuXinLoiModal
+            data={selectedRecordForPhieu}
+            receivingWard={employees?.find(e => e.id === user.employeeId)?.managedWards?.[0] || 'chơn thành'}
+            onClose={() => {
+                setShowPhieuXinLoi(false);
+                setSelectedRecordForPhieu(null);
+            }}
+        />
+      )}
     </div>
   );
 };

@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -97,7 +97,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
           <td className={cellClass}>
               <div className="flex flex-col gap-1 items-center text-center">
                   <div className="break-words leading-normal text-sm font-medium text-gray-900" title={record.customerName}>
-                      {toTitleCase(record.customerName)}
+                      {record.customerName}
                   </div>
                   {record.phoneNumber && (
                       <div className="flex items-center gap-1 text-sm text-gray-600">

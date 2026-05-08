@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink } from 'lucide-react';
-import { toTitleCase } from '../../utils/appHelpers';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -374,11 +373,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   };
 
   const handleChange = (k: keyof Contract, v: any) => {
-      let finalValue = v;
-      if (k === 'customerName' || k === 'address') {
-          finalValue = toTitleCase(v);
-      }
-      setFormData(p => ({ ...p, [k]: finalValue }));
+      setFormData(p => ({ ...p, [k]: v }));
   };
   
   const availableServices = (() => {

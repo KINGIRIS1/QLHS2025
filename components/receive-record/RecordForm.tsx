@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
 import { RECORD_TYPES } from '../../constants';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map } from 'lucide-react';
-import { toTitleCase } from '../../utils/appHelpers';
 
 interface RecordFormProps {
   onSave: (record: RecordFile) => Promise<boolean>;
@@ -63,14 +62,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
-        let finalValue = value;
-        if (field === 'customerName' || field === 'address') {
-            finalValue = toTitleCase(value);
-        }
-        const newData = { ...prev, [field]: finalValue };
+        const newData = { ...prev, [field]: value };
         if (field === 'recordType' || field === 'receivedDate') {
-            const rType = field === 'recordType' ? finalValue : prev.recordType;
-            const rDate = field === 'receivedDate' ? finalValue : prev.receivedDate;
+            const rType = field === 'recordType' ? value : prev.recordType;
+            const rDate = field === 'receivedDate' ? value : prev.receivedDate;
             if (rType && rDate) newData.deadline = calculateDeadline(rType, rDate);
         }
         return newData;

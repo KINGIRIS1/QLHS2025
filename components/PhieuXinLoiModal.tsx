@@ -32,7 +32,8 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
         code: data.code || '',
         deadline: formatForInput(initialDDate),
         wardName: getFullWard(receivingWard),
-        reason: 'hồ sơ trích đo tăng đột biến và ranh giới sai lệch so với giấy chứng nhận quyền sử dụng đất được cấp năm 2023'
+        reason: 'Số lượng hồ sơ trích đo trên địa bàn tăng đột biến, dẫn đến quá tải trong công tác kiểm tra thực địa và biên tập hồ sơ kỹ thuật, chưa kịp thời xử lý đúng theo thời gian quy định.',
+        newReturnDate: ''
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -188,6 +189,10 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
                                 <input type="date" name="deadline" value={formState.deadline} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                             </div>
                             <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Thời gian hẹn trả kết quả lại</label>
+                                <input type="date" name="newReturnDate" value={formState.newReturnDate} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                            </div>
+                            <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Bộ phận tiếp nhận (Xã/Phường)</label>
                                 <input name="wardName" value={formState.wardName} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                             </div>
@@ -215,7 +220,7 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
                                 <div className="text-center" style={{ width: '55%' }}>
                                     <div className="font-bold whitespace-nowrap" style={{ fontSize: '16px' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
                                     <div className="font-bold underline mb-2" style={{ fontSize: '16px' }}>Độc lập - Tự do - Hạnh phúc</div>
-                                    <div className="italic mt-4" style={{ fontSize: '16px' }}>Chơn Thành, {formatDateOnly(new Date())}</div>
+                                    <div className="italic mt-4" style={{ fontSize: '16px' }}>Chơn Thành, ngày ..... tháng .... năm 20....</div>
                                 </div>
                             </div>
 
@@ -237,7 +242,9 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
                                 <p className="indent">Sau khi tiếp nhận hồ sơ của {prefixCus.toLowerCase()} {shortName}, Bộ phận tiếp nhận và trả kết quả {formState.wardName} đã chuyển hồ sơ cho Chi nhánh Chơn thành xem xét, giải quyết theo quy định.</p>
                                 <p className="indent">Tuy nhiên Văn phòng Đăng ký đất đai thành phố Đồng Nai- Chi nhánh Chơn Thành chưa trả kết quả giải quyết hồ sơ của {prefixCus.toLowerCase()} {shortName} đúng thời hạn quy định ghi trên Giấy tiếp nhận hồ sơ và trả kết quả / Biên nhận hồ sơ.</p>
                                 <p className="indent">Lý do: {formState.reason}.</p>
-                                <p className="indent">Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành gửi phiếu xin lỗi đến {prefixCus.toLowerCase()} {shortName}, rất mong nhận được sự thông cảm của ông (bà) vì sự chậm trễ này./.</p>
+                                <p className="indent">Chi nhánh Chơn Thành trân trọng gửi lời xin lỗi đến {prefixCus.toLowerCase()} {shortName}, rất mong nhận được sự thông cảm của ông, bà vì sự chậm trễ này.</p>
+                                <p className="font-bold indent">Thời gian hẹn trả kết quả lại: {formState.newReturnDate ? `Ngày ${new Date(formState.newReturnDate).getDate().toString().padStart(2, '0')} tháng ${(new Date(formState.newReturnDate).getMonth() + 1).toString().padStart(2, '0')} năm ${new Date(formState.newReturnDate).getFullYear()}` : 'Ngày …… tháng …… năm 2026'}.</p>
+                                <p className="indent">Trân trọng./.</p>
                             </div>
 
                             {/* Signatures */}
@@ -249,7 +256,14 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
                                     <div className="text-[14px]">- Lưu: VT.</div>
                                 </div>
                                 <div style={{ width: '50%' }} className="text-center">
-                                    <div className="font-bold text-[16px]">GIÁM ĐỐC</div>
+                                    {(formState.wardName.toLowerCase().includes('chơn thành') || formState.wardName.toLowerCase().includes('minh hưng')) ? (
+                                        <>
+                                            <div className="font-bold text-[16px]">KT. GIÁM ĐỐC</div>
+                                            <div className="font-bold text-[16px]">PHÓ GIÁM ĐỐC</div>
+                                        </>
+                                    ) : (
+                                        <div className="font-bold text-[16px]">GIÁM ĐỐC</div>
+                                    )}
                                 </div>
                             </div>
 

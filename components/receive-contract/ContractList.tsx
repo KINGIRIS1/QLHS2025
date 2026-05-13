@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contract } from '../../types';
 import { fetchContracts } from '../../services/api';
-import { Search, RotateCcw, Edit, Printer, FileCheck, Trash2, Loader2, DollarSign, ExternalLink } from 'lucide-react';
+import { Search, RotateCcw, Edit, Printer, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, Download, X } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
+import * as XLSX from 'xlsx-js-style';
 
 interface ContractListProps {
   onEdit: (c: Contract) => void;
@@ -43,6 +44,130 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
 
   const isLiquidationMode = viewMode === 'liquidation';
 
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFromDate, setExportFromDate] = useState('');
+  const [exportToDate, setExportToDate] = useState('');
+  const [exportMonth, setExportMonth] = useState('');
+  const [exportYear, setExportYear] = useState(new Date().getFullYear().toString());
+
+  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      setExportMonth(val);
+      if (val) {
+          const [year, month] = val.split('-');
+          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+          setExportFromDate(`${val}-01`);
+          setExportToDate(`${val}-${lastDay}`);
+      }
+  };
+
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const val = e.target.value;
+      setExportYear(val);
+      if (val) {
+          setExportFromDate(`${val}-01-01`);
+          setExportToDate(`${val}-12-31`);
+          setExportMonth(''); // reset month
+      }
+  };
+
+  const handleExportExcelClick = () => {
+      setShowExportModal(true);
+  };
+
+  const executeExport = () => {
+    let dataToExport = filtered;
+    
+    if (exportFromDate) {
+        const from = new Date(exportFromDate);
+        dataToExport = dataToExport.filter(c => {
+            if (!c.createdDate) return false;
+            return new Date(c.createdDate) >= from;
+        });
+    }
+    
+    if (exportToDate) {
+        const to = new Date(exportToDate);
+        to.setHours(23, 59, 59, 999);
+        dataToExport = dataToExport.filter(c => {
+            if (!c.createdDate) return false;
+            return new Date(c.createdDate) <= to;
+        });
+    }
+
+    const wsData = [
+      [
+        "STT",
+        "Ngày lập HĐ",
+        "Số hợp đồng",
+        "Ngày hợp đồng",
+        "Tên cá nhân/đơn vị",
+        "Đại diện đơn vị",
+        "Nội dung công việc",
+        "Số lượng mốc/ diện tích",
+        "Giá trị hợp đồng",
+        "Giá trị thanh lý",
+        "Ghi chú"
+      ],
+      ...dataToExport.map((c, index) => {
+        const dateStr = c.createdDate ? new Date(c.createdDate).toLocaleDateString('vi-VN') : '';
+        const slGiaTri = c.contractType === 'Cắm mốc' ? (c.markerCount || '') : (c.area || '');
+        return [
+          index + 1,
+          dateStr,
+          c.code || '',
+          dateStr,
+          c.customerName || '',
+          c.customerName || '', // Có thể tuỳ biến nếu có field riêng
+          c.serviceType || c.contractType || '',
+          slGiaTri,
+          c.totalAmount || 0,
+          c.liquidationAmount || 0,
+          c.content || ''
+        ];
+      })
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Style cho header
+    for (let C = 0; C < 11; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ c: C, r: 0 });
+      if (!ws[cellAddress]) continue;
+      ws[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "4F46E5" } }, // indigo-600
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" }
+        }
+      };
+    }
+
+    // Set width
+    ws['!cols'] = [
+      { wch: 6 },  // STT
+      { wch: 15 }, // Ngày lập HĐ
+      { wch: 20 }, // Số hd
+      { wch: 15 }, // Ngày hd
+      { wch: 30 }, // Tên
+      { wch: 30 }, // Đại diện
+      { wch: 30 }, // Nội dung
+      { wch: 25 }, // SL/DT
+      { wch: 20 }, // Giá trị HĐ
+      { wch: 20 }, // Giá trị Thanh lý
+      { wch: 25 }  // Ghi chú
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach");
+    XLSX.writeFile(wb, `Danh_Sach_Hop_Dong_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setShowExportModal(false);
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in">
         <div className={`p-4 border-b border-gray-200 flex items-center gap-3 shrink-0 ${isLiquidationMode ? 'bg-orange-50' : 'bg-purple-50'}`}>
@@ -59,7 +184,10 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                     onChange={(e) => setSearchTerm(e.target.value)} 
                 />
             </div>
-            <button onClick={loadContracts} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full" title="Tải lại"> 
+            <button onClick={handleExportExcelClick} className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full border border-green-200" title="Xuất Excel">
+                <Download size={18} />
+            </button>
+            <button onClick={loadContracts} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full border border-gray-200" title="Tải lại"> 
                 <RotateCcw size={18} /> 
             </button>
         </div>
@@ -140,6 +268,58 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                 </tbody>
             </table>
         </div>
+
+        {/* Modal xuất Excel */}
+        {showExportModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                    <div className="flex items-center justify-between mb-4 border-b pb-3">
+                        <h3 className="font-bold text-lg text-gray-800">Xuất Excel Hợp Đồng</h3>
+                        <button onClick={() => setShowExportModal(false)} className="text-gray-500 hover:text-gray-700">
+                            <X size={20} />
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Chọn tháng</label>
+                                <input type="month" value={exportMonth} onChange={handleMonthChange} className="w-full border border-gray-300 rounded p-2 text-sm" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Chọn năm</label>
+                                <select value={exportYear} onChange={handleYearChange} className="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                                    <option value="">- Chọn -</option>
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                        <option key={year} value={year}>{year}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+                                <input type="date" value={exportFromDate} onChange={e => setExportFromDate(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
+                                <input type="date" value={exportToDate} onChange={e => setExportToDate(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                        <button onClick={() => setShowExportModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                            Hủy
+                        </button>
+                        <button onClick={executeExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                            <Download size={16} /> Xuất File
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

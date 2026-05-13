@@ -9,6 +9,8 @@ import { updateRecordApi } from '../services/api';
 import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../services/apiArchive';
 import PhieuXinLoiModal from './PhieuXinLoiModal';
 
+import PersonalReportView from './PersonalReportView';
+
 interface PersonalProfileProps {
   user: User;
   employees?: Employee[];
@@ -38,7 +40,7 @@ function removeVietnameseTones(str: string): string {
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   // Thêm tab 'completed_work' và 'pending_sign'
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -466,21 +468,35 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                 >
                     <Bell size={16} /> Nhắc việc ({reminderRecords.length})
                 </button>
+                <button 
+                    onClick={() => { setActiveTab('report'); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'report' ? 'bg-orange-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    Báo cáo cá nhân
+                </button>
             </div>
             
-            <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                    type="text" 
-                    placeholder={`Tìm trong ${getTabLabel()}...`}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                />
-            </div>
+            {activeTab !== 'report' && (
+                <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder={`Tìm trong ${getTabLabel()}...`}
+                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        value={searchTerm}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                    />
+                </div>
+            )}
         </div>
         
-        <div className="flex-1 overflow-y-auto">
+        {activeTab === 'report' ? (
+            <PersonalReportView myRecords={myRecords} user={user} />
+        ) : (
+            <>
+                <div className="flex-1 overflow-y-auto">
             {displayRecords.length > 0 ? (
                 <table className="w-full text-left table-fixed min-w-[1050px]">
                     <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
@@ -613,6 +629,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                     <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={18} /></button>
                 </div>
             </div>
+        )}
+        </>
         )}
       </div>
       

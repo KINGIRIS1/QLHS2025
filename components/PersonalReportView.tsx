@@ -82,7 +82,21 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
             return d >= reportRange.start && d <= reportRange.end;
         });
         
-        return { received, completed };
+        const getGroupedTypes = (arr: RecordFile[]) => {
+            const groups: Record<string, number> = {};
+            arr.forEach(r => {
+                const t = getShortRecordType(r.recordType||'') || 'Khác';
+                groups[t] = (groups[t] || 0) + 1;
+            });
+            return groups;
+        };
+        
+        return { 
+            received, 
+            completed,
+            receivedTypes: getGroupedTypes(received),
+            completedTypes: getGroupedTypes(completed)
+        };
     }, [myRecords, reportRange]);
 
     const mySchedules = useMemo(() => {
@@ -115,14 +129,24 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
     }
 
     const handleExport = () => {
-        const wsData = [
+        const wsData: any[][] = [
             ["BÁO CÁO CÁ NHÂN: " + user.name.toUpperCase()],
             ["Từ ngày", reportRange.start.toLocaleDateString('vi-VN'), "Đến ngày", reportRange.end.toLocaleDateString('vi-VN')],
             [],
             ["I. THỐNG KÊ HỒ SƠ", "Nhận:", filteredRecords.received.length, "Hoàn thành:", filteredRecords.completed.length],
-            ["HỒ SƠ NHẬN/ĐƯỢC GIAO"],
-            ["STT", "Mã HS", "Chủ sử dụng", "Loại hồ sơ", "Ngày P/C", "Trạng thái", "Hẹn trả"]
+            ["Chi tiết nhận:"],
         ];
+        Object.entries(filteredRecords.receivedTypes).forEach(([type, count]) => {
+            wsData.push(["- " + type, count]);
+        });
+        wsData.push([]);
+        wsData.push(["Chi tiết hoàn thành:"]);
+        Object.entries(filteredRecords.completedTypes).forEach(([type, count]) => {
+            wsData.push(["- " + type, count]);
+        });
+        wsData.push([]);
+        wsData.push(["HỒ SƠ NHẬN/ĐƯỢC GIAO"]);
+        wsData.push(["STT", "Mã HS", "Chủ sử dụng", "Loại hồ sơ", "Ngày P/C", "Trạng thái", "Hẹn trả"]);
 
         filteredRecords.received.forEach((r, i) => {
             wsData.push([
@@ -163,9 +187,6 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
         });
 
         const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(XLSX.utils.book_new(), ws, "Bao_Cao");
-        XLSX.writeFile(XLSX.utils.book_new() || ws, `Bao_Cao_${user.name.replace(/\s/g, '')}_${new Date().toISOString().split('T')[0]}.xlsx`); 
-        // Note: XLSX writeFile needs a workbook, not just sheet
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Bao_Cao");
         XLSX.writeFile(wb, `Bao_Cao_${user.name.replace(/\s/g, '')}_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -212,15 +233,37 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
-                    <span className="text-gray-500 text-sm font-semibold uppercase mb-1">Hồ sơ giao duyệt</span>
-                    <span className="text-3xl font-bold text-blue-700">{filteredRecords.received.length}</span>
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col justify-start">
+                    <div className="text-center mb-2">
+                        <span className="text-gray-500 text-sm font-semibold uppercase mb-1 block">Hồ sơ giao duyệt</span>
+                        <span className="text-3xl font-bold text-blue-700">{filteredRecords.received.length}</span>
+                    </div>
+                    {Object.keys(filteredRecords.receivedTypes).length > 0 && (
+                        <div className="w-full text-sm text-blue-800 space-y-1 bg-blue-100/50 p-3 rounded mt-2">
+                            {Object.entries(filteredRecords.receivedTypes).map(([type, count]) => (
+                                <div key={type} className="flex justify-between w-full">
+                                    <span className="truncate mr-2">- {type}:</span> <span className="font-semibold whitespace-nowrap">{count} hs</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-100 flex flex-col items-center justify-center">
-                    <span className="text-gray-500 text-sm font-semibold uppercase mb-1">Hồ sơ hoàn thành</span>
-                    <span className="text-3xl font-bold text-green-700">{filteredRecords.completed.length}</span>
+                <div className="bg-green-50 p-4 rounded-lg border border-green-100 flex flex-col justify-start">
+                    <div className="text-center mb-2">
+                        <span className="text-gray-500 text-sm font-semibold uppercase mb-1 block">Hồ sơ hoàn thành</span>
+                        <span className="text-3xl font-bold text-green-700">{filteredRecords.completed.length}</span>
+                    </div>
+                    {Object.keys(filteredRecords.completedTypes).length > 0 && (
+                        <div className="w-full text-sm text-green-800 space-y-1 bg-green-100/50 p-3 rounded mt-2">
+                            {Object.entries(filteredRecords.completedTypes).map(([type, count]) => (
+                                <div key={type} className="flex justify-between w-full">
+                                    <span className="truncate mr-2">- {type}:</span> <span className="font-semibold whitespace-nowrap">{count} hs</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 flex flex-col items-center justify-center">
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 flex flex-col justify-center items-center">
                     <span className="text-gray-500 text-sm font-semibold uppercase mb-1">Lịch công tác</span>
                     <span className="text-3xl font-bold text-purple-700">{mySchedules.length}</span>
                 </div>

@@ -10,6 +10,9 @@ import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
 import LateRecordsView from './report/LateRecordsView';
+import TeamWeeklyDetailsView from './report/TeamWeeklyDetailsView';
+import { fetchWorkSchedules } from '../services/apiWorkSchedule';
+import { WorkSchedule } from '../types';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -39,7 +42,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records' | 'team_weekly'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -50,6 +53,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
     const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
+    const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
+
+    useEffect(() => {
+        fetchWorkSchedules().then(res => setSchedules(res));
+    }, []);
 
     // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
     const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
@@ -424,6 +432,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <UserCheck size={16}/> Thống kê nhân viên
                 </button>
                 <button 
+                    onClick={() => setActiveTab('team_weekly')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'team_weekly' ? 'border-amber-600 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <ListFilter size={16}/> Báo cáo chi tiết
+                </button>
+                <button 
                     onClick={() => setActiveTab('daily_stats')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
@@ -609,6 +623,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             )}
                         </div>
                     </div>
+                )}
+
+                {activeTab === 'team_weekly' && (
+                    <TeamWeeklyDetailsView
+                        records={activeRecords}
+                        employees={activeEmployees}
+                        schedules={schedules}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                    />
                 )}
 
                 {activeTab === 'daily_stats' && (

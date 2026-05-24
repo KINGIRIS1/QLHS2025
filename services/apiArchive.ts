@@ -13,6 +13,7 @@ export interface ArchiveRecord {
     trich_yeu: string; // Nội dung/Trích yếu
     ngay_thang: string;
     noi_nhan_gui: string;
+    attached_files?: any[];
     data: any; // Các trường mở rộng khác
 }
 
@@ -209,6 +210,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 trich_yeu: payload.trich_yeu,
                 ngay_thang: payload.ngay_thang,
                 noi_nhan_gui: payload.noi_nhan_gui,
+                attached_files: payload.attached_files,
                 data: payload.data
             }).eq('id', record.id).select().single();
             
@@ -227,7 +229,19 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             // Để Supabase/Postgres tự sinh ID.
             delete payload.id; 
             
-            const { data, error } = await supabase.from('archive_records').insert([payload]).select().single();
+            const insertPayload = {
+                type: payload.type,
+                status: payload.status,
+                so_hieu: payload.so_hieu,
+                trich_yeu: payload.trich_yeu,
+                ngay_thang: payload.ngay_thang,
+                noi_nhan_gui: payload.noi_nhan_gui,
+                attached_files: payload.attached_files,
+                data: payload.data,
+                created_by: payload.created_by
+            };
+            
+            const { data, error } = await supabase.from('archive_records').insert([insertPayload]).select().single();
             if (error) throw error;
             
             // Mutate cache

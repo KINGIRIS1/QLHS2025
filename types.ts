@@ -56,6 +56,7 @@ export interface RecordFile {
   receivedDate?: string | null;   
   deadline?: string | null;       
   assignedDate?: string | null;  
+  workCompletedDate?: string | null; // Ngày Đã thực hiện
   
   submissionDate?: string | null; // Ngày trình ký
   approvalDate?: string | null;   // Ngày ký duyệt

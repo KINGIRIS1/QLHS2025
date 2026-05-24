@@ -46,6 +46,9 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
       
       // Lọc danh sách
       const list = records.filter(r => {
+          // BỎ QUA hồ sơ Khác (CMD, Tòa án, Thi hành án)
+          if (['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return false;
+
           // 1. Lọc theo ngày nhận
           if (r.receivedDate !== filterDate) return false;
           

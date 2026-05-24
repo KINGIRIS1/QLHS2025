@@ -120,6 +120,8 @@ export const exportReportToExcel = async (
         "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
         "Ngày Nhận", 
         "Hẹn Trả", 
+        "Đã Thực Hiện", // NEW 
+        "Chờ Ký Duyệt", // NEW
         "Ngày hoàn thành",
         "Ngày trả kết quả",
         "Trạng Thái", 
@@ -128,6 +130,10 @@ export const exportReportToExcel = async (
     
     const dataRows = filtered.map((r, i) => {
         const contractInfo = getContractInfo(r.code);
+        
+        const isCompletedWork = r.status === RecordStatus.COMPLETED_WORK;
+        const isPendingSign = r.status === RecordStatus.PENDING_SIGN;
+
         return [
             i + 1,
             r.code,
@@ -143,6 +149,8 @@ export const exportReportToExcel = async (
             contractInfo.liquidation, // Giá trị TL
             formatDate(r.receivedDate),
             formatDate(r.deadline),
+            isCompletedWork ? 'x' : '', // Đã thực hiện
+            isPendingSign ? 'x' : '',   // Chờ ký duyệt
             formatDate(r.completedDate),      
             formatDate(r.resultReturnedDate),
             STATUS_LABELS[r.status],
@@ -216,6 +224,8 @@ export const exportReportToExcel = async (
         { wch: 15 }, // Giá trị TL (New)
         { wch: 12 }, // Ngày Nhận
         { wch: 12 }, // Hẹn Trả
+        { wch: 14 }, // Đã thực hiện
+        { wch: 14 }, // Chờ ký duyệt
         { wch: 14 }, // Ngày hoàn thành
         { wch: 14 }, // Ngày trả kết quả
         { wch: 15 }, // Trạng thái
@@ -242,9 +252,8 @@ export const exportReportToExcel = async (
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Căn giữa: STT, Tờ, Thửa, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
-            // Index: 0(STT), 4(Tờ), 5(Thửa), 8(NV), 9(BL), 10(HĐ), 11(TL), 12(NgayNhan), 13(Hen), 14(Xong), 15(TraKQ), 16(Status)
-            if ([0, 4, 5, 8, 9, 12, 13, 14, 15, 16].includes(c)) ws[cellRef].s = centerStyle;
+            // Căn giữa: STT, Tờ, Thửa, NV, BL, Ngày, x, Trạng thái. Căn phải: Tiền.
+            if ([0, 4, 5, 8, 9, 12, 13, 14, 15, 16, 17, 18].includes(c)) ws[cellRef].s = centerStyle;
             else if (c === 10 || c === 11) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }

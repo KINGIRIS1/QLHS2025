@@ -9,6 +9,7 @@ interface RecordFormProps {
   currentUser: User; // Thêm prop này để biết ai đang nhập
   onSubmit: (data: LandRecordFormData) => Promise<void> | void;
   onCancel: () => void;
+  filePrefix?: string;
 }
 
 // Dữ liệu danh sách xã/phường (Giống như trong App.tsx để đồng bộ)
@@ -29,7 +30,7 @@ const PREDEFINED_OLD_COMMUNES = [
   'Minh Long'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
-const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSubmit, onCancel }) => {
+const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSubmit, onCancel, filePrefix }) => {
   const [formData, setFormData] = useState<LandRecordFormData>({
     owners: [''],
     issueNumber: '',
@@ -222,32 +223,52 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       
       // Upload pending blocked files
       if (pendingFiles.length > 0) {
-        if (!isConfigured) throw new Error("Vui lòng cấu hình Supabase để tải file lên.");
         const uploadedFiles = [];
         for (const file of pendingFiles) {
+          if (!isConfigured) {
+              uploadedFiles.push({ id: `mock-${Date.now()}`, url: URL.createObjectURL(file), name: file.name });
+              continue;
+          }
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const filePath = `blocking_docs/${fileName}`;
+          const baseFolder = filePrefix ? `${filePrefix}_blocking_docs` : `blocking_docs`;
+          const filePath = `${baseFolder}/${fileName}`;
           const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
-          if (error) throw new Error(error.message);
-          const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
-          uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+          
+          if (error) {
+              console.error("Storage upload error:", error);
+              alert(`Không thể upload file ${file.name}. Lỗi: ${error.message}`);
+              continue;
+          } else {
+              const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
+              uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+          }
         }
         finalFormData.attached_files = [...(finalFormData.attached_files || []), ...uploadedFiles];
       }
 
       // Upload pending unblock files
       if (pendingUnblockFiles.length > 0) {
-        if (!isConfigured) throw new Error("Vui lòng cấu hình Supabase để tải file lên.");
         const uploadedFiles = [];
         for (const file of pendingUnblockFiles) {
+          if (!isConfigured) {
+              uploadedFiles.push({ id: `mock-${Date.now()}`, url: URL.createObjectURL(file), name: file.name });
+              continue;
+          }
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const filePath = `unblock_docs/${fileName}`;
+          const baseFolder = filePrefix ? `${filePrefix}_unblock_docs` : `unblock_docs`;
+          const filePath = `${baseFolder}/${fileName}`;
           const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
-          if (error) throw new Error(error.message);
-          const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
-          uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+
+          if (error) {
+              console.error("Storage upload error:", error);
+              alert(`Không thể upload file ${file.name}. Lỗi: ${error.message}`);
+              continue;
+          } else {
+              const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
+              uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+          }
         }
         finalFormData.unblock_attached_files = [...(finalFormData.unblock_attached_files || []), ...uploadedFiles];
       }

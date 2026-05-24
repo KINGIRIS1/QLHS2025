@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import { RecordFile, Employee, WorkSchedule, RecordStatus } from "../../types";
-import * as XLSX from "xlsx-js-style";
+import { exportTeamWeeklyReportToWord } from "../../utils/exportTeamWeeklyReport";
 import { Download } from "lucide-react";
-import { getShortRecordType } from "../../constants";
+import { getShortRecordType, getNormalizedWard } from "../../constants";
 
 interface TeamWeeklyDetailsViewProps {
   records: RecordFile[];
@@ -66,41 +66,61 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
 
     // Process records
     records.forEach((r) => {
-      if (!r.assignedTo || !empMap.has(r.assignedTo)) return;
-      const empData = empMap.get(r.assignedTo)!;
+      // OVERALL STATS & EMPLOYEE STATS
 
-      // Check received
-      const rDateStr = r.assignedDate || r.receivedDate;
-      if (rDateStr) {
-        const rDate = new Date(rDateStr);
+      // 1. Hồ sơ nhận: Nhập vào hệ thống trong tuần này
+      if (r.receivedDate) {
+        const rDate = new Date(r.receivedDate);
         if (rDate >= start && rDate <= end) {
-          empData.received.push(r);
           allReceived.push(r);
+          if (r.assignedTo && empMap.has(r.assignedTo)) {
+            empMap.get(r.assignedTo)!.received.push(r);
+          }
         }
       }
 
-      // Check completed
-      if (finishedStatuses.includes(r.status)) {
+      // 2. Hồ sơ hoàn thành: Đã ký duyệt trở đi
+      const isCompletedStatus = [
+        RecordStatus.SIGNED,
+        RecordStatus.HANDOVER,
+        RecordStatus.RETURNED,
+      ].includes(r.status);
+
+      if (isCompletedStatus) {
         const cDateStr =
-          r.completedDate ||
           r.approvalDate ||
+          r.completedDate ||
           r.resultReturnedDate ||
-          r.exportDate ||
-          r.submissionDate ||
-          r.assignedDate;
+          r.exportDate;
         if (cDateStr) {
           const cDate = new Date(cDateStr);
           if (cDate >= start && cDate <= end) {
-            empData.completed.push(r);
             allCompleted.push(r);
+            if (r.assignedTo && empMap.has(r.assignedTo)) {
+              empMap.get(r.assignedTo)!.completed.push(r);
+            }
+          }
+        }
+      }
 
-            // Further break down
-            if (r.status === RecordStatus.COMPLETED_WORK) {
-              empData.completedWork.push(r);
-              allCompletedWork.push(r);
-            } else if (r.status === RecordStatus.PENDING_SIGN) {
-              empData.pendingSign.push(r);
-              allPendingSign.push(r);
+      // 3. Hồ sơ Đã thực hiện
+      if (r.status === RecordStatus.COMPLETED_WORK) {
+        if (r.workCompletedDate) {
+          const wDate = new Date(r.workCompletedDate);
+          if (wDate >= start && wDate <= end) {
+            allCompletedWork.push(r);
+            if (r.assignedTo && empMap.has(r.assignedTo)) {
+              empMap.get(r.assignedTo)!.completedWork.push(r);
+            }
+          }
+        }
+      } else if (r.status === RecordStatus.PENDING_SIGN) {
+        if (r.submissionDate) {
+          const sDate = new Date(r.submissionDate);
+          if (sDate >= start && sDate <= end) {
+            allPendingSign.push(r);
+            if (r.assignedTo && empMap.has(r.assignedTo)) {
+              empMap.get(r.assignedTo)!.pendingSign.push(r);
             }
           }
         }
@@ -153,6 +173,21 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       return groups;
     };
 
+    const getGroupedByWard = (arr: RecordFile[]) => {
+      const wards: Record<string, { total: number; types: Record<string, number> }> = {};
+      arr.forEach((r) => {
+        const w = getNormalizedWard(r.ward) || "Khác";
+        if (!wards[w]) {
+          wards[w] = { total: 0, types: {} };
+        }
+        wards[w].total += 1;
+        
+        const t = getShortRecordType(r.recordType || "") || "Khác";
+        wards[w].types[t] = (wards[w].types[t] || 0) + 1;
+      });
+      return wards;
+    };
+
     return {
       totalReceivedCount: allReceived.length,
       totalCompletedCount: allCompleted.length,
@@ -163,115 +198,28 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       completedTypes: getGroupedTypes(allCompleted),
       completedWorkTypes: getGroupedTypes(allCompletedWork),
       pendingSignTypes: getGroupedTypes(allPendingSign),
+      receivedByWard: getGroupedByWard(allReceived),
+      completedByWard: getGroupedByWard(allCompleted),
       employeesData: Array.from(empMap.values()),
       allSchedules,
     };
   }, [records, employees, schedules, fromDate, toDate]);
 
   const handleExport = () => {
-    const wsData: any[][] = [];
-    wsData.push(["BÁO CÁO CHI TIẾT"]);
-    wsData.push([
-      "Từ ngày",
-      new Date(fromDate).toLocaleDateString("vi-VN"),
-      "Đến ngày",
-      new Date(toDate).toLocaleDateString("vi-VN"),
-    ]);
-    wsData.push([]);
-
-    wsData.push(["I. BÁO CÁO TỔNG QUAN"]);
-    wsData.push([`- Tổng số hồ sơ nhận: ${reportData.totalReceivedCount}`]);
-    Object.entries(reportData.receivedTypes).forEach(([type, count]) => {
-      wsData.push([`  + ${type}: ${count}`]);
-    });
-    wsData.push([
-      `- Tổng số hồ sơ hoàn thành: ${reportData.totalCompletedCount}`,
-    ]);
-    Object.entries(reportData.completedTypes).forEach(([type, count]) => {
-      wsData.push([`  + ${type}: ${count}`]);
-    });
-    wsData.push([`  Trong đó:`]);
-    wsData.push([
-      `  * Đã thực hiện (chờ trình ký): ${reportData.totalCompletedWorkCount}`,
-    ]);
-    wsData.push([
-      `  * Đang trình ký duyệt: ${reportData.totalPendingSignCount}`,
-    ]);
-
-    wsData.push([`- Tổng số lịch công tác: ${reportData.totalScheduleCount}`]);
-    wsData.push([]);
-
-    wsData.push(["II. BÁO CÁO THEO NHÂN VIÊN"]);
-
-    reportData.employeesData.forEach((data, index) => {
-      wsData.push([
-        `${index + 1}. ${data.employee.name} ${data.employee.department ? `(${data.employee.department})` : ""}`,
-      ]);
-
-      // Received
-      const receivedTypes: Record<string, number> = {};
-      data.received.forEach((r) => {
-        const t = getShortRecordType(r.recordType || "") || "Khác";
-        receivedTypes[t] = (receivedTypes[t] || 0) + 1;
-      });
-      wsData.push([`  a) Số lượng hồ sơ nhận: ${data.received.length} hồ sơ`]);
-      Object.entries(receivedTypes).forEach(([type, count]) => {
-        wsData.push([`    - ${type}: ${count}`]);
-      });
-
-      // Completed
-      const completedTypes: Record<string, number> = {};
-      data.completed.forEach((r) => {
-        const t = getShortRecordType(r.recordType || "") || "Khác";
-        completedTypes[t] = (completedTypes[t] || 0) + 1;
-      });
-      wsData.push([
-        `  b) Số lượng hồ sơ hoàn thành: ${data.completed.length} hồ sơ`,
-      ]);
-      Object.entries(completedTypes).forEach(([type, count]) => {
-        wsData.push([`    - ${type}: ${count}`]);
-      });
-      if (data.completedWork.length > 0 || data.pendingSign.length > 0) {
-        wsData.push([`    Trong đó:`]);
-        wsData.push([
-          `    * Đã thực hiện (chờ trình ký): ${data.completedWork.length}`,
-        ]);
-        wsData.push([`    * Đang trình ký duyệt: ${data.pendingSign.length}`]);
-      }
-
-      // Schedules
-      wsData.push([`  c) Lịch công tác: ${data.schedules.length} lịch`]);
-      data.schedules.forEach((s) => {
-        wsData.push([
-          `    - Ngày ${new Date(s.date).toLocaleDateString("vi-VN")}: ${s.content}`,
-        ]);
-      });
-
-      wsData.push([]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws["!cols"] = [{ wch: 60 }];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Bao_Cao_Chi_Tiet");
-    XLSX.writeFile(
-      wb,
-      `Bao_Cao_Chi_Tiet_${new Date().toISOString().split("T")[0]}.xlsx`,
-    );
+    exportTeamWeeklyReportToWord(reportData, fromDate, toDate);
   };
 
   return (
-    <div className="h-full bg-white overflow-y-auto w-full p-6 text-sm animate-fade-in relative block">
+    <div className="h-full bg-white overflow-y-auto w-full p-6 animate-fade-in relative block">
       <div className="flex justify-between items-center mb-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
         <h3 className="font-bold text-gray-800 uppercase text-base">
           Báo cáo chi tiết
         </h3>
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          <Download size={16} /> Xuất Danh Sách
+          <Download size={16} /> Xuất Báo Cáo Word
         </button>
       </div>
 
@@ -304,7 +252,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
         </div>
 
         {/* Tiêu đề */}
-        <h2 className="text-xl font-bold uppercase text-center mb-2">
+        <h2 className="font-bold uppercase text-center mb-2">
           BÁO CÁO CÔNG TÁC
         </h2>
         <div className="text-center mb-8 italic">
@@ -312,54 +260,105 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
           {new Date(toDate).toLocaleDateString("vi-VN")})
         </div>
 
-        <h3 className="font-bold text-lg mb-3">I. BÁO CÁO TỔNG QUAN</h3>
+        <h3 className="font-bold mb-3">I. BÁO CÁO TỔNG QUAN</h3>
         <ul className="list-none mb-6 space-y-2 text-justify pl-4">
           <li>
             <span className="font-bold">1. Tổng hồ sơ nhận:</span>{" "}
             {reportData.totalReceivedCount} hồ sơ
             {Object.keys(reportData.receivedTypes).length > 0 && (
-              <ul className="list-none pl-6 mt-1 space-y-1">
-                {Object.entries(reportData.receivedTypes).map(
-                  ([type, count]) => (
-                    <li key={type}>
-                      - {type}: {count} hồ sơ;
-                    </li>
-                  ),
+              <div className="pl-6 mt-1 space-y-3">
+                <ul className="list-none space-y-1">
+                  {Object.entries(reportData.receivedTypes).map(
+                    ([type, count]) => (
+                      <li key={type}>
+                        - {type}: {count} hồ sơ;
+                      </li>
+                    ),
+                  )}
+                </ul>
+                
+                {Object.keys(reportData.receivedByWard).length > 0 && (
+                  <div>
+                    <div className="font-bold mb-1 italic">* Chi tiết theo xã phường:</div>
+                    <ul className="list-none space-y-2">
+                      {Object.entries(reportData.receivedByWard).map(([ward, wardData]) => (
+                        <li key={ward}>
+                          <span className="font-semibold">- Xã/Phường {ward}: {wardData.total} hồ sơ</span>
+                          <ul className="list-none pl-6 mt-1 space-y-1 text-gray-700">
+                            {Object.entries(wardData.types).map(([type, count]) => (
+                              <li key={type}>+ {type}: {count} hồ sơ</li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-              </ul>
+              </div>
             )}
           </li>
           <li>
             <span className="font-bold">2. Tổng hồ sơ hoàn thành:</span>{" "}
             {reportData.totalCompletedCount} hồ sơ
             {Object.keys(reportData.completedTypes).length > 0 && (
-              <ul className="list-none pl-6 mt-1 space-y-1">
-                {Object.entries(reportData.completedTypes).map(
-                  ([type, count]) => (
-                    <li key={type}>
-                      - {type}: {count} hồ sơ;
-                    </li>
-                  ),
+              <div className="pl-6 mt-1 space-y-3">
+                <ul className="list-none space-y-1">
+                  {Object.entries(reportData.completedTypes).map(
+                    ([type, count]) => (
+                      <li key={type}>
+                        - {type}: {count} hồ sơ;
+                      </li>
+                    ),
+                  )}
+                </ul>
+
+                {Object.keys(reportData.completedByWard).length > 0 && (
+                  <div>
+                    <div className="font-bold mb-1 italic">* Chi tiết theo xã phường:</div>
+                    <ul className="list-none space-y-2">
+                      {Object.entries(reportData.completedByWard).map(([ward, wardData]) => (
+                        <li key={ward}>
+                          <span className="font-semibold">- Xã/Phường {ward}: {wardData.total} hồ sơ</span>
+                          <ul className="list-none pl-6 mt-1 space-y-1 text-gray-700">
+                            {Object.entries(wardData.types).map(([type, count]) => (
+                              <li key={type}>+ {type}: {count} hồ sơ</li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                <li className="italic text-gray-700 mt-2">Trong đó:</li>
-                <li className="italic text-gray-700">
-                  - Đã thực hiện (chờ trình ký):{" "}
-                  {reportData.totalCompletedWorkCount} hồ sơ
-                </li>
-                <li className="italic text-gray-700">
-                  - Đang trình ký duyệt: {reportData.totalPendingSignCount} hồ
-                  sơ
-                </li>
-              </ul>
+
+              </div>
             )}
           </li>
           <li>
-            <span className="font-bold">3. Tổng lịch công tác:</span>{" "}
+            <span className="font-bold">3. Tổng số hồ sơ đã thực hiện: </span>
+            {reportData.totalCompletedWorkCount + reportData.totalPendingSignCount} hồ sơ
+            {(reportData.totalCompletedWorkCount > 0 || reportData.totalPendingSignCount > 0) && (
+              <div className="pl-6 mt-1 space-y-1">
+                <div className="italic text-gray-700 mb-1">Trong đó:</div>
+                <ul className="list-none space-y-1">
+                  <li className="italic text-gray-700">
+                    - Đã thực hiện (đang chờ kiểm tra):{" "}
+                    {reportData.totalCompletedWorkCount} hồ sơ
+                  </li>
+                  <li className="italic text-gray-700">
+                    - Đã thực hiện (chờ ký duyệt): {reportData.totalPendingSignCount} hồ
+                    sơ
+                  </li>
+                </ul>
+              </div>
+            )}
+          </li>
+          <li>
+            <span className="font-bold">4. Tổng lịch công tác:</span>{" "}
             {reportData.totalScheduleCount} lịch
           </li>
         </ul>
 
-        <h3 className="font-bold text-lg mb-3 mt-8">
+        <h3 className="font-bold mb-3 mt-8">
           II. BÁO CÁO THEO NHÂN VIÊN
         </h3>
         <div className="space-y-6 text-justify pl-4">
@@ -410,32 +409,35 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                             - {type}: {count} hồ sơ;
                           </li>
                         ))}
-
-                        {(data.completedWork.length > 0 ||
-                          data.pendingSign.length > 0) && (
-                          <>
-                            <li className="italic text-gray-700 mt-2">
-                              Trong đó:
-                            </li>
-                            {data.completedWork.length > 0 && (
-                              <li className="italic text-gray-700">
-                                - Đã thực hiện (chờ trình ký):{" "}
-                                {data.completedWork.length} hồ sơ
-                              </li>
-                            )}
-                            {data.pendingSign.length > 0 && (
-                              <li className="italic text-gray-700">
-                                - Đang trình ký duyệt: {data.pendingSign.length}{" "}
-                                hồ sơ
-                              </li>
-                            )}
-                          </>
+                      </ul>
+                    )}
+                  </li>
+                  <li>
+                    <span className="font-bold">c) Số hồ sơ đã thực hiện:</span>{" "}
+                    {data.completedWork.length + data.pendingSign.length} hồ sơ
+                    {(data.completedWork.length > 0 ||
+                      data.pendingSign.length > 0) && (
+                      <ul className="list-none pl-6 mt-1 space-y-1">
+                        <li className="italic text-gray-700 mt-2">
+                          Trong đó:
+                        </li>
+                        {data.completedWork.length > 0 && (
+                          <li className="italic text-gray-700">
+                            - Đã thực hiện (đang chờ kiểm tra):{" "}
+                            {data.completedWork.length} hồ sơ
+                          </li>
+                        )}
+                        {data.pendingSign.length > 0 && (
+                          <li className="italic text-gray-700">
+                            - Đã thực hiện (chờ ký duyệt): {data.pendingSign.length}{" "}
+                            hồ sơ
+                          </li>
                         )}
                       </ul>
                     )}
                   </li>
                   <li>
-                    <span className="font-bold">c) Lịch công tác:</span>{" "}
+                    <span className="font-bold">d) Lịch công tác:</span>{" "}
                     {data.schedules.length} lịch
                     {data.schedules.length > 0 && (
                       <ul className="list-none pl-6 mt-1 space-y-1">

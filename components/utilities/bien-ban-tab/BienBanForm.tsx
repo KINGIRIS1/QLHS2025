@@ -35,7 +35,7 @@ const WARDS_QUICK = [
 const ADJACENT_OBJECTS = ["Thửa đất số", "Đường", "Đường nhựa", "Đường bê tông", "Đường đất", "Sông", "Suối", "Mương nước", "Cống"];
 const PRESETS = {
     ROAD: "Do mép đường theo hiện trạng có thay đổi so với GCN đã cấp (hiện trạng là đường đất và được công nhận theo kết quả đo đạc bản đồ địa chính năm 2024)",
-    ERROR: "Ranh giới thửa đất có biến động so với GCNQSD đất do khi đo đạc cấp GCNQSD đất chưa chính xác"
+    ERROR: "Do bản đồ địa chính Minh Long thành lập năm 1999 được đo đạc theo phương pháp thủ công, không theo hệ tọa độ hiện hành dẫn đến hình thể, diện tích thửa đất trên GCN có biến động so với hiện trạng sử dụng đất."
 };
 
 const PRESET_BDDC = "Khi đo đạc lập bản đồ địa chính không có sự chỉ ranh của chủ sử dụng đất và các chủ sử dụng giáp ranh dẫn đến ranh giới mốc giới chưa được các bên xác định chính xác";

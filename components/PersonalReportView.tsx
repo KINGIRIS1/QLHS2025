@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, RecordStatus, WorkSchedule } from '../types';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
-import * as XLSX from 'xlsx-js-style';
+import { exportPersonalReportToWord } from '../utils/exportPersonalReport';
 import { Calendar, Download, Search, CheckCircle, Clock } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 
@@ -54,31 +54,36 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
     }, [reportType, fromDate, toDate, month]);
 
     const filteredRecords = useMemo(() => {
-        // Hồ sơ nhận
+        // 1. Hồ sơ nhận: Dựa theo receivedDate
         const received = myRecords.filter(r => {
-            const dStr = r.assignedDate || r.receivedDate;
+            if (!r.receivedDate) return false;
+            const d = new Date(r.receivedDate);
+            return d >= reportRange.start && d <= reportRange.end;
+        });
+
+        // 2. Hồ sơ hoàn thành: SIGNED, HANDOVER, RETURNED
+        const completedStatuses = [RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED];
+        const completed = myRecords.filter(r => {
+            if (!completedStatuses.includes(r.status)) return false;
+            const dStr = r.approvalDate || r.completedDate || r.resultReturnedDate || r.exportDate;
             if (!dStr) return false;
             const d = new Date(dStr);
             return d >= reportRange.start && d <= reportRange.end;
         });
 
-        // Hồ sơ hoàn thành (FINISHED/RETURNED etc or COMPLETED_WORK)
-        // Dựa vào context "hoàn thành" ở đây có thể là completed_work hoặc trả kết quả. Mình lấy Finished (SIGNED, HANDOVER, vb)
-        const finishedStatuses = [
-            RecordStatus.COMPLETED_WORK,
-            RecordStatus.PENDING_SIGN,
-            RecordStatus.SIGNED, 
-            RecordStatus.HANDOVER, 
-            RecordStatus.RETURNED
-        ];
-        
-        const completed = myRecords.filter(r => {
-            if (!finishedStatuses.includes(r.status)) return false;
-            // nếu có action date thì tốt, không thì lấy receivedDate tạm hoặc lấy những hs hiện đã xong
-            // tuy nhiên ko có completedDate, ta có completedDate, approvalDate
-            const dStr = r.completedDate || r.approvalDate || r.resultReturnedDate || r.exportDate || r.submissionDate || r.assignedDate;
-            if (!dStr) return false;
-            const d = new Date(dStr);
+        // 3. Hồ sơ Đã thực hiện
+        const completedWork = myRecords.filter(r => {
+            if (r.status !== RecordStatus.COMPLETED_WORK) return false;
+            if (!r.workCompletedDate) return false;
+            const d = new Date(r.workCompletedDate);
+            return d >= reportRange.start && d <= reportRange.end;
+        });
+
+        // 4. Hồ sơ chờ ký duyệt
+        const pendingSign = myRecords.filter(r => {
+            if (r.status !== RecordStatus.PENDING_SIGN) return false;
+            if (!r.submissionDate) return false;
+            const d = new Date(r.submissionDate);
             return d >= reportRange.start && d <= reportRange.end;
         });
         
@@ -94,6 +99,8 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
         return { 
             received, 
             completed,
+            completedWork,
+            pendingSign,
             receivedTypes: getGroupedTypes(received),
             completedTypes: getGroupedTypes(completed)
         };
@@ -129,67 +136,13 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
     }
 
     const handleExport = () => {
-        const wsData: any[][] = [
-            ["BÁO CÁO CÁ NHÂN: " + user.name.toUpperCase()],
-            ["Từ ngày", reportRange.start.toLocaleDateString('vi-VN'), "Đến ngày", reportRange.end.toLocaleDateString('vi-VN')],
-            [],
-            ["I. THỐNG KÊ HỒ SƠ", "Nhận:", filteredRecords.received.length, "Hoàn thành:", filteredRecords.completed.length],
-            ["Chi tiết nhận:"],
-        ];
-        Object.entries(filteredRecords.receivedTypes).forEach(([type, count]) => {
-            wsData.push(["- " + type, count]);
-        });
-        wsData.push([]);
-        wsData.push(["Chi tiết hoàn thành:"]);
-        Object.entries(filteredRecords.completedTypes).forEach(([type, count]) => {
-            wsData.push(["- " + type, count]);
-        });
-        wsData.push([]);
-        wsData.push(["HỒ SƠ NHẬN/ĐƯỢC GIAO"]);
-        wsData.push(["STT", "Mã HS", "Chủ sử dụng", "Loại hồ sơ", "Ngày P/C", "Trạng thái", "Hẹn trả"]);
-
-        filteredRecords.received.forEach((r, i) => {
-            wsData.push([
-                i + 1,
-                r.code || '',
-                r.customerName || '',
-                getShortRecordType(r.recordType || undefined) || '',
-                r.assignedDate || r.receivedDate || '',
-                r.status,
-                r.deadline || ''
-            ]);
-        });
-        
-        wsData.push([]);
-        wsData.push(["HỒ SƠ HOÀN THÀNH"]);
-        wsData.push(["STT", "Mã HS", "Chủ sử dụng", "Loại hồ sơ", "Trạng thái", "Hẹn trả"]);
-        filteredRecords.completed.forEach((r, i) => {
-            wsData.push([
-                i + 1,
-                r.code || '',
-                r.customerName || '',
-                getShortRecordType(r.recordType || undefined) || '',
-                r.status,
-                r.deadline || ''
-            ]);
-        });
-
-        wsData.push([]);
-        wsData.push(["II. LỊCH CÔNG TÁC (" + mySchedules.length + " lịch)"]);
-        wsData.push(["STT", "Ngày", "Nội dung", "Cơ quan phối hợp"]);
-        mySchedules.forEach((s, i) => {
-            wsData.push([
-                i + 1,
-                new Date(s.date).toLocaleDateString('vi-VN'),
-                s.content || '',
-                s.partner || ''
-            ]);
-        });
-
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Bao_Cao");
-        XLSX.writeFile(wb, `Bao_Cao_${user.name.replace(/\s/g, '')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportPersonalReportToWord(
+            filteredRecords,
+            mySchedules,
+            user,
+            reportRange.start.toISOString(),
+            reportRange.end.toISOString()
+        );
     };
 
     return (
@@ -226,13 +179,13 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
                             <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="border border-gray-300 rounded p-1.5 text-sm" />
                         </>
                     )}
-                    <button onClick={handleExport} className="ml-2 flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700">
-                        <Download size={16} /> Xuất Excel
+                    <button onClick={handleExport} className="ml-2 flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors">
+                        <Download size={16} /> Xuất Báo Cáo Word
                     </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col justify-start">
                     <div className="text-center mb-2">
                         <span className="text-gray-500 text-sm font-semibold uppercase mb-1 block">Hồ sơ giao duyệt</span>
@@ -260,6 +213,26 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
                                     <span className="truncate mr-2">- {type}:</span> <span className="font-semibold whitespace-nowrap">{count} hs</span>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex flex-col justify-start">
+                    <div className="text-center mb-2">
+                        <span className="text-gray-500 text-sm font-semibold uppercase mb-1 block">Đã thực hiện</span>
+                        <span className="text-3xl font-bold text-orange-700">{filteredRecords.completedWork.length + filteredRecords.pendingSign.length}</span>
+                    </div>
+                    {(filteredRecords.completedWork.length > 0 || filteredRecords.pendingSign.length > 0) && (
+                        <div className="w-full text-sm text-orange-800 space-y-1 bg-orange-100/50 p-3 rounded mt-2">
+                            {filteredRecords.completedWork.length > 0 && (
+                                <div className="flex justify-between w-full">
+                                    <span className="truncate mr-2">- Chờ kiểm tra:</span> <span className="font-semibold whitespace-nowrap">{filteredRecords.completedWork.length} hs</span>
+                                </div>
+                            )}
+                            {filteredRecords.pendingSign.length > 0 && (
+                                <div className="flex justify-between w-full">
+                                    <span className="truncate mr-2">- Chờ ký duyệt:</span> <span className="font-semibold whitespace-nowrap">{filteredRecords.pendingSign.length} hs</span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

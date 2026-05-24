@@ -341,6 +341,7 @@ function App() {
           case RecordStatus.ASSIGNED:
           case RecordStatus.IN_PROGRESS:
               if (!updates.assignedDate) updates.assignedDate = todayStr;
+              updates.workCompletedDate = null;
               updates.submissionDate = null;
               updates.approvalDate = null;
               updates.completedDate = null;
@@ -351,6 +352,7 @@ function App() {
           // MỚI: Trạng thái Đã thực hiện
           case RecordStatus.COMPLETED_WORK:
               // Giữ nguyên assignedDate
+              updates.workCompletedDate = todayStr;
               updates.submissionDate = null; 
               updates.approvalDate = null;
               updates.completedDate = null;

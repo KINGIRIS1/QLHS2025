@@ -32,6 +32,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
 
     // Detail Modal State
     const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
@@ -358,6 +359,24 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             setPendingFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
         }
         e.target.value = ''; // Reset input
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            setPendingFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+        }
     };
 
     const removePendingFile = (index: number) => {
@@ -856,94 +875,192 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 />
 
                 {isFormOpen && (
-                    <div className="w-1/3 min-w-[300px] border-r pr-4 bg-gray-50 p-4 rounded-lg h-full flex flex-col">
-                        <h3 className="font-bold text-gray-800 mb-4">{editingId ? 'Cập nhật Công văn' : 'Thêm mới Công văn'}</h3>
-                        <form onSubmit={handleSave} className="space-y-3 flex-1 overflow-y-auto">
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Số hiệu</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số CV..." /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Ngày tháng</label><input type="date" className="w-full border rounded px-3 py-2 text-sm" value={formData.ngay_thang} onChange={e => setFormData({...formData, ngay_thang: e.target.value})} /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Trích yếu</label><textarea rows={3} className="w-full border rounded px-3 py-2 text-sm" value={formData.trich_yeu} onChange={e => setFormData({...formData, trich_yeu: e.target.value})} placeholder="Nội dung..." /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: e.target.value})} placeholder="Đơn vị..." /></div>
-                            
-                            {formData.status === 'completed' && (
-                                <div className="grid grid-cols-2 gap-3 bg-green-50 p-3 rounded-lg border border-green-200">
-                                    <div>
-                                        <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Ngày giao</label>
-                                        <input type="date" className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.data?.ngay_hoan_thanh || ''} onChange={e => setFormData({...formData, data: { ...formData.data, ngay_hoan_thanh: e.target.value }})} />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Đợt giao</label>
-                                        <input type="text" className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.data?.danh_sach || ''} onChange={e => setFormData({...formData, data: { ...formData.data, danh_sach: e.target.value }})} placeholder="VD: Đợt 1" />
+                    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[100] p-4 font-sans animate-in fade-in duration-200">
+                        <div className="bg-white shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col rounded-md overflow-hidden transform animate-in zoom-in-95 duration-200">
+                            {/* Header Modal */}
+                            <div className="flex justify-between items-center px-6 py-4 bg-orange-600 text-white border-b border-orange-700 shrink-0">
+                                <div>
+                                    <h2 className="text-base font-bold uppercase tracking-wide">
+                                        {editingId ? 'Cập nhật Công văn' : 'Thêm mới Công văn mới'}
+                                    </h2>
+                                    <div className="text-xs text-orange-100 opacity-90 mt-0.5">
+                                        Vui lòng nhập đầy đủ các thông tin bắt buộc dưới đây
                                     </div>
                                 </div>
-                            )}
+                                <button type="button" onClick={handleCloseForm} className="text-white hover:text-orange-200 transition-colors p-1 hover:bg-orange-700 rounded-full">
+                                    <X size={20} />
+                                </button>
+                            </div>
 
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mb-1">
-                                    <Paperclip size={14} /> Tài liệu đính kèm
-                                </label>
+                            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Số hiệu</label>
+                                        <input 
+                                            className="w-full border rounded px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors" 
+                                            value={formData.so_hieu} 
+                                            onChange={e => setFormData({...formData, so_hieu: e.target.value})} 
+                                            placeholder="Nhập số công văn..." 
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Ngày tháng</label>
+                                        <input 
+                                            type="date" 
+                                            className="w-full border rounded px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors" 
+                                            value={formData.ngay_thang} 
+                                            onChange={e => setFormData({...formData, ngay_thang: e.target.value})} 
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Trích yếu văn bản</label>
+                                    <textarea 
+                                        rows={3} 
+                                        className="w-full border rounded px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors" 
+                                        value={formData.trich_yeu} 
+                                        onChange={e => setFormData({...formData, trich_yeu: e.target.value})} 
+                                        placeholder="Nhập trích yếu / nội dung tóm tắt của công văn..." 
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Cơ quan phát hành / Đơn vị nhận</label>
+                                    <input 
+                                        className="w-full border rounded px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors" 
+                                        value={formData.noi_nhan_gui} 
+                                        onChange={e => setFormData({...formData, noi_nhan_gui: e.target.value})} 
+                                        placeholder="Đơn vị gửi và nhận..." 
+                                        required
+                                    />
+                                </div>
                                 
-                                <div className="space-y-2">
-                                    {/* Existing Files */}
-                                    {getAttachedFiles(formData).map((file: any, index: number) => (
-                                        <div key={`exist-${index}`} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg text-sm">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                <div className="p-1.5 bg-blue-50 text-blue-600 rounded">
-                                                    <Paperclip size={14} />
-                                                </div>
-                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 font-medium hover:underline max-w-[150px]" title={file.name}>
-                                                    {file.name}
-                                                </a>
+                                {formData.status === 'completed' && (
+                                    <div className="grid grid-cols-2 gap-3 bg-green-50 p-3 rounded-lg border border-green-200">
+                                        <div>
+                                            <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Ngày giao</label>
+                                            <input 
+                                                type="date" 
+                                                className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" 
+                                                value={formData.data?.ngay_hoan_thanh || ''} 
+                                                onChange={e => setFormData({...formData, data: { ...formData.data, ngay_hoan_thanh: e.target.value }})} 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Đợt giao</label>
+                                            <input 
+                                                type="text" 
+                                                 className="w-full border border-green-300 rounded-lg px-2 py-2 text-sm outline-none" 
+                                                 value={formData.data?.danh_sach || ''} 
+                                                 onChange={e => setFormData({...formData, data: { ...formData.data, danh_sach: e.target.value }})} 
+                                                 placeholder="VD: Đợt 1" 
+                                             />
+                                         </div>
+                                     </div>
+                                 )}
+
+                                 <div className="border-t border-gray-100 pt-4">
+                                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mb-2">
+                                        <Paperclip size={14} /> Tài liệu đính kèm (PDF, Word, Excel, Hình ảnh...)
+                                    </label>
+                                    
+                                    <div className="space-y-3">
+                                        <input 
+                                          type="file" 
+                                          id={`cong_van_files_input_${editingId || 'new'}`}
+                                          multiple 
+                                          className="hidden" 
+                                          onChange={handleFileAdd} 
+                                        />
+                                        <label 
+                                          htmlFor={`cong_van_files_input_${editingId || 'new'}`}
+                                          onDragOver={handleDragOver}
+                                          onDragLeave={handleDragLeave}
+                                          onDrop={handleDrop}
+                                          className={`block border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                                            isDragging 
+                                              ? 'border-blue-500 bg-blue-50 text-blue-700 animate-pulse' 
+                                              : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:bg-gray-50'
+                                          }`}
+                                        >
+                                            <div className="flex flex-col items-center justify-center gap-1.5">
+                                                <Paperclip size={24} className={isDragging ? 'text-blue-600' : 'text-gray-400'} />
+                                                <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-blue-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
+                                                <div className="text-[11px] text-gray-400">Hỗ trợ tải lên nhiều file cùng lúc</div>
                                             </div>
-                                            {isManager && (
+                                        </label>
+
+                                        {/* Existing Files */}
+                                        {getAttachedFiles(formData).map((file: any, index: number) => (
+                                            <div key={`exist-${index}`} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg text-sm shadow-sm">
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded">
+                                                        <Paperclip size={14} />
+                                                    </div>
+                                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 font-medium hover:underline max-w-[280px]" title={file.name}>
+                                                        {file.name}
+                                                    </a>
+                                                </div>
+                                                {isManager && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => removeExistingFile(index)}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                        title="Chỉ admin mới có quyền xóa file đã lưu"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+
+                                        {/* Pending Files */}
+                                        {pendingFiles.map((file, index) => (
+                                            <div key={`pending-${index}`} className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm shadow-xs">
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <div className="p-1.5 bg-yellow-100 text-yellow-600 rounded animate-pulse">
+                                                        <Paperclip size={14} className="text-yellow-600" />
+                                                    </div>
+                                                    <span className="truncate text-yellow-800 font-medium max-w-[280px]" title={file.name}>
+                                                        {file.name} <em className="text-[10px] font-normal text-yellow-600">(Chờ lưu...)</em>
+                                                    </span>
+                                                </div>
                                                 <button 
                                                     type="button"
-                                                    onClick={() => removeExistingFile(index)}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                                                    title="Chỉ admin mới có quyền xóa file đã lưu"
+                                                    onClick={() => removePendingFile(index)}
+                                                    className="p-1.5 text-yellow-600 hover:bg-yellow-100 rounded transition-colors"
+                                                    disabled={isSubmitting}
                                                 >
                                                     <X size={14} />
                                                 </button>
-                                            )}
-                                        </div>
-                                    ))}
-
-                                    {/* Pending Files */}
-                                    {pendingFiles.map((file, index) => (
-                                        <div key={`pending-${index}`} className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-250 rounded-lg text-sm">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                <div className="p-1.5 bg-yellow-100 text-yellow-600 rounded">
-                                                    <Paperclip size={14} />
-                                                </div>
-                                                <span className="truncate text-yellow-800 font-medium max-w-[150px]" title={file.name}>
-                                                    {file.name} <em className="text-[10px] font-normal text-yellow-600">(Chờ tải lên...)</em>
-                                                </span>
                                             </div>
-                                            <button 
-                                                type="button"
-                                                onClick={() => removePendingFile(index)}
-                                                className="p-1.5 text-yellow-600 hover:bg-yellow-101 rounded"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    
-                                    <div className="mt-2">
-                                        <label className="flex items-center justify-center w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer text-sm text-gray-600 font-medium">
-                                            <Plus size={16} className="mr-1" /> Thêm file đính kèm
-                                            <input type="file" className="hidden" multiple onChange={handleFileAdd} />
-                                        </label>
+                                        ))}
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="pt-4 flex gap-2 justify-end">
-                                <button type="button" onClick={handleCloseForm} className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded text-sm disabled:opacity-50" disabled={isSubmitting}>Hủy</button>
-                                <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-orange-600 text-white rounded font-bold text-sm hover:bg-orange-700 flex items-center gap-1 disabled:opacity-50">
-                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16}/>} Lưu
-                                </button>
-                            </div>
-                        </form>
+                                <div className="pt-4 border-t border-gray-100 flex gap-2 justify-end shrink-0">
+                                    <button 
+                                        type="button" 
+                                        onClick={handleCloseForm} 
+                                        className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-100 text-sm font-medium transition-colors disabled:opacity-50" 
+                                        disabled={isSubmitting}
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSubmitting} 
+                                        className="px-5 py-2 bg-orange-600 text-white rounded-md font-bold text-sm hover:bg-orange-700 flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16}/>} Lưu công văn
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 )}
 

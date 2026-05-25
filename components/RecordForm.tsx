@@ -165,17 +165,50 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
   const [pendingUnblockFiles, setPendingUnblockFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletedFilePaths, setDeletedFilePaths] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDraggingUnblock, setIsDraggingUnblock] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setPendingFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+    }
+  };
+
+  const handleDragOverUnblock = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingUnblock(true);
+  };
+
+  const handleDragLeaveUnblock = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingUnblock(false);
+  };
+
+  const handleDropUnblock = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingUnblock(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setPendingUnblockFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+    }
+  };
 
   const handleUnblockFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (file.type !== 'application/pdf') {
-      alert('Vui lòng chỉ chọn file PDF!');
-      return;
-    }
-
-    setPendingUnblockFiles(prev => [...prev, file]);
+    setPendingUnblockFiles(prev => [...prev, ...Array.from(files)]);
     e.target.value = '';
   };
 
@@ -205,15 +238,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (file.type !== 'application/pdf') {
-      alert('Vui lòng chỉ chọn file PDF!');
-      return;
-    }
-
-    setPendingFiles(prev => [...prev, file]);
+    setPendingFiles(prev => [...prev, ...Array.from(files)]);
     e.target.value = ''; // Reset input
   };
 
@@ -650,29 +678,47 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
                     {/* File Upload Section */}
                     <div className="pt-4 border-t border-gray-100">
-                        <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (Chỉ hỗ trợ PDF)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (PDF, Word, Excel, Hình ảnh...)</label>
                         
-                        <div className="flex items-center gap-3 mb-3">
-                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}`}>
-                                <Paperclip size={16} />
-                                Chọn file PDF
-                                <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} />
-                            </label>
+                        <input 
+                          type="file" 
+                          id="attached_files_input"
+                          multiple 
+                          className="hidden" 
+                          onChange={handleFileUpload} 
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div 
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                            isDragging 
+                              ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                              : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:bg-gray-50'
+                          }`}
+                          onClick={() => document.getElementById('attached_files_input')?.click()}
+                        >
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                                <Paperclip size={24} className={isDragging ? 'text-blue-600 animate-bounce' : 'text-gray-400'} />
+                                <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-blue-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
+                                <div className="text-[11px] text-gray-400">Hỗ trợ tải lên nhiều file cùng lúc</div>
+                            </div>
                         </div>
 
                         {/* Hiển thị danh sách file đã đính kèm */}
                         {formData.attached_files && formData.attached_files.length > 0 && (
-                            <div className="space-y-2 mt-2">
+                            <div className="space-y-2 mt-3">
                                 {formData.attached_files.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between bg-gray-50 p-2 border border-gray-200 rounded-sm text-sm">
-                                        <div className="flex items-center gap-2 text-gray-700">
-                                            <Paperclip size={14} className="text-gray-400" />
-                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                        <div className="flex items-center gap-2 text-gray-700 overflow-hidden">
+                                            <Paperclip size={14} className="text-gray-400 shrink-0" />
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline truncate max-w-[280px]" title={file.name}>
                                                 {file.name}
                                             </a>
                                         </div>
                                         {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
-                                            <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 p-1" title="Chỉ admin mới có quyền xóa file đã lưu">
+                                            <button type="button" onClick={() => removeFile(index)} className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors" title="Chỉ admin mới có quyền xóa file đã lưu">
                                                 <X size={16} />
                                             </button>
                                         )}
@@ -685,13 +731,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                             <div className="space-y-2 mt-2">
                                 {pendingFiles.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between bg-yellow-50 p-2 border border-yellow-200 rounded-sm text-sm">
-                                        <div className="flex items-center gap-2 text-yellow-700">
-                                            {isSubmitting ? <Loader2 size={14} className="text-yellow-600 animate-spin" /> : <Paperclip size={14} className="text-yellow-600" />}
-                                            <span>
+                                        <div className="flex items-center gap-2 text-yellow-700 overflow-hidden">
+                                            {isSubmitting ? <Loader2 size={14} className="text-yellow-600 animate-spin shrink-0" /> : <Paperclip size={14} className="text-yellow-600 shrink-0" />}
+                                            <span className="truncate max-w-[280px]" title={file.name}>
                                                 {file.name} <em className="text-[10px] text-yellow-600">(Chờ tải lên...)</em>
                                             </span>
                                         </div>
-                                        <button type="button" onClick={() => removePendingFile(index)} className="text-red-500 hover:text-red-700 p-1" disabled={isSubmitting}>
+                                        <button type="button" onClick={() => removePendingFile(index)} className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors" disabled={isSubmitting}>
                                             <X size={16} />
                                         </button>
                                     </div>
@@ -735,12 +781,34 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                             />
                         </div>
 
-                        <div className="flex items-center gap-3 mb-3">
-                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}`}>
-                                <Paperclip size={16} />
-                                Đính kèm file giải tỏa (PDF)
-                                <input type="file" accept=".pdf" className="hidden" onChange={handleUnblockFileUpload} />
-                            </label>
+                        <div className="mb-3">
+                            <label className="block text-xs font-semibold text-green-800 mb-2 uppercase">File giải tỏa đính kèm (PDF, Word, Excel, Hình ảnh...)</label>
+                            
+                            <input 
+                              type="file" 
+                              id="unblock_files_input"
+                              multiple 
+                              className="hidden" 
+                              onChange={handleUnblockFileUpload} 
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div 
+                              onDragOver={handleDragOverUnblock}
+                              onDragLeave={handleDragLeaveUnblock}
+                              onDrop={handleDropUnblock}
+                              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                                isDraggingUnblock 
+                                  ? 'border-green-600 bg-green-50 text-green-800' 
+                                  : 'border-green-300 bg-white text-green-700 hover:border-green-500 hover:bg-green-50'
+                              }`}
+                              onClick={() => document.getElementById('unblock_files_input')?.click()}
+                            >
+                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <Paperclip size={24} className={isDraggingUnblock ? 'text-green-600 animate-bounce' : 'text-green-500'} />
+                                    <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-green-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
+                                    <div className="text-[11px] text-green-700/80">Hỗ trợ tải lên nhiều file cùng lúc</div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Hiển thị danh sách file giải tỏa đính kèm */}
@@ -748,14 +816,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                             <div className="space-y-2 mt-2">
                                 {formData.unblock_attached_files.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between bg-green-50 p-2 border border-green-200 rounded-sm text-sm">
-                                        <div className="flex items-center gap-2 text-green-800">
-                                            <Paperclip size={14} className="text-green-600" />
-                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-green-900 hover:underline">
+                                        <div className="flex items-center gap-2 text-green-800 overflow-hidden">
+                                            <Paperclip size={14} className="text-green-600 shrink-0" />
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-green-900 hover:underline truncate max-w-[280px]" title={file.name}>
                                                 {file.name}
                                             </a>
                                         </div>
                                         {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
-                                            <button type="button" onClick={() => removeUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1" title="Chỉ admin mới có quyền xóa file giải tỏa đã lưu">
+                                            <button type="button" onClick={() => removeUnblockFile(index)} className="text-gray-400 hover:text-red-700 p-1 hover:bg-green-100 rounded transition-colors" title="Chỉ admin mới có quyền xóa file giải tỏa đã lưu">
                                                 <X size={16} />
                                             </button>
                                         )}
@@ -768,13 +836,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                             <div className="space-y-2 mt-2">
                                 {pendingUnblockFiles.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between bg-yellow-50 p-2 border border-yellow-200 rounded-sm text-sm">
-                                        <div className="flex items-center gap-2 text-yellow-700">
-                                            {isSubmitting ? <Loader2 size={14} className="text-yellow-600 animate-spin" /> : <Paperclip size={14} className="text-yellow-600" />}
-                                            <span>
+                                        <div className="flex items-center gap-2 text-yellow-700 overflow-hidden">
+                                            {isSubmitting ? <Loader2 size={14} className="text-yellow-600 animate-spin shrink-0" /> : <Paperclip size={14} className="text-yellow-600 shrink-0" />}
+                                            <span className="truncate max-w-[280px]" title={file.name}>
                                                 {file.name} <em className="text-[10px] text-yellow-600">(Chờ tải lên...)</em>
                                             </span>
                                         </div>
-                                        <button type="button" onClick={() => removePendingUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1" disabled={isSubmitting}>
+                                        <button type="button" onClick={() => removePendingUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors" disabled={isSubmitting}>
                                             <X size={16} />
                                         </button>
                                     </div>

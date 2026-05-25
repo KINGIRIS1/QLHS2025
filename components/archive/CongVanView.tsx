@@ -57,6 +57,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         noi_nhan_gui: ''
     });
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [deletedFilePaths, setDeletedFilePaths] = useState<string[]>([]);
     
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -345,6 +346,13 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         return emp ? emp.name : id;
     };
 
+    const getAttachedFiles = (record: Partial<ArchiveRecord> | ArchiveRecord | null | undefined): any[] => {
+        if (!record) return [];
+        if (Array.isArray(record.attached_files)) return record.attached_files;
+        if (Array.isArray(record.data?.attached_files)) return record.data.attached_files;
+        return [];
+    };
+
     const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setPendingFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
@@ -356,22 +364,49 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         setPendingFiles(prev => prev.filter((_, i) => i !== index));
     };
 
-    const removeExistingFile = (index: number) => {
-        setFormData(prev => {
-            const currentData = prev.data || {};
-            // Lấy từ root nếu có, nếu không lấy từ data, tránh xung đột
-            const currentFiles = (prev.attached_files && prev.attached_files.length > 0) 
-                ? [...prev.attached_files] 
-                : [...(currentData.attached_files || [])];
-            
+    const handleCloseForm = () => {
+        setIsFormOpen(false);
+        setEditingId(null);
+        setPendingFiles([]);
+        setDeletedFilePaths([]);
+        setFormData({ 
+            type: 'congvan', 
+            status: 'draft', 
+            so_hieu: '', 
+            trich_yeu: '', 
+            ngay_thang: new Date().toISOString().split('T')[0], 
+            noi_nhan_gui: '', 
+            attached_files: [] 
+        });
+    };
+
+    const removeExistingFile = async (index: number) => {
+        if (!isManager) {
+            alert('Chỉ quản lý viên/quản trị viên mới có quyền xóa tệp đính kèm đã lưu!');
+            return;
+        }
+
+        const currentFiles = [...getAttachedFiles(formData)];
+        const fileToDelete = currentFiles[index];
+        if (!fileToDelete) return;
+
+        if (await confirmAction(`Bạn có chắc chắn muốn bỏ tệp đính kèm "${fileToDelete.name}"? Tệp sẽ chỉ bị xóa vĩnh viễn khỏi hệ thống sau khi bạn nhấn nút "Lưu".`)) {
+            // Đăng ký vào danh sách cần xóa vật lý khỏi Storage khi bấm Lưu
+            if (isConfigured && fileToDelete.id && !fileToDelete.id.startsWith('mock-')) {
+                setDeletedFilePaths(prev => [...prev, fileToDelete.id]);
+            }
+
             currentFiles.splice(index, 1);
             
-            return { 
-                ...prev, 
-                attached_files: currentFiles, 
-                data: { ...currentData, attached_files: currentFiles } 
-            };
-        });
+            setFormData(prev => {
+                const currentData = prev.data || {};
+                return { 
+                    ...prev, 
+                    attached_files: currentFiles, 
+                    data: { ...currentData, attached_files: currentFiles } 
+                };
+            });
+        }
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -380,26 +415,26 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         
         setIsSubmitting(true);
         try {
-            let currentAttachedFiles = formData.attached_files || formData.data?.attached_files || [];
+            let currentAttachedFiles = [...getAttachedFiles(formData)];
 
             if (pendingFiles.length > 0) {
                 const uploadedFiles = [];
                 for (const file of pendingFiles) {
                     if (!isConfigured) {
-                        // Mock upload for local testing
-                        uploadedFiles.push({ id: `mock-${Date.now()}`, url: URL.createObjectURL(file), name: file.name });
+                        // Mock upload để test offline
+                        uploadedFiles.push({ id: `mock-${Date.now()}-${Math.random().toString(36).substring(5)}`, url: URL.createObjectURL(file), name: file.name });
                         continue;
                     }
 
                     const fileExt = file.name.split('.').pop();
                     const fileName = `archive_congvan_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                    const filePath = `blocking_docs/${fileName}`;
+                    const filePath = `archive_attachments/congvan/${fileName}`;
                     const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
                     
                     if (error) {
                         console.error("Storage upload error:", error);
-                        alert(`Không thể upload file ${file.name}. Lỗi: ${error.message} (Kiểm tra xem bucket 'chat-files' đã set Public và Policy Insert chưa)`);
-                        continue; // Bỏ qua file lỗi, tiếp tục lưu record
+                        alert(`Không thể tải lên tệp ${file.name}. Lỗi: ${error.message}`);
+                        continue; 
                     } else {
                         const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
                         uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
@@ -408,30 +443,41 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 currentAttachedFiles = [...currentAttachedFiles, ...uploadedFiles];
             }
 
-            // Ensure we don't accidentally send top-level attached_files which might break Supabase insert if column is missing
-            const payloadToSave = { ...formData };
-            delete (payloadToSave as any).attached_files;
-
             const success = await saveArchiveRecord({
-                ...payloadToSave,
-                data: { ...(formData.data || {}), attached_files: currentAttachedFiles },
+                ...formData,
+                attached_files: currentAttachedFiles,
+                data: { 
+                    ...(formData.data || {}), 
+                    attached_files: currentAttachedFiles 
+                },
                 id: editingId || undefined,
                 created_by: currentUser.username
             });
 
             if (success) {
+                // Chỉ xóa vĩnh viễn tệp trên Storage sau khi lưu CSDL thành công
+                if (isConfigured && deletedFilePaths.length > 0) {
+                    try {
+                        const { error } = await supabase.storage.from('chat-files').remove(deletedFilePaths);
+                        if (error) {
+                            console.error("Lỗi khi xóa các tệp khỏi Storage:", error);
+                        } else {
+                            console.log("Đã xóa vĩnh viễn tệp trên Storage thành công:", deletedFilePaths);
+                        }
+                    } catch (storageErr) {
+                        console.error("Lỗi dọn dẹp các tệp cũ từ Storage:", storageErr);
+                    }
+                }
+
                 if (editingId) setRecords(prev => prev.map(r => r.id === success.id ? success : r));
                 else setRecords(prev => [success, ...prev]);
                 
-                setIsFormOpen(false);
-                setEditingId(null);
-                setPendingFiles([]);
-                setFormData({ type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: '' });
+                handleCloseForm();
             } else {
                 alert('Lỗi khi lưu công văn.');
             }
         } catch (error: any) {
-            console.error("Lỗi khi tải file hoặc lưu dữ liệu:", error);
+            console.error("Lỗi khi lưu dữ liệu công văn:", error);
             alert('Có lỗi xảy ra hệ thống: ' + error.message);
         } finally {
             setIsSubmitting(false);
@@ -560,16 +606,46 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleDelete = async (id: string) => {
-        if (await confirmAction('Xóa công văn này?')) {
+        if (await confirmAction('Xóa công văn này và tất cả các tệp đính kèm liên quan?')) {
+            const record = records.find(r => r.id === id);
+            if (record) {
+                const filesToDelete = getAttachedFiles(record);
+                const filePaths = filesToDelete
+                    .filter((f: any) => f.id && !f.id.startsWith('mock-'))
+                    .map((f: any) => f.id);
+
+                if (isConfigured && filePaths.length > 0) {
+                    try {
+                        const { error } = await supabase.storage.from('chat-files').remove(filePaths);
+                        if (error) {
+                            console.error("Lỗi xóa các tệp từ Storage:", error);
+                        } else {
+                            console.log("Đã xóa thành công các tệp liên quan từ Storage:", filePaths);
+                        }
+                    } catch (err) {
+                        console.error("Lỗi xóa tệp liên quan từ Storage:", err);
+                    }
+                }
+            }
             await deleteArchiveRecord(id);
             loadData();
         }
     };
 
     const handleEdit = (r: ArchiveRecord) => {
-        setFormData(r);
+        const files = getAttachedFiles(r);
+        
+        setFormData({
+            ...r,
+            attached_files: files,
+            data: {
+                ...(r.data || {}),
+                attached_files: files
+            }
+        });
         setEditingId(r.id);
         setPendingFiles([]);
+        setDeletedFilePaths([]);
         setIsFormOpen(true);
     };
 
@@ -705,7 +781,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <FileSpreadsheet size={16}/> Import Excel
                                     <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
                                 </label>
-                                <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm">
+                                <button onClick={() => { setIsFormOpen(true); setEditingId(null); setPendingFiles([]); setDeletedFilePaths([]); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: '', attached_files: []}); }} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm">
                                     <Plus size={16}/> Tạo mới
                                 </button>
                                 {currentUser.role === 'ADMIN' && (
@@ -808,41 +884,44 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 
                                 <div className="space-y-2">
                                     {/* Existing Files */}
-                                    {(formData.attached_files || formData.data?.attached_files || []).map((file: any, index: number) => (
+                                    {getAttachedFiles(formData).map((file: any, index: number) => (
                                         <div key={`exist-${index}`} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg text-sm">
                                             <div className="flex items-center gap-2 overflow-hidden">
                                                 <div className="p-1.5 bg-blue-50 text-blue-600 rounded">
                                                     <Paperclip size={14} />
                                                 </div>
-                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 font-medium hover:underline max-w-[150px]">
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 font-medium hover:underline max-w-[150px]" title={file.name}>
                                                     {file.name}
                                                 </a>
                                             </div>
-                                            <button 
-                                                type="button"
-                                                onClick={() => removeExistingFile(index)}
-                                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                                            >
-                                                <X size={14} />
-                                            </button>
+                                            {isManager && (
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => removeExistingFile(index)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                                                    title="Chỉ admin mới có quyền xóa file đã lưu"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
 
                                     {/* Pending Files */}
                                     {pendingFiles.map((file, index) => (
-                                        <div key={`pending-${index}`} className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                                        <div key={`pending-${index}`} className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-250 rounded-lg text-sm">
                                             <div className="flex items-center gap-2 overflow-hidden">
                                                 <div className="p-1.5 bg-yellow-100 text-yellow-600 rounded">
                                                     <Paperclip size={14} />
                                                 </div>
-                                                <span className="truncate text-yellow-800 font-medium max-w-[150px]">
-                                                    {file.name}
+                                                <span className="truncate text-yellow-800 font-medium max-w-[150px]" title={file.name}>
+                                                    {file.name} <em className="text-[10px] font-normal text-yellow-600">(Chờ tải lên...)</em>
                                                 </span>
                                             </div>
                                             <button 
                                                 type="button"
                                                 onClick={() => removePendingFile(index)}
-                                                className="p-1.5 text-yellow-600 hover:bg-yellow-100 rounded"
+                                                className="p-1.5 text-yellow-600 hover:bg-yellow-101 rounded"
                                             >
                                                 <X size={14} />
                                             </button>
@@ -859,7 +938,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                             </div>
 
                             <div className="pt-4 flex gap-2 justify-end">
-                                <button type="button" onClick={() => { setIsFormOpen(false); setPendingFiles([]); }} className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded text-sm disabled:opacity-50" disabled={isSubmitting}>Hủy</button>
+                                <button type="button" onClick={handleCloseForm} className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded text-sm disabled:opacity-50" disabled={isSubmitting}>Hủy</button>
                                 <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-orange-600 text-white rounded font-bold text-sm hover:bg-orange-700 flex items-center gap-1 disabled:opacity-50">
                                     {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16}/>} Lưu
                                 </button>
@@ -898,9 +977,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 text-gray-800">
                                         <div className="flex items-start gap-2">
                                             <span>{r.trich_yeu}</span>
-                                            {(r.attached_files && r.attached_files.length > 0) || (r.data?.attached_files && r.data.attached_files.length > 0) ? (
+                                            {getAttachedFiles(r).length > 0 ? (
                                                 <div className="flex items-center gap-0.5 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded text-xs font-semibold shrink-0 mt-0.5" title="Có file đính kèm">
-                                                    <Paperclip size={12} /> {(r.attached_files || r.data.attached_files).length}
+                                                    <Paperclip size={12} /> {getAttachedFiles(r).length}
                                                 </div>
                                             ) : null}
                                         </div>

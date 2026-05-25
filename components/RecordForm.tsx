@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LandRecord, LandRecordFormData, BlockingDocument, User, PlotData } from '../types';
+import { LandRecord, LandRecordFormData, BlockingDocument, User, PlotData, UserRole } from '../types';
 import { supabase, isConfigured } from '../services/supabaseClient';
 import { Plus, Trash2, X, Save, AlertCircle, FileText, Paperclip, Loader2, Download } from 'lucide-react';
 import JSZip from 'jszip';
@@ -164,6 +164,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [pendingUnblockFiles, setPendingUnblockFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletedFilePaths, setDeletedFilePaths] = useState<string[]>([]);
 
   const handleUnblockFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -178,11 +179,25 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     e.target.value = '';
   };
 
-  const removeUnblockFile = (indexToRemove: number) => {
-    setFormData(prev => ({
-      ...prev,
-      unblock_attached_files: prev.unblock_attached_files?.filter((_, idx) => idx !== indexToRemove)
-    }));
+  const removeUnblockFile = async (indexToRemove: number) => {
+    if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUBADMIN) {
+      alert('Chỉ quản trị viên hoặc quản lý viên mới có quyền xóa tệp đính kèm đã lưu!');
+      return;
+    }
+
+    const fileToDelete = formData.unblock_attached_files?.[indexToRemove];
+    if (!fileToDelete) return;
+
+    if (window.confirm(`Bạn có chắc chắn muốn bỏ tệp đính kèm giải tỏa "${fileToDelete.name}"? Tệp sẽ chỉ bị xóa vĩnh viễn khỏi hệ thống sau khi bạn nhấn nút "Lưu".`)) {
+      setFormData(prev => ({
+        ...prev,
+        unblock_attached_files: prev.unblock_attached_files?.filter((_, idx) => idx !== indexToRemove)
+      }));
+
+      if (isConfigured && fileToDelete.id && !fileToDelete.id.startsWith('mock-')) {
+        setDeletedFilePaths(prev => [...prev, fileToDelete.id]);
+      }
+    }
   };
   
   const removePendingUnblockFile = (index: number) => {
@@ -202,12 +217,26 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     e.target.value = ''; // Reset input
   };
 
-  const removeFile = (index: number) => {
-    setFormData(prev => {
-      const newFiles = [...(prev.attached_files || [])];
-      newFiles.splice(index, 1);
-      return { ...prev, attached_files: newFiles };
-    });
+  const removeFile = async (index: number) => {
+    if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUBADMIN) {
+      alert('Chỉ quản trị viên hoặc quản lý viên mới có quyền xóa tệp đính kèm đã lưu!');
+      return;
+    }
+
+    const fileToDelete = formData.attached_files?.[index];
+    if (!fileToDelete) return;
+
+    if (window.confirm(`Bạn có chắc chắn muốn bỏ tệp đính kèm ngăn chặn "${fileToDelete.name}"? Tệp sẽ chỉ bị xóa vĩnh viễn khỏi hệ thống sau khi bạn nhấn nút "Lưu".`)) {
+      setFormData(prev => {
+        const newFiles = [...(prev.attached_files || [])];
+        newFiles.splice(index, 1);
+        return { ...prev, attached_files: newFiles };
+      });
+
+      if (isConfigured && fileToDelete.id && !fileToDelete.id.startsWith('mock-')) {
+        setDeletedFilePaths(prev => [...prev, fileToDelete.id]);
+      }
+    }
   };
 
   const removePendingFile = (index: number) => {
@@ -231,7 +260,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
           }
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const baseFolder = filePrefix ? `${filePrefix}_blocking_docs` : `blocking_docs`;
+          const baseFolder = filePrefix ? `${filePrefix}_blocking_docs` : `archive_records/blocking_docs`;
           const filePath = `${baseFolder}/${fileName}`;
           const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
           
@@ -257,7 +286,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
           }
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const baseFolder = filePrefix ? `${filePrefix}_unblock_docs` : `unblock_docs`;
+          const baseFolder = filePrefix ? `${filePrefix}_unblock_docs` : `archive_records/unblock_docs`;
           const filePath = `${baseFolder}/${fileName}`;
           const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
 
@@ -274,6 +303,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       }
       
       await onSubmit(finalFormData);
+
+      // Thao tác xóa các file thực tế từ Storage khi submit thành công
+      if (isConfigured && deletedFilePaths.length > 0) {
+        try {
+          const { error } = await supabase.storage.from('chat-files').remove(deletedFilePaths);
+          if (error) {
+            console.error("Lỗi khi xóa các tệp khỏi Storage:", error);
+          } else {
+            console.log("Đã dọn dẹp các tệp bị xóa khỏi Storage thành công:", deletedFilePaths);
+          }
+        } catch (storageErr) {
+          console.error("Lỗi dọn tệp khỏi Storage:", storageErr);
+        }
+      }
     } catch (error: any) {
       console.error("Lỗi khi tải file hoặc lưu dữ liệu:", error);
       alert('Có lỗi xảy ra: ' + error.message);
@@ -628,9 +671,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                                                 {file.name}
                                             </a>
                                         </div>
-                                        <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 p-1">
-                                            <X size={16} />
-                                        </button>
+                                        {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
+                                            <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 p-1" title="Chỉ admin mới có quyền xóa file đã lưu">
+                                                <X size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -709,9 +754,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                                                 {file.name}
                                             </a>
                                         </div>
-                                        <button type="button" onClick={() => removeUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1">
-                                            <X size={16} />
-                                        </button>
+                                        {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
+                                            <button type="button" onClick={() => removeUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1" title="Chỉ admin mới có quyền xóa file giải tỏa đã lưu">
+                                                <X size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>

@@ -30,6 +30,9 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
     };
 
     const currentStatus = mapStatus(record.status);
+    const files = Array.isArray(record.attached_files) 
+        ? record.attached_files 
+        : (Array.isArray(record.data?.attached_files) ? record.data.attached_files : []);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -95,14 +98,14 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                             </div>
                         </div>
 
-                        {((record.attached_files && record.attached_files.length > 0) || (record.data?.attached_files && record.data.attached_files.length > 0)) && (
+                         {files.length > 0 && (
                             <div>
                                 <h4 className="text-sm font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
                                     <Paperclip size={16}/> Tài liệu đính kèm
                                 </h4>
                                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                                     <div className="flex flex-col gap-2">
-                                        {((record.attached_files && record.attached_files.length > 0) ? record.attached_files : (record.data?.attached_files || [])).map((file: any, index: number) => (
+                                        {files.map((file: any, index: number) => (
                                             <a key={index} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 w-fit bg-white text-blue-600 px-3 py-2 rounded-lg border border-gray-200 hover:bg-blue-50 transition-colors shadow-sm">
                                                 <div className="p-1.5 rounded bg-blue-100 text-blue-600">
                                                     <Paperclip size={14} />

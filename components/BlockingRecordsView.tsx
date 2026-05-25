@@ -80,9 +80,36 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa hồ sơ ngăn chặn này?')) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa hồ sơ ngăn chặn này và tất cả các tệp đính kèm liên quan?')) return;
     try {
-      if (isConfigured) {
+      const record = records.find(r => r.id === id);
+      if (isConfigured && record) {
+         // Thu thập tất cả file đính kèm để xóa vật lý trên Supabase Storage
+         const filesToDelete: any[] = [];
+         if (record.attached_files && Array.isArray(record.attached_files)) {
+            filesToDelete.push(...record.attached_files);
+         }
+         if (record.unblock_attached_files && Array.isArray(record.unblock_attached_files)) {
+            filesToDelete.push(...record.unblock_attached_files);
+         }
+
+         const filePaths = filesToDelete
+            .filter(f => f && f.id && !f.id.startsWith('mock-'))
+            .map(f => f.id);
+
+         if (filePaths.length > 0) {
+            try {
+               const { error: storageError } = await supabase.storage.from('chat-files').remove(filePaths);
+               if (storageError) {
+                  console.error('Lỗi khi xóa các file đính kèm của hồ sơ ngăn chặn khỏi Storage:', storageError);
+               } else {
+                  console.log('Đã xóa thành công các file đính kèm khỏi Storage:', filePaths);
+               }
+            } catch (storageErr) {
+               console.error('Lỗi ngoại lệ khi xóa file khỏi Storage:', storageErr);
+            }
+         }
+
          const { error } = await supabase.from('blocking_records').delete().eq('id', id);
          if (error) throw error;
       }

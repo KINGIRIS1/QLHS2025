@@ -208,7 +208,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setPendingUnblockFiles(prev => [...prev, ...Array.from(files)]);
+    const filesArray = Array.from(files);
+    setPendingUnblockFiles(prev => [...prev, ...filesArray]);
     e.target.value = '';
   };
 
@@ -241,7 +242,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setPendingFiles(prev => [...prev, ...Array.from(files)]);
+    const filesArray = Array.from(files);
+    setPendingFiles(prev => [...prev, ...filesArray]);
     e.target.value = ''; // Reset input
   };
 

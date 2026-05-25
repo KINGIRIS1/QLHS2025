@@ -14,6 +14,13 @@ import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
 import DeleteAllModal from './DeleteAllModal';
 
+function promiseWithTimeout<T>(promise: Promise<T>, ms: number, errorMessage = 'Thao tác quá thời gian cho phép.'): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), ms))
+    ]);
+}
+
 interface CongVanViewProps {
     currentUser: User;
 }
@@ -356,7 +363,8 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            setPendingFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+            const filesArray = Array.from(e.target.files);
+            setPendingFiles(prev => [...prev, ...filesArray]);
         }
         e.target.value = ''; // Reset input
     };
@@ -448,15 +456,26 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     const fileExt = file.name.split('.').pop();
                     const fileName = `archive_congvan_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                     const filePath = `archive_attachments/congvan/${fileName}`;
-                    const { data, error } = await supabase.storage.from('chat-files').upload(filePath, file);
                     
-                    if (error) {
-                        console.error("Storage upload error:", error);
-                        alert(`Không thể tải lên tệp ${file.name}. Lỗi: ${error.message}`);
-                        continue; 
-                    } else {
-                        const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
-                        uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+                    try {
+                        const { data, error } = await promiseWithTimeout(
+                            supabase.storage.from('chat-files').upload(filePath, file),
+                            30000,
+                            `Quá thời gian tải lên tệp "${file.name}" (30 giây). Máy chủ đang khởi động lại hoặc kết nối mạng bị gián đoạn, vui lòng thử lại sau giây lát!`
+                        );
+                        
+                        if (error) {
+                            console.error("Storage upload error:", error);
+                            alert(`Không thể tải lên tệp ${file.name}. Lỗi: ${error.message}`);
+                            continue; 
+                        } else if (data) {
+                            const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
+                            uploadedFiles.push({ id: data.path, url: publicUrl, name: file.name });
+                        }
+                    } catch (uploadErr: any) {
+                        console.error("Storage upload timeout or error:", uploadErr);
+                        alert(uploadErr.message || `Lỗi quá thời gian khi tải lên tệp ${file.name}.`);
+                        continue;
                     }
                 }
                 currentAttachedFiles = [...currentAttachedFiles, ...uploadedFiles];
@@ -971,17 +990,17 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <div className="space-y-3">
                                         <input 
                                           type="file" 
-                                          id={`cong_van_files_input_${editingId || 'new'}`}
+                                          id="cong_van_files_input_unique"
                                           multiple 
                                           className="hidden" 
                                           onChange={handleFileAdd} 
                                         />
-                                        <label 
-                                          htmlFor={`cong_van_files_input_${editingId || 'new'}`}
+                                        <div 
                                           onDragOver={handleDragOver}
                                           onDragLeave={handleDragLeave}
                                           onDrop={handleDrop}
-                                          className={`block border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                                          onClick={() => document.getElementById('cong_van_files_input_unique')?.click()}
+                                          className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
                                             isDragging 
                                               ? 'border-blue-500 bg-blue-50 text-blue-700 animate-pulse' 
                                               : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:bg-gray-50'
@@ -992,7 +1011,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                                 <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-blue-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
                                                 <div className="text-[11px] text-gray-400">Hỗ trợ tải lên nhiều file cùng lúc</div>
                                             </div>
-                                        </label>
+                                        </div>
 
                                         {/* Existing Files */}
                                         {getAttachedFiles(formData).map((file: any, index: number) => (

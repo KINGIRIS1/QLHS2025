@@ -502,14 +502,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         )}
                     </div>
 
-                    {/* NGƯỜI XỬ LÝ */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
-                        <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                <UserIcon size={16}/>
+                    {/* NGƯỜI XỬ LÝ & TIẾP NHẬN */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <div>
+                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người tiếp nhận hồ sơ</label>
+                            <div className="flex items-center gap-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <UserIcon size={16}/>
+                                </div>
+                                <span className="font-bold text-sm text-blue-700">{record.createdBy || 'Hệ thống'}</span>
                             </div>
-                            <span className="font-bold text-sm text-gray-700">{getEmployeeName(record.assignedTo)}</span>
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
+                            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                    <UserIcon size={16}/>
+                                </div>
+                                <span className="font-bold text-sm text-gray-700">{getEmployeeName(record.assignedTo)}</span>
+                            </div>
                         </div>
                     </div>
 

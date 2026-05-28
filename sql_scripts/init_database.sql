@@ -73,7 +73,9 @@ CREATE TABLE records (
     "receiptNumber" VARCHAR(50),
     "receiverName" VARCHAR(100),
     "resultReturnedDate" DATE,
-    "needsMapCorrection" BOOLEAN DEFAULT FALSE
+    "needsMapCorrection" BOOLEAN DEFAULT FALSE,
+    "plotCount" INT DEFAULT 1,
+    "createdBy" VARCHAR(100)
 );
 
 -- Bảng Hợp đồng (Contract)

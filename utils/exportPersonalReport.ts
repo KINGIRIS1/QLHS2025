@@ -53,10 +53,14 @@ export const exportPersonalReportToWord = async (
     addText(`- ${type}: ${count} hồ sơ`, false, 720);
   });
 
+  const getRecordPlotCount = (r: any) => ['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1);
+
   addText(`2. Số hồ sơ hoàn thành: ${filteredRecords.completed.length} hồ sơ`, true, 360);
   Object.entries(filteredRecords.completedTypes).forEach(([type, count]) => {
     addText(`- ${type}: ${count} hồ sơ`, false, 720);
   });
+  const plotCountCompleted = filteredRecords.completed.reduce((sum: number, r: any) => sum + getRecordPlotCount(r), 0);
+  addText(`- Tổng số lượng thửa đất đã hoàn thành: ${plotCountCompleted} thửa`, true, 720);
 
   const execCount = filteredRecords.completedWork.length + filteredRecords.pendingSign.length;
   addText(`3. Số hồ sơ đã thực hiện: ${execCount} hồ sơ`, true, 360);
@@ -68,6 +72,8 @@ export const exportPersonalReportToWord = async (
     if (filteredRecords.pendingSign.length > 0) {
       addText(`- Đã thực hiện (chờ ký duyệt): ${filteredRecords.pendingSign.length} hồ sơ`, false, 1080);
     }
+    const plotCountExecuted = [...filteredRecords.completedWork, ...filteredRecords.pendingSign].reduce((sum: number, r: any) => sum + getRecordPlotCount(r), 0);
+    addText(`- Tổng số lượng thửa đất đã thực hiện: ${plotCountExecuted} thửa`, true, 1080);
   }
 
   addText(`4. Lịch công tác: ${mySchedules.length} lịch`, true, 360);

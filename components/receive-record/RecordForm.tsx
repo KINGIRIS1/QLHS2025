@@ -80,7 +80,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         return; 
     }
     setLoading(true);
-    const recordToSave: RecordFile = { ...formData, id: formData.id || Math.random().toString(36).substr(2, 9), status: formData.status || RecordStatus.RECEIVED } as RecordFile;
+    const recordToSave: RecordFile = { 
+        ...formData, 
+        id: formData.id || Math.random().toString(36).substr(2, 9), 
+        status: formData.status || RecordStatus.RECEIVED,
+        createdBy: formData.createdBy || currentUser.name
+    } as RecordFile;
     const success = await onSave(recordToSave);
     setLoading(false);
     if (success) {

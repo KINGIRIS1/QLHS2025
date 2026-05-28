@@ -13,7 +13,9 @@ const RECORD_DB_COLUMNS = [
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt',
     'receiptNumber', 'resultReturnedDate', 'receiverName',
-    'needsMapCorrection' // Cột mới
+    'needsMapCorrection', // Cột mới
+    'plotCount',
+    'createdBy' // Người tiếp nhận hồ sơ
 ];
 
 let CACHED_RECORDS: RecordFile[] = [];
@@ -130,11 +132,44 @@ export const fetchRecords = async (forceUpdate: boolean = false): Promise<Record
 };
 
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    if (!isConfigured) return record;
+    if (!isConfigured) return { ...record, createdBy: record.createdBy || null };
     try {
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
         const { data, error } = await supabase.from('records').insert([payload]).select();
-        if (error) throw error;
+        
+        if (error) {
+            const errCode = (error as any).code;
+            const errMsg = String((error as any).message || '');
+            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount')) {
+                console.warn("⚠️ [Database out of sync] Thử lại createRecordApi loại bỏ cột lỗi...");
+                let fallbackColumns = RECORD_DB_COLUMNS.slice();
+                if (errCode === '42703' || errMsg.includes('createdBy')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'createdBy');
+                }
+                if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
+                }
+                const fallbackPayload = sanitizeData(record, fallbackColumns);
+                const { data: fbData, error: fbError } = await supabase.from('records').insert([fallbackPayload]).select();
+                
+                if (fbError) {
+                    // Thử an toàn hoàn toàn bằng cách loại bỏ cả plotCount lẫn createdBy
+                    const safeColumns = RECORD_DB_COLUMNS.filter(col => col !== 'plotCount' && col !== 'createdBy');
+                    const safePayload = sanitizeData(record, safeColumns);
+                    const { data: safeData, error: safeError } = await supabase.from('records').insert([safePayload]).select();
+                    if (safeError) throw safeError;
+                    if (safeData?.[0]) {
+                        if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(safeData[0] as RecordFile);
+                        return safeData[0] as RecordFile;
+                    }
+                }
+                if (fbData?.[0]) {
+                    if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(fbData[0] as RecordFile);
+                    return fbData[0] as RecordFile;
+                }
+            }
+            throw error;
+        }
         
         if (data?.[0]) {
             if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(data[0] as RecordFile);
@@ -152,7 +187,45 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
     try {
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
         const { data, error } = await supabase.from('records').update(payload).eq('id', record.id).select();
-        if (error) throw error;
+        
+        if (error) {
+            const errCode = (error as any).code;
+            const errMsg = String((error as any).message || '');
+            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount')) {
+                console.warn("⚠️ [Database out of sync] Thử lại updateRecordApi loại bỏ cột lỗi...");
+                let fallbackColumns = RECORD_DB_COLUMNS.slice();
+                if (errCode === '42703' || errMsg.includes('createdBy')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'createdBy');
+                }
+                if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
+                }
+                const fallbackPayload = sanitizeData(record, fallbackColumns);
+                const { data: fbData, error: fbError } = await supabase.from('records').update(fallbackPayload).eq('id', record.id).select();
+                
+                if (fbError) {
+                    const safeColumns = RECORD_DB_COLUMNS.filter(col => col !== 'plotCount' && col !== 'createdBy');
+                    const safePayload = sanitizeData(record, safeColumns);
+                    const { data: safeData, error: safeError } = await supabase.from('records').update(safePayload).eq('id', record.id).select();
+                    if (safeError) throw safeError;
+                    if (safeData?.[0]) {
+                        if (IS_CACHED_RECORDS_LOADED) {
+                            const idx = CACHED_RECORDS.findIndex(r => r.id === safeData[0].id);
+                            if (idx !== -1) CACHED_RECORDS[idx] = safeData[0] as RecordFile;
+                        }
+                        return safeData[0] as RecordFile;
+                    }
+                }
+                if (fbData?.[0]) {
+                    if (IS_CACHED_RECORDS_LOADED) {
+                        const idx = CACHED_RECORDS.findIndex(r => r.id === fbData[0].id);
+                        if (idx !== -1) CACHED_RECORDS[idx] = fbData[0] as RecordFile;
+                    }
+                    return fbData[0] as RecordFile;
+                }
+            }
+            throw error;
+        }
         
         if (data?.[0]) {
             if (IS_CACHED_RECORDS_LOADED) {

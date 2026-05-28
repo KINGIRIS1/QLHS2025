@@ -106,6 +106,19 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
         };
     }, [myRecords, reportRange]);
 
+    const getRecordPlotCount = (r: RecordFile) => {
+        if (['Sao lục', 'Công văn'].includes(r.recordType || '')) return 0;
+        return r.plotCount || 1;
+    };
+
+    const totalPlotCountCompleted = useMemo(() => {
+        return filteredRecords.completed.reduce((sum, r) => sum + getRecordPlotCount(r), 0);
+    }, [filteredRecords.completed]);
+
+    const totalPlotCountExecuted = useMemo(() => {
+        return [...filteredRecords.completedWork, ...filteredRecords.pendingSign].reduce((sum, r) => sum + getRecordPlotCount(r), 0);
+    }, [filteredRecords.completedWork, filteredRecords.pendingSign]);
+
     const mySchedules = useMemo(() => {
         const myName = removeVietnameseTones(user.name);
         return schedules.filter(s => {
@@ -215,6 +228,10 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
                             ))}
                         </div>
                     )}
+                    <div className="mt-auto pt-2 border-t border-green-200/50 flex justify-between items-center text-xs text-green-800 font-bold">
+                        <span>Tổng số thửa đất:</span>
+                        <span>{totalPlotCountCompleted} thửa</span>
+                    </div>
                 </div>
                 <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex flex-col justify-start">
                     <div className="text-center mb-2">
@@ -235,6 +252,10 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
                             )}
                         </div>
                     )}
+                    <div className="mt-auto pt-2 border-t border-orange-200/50 flex justify-between items-center text-xs text-orange-800 font-bold">
+                        <span>Tổng số thửa đất:</span>
+                        <span>{totalPlotCountExecuted} thửa</span>
+                    </div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 flex flex-col justify-center items-center">
                     <span className="text-gray-500 text-sm font-semibold uppercase mb-1">Lịch công tác</span>

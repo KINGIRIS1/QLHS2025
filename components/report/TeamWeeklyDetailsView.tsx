@@ -191,8 +191,10 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
     return {
       totalReceivedCount: allReceived.length,
       totalCompletedCount: allCompleted.length,
+      totalPlotCountCompleted: allCompleted.reduce((sum, r) => sum + (['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1)), 0),
       totalCompletedWorkCount: allCompletedWork.length,
       totalPendingSignCount: allPendingSign.length,
+      totalPlotCountExecuted: [...allCompletedWork, ...allPendingSign].reduce((sum, r) => sum + (['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1)), 0),
       totalScheduleCount: allSchedules.length,
       receivedTypes: getGroupedTypes(allReceived),
       completedTypes: getGroupedTypes(allCompleted),
@@ -334,7 +336,11 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
             )}
           </li>
           <li>
-            <span className="font-bold">3. Tổng số hồ sơ đã thực hiện: </span>
+            <span className="font-bold">3. Tổng số lượng thửa đất thuộc hồ sơ hoàn thành:</span>{" "}
+            <span className="font-bold text-green-800">{reportData.totalPlotCountCompleted}</span> thửa đất
+          </li>
+          <li>
+            <span className="font-bold">4. Tổng số hồ sơ đã thực hiện: </span>
             {reportData.totalCompletedWorkCount + reportData.totalPendingSignCount} hồ sơ
             {(reportData.totalCompletedWorkCount > 0 || reportData.totalPendingSignCount > 0) && (
               <div className="pl-6 mt-1 space-y-1">
@@ -353,7 +359,11 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
             )}
           </li>
           <li>
-            <span className="font-bold">4. Tổng lịch công tác:</span>{" "}
+            <span className="font-bold">5. Tổng số lượng thửa đất thuộc hồ sơ đã thực hiện:</span>{" "}
+            <span className="font-bold text-blue-800">{reportData.totalPlotCountExecuted}</span> thửa đất
+          </li>
+          <li>
+            <span className="font-bold">6. Tổng lịch công tác:</span>{" "}
             {reportData.totalScheduleCount} lịch
           </li>
         </ul>
@@ -411,6 +421,13 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                         ))}
                       </ul>
                     )}
+                    {data.completed.length > 0 && (
+                      <ul className="list-none pl-6 mt-1">
+                        <li className="italic text-green-800 font-semibold">
+                          - Tổng số lượng thửa đất đã hoàn thành: {data.completed.reduce((sum, r) => sum + (['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1)), 0)} thửa đất
+                        </li>
+                      </ul>
+                    )}
                   </li>
                   <li>
                     <span className="font-bold">c) Số hồ sơ đã thực hiện:</span>{" "}
@@ -433,6 +450,9 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                             hồ sơ
                           </li>
                         )}
+                        <li className="italic text-blue-800 font-semibold">
+                          - Tổng số lượng thửa đất đã thực hiện: {[...data.completedWork, ...data.pendingSign].reduce((sum, r) => sum + (['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1)), 0)} thửa đất
+                        </li>
                       </ul>
                     )}
                   </li>

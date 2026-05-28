@@ -56,7 +56,7 @@ interface AppRoutesProps {
     onRefreshData: () => void;
     setWards: React.Dispatch<React.SetStateAction<string[]>>;
     onResetWards: () => void;
-    handleQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
+    handleQuickUpdate: (id: string, field: keyof RecordFile, value: any, additionalUpdates?: Partial<RecordFile>) => void;
     handleUpdateCurrentAccount: (data: any) => Promise<boolean>;
     
     // Report Props
@@ -479,7 +479,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     user={currentUser}
                     employees={employees}
                     records={records}
-                    onUpdateStatus={(r, status) => props.handleQuickUpdate(r.id, 'status', status)}
+                    onUpdateStatus={(r, status, additionalUpdates) => props.handleQuickUpdate(r.id, 'status', status, additionalUpdates)}
                     onViewRecord={props.handleViewRecord}
                     onCreateLiquidation={(r) => { 
                         props.setRecordToLiquidate(r); 

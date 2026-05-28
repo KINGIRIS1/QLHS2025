@@ -8,6 +8,7 @@ import { confirmAction } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
 import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../services/apiArchive';
 import PhieuXinLoiModal from './PhieuXinLoiModal';
+import { PlotCountModal } from './PlotCountModal';
 
 import PersonalReportView from './PersonalReportView';
 
@@ -15,7 +16,7 @@ interface PersonalProfileProps {
   user: User;
   employees?: Employee[];
   records: RecordFile[];
-  onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
+  onUpdateStatus: (record: RecordFile, newStatus: RecordStatus, additionalUpdates?: Partial<RecordFile>) => void;
   onViewRecord: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void; 
   onMapCorrection?: (record: RecordFile) => void; // New Handler Prop
@@ -54,6 +55,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
 
   const [showPhieuXinLoi, setShowPhieuXinLoi] = useState(false);
   const [selectedRecordForPhieu, setSelectedRecordForPhieu] = useState<RecordFile | null>(null);
+
+  const [isPlotCountModalOpen, setIsPlotCountModalOpen] = useState(false);
+  const [selectedRecordForPlotCount, setSelectedRecordForPlotCount] = useState<RecordFile | null>(null);
 
   useEffect(() => {
     const loadArchive = async () => {
@@ -269,8 +273,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   };
 
   const handleForwardToSign = async (record: RecordFile) => {
-    if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
-        if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
+    if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
+        if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
              // Handle Archive Record
             const historyEntry = {
                 action: 'Trình ký',
@@ -295,10 +299,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                  const congvan = await fetchArchiveRecords('congvan');
                  setArchiveRecords([...saoluc, ...congvan]);
             }
-        } else {
-            // Normal Record
-            onUpdateStatus(record, RecordStatus.PENDING_SIGN);
         }
+    } else {
+         // Normal Record => Mở modal yêu cầu nhập số lượng thửa đất (Áp dụng cho Đo đạc và Khác)
+         setSelectedRecordForPlotCount(record);
+         setIsPlotCountModalOpen(true);
+    }
+  };
+
+  const handleConfirmPlotCount = (plotCount: number) => {
+    if (selectedRecordForPlotCount) {
+      onUpdateStatus(selectedRecordForPlotCount, RecordStatus.PENDING_SIGN, { plotCount });
+      setIsPlotCountModalOpen(false);
+      setSelectedRecordForPlotCount(null);
     }
   };
 
@@ -644,6 +657,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
             }}
         />
       )}
+
+      <PlotCountModal
+        isOpen={isPlotCountModalOpen}
+        onClose={() => {
+          setIsPlotCountModalOpen(false);
+          setSelectedRecordForPlotCount(null);
+        }}
+        onConfirm={handleConfirmPlotCount}
+        record={selectedRecordForPlotCount}
+      />
     </div>
   );
 };

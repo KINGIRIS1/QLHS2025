@@ -219,6 +219,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
     }, [filteredData, activeTab, selectedEmpId, dailyStatsRecords]);
 
+    const totalPlotCount = useMemo(() => {
+        return filteredData.reduce((sum, r) => sum + (r.plotCount || 1), 0);
+    }, [filteredData]);
+
     const handleQuickReport = (type: 'week' | 'month') => {
         const now = new Date();
         let start = new Date();
@@ -379,7 +383,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 </div>
 
                 {/* STATS CARDS: HIỂN THỊ LUÔN (Theo yêu cầu layout mới) */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-fade-in">
                     <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
                         <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
                         <div><div className="text-2xl font-bold text-blue-800">{generalStats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
@@ -391,6 +395,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
                         <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
                         <div><div className="text-2xl font-bold text-orange-800">{generalStats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
+                    </div>
+                    {/* Thêm Card Tổng số thửa đất */}
+                    <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl flex items-center gap-3">
+                        <div className="bg-amber-200 p-2 rounded-lg text-amber-700"><Ruler size={20}/></div>
+                        <div><div className="text-2xl font-bold text-amber-800">{totalPlotCount}</div><div className="text-xs text-amber-600 uppercase font-bold">Tổng số thửa đất</div></div>
                     </div>
                     <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
                         <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>

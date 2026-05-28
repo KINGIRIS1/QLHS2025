@@ -82,6 +82,7 @@ export const exportTeamWeeklyReportToWord = async (
       });
     });
   }
+  addText(`- Tổng số lượng thửa đất thuộc hồ sơ hoàn thành: ${reportData.totalPlotCountCompleted} thửa`, true, 720);
 
   const totalExecuted = reportData.totalCompletedWorkCount + reportData.totalPendingSignCount;
   addText(`3. Tổng số hồ sơ đã thực hiện: ${totalExecuted} hồ sơ`, true, 360);
@@ -89,6 +90,7 @@ export const exportTeamWeeklyReportToWord = async (
     addText("Trong đó:", false, 720);
     addText(`- Đã thực hiện (đang chờ kiểm tra): ${reportData.totalCompletedWorkCount} hồ sơ`, false, 1080);
     addText(`- Đã thực hiện (chờ ký duyệt): ${reportData.totalPendingSignCount} hồ sơ`, false, 1080);
+    addText(`- Tổng số lượng thửa đất thuộc hồ sơ đã thực hiện: ${reportData.totalPlotCountExecuted} thửa`, true, 1080);
   }
 
   addText(`4. Tổng lịch công tác: ${reportData.totalScheduleCount} lịch`, true, 360);
@@ -96,6 +98,8 @@ export const exportTeamWeeklyReportToWord = async (
   children.push(new Paragraph({ spacing: { before: 400 } }));
   addText("II. BÁO CÁO THEO NHÂN VIÊN", true);
   
+  const getRecordPlotCount = (r: any) => ['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1);
+
   reportData.employeesData.forEach((data: any, index: number) => {
     addText(`${index + 1}. ${data.employee.name} ${data.employee.department ? `(${data.employee.department})` : ""}`, true, 360);
     
@@ -120,6 +124,8 @@ export const exportTeamWeeklyReportToWord = async (
     Object.entries(completedTypes).forEach(([type, count]) => {
       addText(`- ${type}: ${count} hồ sơ`, false, 1080);
     });
+    const plotCountCompleted = data.completed.reduce((sum: number, r: any) => sum + getRecordPlotCount(r), 0);
+    addText(`- Tổng số lượng thửa đất đã hoàn thành: ${plotCountCompleted} thửa`, true, 1080);
     
     const execCount = data.completedWork.length + data.pendingSign.length;
     addText(`c) Số hồ sơ đã thực hiện: ${execCount} hồ sơ`, true, 720);
@@ -127,6 +133,8 @@ export const exportTeamWeeklyReportToWord = async (
       addText("Trong đó:", false, 1080);
       if (data.completedWork.length > 0) addText(`- Đã thực hiện (đang chờ kiểm tra): ${data.completedWork.length} hồ sơ`, false, 1440);
       if (data.pendingSign.length > 0) addText(`- Đã thực hiện (chờ ký duyệt): ${data.pendingSign.length} hồ sơ`, false, 1440);
+      const plotCountExecuted = [...data.completedWork, ...data.pendingSign].reduce((sum: number, r: any) => sum + getRecordPlotCount(r), 0);
+      addText(`- Tổng số lượng thửa đất đã thực hiện: ${plotCountExecuted} thửa`, true, 1440);
     }
     
     addText(`d) Lịch công tác: ${data.schedules.length} lịch`, true, 720);

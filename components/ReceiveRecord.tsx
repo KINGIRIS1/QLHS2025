@@ -412,6 +412,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 records={records}
                 wards={wards}
                 currentUser={currentUser}
+                employees={employees}
                 onPreviewExcel={handlePreviewExcel}
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}

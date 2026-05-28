@@ -77,6 +77,7 @@ export interface RecordFile {
   
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
+  plotCount?: number | null; // Số lượng thửa đất (đối với hồ sơ Đo đạc và Hồ sơ Khác)
   
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc
@@ -89,6 +90,7 @@ export interface RecordFile {
 
   // Tính năng Chỉnh lý bản đồ (Mới)
   needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý
+  createdBy?: string | null;    // Người tiếp nhận hồ sơ
 }
 
 // Interface cho Item tách thửa

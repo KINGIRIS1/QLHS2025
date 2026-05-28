@@ -24,6 +24,7 @@ import { useIsMobile } from './hooks/useIsMobile';
 import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
 import UpdateRequiredModal from './components/UpdateRequiredModal';
+import { PlotCountModal } from './components/PlotCountModal';
 
 function App() {
   const isMobile = useIsMobile(768);
@@ -65,6 +66,9 @@ function App() {
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnRecord, setReturnRecord] = useState<RecordFile | null>(null);
+
+  const [isPlotCountModalOpen, setIsPlotCountModalOpen] = useState(false);
+  const [selectedRecordForPlotCount, setSelectedRecordForPlotCount] = useState<RecordFile | null>(null);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -324,7 +328,7 @@ function App() {
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
   };
 
-  const getUpdatesForStatusChange = (newStatus: RecordStatus) => {
+  const getUpdatesForStatusChange = useCallback((newStatus: RecordStatus) => {
       const todayStr = new Date().toISOString().split('T')[0];
       const updates: any = { status: newStatus };
 
@@ -378,7 +382,7 @@ function App() {
               break;
       }
       return updates;
-  };
+  }, []);
 
   const handleBulkUpdate = async (field: keyof RecordFile, value: any) => {
       const selectedIds = Array.from(selectedRecordIds);
@@ -407,10 +411,10 @@ function App() {
       setSelectedRecordIds(new Set()); 
   };
 
-  const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
-      let updates: any = { [field]: value };
+  const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: any, additionalUpdates?: Partial<RecordFile>) => {
+      let updates: any = { [field]: value, ...additionalUpdates };
       if (field === 'status') {
-          updates = getUpdatesForStatusChange(value as RecordStatus);
+          updates = { ...updates, ...getUpdatesForStatusChange(value as RecordStatus) };
       }
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
       const record = records.find(r => r.id === id); 
@@ -462,11 +466,29 @@ function App() {
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];
+          // Nếu chuyển lên PENDING_SIGN, yêu cầu nhập số lượng thửa cho hồ sơ Đo đạc và hồ sơ Khác
+          if (nextStatus === RecordStatus.PENDING_SIGN && !['Sao lục', 'Công văn'].includes(record.recordType || '')) {
+              setSelectedRecordForPlotCount(record);
+              setIsPlotCountModalOpen(true);
+              return;
+          }
           const updates = getUpdatesForStatusChange(nextStatus);
           setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
           await updateRecordApi({ ...record, ...updates });
       }
-  }, []);
+  }, [getUpdatesForStatusChange]);
+
+  const handleConfirmPlotCount = useCallback(async (plotCount: number) => {
+      if (selectedRecordForPlotCount) {
+          const nextStatus = RecordStatus.PENDING_SIGN;
+          const updates = { ...getUpdatesForStatusChange(nextStatus), plotCount };
+          setRecords(prev => prev.map(r => r.id === selectedRecordForPlotCount.id ? { ...r, ...updates } : r));
+          await updateRecordApi({ ...selectedRecordForPlotCount, ...updates });
+          setIsPlotCountModalOpen(false);
+          setSelectedRecordForPlotCount(null);
+          setToast({ type: 'success', message: `Số thửa đã cập nhật thành ${plotCount} và chuyển hồ sơ ${selectedRecordForPlotCount.code} sang Chờ ký duyệt.` });
+      }
+  }, [selectedRecordForPlotCount, getUpdatesForStatusChange]);
 
   const executeBatchExport = async (batchNumber: number, batchDate: string) => {
       const todayStr = recordFilterProps.filterDate || new Date().toISOString().split('T')[0];
@@ -781,6 +803,16 @@ function App() {
                 {toast.message}
             </div>
         )}
+
+        <PlotCountModal
+            isOpen={isPlotCountModalOpen}
+            onClose={() => {
+                setIsPlotCountModalOpen(false);
+                setSelectedRecordForPlotCount(null);
+            }}
+            onConfirm={handleConfirmPlotCount}
+            record={selectedRecordForPlotCount}
+        />
     </MainLayout>
   );
 }

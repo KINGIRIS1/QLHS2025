@@ -1,14 +1,14 @@
-
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
-import { RecordFile } from '../../types';
+import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
-import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Globe } from 'lucide-react';
 
 interface DailyListProps {
   records: RecordFile[];
   wards: string[];
   currentUser: any;
+  employees?: Employee[];
   onPreviewExcel: (wb: XLSX.WorkBook, name: string) => void;
   // New Handlers
   onEdit: (record: RecordFile) => void;
@@ -24,7 +24,7 @@ const getShortCode = (ward: string) => {
         .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
 
     if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
-    if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
+    if (cleanName.includes('chơn thành') || cleanName.includes('the_chon_thanh') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
     if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
     if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
     if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
@@ -35,10 +35,19 @@ const getShortCode = (ward: string) => {
     return 'CT'; // Mặc định
 };
 
-const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, onEdit, onDelete, onPrint }) => {
+const normalizeWardName = (w: string) => {
+    if (!w) return '';
+    return w.toLowerCase()
+        .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
+        .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ')
+        .trim();
+};
+
+const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, employees = [], onPreviewExcel, onEdit, onDelete, onPrint }) => {
   const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [filterWard, setFilterWard] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [subTab, setSubTab] = useState<'inside' | 'outside'>('inside');
 
   const filteredDailyRecords = useMemo(() => {
       if (!records) return [];
@@ -98,8 +107,44 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
       });
   }, [records, filterDate, filterWard, searchTerm]);
 
-  const createDailyListWorkbook = () => {
-      if (filteredDailyRecords.length === 0) return null;
+  // Phân loại địa giới và phi địa giới
+  const normalizedMyWards = useMemo(() => {
+      const linkedEmp = employees.find(e => e.id === currentUser?.employeeId);
+      const myManagedWards = linkedEmp?.managedWards || [];
+      return myManagedWards.map(w => normalizeWardName(w));
+  }, [employees, currentUser]);
+
+  const mySuffixes = useMemo(() => {
+      const linkedEmp = employees.find(e => e.id === currentUser?.employeeId);
+      const myManagedWards = linkedEmp?.managedWards || [];
+      return myManagedWards.map(w => getShortCode(w));
+  }, [employees, currentUser]);
+
+  const [insideRecords, outsideRecords] = useMemo(() => {
+      const inside: RecordFile[] = [];
+      const outside: RecordFile[] = [];
+      
+      filteredDailyRecords.forEach(r => {
+          const rWardNorm = normalizeWardName(r.ward || '');
+          const rSuffix = getShortCode(r.ward || '');
+          const isMyWard = rWardNorm && normalizedMyWards.includes(rWardNorm);
+          const isMyWardBySuffix = mySuffixes.includes(rSuffix);
+          
+          if (isMyWard || isMyWardBySuffix) {
+              inside.push(r);
+          } else {
+              outside.push(r);
+          }
+      });
+      return [inside, outside];
+  }, [filteredDailyRecords, normalizedMyWards, mySuffixes]);
+
+  const currentTabRecords = useMemo(() => {
+      return subTab === 'inside' ? insideRecords : outsideRecords;
+  }, [subTab, insideRecords, outsideRecords]);
+
+  const createDailyListWorkbook = (recordsToExport: RecordFile[]) => {
+      if (recordsToExport.length === 0) return null;
       
       // Nếu là "Tất cả", tiêu đề sẽ là "DANH SÁCH TỔNG HỢP...", ngược lại là tên xã cụ thể
       const wardTitle = filterWard !== 'all' ? filterWard.toUpperCase() : "CÁC ĐƠN VỊ";
@@ -108,7 +153,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
       
       const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã / Phường", "Tờ", "Thửa", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"];
       
-      const dataRows = filteredDailyRecords.map((r, i) => [
+      const dataRows = recordsToExport.map((r, i) => [
           i + 1, r.code, r.customerName, 
           getNormalizedWard(r.ward), 
           r.mapSheet, r.landPlot, 
@@ -129,7 +174,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
       // Header content
       XLSX.utils.sheet_add_aoa(ws, [
           ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"], ["Độc lập - Tự do - Hạnh phúc"], [""],
-          ["DANH SÁCH TIẾP NHẬN HỒ SƠ"], [wardTitle], [dateStr], tableHeader
+          ["DANH SÁCH TIẾP NHẬN HỒ SƠ - " + (subTab === 'inside' ? "ĐÚNG ĐỊA BÀN" : "PHI ĐỊA GIỚI")], [wardTitle], [dateStr], tableHeader
       ], { origin: "A1" });
       
       // Data content
@@ -195,15 +240,15 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
   };
 
   const handleExport = () => {
-      const wb = createDailyListWorkbook();
+      const wb = createDailyListWorkbook(currentTabRecords);
       if (!wb) { alert("Không có hồ sơ."); return; }
-      XLSX.writeFile(wb, `DS_Tiep_Nhan_${filterDate.replace(/-/g, '')}.xlsx`);
+      XLSX.writeFile(wb, `DS_Tiep_Nhan_${subTab === 'inside' ? 'Dia_Ban' : 'Phi_Dia_Gioi'}_${filterDate.replace(/-/g, '')}.xlsx`);
   };
 
   const handlePreview = () => {
-      const wb = createDailyListWorkbook();
+      const wb = createDailyListWorkbook(currentTabRecords);
       if (!wb) { alert("Không có hồ sơ."); return; }
-      onPreviewExcel(wb, `DS_Tiep_Nhan_${filterDate.replace(/-/g, '')}`);
+      onPreviewExcel(wb, `DS_Tiep_Nhan_${subTab === 'inside' ? 'Dia_Ban' : 'Phi_Dia_Gioi'}_${filterDate.replace(/-/g, '')}`);
   };
 
   return (
@@ -216,7 +261,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
             <div className="flex items-center gap-2"> 
                 <label className="text-sm font-medium text-gray-600">Đơn vị (Lọc):</label> 
                 <select className="border border-gray-300 rounded px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500" value={filterWard} onChange={(e) => setFilterWard(e.target.value)}> 
-                    <option value="all">-- Tất cả (Sắp xếp theo đơn vị) --</option> 
+                    <option value="all">-- Tất cả --</option> 
                     {wards.map(w => <option key={w} value={w}>{w}</option>)} 
                 </select> 
             </div>
@@ -229,7 +274,44 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
                 <button onClick={handleExport} className="flex items-center gap-2 bg-white text-green-600 border border-green-200 px-4 py-2 rounded-md hover:bg-green-50 shadow-sm text-sm font-medium"> <FileSpreadsheet size={16} /> Tải Excel </button>
             </div>
         </div>
-        <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+
+        {/* Thêm phần Tabs phân chia địa bàn / phi địa giới */}
+        <div className="flex border-b border-gray-200 bg-white rounded-t-xl shrink-0">
+            <button
+                onClick={() => setSubTab('inside')}
+                className={`flex items-center gap-2 px-6 py-3 border-b-2 font-medium text-sm transition-all outline-none ${
+                    subTab === 'inside'
+                        ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-tl-xl'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+                <MapPin size={16} className={subTab === 'inside' ? 'text-blue-600' : 'text-gray-400'} />
+                <span>Danh sách theo địa bàn</span>
+                <span className={`ml-1.5 px-2 py-0.5 text-xs font-bold rounded-full ${
+                    subTab === 'inside' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                    {insideRecords.length}
+                </span>
+            </button>
+            <button
+                onClick={() => setSubTab('outside')}
+                className={`flex items-center gap-2 px-6 py-3 border-b-2 font-medium text-sm transition-all outline-none ${
+                    subTab === 'outside'
+                        ? 'border-orange-600 text-orange-600 bg-orange-50/50 rounded-tr-xl'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+                <Globe size={16} className={subTab === 'outside' ? 'text-orange-600' : 'text-gray-400'} />
+                <span>Danh sách phi địa giới</span>
+                <span className={`ml-1.5 px-2 py-0.5 text-xs font-bold rounded-full ${
+                    subTab === 'outside' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                    {outsideRecords.length}
+                </span>
+            </button>
+        </div>
+
+        <div className="flex-1 bg-white rounded-b-xl border-x border-b border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
                 <table className="w-full text-left table-fixed min-w-[1300px]">
                     <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm">
@@ -248,8 +330,8 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
-                        {filteredDailyRecords.length > 0 ? (
-                            filteredDailyRecords.map((r, index) => (
+                        {currentTabRecords.length > 0 ? (
+                            currentTabRecords.map((r, index) => (
                                 <tr key={r.id} className="hover:bg-blue-50/50 group">
                                     <td className="p-4 text-center text-gray-400 align-middle">{index + 1}</td> 
                                     <td className="p-4 font-medium text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
@@ -280,7 +362,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, onPreviewExcel, o
                                     </td>
                                 </tr>
                             ))
-                        ) : ( <tr><td colSpan={11} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
+                        ) : ( <tr><td colSpan={11} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này thuộc nhóm này hoặc phù hợp với bộ lọc. </td></tr> )}
                     </tbody>
                 </table>
             </div>

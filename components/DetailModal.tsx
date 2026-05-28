@@ -136,46 +136,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     return emp ? `${emp.name} (${emp.department})` : 'Không xác định';
   };
 
-  const getReceiverName = (rec: any) => {
-    if (rec.createdBy) return rec.createdBy;
-    
-    // Fallback logic for historical/imported records based on Ward / Suffix
-    const wardNorm = (rec.ward || '').toUpperCase().trim();
-    const codeNorm = (rec.code || '').toUpperCase().trim();
-    
-    if (wardNorm.includes('MINH HƯNG') || codeNorm.endsWith('-MH') || codeNorm.includes('-MH-')) {
-        return 'Nguyễn Phan Thái'; // Một cửa Minh Hưng
-    }
-    if (wardNorm.includes('NHA BÍCH') || codeNorm.endsWith('-NB') || codeNorm.includes('-NB-')) {
-        return 'Nguyễn Thanh Hùng'; // Một cửa Nha Bích
-    }
-    if (wardNorm.includes('CHƠN THÀNH') || wardNorm.includes('HƯNG LONG') || codeNorm.endsWith('-CT') || codeNorm.includes('-CT-')) {
-        return 'Phương Ngọc Dung'; // Một cửa Chơn Thành
-    }
-    if (wardNorm.includes('MINH LẬP') || codeNorm.endsWith('-ML') || codeNorm.includes('-ML-')) {
-        return 'Tạ Thị Thư'; // Một cửa Minh Lập
-    }
-    if (wardNorm.includes('MINH THẮNG') || codeNorm.endsWith('-MT') || codeNorm.includes('-MT-')) {
-        return 'Lê Đình Hòa'; // Một cửa Minh Thắng
-    }
-    if (wardNorm.includes('QUANG MINH') || codeNorm.endsWith('-QM') || codeNorm.includes('-QM-')) {
-        return 'Phạm Thị Thu Hà'; // Một cửa Quang Minh
-    }
-    if (wardNorm.includes('THÀNH TÂM') || codeNorm.endsWith('-TT') || codeNorm.includes('-TT-')) {
-        return 'Vũ Đình Hải'; // Một cửa Thành Tâm
-    }
-    if (wardNorm.includes('MINH LONG') || codeNorm.endsWith('-MLO') || codeNorm.includes('-MLO-')) {
-        return 'Hồ Viết Hùng'; // Một cửa Minh Long
-    }
-    
-    // Fallback to assigned specialist if exists, otherwise "Một cửa" general tag
-    if (rec.assignedTo) {
-        const emp = employees.find(e => e.id === rec.assignedTo);
-        if (emp) return `Một cửa / ${emp.name}`;
-    }
-    return 'Một cửa';
-  };
-
   const handleSavePersonalNote = async () => {
       setIsSavingNote(true);
       setNoteSaveStatus('');
@@ -544,15 +504,17 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                     {/* NGƯỜI XỬ LÝ & TIẾP NHẬN */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                        <div>
-                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người tiếp nhận hồ sơ</label>
-                            <div className="flex items-center gap-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                                    <UserIcon size={16}/>
+                        {record.createdBy && (
+                            <div>
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người tiếp nhận hồ sơ</label>
+                                <div className="flex items-center gap-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                        <UserIcon size={16}/>
+                                    </div>
+                                    <span className="font-bold text-sm text-blue-700">{record.createdBy}</span>
                                 </div>
-                                <span className="font-bold text-sm text-blue-700">{getReceiverName(record)}</span>
                             </div>
-                        </div>
+                        )}
                         <div>
                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
                             <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">

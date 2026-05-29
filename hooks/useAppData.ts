@@ -7,6 +7,7 @@ import {
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi,
     initRealtimeRecords
 } from '../services/api';
+import { saveArchiveRecord } from '../services/apiArchive';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 
 export const useAppData = (currentUser: User | null) => {
@@ -146,7 +147,38 @@ export const useAppData = (currentUser: User | null) => {
 
     // --- Record Handlers ---
     const handleAddOrUpdateRecord = async (recordData: any) => {
+        const isSaoLuc = recordData.recordType === 'Sao lục hồ sơ';
         const isEdit = recordData.id && records.find(r => r.id === recordData.id);
+
+        if (isSaoLuc && !isEdit) {
+            const saoLucData = {
+                so_hieu: recordData.code,
+                chu_su_dung: recordData.customerName,
+                xa_phuong: recordData.ward,
+                to_ban_do: recordData.mapSheet,
+                thua_dat: recordData.landPlot,
+                ngay_nhan: recordData.receivedDate,
+                hen_tra: recordData.deadline,
+                noi_dung: recordData.content,
+                status: 'draft',
+                ngay_hoan_thanh: '',
+                danh_sach: ''
+            };
+            const arToSave = {
+                type: 'saoluc' as 'saoluc',
+                status: 'draft' as any,
+                so_hieu: recordData.code,
+                trich_yeu: recordData.content,
+                ngay_thang: recordData.receivedDate,
+                noi_nhan_gui: recordData.customerName,
+                data: saoLucData,
+                created_by: recordData.createdBy || (currentUser?.name || ''),
+                created_at: new Date().toISOString()
+            };
+            const success = await saveArchiveRecord(arToSave);
+            return !!success; // Return true to indicate success to the form
+        }
+
         if (isEdit) {
             const updated = await updateRecordApi(recordData);
             if (updated) {

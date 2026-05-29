@@ -210,7 +210,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     else if (rType.includes('trích đo') || rType.includes('đo đạc') || rType.includes('cắm mốc')) standardDays = "30";
 
     let tp1Value = 'Phiếu yêu cầu';
-    if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục')) {
+    if (rType.includes('cung cấp thông tin') || rType.includes('sao lục')) {
+        tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
+    } else if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     } else if (rType.includes('đo đạc') || rType.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';

@@ -49,7 +49,9 @@ export const RECORD_TYPES = [
   'Trích đo bản đồ địa chính',
   'Trích lục bản đồ địa chính',
   'Đo đạc',     
-  'Cắm mốc'
+  'Cắm mốc',
+  'Cung cấp thông tin quy hoạch',
+  'Sao lục hồ sơ'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)

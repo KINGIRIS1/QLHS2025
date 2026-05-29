@@ -155,7 +155,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) standardDays = "30";
 
     let tp1Value = 'Phiếu yêu cầu';
-    if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
+    if (type.includes('cung cấp thông tin') || type.includes('sao lục')) tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
+    else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     
     let sdtLienHe = "";

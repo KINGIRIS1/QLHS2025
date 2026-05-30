@@ -9,7 +9,7 @@ import { confirmAction } from '../utils/appHelpers';
 interface TemplateConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
-  type: 'receipt' | 'contract' | 'excel_list' | 'vphc';
+  type: 'receipt' | 'contract' | 'excel_list' | 'vphc' | 'late_submission';
 }
 
 const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClose, type }) => {
@@ -69,6 +69,15 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
           } else {
               storageKey = STORAGE_KEYS.VPHC_TEMPLATE_02;
               title = 'Mẫu 02: Biên bản Làm Việc';
+          }
+          break;
+      case 'late_submission':
+          if (vphcSubType === 'mau01') {
+              storageKey = STORAGE_KEYS.LATE_SUBMISSION_TEMPLATE_01;
+              title = 'Mẫu 01: Phiếu chậm nộp';
+          } else {
+              storageKey = STORAGE_KEYS.LATE_SUBMISSION_TEMPLATE_02;
+              title = 'Mẫu 02: Phiếu chậm nộp';
           }
           break;
   }

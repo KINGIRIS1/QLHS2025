@@ -1,5 +1,5 @@
 import React from 'react';
-import { RecordFile, Employee, User, RecordStatus } from '../types';
+import { RecordFile, Employee, User, RecordStatus, Holiday } from '../types';
 import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
@@ -82,6 +82,7 @@ interface AppModalsProps {
     canPerformAction: boolean;
     selectedRecordsForBulk: RecordFile[];
     currentView: string;
+    holidays: Holiday[];
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
@@ -100,6 +101,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 currentUser={props.currentUser}
                 wards={props.wards}
                 currentView={props.currentView}
+                holidays={props.holidays}
             />
             
             <ImportModal 

@@ -10,22 +10,7 @@ import { confirmAction } from '../utils/appHelpers';
 // ... (Giữ nguyên phần định nghĩa interface Window và MessageItem component không thay đổi) ...
 declare global {
   interface Window {
-    electronAPI?: {
-      captureScreenshot: (options?: { hideWindow: boolean }) => Promise<string>;
-      openExternal: (url: string) => Promise<void>;
-      saveAndOpenFile: (data: { fileName: string; base64Data: string; outputFolder?: string | null }) => Promise<{ success: boolean; path?: string; message?: string }>;
-      openFilePath: (path: string) => Promise<boolean>;
-      selectFolder: () => Promise<string | null>;
-      checkForUpdate: (serverUrl: string) => Promise<any>;
-      downloadUpdate: () => Promise<void>;
-      quitAndInstall: () => Promise<void>;
-      onUpdateStatus: (callback: (data: any) => void) => void;
-      removeUpdateListener: () => void;
-      showNotification: (title: string, body: string) => Promise<boolean>;
-      onNavigateToView: (callback: (viewId: string) => void) => void;
-      removeNavigationListener: () => void;
-      showConfirmDialog: (message: string, title?: string) => Promise<boolean>;
-    };
+    electronAPI: any;
   }
 }
 

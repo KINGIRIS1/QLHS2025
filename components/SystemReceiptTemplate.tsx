@@ -98,7 +98,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
 
     const type = (data.recordType || '').toLowerCase();
     let standardDays = "30"; 
-    if (type.includes('trích lục')) {
+    if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
     } else if (type.includes('trích đo chỉnh lý')) {
         standardDays = "15"; 

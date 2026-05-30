@@ -150,7 +150,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     
     let standardDays = "30"; 
     const type = (record.recordType || '').toLowerCase();
-    if (type.includes('trích lục')) standardDays = "10";
+    if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) standardDays = "10";
     else if (type.includes('trích đo chỉnh lý')) standardDays = "15"; 
     else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) standardDays = "30";
 

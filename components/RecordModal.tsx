@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
+import { RecordFile, RecordStatus, Employee, User, UserRole, Holiday } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck } from 'lucide-react';
+import { calculateDeadlineHelper } from '../utils/appHelpers';
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -13,9 +14,10 @@ interface RecordModalProps {
   currentUser: User;
   wards: string[];
   currentView?: string;
+  holidays: Holiday[];
 }
 
-const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView }) => {
+const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays }) => {
   const defaultState: Partial<RecordFile> = {
     code: '', customerName: '', phoneNumber: '', cccd: '', content: '', otherDocs: '',
     receivedDate: new Date().toISOString().split('T')[0], deadline: '', assignedTo: '',
@@ -117,7 +119,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     onClose();
   };
 
-  const handleChange = (field: keyof RecordFile, value: any) => setFormData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof RecordFile, value: any) => {
+    setFormData(prev => {
+        const newData = { ...prev, [field]: value };
+        if (field === 'recordType' || field === 'receivedDate') {
+            const rType = field === 'recordType' ? value : prev.recordType;
+            const rDate = field === 'receivedDate' ? value : prev.receivedDate;
+            if (rType && rDate) {
+                newData.deadline = calculateDeadlineHelper(rType, rDate, holidays);
+            }
+        }
+        return newData;
+    });
+  };
   const val = (v: any) => v === undefined || v === null ? '' : v;
 
   const isOtherView = currentView?.startsWith('other_');

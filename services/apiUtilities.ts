@@ -388,6 +388,74 @@ export const deleteTachThuaRecord = async (id: string): Promise<boolean> => {
     }
 };
 
+export interface LateSubmission extends GenericRecord {
+    // data chứa formData của phiếu chậm nộp
+}
+
+const MOCK_LATE: LateSubmission[] = [];
+
+export const fetchLateSubmissions = async (): Promise<LateSubmission[]> => {
+    if (!isConfigured) return MOCK_LATE;
+    try {
+        const { data, error } = await supabase
+            .from('late_submissions')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data as LateSubmission[];
+    } catch (error) {
+        logError("fetchLateSubmissions", error);
+        return MOCK_LATE;
+    }
+};
+
+export const saveLateSubmission = async (record: Partial<LateSubmission>): Promise<boolean> => {
+    if (!isConfigured) {
+        if (!record.id) {
+            const newRec = { ...record, id: generateId(), created_at: new Date().toISOString() } as LateSubmission;
+            MOCK_LATE.unshift(newRec);
+        } else {
+            const idx = MOCK_LATE.findIndex(r => r.id === record.id);
+            if (idx !== -1) MOCK_LATE[idx] = { ...MOCK_LATE[idx], ...record } as LateSubmission;
+        }
+        return true;
+    }
+    try {
+        if (record.id) {
+            const { error } = await supabase.from('late_submissions').update({ 
+                customer_name: record.customer_name,
+                data: record.data,
+                created_by: record.created_by
+            }).eq('id', record.id);
+            if (error) throw error;
+        } else {
+            const newRecord = { ...record, id: generateId() };
+            const { error } = await supabase.from('late_submissions').insert([newRecord]);
+            if (error) throw error;
+        }
+        return true;
+    } catch (error) {
+        logError("saveLateSubmission", error);
+        return false;
+    }
+};
+
+export const deleteLateSubmission = async (id: string): Promise<boolean> => {
+    if (!isConfigured) {
+        const idx = MOCK_LATE.findIndex(r => r.id === id);
+        if (idx !== -1) MOCK_LATE.splice(idx, 1);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('late_submissions').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteLateSubmission", error);
+        return false;
+    }
+};
+
 // ============================================================================
 // 6. CHUYỂN ĐỔI TỜ BẢN ĐỒ
 // ============================================================================

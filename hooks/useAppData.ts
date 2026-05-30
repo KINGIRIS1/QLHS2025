@@ -7,7 +7,7 @@ import {
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi,
     initRealtimeRecords
 } from '../services/api';
-import { saveArchiveRecord } from '../services/apiArchive';
+import { saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 
 export const useAppData = (currentUser: User | null) => {
@@ -150,7 +150,7 @@ export const useAppData = (currentUser: User | null) => {
         const isSaoLuc = recordData.recordType === 'Sao lục hồ sơ';
         const isEdit = recordData.id && records.find(r => r.id === recordData.id);
 
-        if (isSaoLuc && !isEdit) {
+        if (isSaoLuc) {
             const saoLucData = {
                 so_hieu: recordData.code,
                 chu_su_dung: recordData.customerName,
@@ -164,19 +164,46 @@ export const useAppData = (currentUser: User | null) => {
                 ngay_hoan_thanh: '',
                 danh_sach: ''
             };
-            const arToSave = {
-                type: 'saoluc' as 'saoluc',
-                status: 'draft' as any,
-                so_hieu: recordData.code,
-                trich_yeu: recordData.content,
-                ngay_thang: recordData.receivedDate,
-                noi_nhan_gui: recordData.customerName,
-                data: saoLucData,
-                created_by: recordData.createdBy || (currentUser?.name || ''),
-                created_at: new Date().toISOString()
-            };
-            const success = await saveArchiveRecord(arToSave);
-            return !!success; // Return true to indicate success to the form
+
+            if (!isEdit) {
+                const arToSave = {
+                    type: 'saoluc' as 'saoluc',
+                    status: 'draft' as any,
+                    so_hieu: recordData.code,
+                    trich_yeu: recordData.content,
+                    ngay_thang: recordData.receivedDate,
+                    noi_nhan_gui: recordData.customerName,
+                    data: saoLucData,
+                    created_by: recordData.createdBy || (currentUser?.name || ''),
+                    created_at: new Date().toISOString()
+                };
+                const archiveSuccess = await saveArchiveRecord(arToSave);
+                if (!archiveSuccess) {
+                    return false;
+                }
+            } else {
+                try {
+                    const existingArchive = await findArchiveRecordBySoHieu('saoluc', recordData.code);
+                    if (existingArchive) {
+                        const archId = existingArchive.id;
+                        const archData = existingArchive.data || {};
+                        await saveArchiveRecord({
+                            id: archId,
+                            type: 'saoluc' as 'saoluc',
+                            status: existingArchive.status || 'draft',
+                            so_hieu: recordData.code,
+                            trich_yeu: recordData.content,
+                            ngay_thang: recordData.receivedDate,
+                            noi_nhan_gui: recordData.customerName,
+                            data: { ...archData, ...saoLucData },
+                        });
+                    }
+                } catch (e) {
+                    console.error("Lỗi cập nhật archive_record khi edit:", e);
+                }
+            }
+            // Chỉ lưu vào archive_records, KHÔNG thêm vào bảng tiếp nhận chung (records)
+            return true;
         }
 
         if (isEdit) {
@@ -196,11 +223,22 @@ export const useAppData = (currentUser: User | null) => {
     };
 
     const handleDeleteRecord = async (id: string) => {
-        const success = await deleteRecordApi(id);
-        if (success) {
-            setRecords(prev => prev.filter(r => r.id !== id));
+        const hasInRecords = records.some(r => r.id === id);
+        if (hasInRecords) {
+            const success = await deleteRecordApi(id);
+            if (success) {
+                setRecords(prev => prev.filter(r => r.id !== id));
+            }
+            return success;
+        } else {
+            // Nếu không có trong records (hoặc là hồ sơ chỉ nằm trong archive_records), thực hiện xóa ở archive_records
+            const success = await deleteArchiveRecord(id);
+            if (success) {
+                // Kích hoạt sự kiện để màn hình Tiếp Nhận làm mới
+                window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: 'saoluc' } }));
+            }
+            return success;
         }
-        return success;
     };
 
     const handleImportRecords = async (newRecords: RecordFile[]) => {

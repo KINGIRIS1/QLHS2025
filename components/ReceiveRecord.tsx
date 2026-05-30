@@ -5,7 +5,30 @@ import { getNormalizedWard, getFullWard } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
+import { fetchArchiveRecords } from '../services/apiArchive';
+
+// Hàm map từ dữ liệu ArchiveRecord sang RecordFile dạng ảo dùng riêng cho Tiếp nhận hôm nay
+const mapArchiveToRecordFile = (ar: any): RecordFile => {
+    const d = ar.data || {};
+    return {
+        id: ar.id,
+        code: ar.so_hieu || d.so_hieu || '',
+        customerName: ar.noi_nhan_gui || d.chu_su_dung || '',
+        content: ar.trich_yeu || d.noi_dung || '',
+        receivedDate: ar.ngay_thang || d.ngay_nhan || '',
+        deadline: d.hen_tra || '',
+        ward: d.xa_phuong || '',
+        mapSheet: d.to_ban_do || '',
+        landPlot: d.thua_dat || '',
+        area: d.dien_tich || 0,
+        phoneNumber: d.so_dien_thoai || d.so_dt || '',
+        cccd: d.cccd || '',
+        status: ar.status || 'draft',
+        recordType: 'Sao lục hồ sơ',
+        createdBy: ar.created_by
+    };
+};
 
 // Components
 import RecordForm from './receive-record/RecordForm';
@@ -62,6 +85,58 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk'>('create');
   // Removed local holidays state and useEffect
   
+  // State quản lý danh sách hồ sơ Sao lục lấy từ Archive
+  const [archiveSaoLucRecords, setArchiveSaoLucRecords] = useState<RecordFile[]>([]);
+  const [archiveVaoSoRecords, setArchiveVaoSoRecords] = useState<RecordFile[]>([]);
+
+  const loadArchiveSaoLuc = async () => {
+      try {
+          const list = await fetchArchiveRecords('saoluc', true);
+          const mapped = list.map(mapArchiveToRecordFile);
+          setArchiveSaoLucRecords(mapped);
+      } catch (err) {
+          console.error("Lỗi lấy danh sách sao lục trong Tiếp nhận:", err);
+      }
+  };
+
+  const loadArchiveVaoSo = async () => {
+      try {
+          const list = await fetchArchiveRecords('vaoso', true);
+          const mapped = list.map(mapArchiveToRecordFile);
+          setArchiveVaoSoRecords(mapped);
+      } catch (err) {
+          console.error("Lỗi lấy danh sách vào sổ trong Tiếp nhận:", err);
+      }
+  };
+
+  useEffect(() => {
+      loadArchiveSaoLuc();
+      loadArchiveVaoSo();
+      
+      const handleArchiveUpdate = (e: Event) => {
+          const detail = (e as CustomEvent).detail;
+          if (detail && detail.type === 'saoluc') {
+              loadArchiveSaoLuc();
+          } else if (detail && detail.type === 'vaoso') {
+              loadArchiveVaoSo();
+          }
+      };
+      window.addEventListener('archive_realtime_update', handleArchiveUpdate);
+      return () => {
+          window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
+      };
+  }, []);
+
+  const handleSaveWithArchiveRefresh = async (record: RecordFile) => {
+      const isSaoLuc = record.recordType === 'Sao lục hồ sơ';
+      const success = await onSave(record);
+      if (success) {
+          await loadArchiveSaoLuc();
+          await loadArchiveVaoSo();
+      }
+      return success;
+  };
+
   // State chỉnh sửa
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
 
@@ -124,6 +199,34 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         }
     });
 
+    // Duyệt qua thêm cả danh sách hồ sơ sao lục của hôm nay để tính toán mã số tiếp theo
+    archiveSaoLucRecords.forEach(r => {
+        if (!r.code) return;
+        const cleanCode = r.code.trim().toUpperCase();
+        const parts = cleanCode.split('-');
+        if (parts.length === 3) {
+            const [rPrefix, rSeq, rSuffix] = parts;
+            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
+                const seqNum = parseInt(rSeq, 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+            }
+        }
+    });
+
+    // Duyệt qua cả danh sách hồ sơ vào sổ lưu trữ của hôm nay để tính toán mã số tiếp theo
+    archiveVaoSoRecords.forEach(r => {
+        if (!r.code) return;
+        const cleanCode = r.code.trim().toUpperCase();
+        const parts = cleanCode.split('-');
+        if (parts.length === 3) {
+            const [rPrefix, rSeq, rSuffix] = parts;
+            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
+                const seqNum = parseInt(rSeq, 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+            }
+        }
+    });
+
     existingCodes.forEach(code => {
         if (!code) return;
         const cleanCode = code.trim().toUpperCase();
@@ -143,54 +246,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
   // --- LOGIC TÍNH HẠN TRẢ (CẬP NHẬT FIX LỖI TIMEZONE VÀ NGÀY NGHỈ) ---
   const calculateDeadline = (type: string, receivedDateStr: string) => {
-      let daysToAdd = 30; 
-      const lowerType = type.toLowerCase();
-
-      if (lowerType.includes('trích lục')) daysToAdd = 10; 
-      else if (lowerType.includes('trích đo chỉnh lý')) daysToAdd = 15; 
-      else if (lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc')) daysToAdd = 30; 
-      
-      const startDate = new Date(receivedDateStr);
-      let count = 0;
-      let currentDate = new Date(startDate);
-      
-      // Tạo Set chứa chuỗi ngày nghỉ (YYYY-MM-DD) để tra cứu nhanh và chính xác
-      const holidaySet = new Set<string>();
-      const currentYear = startDate.getFullYear();
-      // Check cả năm hiện tại và năm sau (trường hợp cuối năm)
-      const yearsToCheck = [currentYear, currentYear + 1];
-
-      holidays.forEach(h => {
-          yearsToCheck.forEach(year => {
-              if (h.isLunar) {
-                  const solarDate = getSolarDateFromLunar(h.day, h.month, year);
-                  if (solarDate) holidaySet.add(formatDateKey(solarDate));
-              } else {
-                  // Lưu ý: Date constructor tháng bắt đầu từ 0
-                  const solarDate = new Date(year, h.month - 1, h.day);
-                  holidaySet.add(formatDateKey(solarDate));
-              }
-          });
-      });
-
-      while (count < daysToAdd) {
-          // Tăng 1 ngày
-          currentDate.setDate(currentDate.getDate() + 1);
-          
-          const dayOfWeek = currentDate.getDay(); // 0 là Chủ Nhật, 6 là Thứ 7
-          const dateString = formatDateKey(currentDate);
-          
-          // Trừ Thứ 7 và Chủ Nhật
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          const isHoliday = holidaySet.has(dateString);
-
-          // Nếu không phải cuối tuần VÀ không phải ngày lễ thì mới tính là 1 ngày làm việc
-          if (!isWeekend && !isHoliday) {
-              count++;
-          }
-      }
-      
-      return formatDateKey(currentDate);
+      return calculateDeadlineHelper(type, receivedDateStr, holidays);
   };
 
   // ... (Phần logic in ấn và render giữ nguyên)
@@ -205,7 +261,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     
     let standardDays = "30"; 
     const rType = (dataToUse.recordType || '').toLowerCase();
-    if (rType.includes('trích lục')) standardDays = "10";
+    if (rType.includes('cung cấp thông tin') || rType.includes('sao lục') || rType.includes('trích lục')) standardDays = "10";
     else if (rType.includes('trích đo chỉnh lý')) standardDays = "15";
     else if (rType.includes('trích đo') || rType.includes('đo đạc') || rType.includes('cắm mốc')) standardDays = "30";
 
@@ -385,7 +441,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         {viewMode === 'create' && (
             <RecordForm 
                 initialData={editingRecord}
-                onSave={onSave}
+                onSave={handleSaveWithArchiveRefresh}
                 wards={wards}
                 records={records}
                 holidays={holidays}
@@ -400,7 +456,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
         {viewMode === 'bulk' && (
             <BulkImport 
-                onSave={onSave}
+                onSave={handleSaveWithArchiveRefresh}
                 calculateDeadline={calculateDeadline}
                 calculateNextCode={(w, d, exist) => calculateNextCode(w, d, exist)}
                 onPreview={handlePreviewDocx}
@@ -412,6 +468,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         {viewMode === 'list' && (
             <DailyList 
                 records={records}
+                archiveRecords={archiveSaoLucRecords}
                 wards={wards}
                 currentUser={currentUser}
                 employees={employees}

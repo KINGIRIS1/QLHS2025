@@ -276,6 +276,74 @@ export const createRecordsBatchApi = async (records: RecordFile[]): Promise<bool
     }
 };
 
+export interface OnlineRecord {
+    id: string;
+    code: string;
+    customerName: string;
+    cccd: string;
+    phoneNumber: string;
+    address: string;
+    ward: string;
+    landPlot: string;
+    mapSheet: string;
+    content: string;
+    recordType: string;
+    status: string; // 'pending', 'approved', 'rejected'
+    created_at: string;
+    data?: any;
+}
+
+const MOCK_ONLINE: OnlineRecord[] = [];
+
+export const submitOnlineRecordApi = async (record: Partial<OnlineRecord>): Promise<boolean> => {
+    if (!isConfigured) {
+        const newRec = { ...record, id: Math.random().toString(36).substr(2, 9), created_at: new Date().toISOString(), status: 'pending' } as OnlineRecord;
+        MOCK_ONLINE.unshift(newRec);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('online_records').insert([record]);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("submitOnlineRecordApi", error);
+        return false;
+    }
+};
+
+export const fetchOnlineSubmissionsApi = async (): Promise<OnlineRecord[]> => {
+    if (!isConfigured) return MOCK_ONLINE;
+    try {
+        const { data, error } = await supabase
+            .from('online_records')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data as OnlineRecord[];
+    } catch (error) {
+        logError("fetchOnlineSubmissionsApi", error);
+        return MOCK_ONLINE;
+    }
+};
+
+export const processOnlineSubmissionApi = async (id: string, action: 'approve' | 'reject'): Promise<boolean> => {
+    if (!isConfigured) {
+        const idx = MOCK_ONLINE.findIndex(r => r.id === id);
+        if (idx !== -1) {
+            MOCK_ONLINE[idx].status = action === 'approve' ? 'approved' : 'rejected';
+        }
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('online_records').update({ status: action === 'approve' ? 'approved' : 'rejected' }).eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("processOnlineSubmissionApi", error);
+        return false;
+    }
+};
+
 export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise<{ success: boolean, count: number }> => {
     if (!isConfigured) return { success: true, count: 0 };
     

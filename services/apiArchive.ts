@@ -482,3 +482,24 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string)
         return [];
     }
 };
+
+export const findArchiveRecordBySoHieu = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky', soHieu: string): Promise<ArchiveRecord | null> => {
+    if (!isConfigured) {
+        return MOCK_ARCHIVE.find(r => r.type === type && r.so_hieu === soHieu) || null;
+    }
+    try {
+        const { data, error } = await supabase
+            .from('archive_records')
+            .select('*')
+            .eq('type', type)
+            .eq('so_hieu', soHieu)
+            .limit(1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) return data[0] as ArchiveRecord;
+        return null;
+    } catch (e) {
+        logError("findArchiveRecordBySoHieu", e);
+        return null;
+    }
+};

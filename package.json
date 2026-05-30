@@ -20,7 +20,7 @@
     "@supabase/supabase-js": "^2.39.7",
     "buffer": "^6.0.3",
     "cors": "^2.8.6",
-    "docx": "^9.6.0",
+    "docx": "^9.7.1",
     "docx-preview": "^0.3.2",
     "docxtemplater": "^3.46.0",
     "electron-log": "^5.1.0",

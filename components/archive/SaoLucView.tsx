@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/api';
+import { fetchRecords } from '../../services/apiRecords';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, AlertTriangle } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
@@ -80,6 +81,8 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     });
     
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [measureRecords, setMeasureRecords] = useState<RecordFile[]>([]);
+    const [archiveVaoSoRecords, setArchiveVaoSoRecords] = useState<ArchiveRecord[]>([]);
     
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -95,7 +98,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
         initRealtimeArchive();
         
         const handleArchiveUpdate = (e: any) => {
-            if (e.detail?.type === 'saoluc') {
+            if (e.detail?.type === 'saoluc' || e.detail?.type === 'vaoso') {
                 loadData();
             }
         };
@@ -107,7 +110,100 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const loadData = async () => {
         const data = await fetchArchiveRecords('saoluc');
         setRecords(data);
+        try {
+            const mData = await fetchRecords();
+            setMeasureRecords(mData);
+        } catch (e) {
+            console.error("Lỗi fetch records trong SaoLucView:", e);
+        }
+        try {
+            const vsData = await fetchArchiveRecords('vaoso');
+            setArchiveVaoSoRecords(vsData);
+        } catch (e) {
+            console.error("Lỗi fetch vaoso trong SaoLucView:", e);
+        }
     };
+
+    const getShortCode = (ward: string) => {
+        const normalized = ward.toLowerCase().trim();
+        const cleanName = normalized
+            .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
+            .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
+
+        if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
+        if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
+        if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
+        if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
+        if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
+        if (cleanName.includes('quang minh') || cleanName.includes('quangminh')) return 'QM';
+        if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
+        if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
+        
+        return 'CT';
+    };
+
+    // Tự sinh mã số hiệu hồ sơ sao lục khi mở form thêm mới hoặc thay đổi ngày/địa bàn
+    useEffect(() => {
+        if (!editingId && isFormOpen && formData.xa_phuong && formData.ngay_nhan) {
+            const d = new Date(formData.ngay_nhan);
+            const yy = d.getFullYear().toString().slice(-2);
+            const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+            const dd = ('0' + d.getDate()).slice(-2);
+            const datePrefix = `${yy}${mm}${dd}`;
+            const suffix = getShortCode(formData.xa_phuong);
+            
+            let maxSeq = 0;
+            
+            // 1. Đếm trong danh sách hồ sơ sao lục (archive_records loại saoluc)
+            records.forEach(r => {
+                if (!r.so_hieu) return;
+                const cleanCode = r.so_hieu.trim().toUpperCase();
+                const parts = cleanCode.split('-');
+                if (parts.length === 3) {
+                    const [rPrefix, rSeq, rSuffix] = parts;
+                    if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            });
+
+            // 2. Đếm trong danh sách đo đạc thô
+            measureRecords.forEach(r => {
+                if (!r.code) return;
+                const cleanCode = r.code.trim().toUpperCase();
+                const parts = cleanCode.split('-');
+                if (parts.length === 3) {
+                    const [rPrefix, rSeq, rSuffix] = parts;
+                    if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            });
+
+            // 3. Đếm trong danh sách hồ sơ vào sổ lưu trữ
+            archiveVaoSoRecords.forEach(r => {
+                if (!r.so_hieu) return;
+                const cleanCode = r.so_hieu.trim().toUpperCase();
+                const parts = cleanCode.split('-');
+                if (parts.length === 3) {
+                    const [rPrefix, rSeq, rSuffix] = parts;
+                    if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            });
+
+            const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
+            const calculatedCode = `${datePrefix}-${nextSeq}-${suffix}`;
+            
+            if (formData.so_hieu !== calculatedCode) {
+                setFormData(prev => ({ ...prev, so_hieu: calculatedCode }));
+            }
+        }
+    }, [editingId, isFormOpen, formData.xa_phuong, formData.ngay_nhan, records, measureRecords, archiveVaoSoRecords]);
 
     const handleDeleteAll = async () => {
         await deleteAllArchiveRecordsByType('saoluc');

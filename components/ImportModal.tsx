@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES } from '../constants';
 import { fetchHolidays } from '../services/api';
+import { calculateDeadlineHelper } from '../utils/appHelpers';
 import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
 
 interface ImportModalProps {
@@ -74,45 +75,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   };
 
   const calculateDeadline = (type: string, receivedDateStr: string) => {
-      if(!receivedDateStr) return '';
-      let daysToAdd = 30; 
-      const lowerType = (type || '').toLowerCase();
-      if (lowerType.includes('trích lục')) daysToAdd = 10; 
-      else if (lowerType.includes('trích đo chỉnh lý')) daysToAdd = 15; 
-      else if (lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc')) daysToAdd = 30; 
-      
-      const startDate = new Date(receivedDateStr);
-      let count = 0;
-      let currentDate = new Date(startDate);
-      
-      // Build Holiday Set
-      const holidaySet = new Set<string>();
-      const currentYear = startDate.getFullYear();
-      [currentYear, currentYear + 1].forEach(year => {
-          holidays.forEach(h => {
-              if (h.isLunar) {
-                  const solar = getSolarDateFromLunar(h.day, h.month, year);
-                  if (solar) holidaySet.add(formatDateKey(solar));
-              } else {
-                  const solar = new Date(year, h.month - 1, h.day);
-                  holidaySet.add(formatDateKey(solar));
-              }
-          });
-      });
-
-      while (count < daysToAdd) {
-          currentDate.setDate(currentDate.getDate() + 1);
-          const dateStr = formatDateKey(currentDate);
-          const day = currentDate.getDay();
-          
-          const isWeekend = day === 0 || day === 6; // Sat + Sun
-          const isHoliday = holidaySet.has(dateStr);
-
-          if (!isWeekend && !isHoliday) {
-              count++;
-          }
-      }
-      return formatDateKey(currentDate);
+      return calculateDeadlineHelper(type, receivedDateStr, holidays);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

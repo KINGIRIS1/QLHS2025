@@ -650,6 +650,7 @@ function App() {
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
             currentView={currentView}
+            holidays={holidays}
         />
 
         {toast && (
@@ -795,6 +796,7 @@ function App() {
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
             currentView={currentView}
+            holidays={holidays}
         />
 
         {toast && (

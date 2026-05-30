@@ -190,7 +190,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     const type = (record.recordType || '').toLowerCase();
 
     // Logic tính số ngày
-    if (type.includes('trích lục')) {
+    if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
     } else if (type.includes('trích đo chỉnh lý')) {
         standardDays = "15"; 

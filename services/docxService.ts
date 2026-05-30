@@ -19,7 +19,11 @@ export const STORAGE_KEYS = {
     
     // MỚI: Template cho VPHC
     VPHC_TEMPLATE_01: 'docx_template_vphc_01', // Biên bản VPHC
-    VPHC_TEMPLATE_02: 'docx_template_vphc_02'  // Biên bản Làm việc
+    VPHC_TEMPLATE_02: 'docx_template_vphc_02',  // Biên bản Làm việc
+    
+    // MỚI: Template phiếu chậm nộp
+    LATE_SUBMISSION_TEMPLATE_01: 'docx_template_late_submission_01',
+    LATE_SUBMISSION_TEMPLATE_02: 'docx_template_late_submission_02'
 };
 
 // --- HELPERS ---

@@ -169,7 +169,9 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    if (lowerType.includes('cung cấp thông tin') || lowerType.includes('sao lục') || lowerType.includes('trích lục')) {
+    if (lowerType.includes('thuế chính quy')) {
+        daysToAdd = 15;
+    } else if (lowerType.includes('cung cấp thông tin') || lowerType.includes('sao lục') || lowerType.includes('trích lục')) {
         daysToAdd = 10; 
     } else if (lowerType.includes('trích đo chỉnh lý')) {
         daysToAdd = 15; 

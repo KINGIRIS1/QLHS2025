@@ -24,7 +24,8 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
             case 'executed': return RecordStatus.COMPLETED_WORK;
             case 'pending_sign': return RecordStatus.PENDING_SIGN;
             case 'signed': return RecordStatus.SIGNED;
-            case 'completed': return RecordStatus.RETURNED; // Or Handover
+            case 'completed': return record.type === 'saoluc' ? RecordStatus.HANDOVER : RecordStatus.RETURNED;
+            case 'returned': return RecordStatus.RETURNED;
             default: return RecordStatus.RECEIVED;
         }
     };

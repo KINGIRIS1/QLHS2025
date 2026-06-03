@@ -173,7 +173,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       return 'CT';
   };
 
-  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = []) => {
+  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = [], recordType?: string) => {
     if (!wardName || !dateStr) return '';
 
     const d = new Date(dateStr);
@@ -184,64 +184,64 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     
     const suffix = getShortCode(wardName);
     
+    // Xác định tiền tố mong muốn tùy thuộc vào loại hồ sơ
+    let targetPrefixType = '';
+    if (recordType === 'Sao lục hồ sơ' || recordType === 'Sao lục') {
+        targetPrefixType = 'SLHS';
+    } else if (recordType === 'Thuế chính quy') {
+        targetPrefixType = 'TCQ';
+    }
+
     let maxSeq = 0;
-    
-    records.forEach(r => {
-        if (!r.code) return;
-        const cleanCode = r.code.trim().toUpperCase();
+
+    const checkAndExtractSeq = (codeStr: string | null | undefined) => {
+        if (!codeStr) return;
+        const cleanCode = codeStr.trim().toUpperCase();
         const parts = cleanCode.split('-');
-        if (parts.length === 3) {
-            const [rPrefix, rSeq, rSuffix] = parts;
-            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
-                const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+        
+        if (targetPrefixType) {
+            // Đang sinh mã có tiền tố SLHS hoặc TCQ (độ dài 4)
+            if (parts.length === 4) {
+                const [rType, rDate, rSeq, rSuffix] = parts;
+                if (rType === targetPrefixType && rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
+                    const seqNum = parseInt(rSeq, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                }
+            }
+        } else {
+            // Đang sinh mã thường (độ dài 3)
+            if (parts.length === 3) {
+                const [rDate, rSeq, rSuffix] = parts;
+                if (rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
+                    const seqNum = parseInt(rSeq, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                }
             }
         }
-    });
+    };
+
+    records.forEach(r => checkAndExtractSeq(r.code));
 
     // Duyệt qua thêm cả danh sách hồ sơ sao lục của hôm nay để tính toán mã số tiếp theo
     archiveSaoLucRecords.forEach(r => {
-        if (!r.code) return;
-        const cleanCode = r.code.trim().toUpperCase();
-        const parts = cleanCode.split('-');
-        if (parts.length === 3) {
-            const [rPrefix, rSeq, rSuffix] = parts;
-            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
-                const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-            }
-        }
+        // Hồ sơ lưu trữ cũng có code
+        checkAndExtractSeq(r.code);
     });
 
     // Duyệt qua cả danh sách hồ sơ vào sổ lưu trữ của hôm nay để tính toán mã số tiếp theo
     archiveVaoSoRecords.forEach(r => {
-        if (!r.code) return;
-        const cleanCode = r.code.trim().toUpperCase();
-        const parts = cleanCode.split('-');
-        if (parts.length === 3) {
-            const [rPrefix, rSeq, rSuffix] = parts;
-            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
-                const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-            }
-        }
+        checkAndExtractSeq(r.code);
     });
 
-    existingCodes.forEach(code => {
-        if (!code) return;
-        const cleanCode = code.trim().toUpperCase();
-        const parts = cleanCode.split('-');
-        if (parts.length === 3) {
-            const [rPrefix, rSeq, rSuffix] = parts;
-            if (rPrefix === datePrefix.toUpperCase() && rSuffix === suffix.toUpperCase()) {
-                const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-            }
-        }
-    });
+    existingCodes.forEach(code => checkAndExtractSeq(code));
 
     const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
-    return `${datePrefix}-${nextSeq}-${suffix}`;
+    
+    if (targetPrefixType) {
+        return `${targetPrefixType}-${datePrefix}-${nextSeq}-${suffix}`;
+    } else {
+        return `${datePrefix}-${nextSeq}-${suffix}`;
+    }
   };
 
   // --- LOGIC TÍNH HẠN TRẢ (CẬP NHẬT FIX LỖI TIMEZONE VÀ NGÀY NGHỈ) ---
@@ -261,12 +261,15 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     
     let standardDays = "30"; 
     const rType = (dataToUse.recordType || '').toLowerCase();
-    if (rType.includes('cung cấp thông tin') || rType.includes('sao lục') || rType.includes('trích lục')) standardDays = "10";
+    if (rType.includes('thuế chính quy')) standardDays = "15";
+    else if (rType.includes('cung cấp thông tin') || rType.includes('sao lục') || rType.includes('trích lục')) standardDays = "10";
     else if (rType.includes('trích đo chỉnh lý')) standardDays = "15";
     else if (rType.includes('trích đo') || rType.includes('đo đạc') || rType.includes('cắm mốc')) standardDays = "30";
 
     let tp1Value = 'Phiếu yêu cầu';
-    if (rType.includes('cung cấp thông tin') || rType.includes('sao lục')) {
+    if (rType.includes('thuế chính quy')) {
+        tp1Value = 'Tờ khai thuế';
+    } else if (rType.includes('cung cấp thông tin') || rType.includes('sao lục')) {
         tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
     } else if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
@@ -458,7 +461,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <BulkImport 
                 onSave={handleSaveWithArchiveRefresh}
                 calculateDeadline={calculateDeadline}
-                calculateNextCode={(w, d, exist) => calculateNextCode(w, d, exist)}
+                calculateNextCode={(w, d, exist, rType) => calculateNextCode(w, d, exist, rType)}
                 onPreview={handlePreviewDocx}
                 currentUser={currentUser}
                 employees={employees}

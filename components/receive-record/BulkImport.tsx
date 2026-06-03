@@ -9,7 +9,7 @@ import { confirmAction } from '../../utils/appHelpers';
 interface BulkImportProps {
   onSave: (record: RecordFile) => Promise<boolean>;
   calculateDeadline: (type: string, date: string) => string;
-  calculateNextCode: (ward: string, date: string, existingCodes: string[]) => string;
+  calculateNextCode: (ward: string, date: string, existingCodes: string[], recordType?: string) => string;
   onPreview: (record: Partial<RecordFile>) => void;
   currentUser: User;
   employees: Employee[];
@@ -81,9 +81,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'TĐ': 'Trích đo bản đồ địa chính',
               'TD': 'Trích đo bản đồ địa chính',
               'TRÍCH ĐO': 'Trích đo bản đồ địa chính',
-              'ĐĐ': 'Đo đạc',
-              'DD': 'Đo đạc',
-              'ĐO ĐẠC': 'Đo đạc',
+              'ĐĐ': 'Đo đạc theo yêu cầu',
+              'DD': 'Đo đạc theo yêu cầu',
+              'ĐO ĐẠC': 'Đo đạc theo yêu cầu',
               'CM': 'Cắm mốc',
               'CẮM MỐC': 'Cắm mốc',
               'CL': 'Trích đo chỉnh lý bản đồ địa chính',
@@ -116,7 +116,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                   else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
-                  else if (lower.includes('đo đạc')) recordType = 'Đo đạc';
+                  else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';
                   else if (lower.includes('cắm mốc')) recordType = 'Cắm mốc';
                   else if (rawType) recordType = rawType;
                   else recordType = RECORD_TYPES[0];
@@ -160,7 +160,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           const newList = [...prev];
           const record = newList[index];
           const existingBulkCodes = newList.map(r => r.code || '').filter(c => c !== '');
-          const newCode = calculateNextCode(processingWard, record.receivedDate || '', existingBulkCodes);
+          const newCode = calculateNextCode(processingWard, record.receivedDate || '', existingBulkCodes, record.recordType || '');
           newList[index] = { ...record, code: newCode };
           return newList;
       });

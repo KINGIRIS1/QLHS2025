@@ -98,7 +98,9 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
 
     const type = (data.recordType || '').toLowerCase();
     let standardDays = "30"; 
-    if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
+    if (type.includes('thuế chính quy')) {
+        standardDays = "15";
+    } else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
     } else if (type.includes('trích đo chỉnh lý')) {
         standardDays = "15"; 
@@ -107,7 +109,9 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     }
 
     let tp1Value = 'Phiếu yêu cầu';
-    if (type.includes('cung cấp thông tin') || type.includes('sao lục')) {
+    if (type.includes('thuế chính quy')) {
+        tp1Value = 'Tờ khai thuế';
+    } else if (type.includes('cung cấp thông tin') || type.includes('sao lục')) {
         tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
     } else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
         tp1Value = `Phiếu yêu cầu trích lục, trích đo`;
@@ -181,8 +185,12 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             
                             <div>1. {tp1Value}</div>
                             <div>2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)</div>
-                            <div>3. Hợp đồng ủy quyền - {data.authorizedBy?.toUpperCase()}</div>
-                            <div>4. {data.otherDocs || ''}</div>
+                            {data.authorizedBy ? (
+                                <div>3. Hợp đồng ủy quyền, giấy ủy quyền: {data.authorizedBy?.toUpperCase()}{data.authDocType ? ` (${data.authDocType})` : ''}</div>
+                            ) : null}
+                            {data.otherDocs ? (
+                                <div>{data.authorizedBy ? '4' : '3'}. Giấy tờ khác: {data.otherDocs}</div>
+                            ) : null}
                             <div>Số lượng hồ sơ:.......1....(bộ)</div>
                             <div>Thời gian giải quyết hồ sơ theo quy định là: <span className="font-bold">{standardDays}</span> ngày làm việc</div>
                             <div>Thời gian nhận hồ sơ: ngày <span className="font-bold">{formatDateShort(rDate)}</span></div>

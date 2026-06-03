@@ -150,14 +150,21 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     
     let standardDays = "30"; 
     const type = (record.recordType || '').toLowerCase();
-    if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) standardDays = "10";
+    if (type.includes('thuế chính quy')) standardDays = "15";
+    else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) standardDays = "10";
     else if (type.includes('trích đo chỉnh lý')) standardDays = "15"; 
     else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) standardDays = "30";
 
     let tp1Value = 'Phiếu yêu cầu';
-    if (type.includes('cung cấp thông tin') || type.includes('sao lục')) tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
-    else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
-    else if (type.includes('đo đạc') || type.includes('cắm mốc')) tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
+    if (type.includes('thuế chính quy')) {
+        tp1Value = 'Tờ khai thuế';
+    } else if (type.includes('cung cấp thông tin') || type.includes('sao lục')) {
+        tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
+    } else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
+        tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
+    } else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
+        tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
+    }
     
     let sdtLienHe = "";
     const wRaw = (record.ward || "").toLowerCase();

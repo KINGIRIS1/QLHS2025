@@ -48,10 +48,11 @@ export const RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
   'Trích đo bản đồ địa chính',
   'Trích lục bản đồ địa chính',
-  'Đo đạc',     
+  'Đo đạc theo yêu cầu',     
   'Cắm mốc',
   'Cung cấp thông tin quy hoạch',
-  'Sao lục hồ sơ'
+  'Sao lục hồ sơ',
+  'Thuế chính quy'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
@@ -119,6 +120,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('cung cấp thông tin')) return 'CCTT';
   if (t.includes('thi hành án')) return 'Thi hành án';
   if (t.includes('tòa án')) return 'Tòa án';
+  if (t.includes('thuế chính quy')) return 'Thuế CQ';
   
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };

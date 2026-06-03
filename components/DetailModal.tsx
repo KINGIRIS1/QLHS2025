@@ -190,7 +190,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     const type = (record.recordType || '').toLowerCase();
 
     // Logic tính số ngày
-    if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
+    if (type.includes('thuế chính quy')) {
+        standardDays = "15";
+    } else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
     } else if (type.includes('trích đo chỉnh lý')) {
         standardDays = "15"; 
@@ -200,7 +202,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
     // Logic Tiêu đề phiếu
     let tp1Value = 'Phiếu yêu cầu';
-    if (type.includes('cung cấp thông tin') || type.includes('sao lục')) {
+    if (type.includes('thuế chính quy')) {
+        tp1Value = 'Tờ khai thuế';
+    } else if (type.includes('cung cấp thông tin') || type.includes('sao lục')) {
         tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
     } else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';

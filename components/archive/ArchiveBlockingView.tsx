@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, LandRecord } from '../../types';
 import RecordForm from '../RecordForm';
-import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip } from 'lucide-react';
+import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip, Download, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
 import { supabase, isConfigured } from '../../services/supabaseClient';
 
 interface Props {
@@ -30,9 +31,167 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState<LandRecord | undefined>();
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const parseExcelDate = (val: any) => {
+    if (!val) return '';
+    if (typeof val === 'number') {
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return date.toISOString().split('T')[0];
+    }
+    if (typeof val === 'string') {
+      const str = val.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+      const parts = str.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        } else {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+          return `${year}-${month}-${day}`;
+        }
+      }
+    }
+    return val.toString();
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data: any[] = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          alert('File Excel rỗng!');
+          return;
+        }
+
+        const newRecords: any[] = [];
+        for (const row of data) {
+          const ownersStr = row['Chủ sử dụng']?.toString() || '';
+          const owners = ownersStr ? ownersStr.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : [];
+          if (!ownersStr) continue; // Bỏ qua dòng trống
+
+          const plots: any[] = [];
+          if (row['Tờ bản đồ cũ'] || row['Thửa đất cũ'] || row['Tờ bản đồ mới'] || row['Thửa đất mới'] || row['Diện tích cũ'] || row['Diện tích mới']) {
+            plots.push({
+              oldMapSheetNumber: row['Tờ bản đồ cũ']?.toString() || '',
+              oldPlotNumber: row['Thửa đất cũ']?.toString() || '',
+              newMapSheetNumber: row['Tờ bản đồ mới']?.toString() || '',
+              newPlotNumber: row['Thửa đất mới']?.toString() || '',
+              oldArea: parseFloat(row['Diện tích cũ']) || 0,
+              newArea: parseFloat(row['Diện tích mới']) || 0,
+            });
+          }
+
+          const blockingDocuments: any[] = [];
+          if (row['Số văn bản ngăn chặn'] || row['Nội dung ngăn chặn'] || row['Cơ quan ngăn chặn'] || row['Ngày văn bản ngăn chặn']) {
+            blockingDocuments.push({
+              docNumber: row['Số văn bản ngăn chặn']?.toString() || '',
+              date: parseExcelDate(row['Ngày văn bản ngăn chặn']),
+              agency: row['Cơ quan ngăn chặn']?.toString() || '',
+              note: row['Nội dung ngăn chặn']?.toString() || '',
+            });
+          }
+
+          const isUnblockedStr = row['Đã giải ngăn chặn']?.toString()?.toLowerCase() || '';
+          const isUnblocked = isUnblockedStr.includes('có') || isUnblockedStr.includes('yes') || isUnblockedStr.includes('đã giải') || isUnblockedStr.includes('rồi');
+
+          newRecords.push({
+            owners,
+            issueNumber: row['Số phát hành GCN']?.toString() || '',
+            certNumber: row['Số vào sổ GCN']?.toString() || '',
+            issueDate: parseExcelDate(row['Ngày cấp GCN']),
+            plots,
+            hamlet: row['Khu phố - Ấp']?.toString() || '',
+            oldCommune: row['Phường - Xã cũ']?.toString() || '',
+            newCommune: row['Phường - Xã mới']?.toString() || '',
+            blockingDocuments,
+            unblockDoc: row['Văn bản giải ngăn chặn']?.toString() || '',
+            notes: row['Ghi chú']?.toString() || '',
+            isUnblocked,
+            createdBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+          });
+        }
+
+        if (newRecords.length === 0) {
+          alert('Không đọc được dữ liệu hợp lệ nào từ file!');
+          return;
+        }
+
+        if (isConfigured) {
+          const { error } = await supabase.from('archive_blocking_records').insert(newRecords);
+          if (error) throw error;
+        } else {
+          const withIds = newRecords.map((r, i) => ({
+            ...r,
+            id: 'temp_import_' + Date.now() + '_' + i
+          }));
+          setRecords(prev => [...withIds, ...prev]);
+        }
+
+        alert(`Đã nhập thành công ${newRecords.length} hồ sơ ngăn chặn lưu trữ!`);
+        if (isConfigured) fetchBlockingRecords();
+        else localStorage.setItem('offline_archive_blocking_records', JSON.stringify([...newRecords, ...records]));
+      } catch (error) {
+        console.error('Lỗi khi import Excel:', error);
+        alert('Có lỗi xảy ra khi nhập file Excel. Hãy kiểm tra lại định dạng file.');
+      } finally {
+        e.target.value = ''; // Reset input
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   useEffect(() => {
     fetchBlockingRecords();
   }, []);
+
+  const handleExportTemplate = () => {
+    const templateData = [
+      {
+        'Chủ sử dụng': 'Nguyễn Văn A, Trần Thị B',
+        'Số phát hành GCN': 'CQ 123456',
+        'Số vào sổ GCN': 'CH 09876',
+        'Ngày cấp GCN': '2023-10-20',
+        'Tờ bản đồ cũ': '10',
+        'Thửa đất cũ': '250',
+        'Diện tích cũ': '120.5',
+        'Tờ bản đồ mới': '12',
+        'Thửa đất mới': '88',
+        'Diện tích mới': '120.5',
+        'Khu phố - Ấp': 'Khu phố 1',
+        'Phường - Xã cũ': 'Xã Tiến Hưng',
+        'Phường - Xã mới': 'Phường Tiến Hưng',
+        'Số văn bản ngăn chặn': '123/QĐ-TA',
+        'Ngày văn bản ngăn chặn': '2023-10-25',
+        'Cơ quan ngăn chặn': 'Tòa án nhân dân tỉnh Bình Phước',
+        'Nội dung ngăn chặn': 'Ngăn chặn giao dịch để phục vụ giải quyết tranh chấp hợp đồng đặt cọc',
+        'Đã giải ngăn chặn': 'Không',
+        'Văn bản giải ngăn chặn': '',
+        'Ghi chú': 'Hồ sơ lưu trữ mẫu minh họa'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const cols = Object.keys(templateData[0]).map(key => ({
+      wch: Math.max(key.length * 1.5, 15)
+    }));
+    ws['!cols'] = cols;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mau_Nhap");
+    XLSX.writeFile(wb, "Mau_Nhap_Ho_So_Ngan_Chan_Luu_Tru.xlsx");
+  };
 
   const fetchBlockingRecords = async () => {
     if (!isConfigured) return;
@@ -167,6 +326,27 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
           >
             Nâng cao
           </button>
+          <button
+            onClick={handleExportTemplate}
+            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+            title="Tải tệp Excel cấu trúc mẫu"
+          >
+            <Download size={18} /> Mẫu nhập Excel
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+            title="Nhập dữ liệu từ tệp Excel"
+          >
+            <Upload size={18} /> Nhập Excel
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportExcel}
+            accept=".xlsx, .xls"
+            className="hidden"
+          />
           <button
             onClick={() => {
               setEditingRecord(undefined);

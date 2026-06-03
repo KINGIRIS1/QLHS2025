@@ -10,7 +10,7 @@ interface RecordFormProps {
   records: RecordFile[];
   holidays: Holiday[];
   calculateDeadline: (type: string, date: string) => string;
-  generateCode: (ward: string, date: string) => string;
+  generateCode: (ward: string, date: string, existingCodes?: string[], recordType?: string) => string;
   onPrint?: (data: Partial<RecordFile>) => void;
   initialData?: RecordFile | null;
   onCancelEdit?: () => void;
@@ -53,12 +53,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   useEffect(() => {
     if (!initialData) {
-        const newCode = generateCode(processingWard, formData.receivedDate || '');
+        const newCode = generateCode(processingWard, formData.receivedDate || '', [], formData.recordType || '');
         if (formData.code !== newCode) {
             setFormData(prev => ({ ...prev, code: newCode }));
         }
     }
-  }, [processingWard, formData.receivedDate, records, initialData]);
+  }, [processingWard, formData.receivedDate, formData.recordType, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {

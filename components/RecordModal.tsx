@@ -136,8 +136,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const isOtherView = currentView?.startsWith('other_');
   const allowedRecordTypes = isOtherView 
-    ? EXTENDED_RECORD_TYPES.filter(t => ['CMD', 'Tòa án', 'Thi hành án'].includes(t))
-    : EXTENDED_RECORD_TYPES.filter(t => !['CMD', 'Tòa án', 'Thi hành án'].includes(t));
+    ? EXTENDED_RECORD_TYPES.filter(t => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(t))
+    : EXTENDED_RECORD_TYPES.filter(t => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(t));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-0 md:p-4 backdrop-blur-sm">

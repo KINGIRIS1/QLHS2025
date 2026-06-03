@@ -41,7 +41,7 @@ function removeVietnameseTones(str: string): string {
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   // Thêm tab 'completed_work' và 'pending_sign'
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report' | 'approaching' | 'overdue'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -181,6 +181,51 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       });
   }, [myRecords, searchTerm]);
 
+  // Helper check hoan thanh
+  const isRecordFinished = (record: RecordFile) => {
+      return (
+          record.status === RecordStatus.HANDOVER || 
+          record.status === RecordStatus.RETURNED || 
+          record.status === RecordStatus.WITHDRAWN ||
+          record.status === RecordStatus.SIGNED ||
+          !!record.exportBatch || 
+          !!record.exportDate ||
+          !!record.resultReturnedDate
+      );
+  };
+
+  // 6. Hồ sơ Sắp tới hạn (Chưa hoàn thành, hạn <= 2 ngày nhưng >= 0 ngày)
+  const approachingRecords = useMemo(() => {
+      let list = myRecords.filter(r => {
+          if (isRecordFinished(r)) return false;
+          if (!r.deadline) return false;
+          const today = new Date();
+          today.setHours(0,0,0,0);
+          const deadline = new Date(r.deadline);
+          deadline.setHours(0,0,0,0);
+          const diffTime = deadline.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          return diffDays >= 0 && diffDays <= 2;
+      });
+      return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
+  // 7. Hồ sơ Trễ hạn (Chưa hoàn thành, hạn < 0 ngày, tức là ngày kết thúc trước hôm nay)
+  const overdueRecords = useMemo(() => {
+      let list = myRecords.filter(r => {
+          if (isRecordFinished(r)) return false;
+          if (!r.deadline) return false;
+          const today = new Date();
+          today.setHours(0,0,0,0);
+          const deadline = new Date(r.deadline);
+          deadline.setHours(0,0,0,0);
+          const diffTime = deadline.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          return diffDays < 0;
+      });
+      return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
   // Helper filter & sort chung
   function filterAndSort(list: RecordFile[], term: string, sort: any) {
       if (term) {
@@ -213,6 +258,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       activeTab === 'completed_work' ? completedWorkRecords :
       activeTab === 'pending_sign' ? reviewRecords :
       activeTab === 'finished' ? finishedRecords :
+      activeTab === 'approaching' ? approachingRecords :
+      activeTab === 'overdue' ? overdueRecords :
       reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
@@ -385,7 +432,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           case 'pending': return 'Đang thực hiện';
           case 'completed_work': return 'Đã thực hiện';
           case 'pending_sign': return 'Chờ ký';
+          case 'finished': return 'Hoàn thành';
           case 'reminder': return 'Nhắc việc';
+          case 'approaching': return 'Sắp tới hạn';
+          case 'overdue': return 'Trễ hạn';
           default: return 'danh sách';
       }
   };
@@ -415,22 +465,30 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           </h2>
           <p className="text-gray-500 mt-1">Danh sách hồ sơ bạn đang phụ trách.</p>
         </div>
-        <div className="flex gap-4 w-full md:w-auto justify-center">
-             <div className="flex-1 md:flex-none text-center px-4 py-2 bg-blue-50 rounded-lg border border-blue-100 min-w-[100px]">
-                <div className="text-2xl font-bold text-blue-700">{pendingRecords.length}</div>
-                <div className="text-xs text-blue-600 uppercase font-semibold">Đang xử lý</div>
+        <div className="flex flex-wrap gap-2 lg:gap-3 w-full md:w-auto justify-center md:justify-end">
+             <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-100 min-w-[90px]">
+                <div className="text-xl font-bold text-blue-700">{pendingRecords.length}</div>
+                <div className="text-[10px] text-blue-600 uppercase font-semibold">Đang xử lý</div>
              </div>
-             <div className="flex-1 md:flex-none text-center px-4 py-2 bg-cyan-50 rounded-lg border border-cyan-100 min-w-[100px]">
-                <div className="text-2xl font-bold text-cyan-700">{completedWorkRecords.length}</div>
-                <div className="text-xs text-cyan-600 uppercase font-semibold">Đã thực hiện</div>
+             <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-cyan-50 rounded-lg border border-cyan-100 min-w-[90px]">
+                <div className="text-xl font-bold text-cyan-700">{completedWorkRecords.length}</div>
+                <div className="text-[10px] text-cyan-600 uppercase font-semibold">Đã thực hiện</div>
              </div>
-             <div className="flex-1 md:flex-none text-center px-4 py-2 bg-purple-50 rounded-lg border border-purple-100 min-w-[100px]">
-                <div className="text-2xl font-bold text-purple-700">{reviewRecords.length}</div>
-                <div className="text-xs text-purple-600 uppercase font-semibold">Chờ ký</div>
+             <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-purple-50 rounded-lg border border-purple-100 min-w-[90px]">
+                <div className="text-xl font-bold text-purple-700">{reviewRecords.length}</div>
+                <div className="text-[10px] text-purple-600 uppercase font-semibold">Chờ ký</div>
              </div>
-             <div className="flex-1 md:flex-none text-center px-4 py-2 bg-green-50 rounded-lg border border-green-100 min-w-[100px]">
-                <div className="text-2xl font-bold text-green-700">{finishedRecords.length}</div>
-                <div className="text-xs text-green-600 uppercase font-semibold">Hoàn thành</div>
+             <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-green-50 rounded-lg border border-green-100 min-w-[90px]">
+                <div className="text-xl font-bold text-green-700">{finishedRecords.length}</div>
+                <div className="text-[10px] text-green-600 uppercase font-semibold">Hoàn thành</div>
+             </div>
+             <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-orange-50 rounded-lg border border-orange-100 min-w-[90px]">
+                <div className="text-xl font-bold text-orange-700">{approachingRecords.length}</div>
+                <div className="text-[10px] text-orange-600 uppercase font-semibold">Sắp tới hạn</div>
+             </div>
+             <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-red-50 rounded-lg border border-red-100 min-w-[90px]">
+                <div className="text-xl font-bold text-red-700">{overdueRecords.length}</div>
+                <div className="text-[10px] text-red-600 uppercase font-semibold">Trễ hạn</div>
              </div>
         </div>
       </div>
@@ -472,6 +530,22 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                     }`}
                 >
                     <FileCheck size={16} /> Hoàn thành ({finishedRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('approaching'); setCurrentPage(1); setSearchTerm(''); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'approaching' ? 'bg-orange-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <Clock size={16} /> Sắp tới hạn ({approachingRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('overdue'); setCurrentPage(1); setSearchTerm(''); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'overdue' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <AlertTriangle size={16} /> Trễ hạn ({overdueRecords.length})
                 </button>
                 <button 
                     onClick={() => { setActiveTab('reminder'); setCurrentPage(1); setSearchTerm(''); }}

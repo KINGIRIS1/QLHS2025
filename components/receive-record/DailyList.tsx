@@ -36,6 +36,16 @@ const getShortCode = (ward: string) => {
     return 'CT'; // Mặc định
 };
 
+const getRecordSuffix = (code: string) => {
+    if (!code) return '';
+    const clean = code.trim().toUpperCase();
+    const parts = clean.split('-');
+    if (parts.length > 0) {
+        return parts[parts.length - 1];
+    }
+    return '';
+};
+
 const normalizeWardName = (w: string) => {
     if (!w) return '';
     return w.toLowerCase()
@@ -50,25 +60,12 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const [filterWard, setFilterWard] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // 3 Tabs chính hoàn hảo theo đúng yêu cầu người dùng:
+  // 4 Tabs chính hoàn hảo theo đúng yêu cầu người dùng:
   // - 'inside': Hồ sơ đo đạc trong địa giới
   // - 'outside': Hồ sơ đo đạc phi địa giới
   // - 'archive': Hồ sơ lưu trữ (Sao lục)
-  const [subTab, setSubTab] = useState<'inside' | 'outside' | 'archive'>('inside');
-
-  // Trạng thái Popup in tổng hợp mới
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printDate, setPrintDate] = useState(filterDate);
-  const [printWard, setPrintWard] = useState(filterWard);
-
-  // Cập nhật bộ lọc in đồng bộ khi người dùng đổi bộ lọc ở bên ngoài
-  useEffect(() => {
-    setPrintDate(filterDate);
-  }, [filterDate]);
-
-  useEffect(() => {
-    setPrintWard(filterWard);
-  }, [filterWard]);
+  // - 'tax': Hồ sơ thuế chính quy
+  const [subTab, setSubTab] = useState<'inside' | 'outside' | 'archive' | 'tax'>('inside');
 
   // Lấy địa bàn quản lý của cán bộ hiện tại
   const normalizedMyWards = useMemo(() => {
@@ -83,12 +80,13 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       return myManagedWards.map(w => getShortCode(w));
   }, [employees, currentUser]);
 
-  // Lọc tất cả các hồ sơ đo đạc thô của ngày nhận hiện tại (bỏ qua Sao lục và các loại CMD, tòa án...)
+  // Lọc tất cả các hồ sơ đo đạc thô của ngày nhận hiện tại (bỏ qua Sao lục, thuế chính quy và các loại CMD, tòa án...)
   const dailyMeasureRecords = useMemo(() => {
       if (!records) return [];
       return records.filter(r => {
           const isSaoLuc = (r.recordType || '').toLowerCase().includes('sao lục');
-          if (isSaoLuc) return false;
+          const isTax = (r.recordType || '').toLowerCase().includes('thuế chính quy');
+          if (isSaoLuc || isTax) return false;
           if (['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return false;
           return r.receivedDate === filterDate;
       });
@@ -118,18 +116,11 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const filteredInsideRecords = useMemo(() => {
       const searchLower = searchTerm.toLowerCase();
       return allInsideRecords.filter(r => {
-          // Lọc theo đơn vị ở ngoài (nếu có chọn)
+          // Lọc theo đơn vị ở ngoài (nếu có chọn) - lọc theo mã tiếp nhận (suffix)
           if (filterWard !== 'all') {
               const targetSuffix = getShortCode(filterWard);
-              const recordCode = (r.code || '').trim().toUpperCase();
-              const parts = recordCode.split('-');
-              const recordSuffix = parts.length > 0 ? parts[parts.length - 1] : '';
-
-              if (parts.length >= 3) {
-                  if (recordSuffix !== targetSuffix) return false;
-              } else {
-                  if (r.ward !== filterWard) return false;
-              }
+              const recordSuffix = getRecordSuffix(r.code || '');
+              if (recordSuffix !== targetSuffix) return false;
           }
 
           // Tìm kiếm từ khóa
@@ -150,18 +141,11 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const filteredOutsideRecords = useMemo(() => {
       const searchLower = searchTerm.toLowerCase();
       return allOutsideRecords.filter(r => {
-          // Lọc theo đơn vị ở ngoài (nếu có chọn)
+          // Lọc theo đơn vị ở ngoài (nếu có chọn) - lọc theo mã tiếp nhận (suffix)
           if (filterWard !== 'all') {
               const targetSuffix = getShortCode(filterWard);
-              const recordCode = (r.code || '').trim().toUpperCase();
-              const parts = recordCode.split('-');
-              const recordSuffix = parts.length > 0 ? parts[parts.length - 1] : '';
-
-              if (parts.length >= 3) {
-                  if (recordSuffix !== targetSuffix) return false;
-              } else {
-                  if (r.ward !== filterWard) return false;
-              }
+              const recordSuffix = getRecordSuffix(r.code || '');
+              if (recordSuffix !== targetSuffix) return false;
           }
 
           // Tìm kiếm từ khóa
@@ -188,14 +172,8 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
           // 2. Lọc theo Đơn vị (đối với sao lục sẽ gom theo mã hồ sơ để không bị tách phi địa giới)
           if (filterWard !== 'all') {
               const targetSuffix = getShortCode(filterWard);
-              const recordCode = (r.code || '').trim().toUpperCase();
-              
-              const hasSuffix = recordCode.endsWith(targetSuffix) || recordCode.includes(`-${targetSuffix}`) || recordCode.includes(`${targetSuffix}-`);
-              const hasWard = normalizeWardName(r.ward || '') === normalizeWardName(filterWard);
-
-              if (!hasSuffix && !hasWard) {
-                  return false;
-              }
+              const recordSuffix = getRecordSuffix(r.code || '');
+              if (recordSuffix !== targetSuffix) return false;
           }
 
           // 3. Tìm kiếm từ khóa
@@ -214,17 +192,53 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       });
   }, [archiveRecords, filterDate, filterWard, searchTerm]);
 
+  // Bộ lọc hồ sơ Thuế chính quy lấy từ bảng records
+  const filteredTaxRecords = useMemo(() => {
+      const searchLower = searchTerm.toLowerCase();
+      const list = records.filter(r => {
+          // 1. Lọc theo loại hồ sơ
+          const isTax = (r.recordType || '').toLowerCase().includes('thuế chính quy');
+          if (!isTax) return false;
+
+          // 2. Lọc theo ngày nhận
+          if (r.receivedDate !== filterDate) return false;
+          
+          // 3. Lọc theo Đơn vị (đối với thuế sẽ gom theo mã hồ sơ để không bị tách phi địa giới, giống sao lục)
+          if (filterWard !== 'all') {
+              const targetSuffix = getShortCode(filterWard);
+              const recordSuffix = getRecordSuffix(r.code || '');
+              if (recordSuffix !== targetSuffix) return false;
+          }
+
+          // 4. Tìm kiếm từ khóa
+          if (searchTerm) {
+              const nameMatch = r.customerName?.toLowerCase().includes(searchLower);
+              const codeMatch = r.code?.toLowerCase().includes(searchLower);
+              if (!nameMatch && !codeMatch) return false;
+          }
+          return true;
+      });
+
+      return list.sort((a, b) => {
+          const codeA = (a.code || '').toUpperCase();
+          const codeB = (b.code || '').toUpperCase();
+          return codeA.localeCompare(codeB, undefined, { numeric: true });
+      });
+  }, [records, filterDate, filterWard, searchTerm]);
+
   // Danh sách hiển thị theo Tab hiện tại ở ngoài giao diện
   const currentTabRecords = useMemo(() => {
       if (subTab === 'inside') return filteredInsideRecords;
       if (subTab === 'outside') return filteredOutsideRecords;
+      if (subTab === 'tax') return filteredTaxRecords;
       return filteredArchiveRecords;
-  }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredArchiveRecords]);
+  }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredTaxRecords, filteredArchiveRecords]);
 
   // Hàm hỗ trợ in Excel: Trả về tiêu đề hiển thị tương ứng với Tab hiện tại
-  const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive') => {
+  const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive' | 'tax') => {
       if (tab === 'inside') return 'Hồ sơ đo đạc trong địa giới';
       if (tab === 'outside') return 'Hồ sơ đo đạc phi địa giới';
+      if (tab === 'tax') return 'Hồ sơ thuế chính quy';
       return 'Hồ sơ lưu trữ (Sao lục)';
   };
 
@@ -327,92 +341,6 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       return wb;
   };
 
-  // Logic tổng hợp & lọc dữ liệu đặc biệt cho popup in (TỰ ĐỘNG THEO TAB ĐANG CHỌN)
-  const compiledPrintRecords = useMemo(() => {
-      if (subTab === 'archive') {
-          // 1. Hồ sơ lưu trữ (Sao lục) từ archiveRecords theo ngày and đơn vị
-          const list = archiveRecords.filter(r => {
-              if (r.receivedDate !== printDate) return false;
-              if (printWard !== 'all') {
-                  const targetSuffix = getShortCode(printWard);
-                  const recordCode = (r.code || '').trim().toUpperCase();
-                  
-                  // ĐỐI VỚI HỒ SƠ SAO LỤC, TỔNG HỢP THEO MÃ HỒ SƠ
-                  const hasSuffix = recordCode.endsWith(targetSuffix) || recordCode.includes(`-${targetSuffix}`) || recordCode.includes(`${targetSuffix}-`);
-                  const hasWard = normalizeWardName(r.ward || '') === normalizeWardName(printWard);
-                  if (!hasSuffix && !hasWard) return false;
-              }
-              return true;
-          });
-          return list.sort((a, b) => {
-              const codeA = (a.code || '').toUpperCase();
-              const codeB = (b.code || '').toUpperCase();
-              return codeA.localeCompare(codeB, undefined, { numeric: true });
-          });
-      } else {
-          // 2. Hồ sơ đo đạc (trong hay phi địa giới)
-          const dailyMeasure = records.filter(r => {
-              const isSaoLuc = (r.recordType || '').toLowerCase().includes('sao lục');
-              if (isSaoLuc) return false;
-              if (['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return false;
-              return r.receivedDate === printDate;
-          });
-
-          const isInsideTab = (subTab === 'inside');
-          const matchedList = dailyMeasure.filter(r => {
-              const rWardNorm = normalizeWardName(r.ward || '');
-              const rSuffix = getShortCode(r.ward || '');
-              const isMyWard = rWardNorm && normalizedMyWards.includes(rWardNorm);
-              const isMyWardBySuffix = mySuffixes.includes(rSuffix);
-
-              const isInside = (isMyWard || isMyWardBySuffix);
-
-              // Tự động phân chia dựa trên Tab hiện tại của người dùng
-              if (isInsideTab && !isInside) return false;
-              if (!isInsideTab && isInside) return false;
-
-              // Lọc theo Xã phụ trách được chọn trong Popup
-              if (printWard !== 'all') {
-                  const targetSuffix = getShortCode(printWard);
-                  const recordCode = (r.code || '').trim().toUpperCase();
-                  const parts = recordCode.split('-');
-                  const recordSuffix = parts.length > 0 ? parts[parts.length - 1] : '';
-
-                  if (parts.length >= 3) {
-                      if (recordSuffix !== targetSuffix) return false;
-                  } else {
-                      if (r.ward !== printWard) return false;
-                  }
-              }
-              return true;
-          });
-
-          return matchedList.sort((a, b) => {
-              const codeA = (a.code || '').toUpperCase();
-              const codeB = (b.code || '').toUpperCase();
-              return codeA.localeCompare(codeB, undefined, { numeric: true });
-          });
-      }
-  }, [records, archiveRecords, printDate, printWard, subTab, normalizedMyWards, mySuffixes]);
-
-  // Hành động Xem trước từ Modal
-  const handlePrintModalPreview = () => {
-      const typeStr = getTabTitleInVietnamese(subTab);
-      const wb = createDailyListWorkbook(compiledPrintRecords, printWard, printDate, typeStr);
-      if (!wb) { alert(`Không tìm thấy hồ sơ thuộc danh mục [${typeStr}] ngày đã chọn!`); return; }
-      onPreviewExcel(wb, `DS_${subTab}_${printDate.replace(/-/g, '')}`);
-      setIsPrintModalOpen(false);
-  };
-
-  // Hành động Tải báo cáo Excel từ Modal
-  const handlePrintModalDownload = () => {
-      const typeStr = getTabTitleInVietnamese(subTab);
-      const wb = createDailyListWorkbook(compiledPrintRecords, printWard, printDate, typeStr);
-      if (!wb) { alert(`Không tìm thấy hồ sơ thuộc danh mục [${typeStr}] ngày đã chọn!`); return; }
-      XLSX.writeFile(wb, `DS_${subTab}_${printWard}_${printDate.replace(/-/g, '')}.xlsx`);
-      setIsPrintModalOpen(false);
-  };
-
   // Tải Excel nhanh cho tab hiện tại ngoài màn hình
   const handleExportQuick = () => {
       const typeStr = getTabTitleInVietnamese(subTab);
@@ -450,11 +378,6 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
             </div>
             
             <div className="ml-auto flex gap-2">
-                <button onClick={() => setIsPrintModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4.5 py-2 rounded-xl shadow-md text-sm font-bold transition-all transform active:scale-95"> 
-                    <Printer size={16} /> 
-                    <span>In Tab Hiện Tại</span> 
-                </button>
-                <div className="h-8 w-px bg-gray-200 self-center"></div>
                 <button onClick={handlePreviewQuick} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100 px-3.5 py-2 rounded-lg hover:bg-blue-100 text-sm font-semibold transition-all"> 
                     <Eye size={15} /> 
                     <span>Xem Excel nhanh</span> 
@@ -506,7 +429,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                 onClick={() => setSubTab('archive')}
                 className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
                     subTab === 'archive'
-                        ? 'border-purple-600 text-purple-700 bg-purple-50/30 rounded-tr-xl'
+                        ? 'border-purple-600 text-purple-700 bg-purple-50/30'
                         : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
                 }`}
             >
@@ -516,6 +439,23 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                     subTab === 'archive' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
                 }`}>
                     {filteredArchiveRecords.length}
+                </span>
+            </button>
+
+            <button
+                onClick={() => setSubTab('tax')}
+                className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
+                    subTab === 'tax'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/30 rounded-tr-xl'
+                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
+                }`}
+            >
+                <CheckCircle2 size={16} className={subTab === 'tax' ? 'text-emerald-600' : 'text-gray-400'} />
+                <span>Hồ sơ thuế chính quy</span>
+                <span className={`ml-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full ${
+                    subTab === 'tax' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                    {filteredTaxRecords.length}
                 </span>
             </button>
         </div>
@@ -558,6 +498,8 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                             (r.recordType || '').toLowerCase().includes('sao lục') 
                                             ? 'bg-purple-100 text-purple-700' 
+                                            : (r.recordType || '').toLowerCase().includes('thuế chính quy')
+                                            ? 'bg-emerald-100 text-emerald-700'
                                             : 'bg-blue-100 text-blue-700'
                                         }`}>
                                             {getShortRecordType(r.recordType)}
@@ -586,80 +528,6 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
             </div>
         </div>
 
-        {/* ==================== POPUP IN HỒ SƠ TỔNG HỢP THEO TAB ĐANG CHỌN ==================== */}
-        {isPrintModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-gray-800">
-                <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-lg overflow-hidden shrink-0 flex flex-col transform transition-all animate-scale-up">
-                    {/* Header Popup */}
-                    <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-blue-100 p-2 rounded-xl text-blue-700">
-                                <Printer size={18} />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-gray-900 text-lg">In Danh Sách Chi Tiết</h3>
-                                <p className="text-xs text-gray-500 font-medium">Bản in tự động thiết lập theo Tab đang hoạt động</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setIsPrintModalOpen(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-all">
-                            <X size={18} />
-                        </button>
-                    </div>
-
-                    {/* Nội Dung Popup */}
-                    <div className="p-6 space-y-5">
-                        {/* Huy hiệu chỉ báo danh mục in hiện tại của tab */}
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-2">
-                            <CheckCircle2 size={18} className="text-blue-600 shrink-0" />
-                            <div className="text-xs text-blue-800 font-semibold">
-                                Danh mục in: <span className="underline font-bold">{getTabTitleInVietnamese(subTab)}</span>
-                            </div>
-                        </div>
-
-                        {/* 1. Chọn ngày nhận */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-bold text-gray-700 flex items-center gap-1">Ngày nhận hồ sơ:</label>
-                            <input type="date" className="w-full border border-gray-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold" value={printDate} onChange={(e) => setPrintDate(e.target.value)} />
-                        </div>
-
-                        {/* 2. Chọn Địa bàn tổng hợp */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-bold text-gray-700 flex items-center gap-1 flex-wrap">Địa bàn cần in:</label>
-                            <select className="w-full border border-gray-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold" value={printWard} onChange={(e) => setPrintWard(e.target.value)}>
-                                <option value="all">-- Tất cả địa bàn --</option>
-                                {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Thống kê nhanh số phiếu sấp sỉ thỏa mãn */}
-                        <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-900 text-xs font-bold">
-                            <span>Số hồ sơ tìm thấy:</span>
-                            <span className="bg-indigo-600 text-white rounded px-2.5 py-0.5 text-sm font-black">{compiledPrintRecords.length} hồ sơ</span>
-                        </div>
-
-                        {/* Hướng dẫn nghiệp vụ */}
-                        {subTab === 'archive' && (
-                            <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-[11px] text-amber-800 leading-relaxed font-semibold">
-                                💡 Lưu ý Sao lục: Hồ sơ sao lục được tổng hợp trực tiếp theo mã xã viết tắt. Ví dụ mã là MH sẽ tự động lọc vào xã Minh Hưng mà không tách phi địa giới.
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Footer Actions */}
-                    <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-2 justify-end">
-                        <button onClick={() => setIsPrintModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200/60 rounded-lg transition-all">Quay lại</button>
-                        <button onClick={handlePrintModalPreview} disabled={compiledPrintRecords.length === 0} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-bold transition-all transform active:scale-95">
-                            <Eye size={15} />
-                            <span>Xem trước</span>
-                        </button>
-                        <button onClick={handlePrintModalDownload} disabled={compiledPrintRecords.length === 0} className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-bold transition-all transform active:scale-95">
-                            <Printer size={15} />
-                            <span>In Excel</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
     </div>
   );
 };

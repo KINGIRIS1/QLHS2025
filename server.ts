@@ -11,14 +11,31 @@ import { GoogleGenAI, Type } from '@google/genai';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+const getGoogleGenAIClient = (req: Request) => {
+  let apiKey = (req.headers['x-gemini-key'] as string) || '';
+  if (!apiKey) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      apiKey = authHeader.substring(7);
     }
   }
-});
+  if (!apiKey) {
+    apiKey = process.env.GEMINI_API_KEY || '';
+  }
+  
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error("Chưa cấu hình API Key cho Gemini AI. Vui lòng vào mục 'Báo cáo tuần/tháng' -> chọn 'Cấu hình AI' để nhập API Key của bạn.");
+  }
+  
+  return new GoogleGenAI({
+    apiKey: apiKey.trim(),
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
+};
 
 const server = jsonServer.create();
 const dbFile = process.env.DB_PATH || path.join(__dirname, 'server/db.json');
@@ -177,6 +194,8 @@ server.post('/custom/ocr-record', async (req: Request, res: Response) => {
         if (!imageBase64) {
             return res.status(400).jsonp({ error: "Thiếu dữ liệu hình ảnh (imageBase64)." });
         }
+
+        const ai = getGoogleGenAIClient(req);
 
         const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
         let mimeType = 'image/jpeg';

@@ -46,10 +46,12 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           try {
               const base64String = evt.target?.result as string;
               
+              const localKey = localStorage.getItem('USER_GEMINI_API_KEY') || '';
               const response = await fetch('/custom/ocr-record', {
                   method: 'POST',
                   headers: {
-                      'Content-Type': 'application/json'
+                      'Content-Type': 'application/json',
+                      'x-gemini-key': localKey
                   },
                   body: JSON.stringify({ imageBase64: base64String })
               });

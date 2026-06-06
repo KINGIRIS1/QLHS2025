@@ -6,9 +6,19 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 const server = jsonServer.create();
 const dbFile = process.env.DB_PATH || path.join(__dirname, 'server/db.json');
@@ -158,6 +168,112 @@ server.post('/custom/counters', (req: Request, res: Response) => {
         res.jsonp(req.body);
     } catch (error) {
         res.status(500).jsonp({ error: "Lỗi." });
+    }
+});
+
+server.post('/custom/ocr-record', async (req: Request, res: Response) => {
+    try {
+        const { imageBase64 } = req.body;
+        if (!imageBase64) {
+            return res.status(400).jsonp({ error: "Thiếu dữ liệu hình ảnh (imageBase64)." });
+        }
+
+        const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+        let mimeType = 'image/jpeg';
+        let base64Data = imageBase64;
+        
+        if (match) {
+            mimeType = match[1];
+            base64Data = match[2];
+        }
+
+        const imagePart = {
+            inlineData: {
+                data: base64Data,
+                mimeType: mimeType
+            }
+        };
+
+        const responseSchema = {
+            type: Type.OBJECT,
+            properties: {
+                records: {
+                    type: Type.ARRAY,
+                    description: "Danh sách các hồ sơ nhận diện được từ bảng danh sách trong hình ảnh",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            customerName: {
+                                type: Type.STRING,
+                                description: "Họ và tên của Chủ sử dụng (Cột Chủ sử dụng). ví dụ: Lê Đức Thành, Hoàng Thị Lan, Trương Thị Quang"
+                            },
+                            landPlot: {
+                                type: Type.STRING,
+                                description: "Số thửa đất (Cột Số thửa) - Trả về chuỗi số, hoặc để trống nếu không có"
+                            },
+                            mapSheet: {
+                                type: Type.STRING,
+                                description: "Tờ bản đồ (Cột Tờ BĐ) - Trả về chuỗi số, hoặc để trống"
+                            },
+                            area: {
+                                type: Type.NUMBER,
+                                description: "Diện tích đất cần trích lục / đo đạc (Cột Diện tích) - giá trị số thực"
+                            },
+                            ward: {
+                                type: Type.STRING,
+                                description: "Địa danh hoặc xã phường (Cột Địa danh / Khu phố). Ví dụ: Khu phố 6, Khu phố 2, Khu phố 7"
+                            },
+                            recordType: {
+                                type: Type.STRING,
+                                description: "Loại hồ sơ (Cột Loại hồ sơ). Hãy biến đổi phù hợp sang một trong các loại chính sau đây: 'CMD', 'Trích lục bản đồ địa chính', 'Trích đo bản đồ địa chính', 'Trích đo chỉnh lý bản đồ địa chính', 'Đo đạc theo yêu cầu', 'Cắm mốc', 'Thuế chính quy', 'Tòa án', 'Thi hành án', 'Khác' dựa vào nội dung viết tắt hoặc viết rõ trong ảnh. (Ví dụ: CMĐ thành 'CMD', Tặng cho QSDĐ thành 'Khác' hoặc loại hồ sơ tương ứng)"
+                            }
+                        },
+                        required: ["customerName"]
+                    }
+                }
+            },
+            required: ["records"]
+        };
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: [
+                imagePart,
+                {
+                    text: `Phân tích hình ảnh bảng bàn giao hoặc tiếp nhận hồ sơ hành chính đất đai này. Hãy trích xuất danh sách tất cả các hồ sơ có trong bảng đúng theo các cột dữ liệu.
+Chú ý một số từ viết tắt phổ biến:
+- "CMĐ" hoặc "CMĐ (SKC)": Chuyển thành loại hồ sơ "CMD".
+- "Tặng cho QSDĐ" hoặc "Tặng cho": Chuyển thành loại hồ sơ "Khác".
+- "Trích lục" hoặc "TL": Chuyển thành "Trích lục bản đồ địa chính".
+- "Trích đo" hoặc "TĐ": Chuyển thành "Trích đo bản đồ địa chính".
+- "Chỉnh lý" hoặc "CL": Chuyển thành "Trích đo chỉnh lý bản đồ địa chính".
+- "ĐĐ" hoặc "Đo đạc": Chuyển thành "Đo đạc theo yêu cầu".
+- "Thuế" hoặc "TCQ": Chuyển thành "Thuế chính quy".
+- "TA" hoặc "Tòa án": Chuyển thành "Tòa án".
+- "THA" hoặc "Thi hành án": Chuyển thành "Thi hành án".
+
+Đối với Cột 'Địa danh' (như Khu phố 6, Khu phố 2, Khu phố 7...), giữ nguyên nội dung đại diện cho khu phố / ấp / xã tương ứng.
+Hãy trả về kết quả dưới định dạng JSON khớp hoàn hảo với responseSchema yêu cầu.`
+                }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+                temperature: 0.1,
+            }
+        });
+
+        const textOutput = response.text;
+        if (!textOutput) {
+            throw new Error("Không nhận được dữ liệu phản hồi từ Gemini.");
+        }
+
+        const resultJson = JSON.parse(textOutput.trim());
+        res.jsonp({ success: true, records: resultJson.records });
+
+    } catch (error: any) {
+        console.error("Lỗi khi gọi Gemini OCR:", error);
+        res.status(500).jsonp({ error: error.message || "Lỗi xử lý hình ảnh OCR từ Gemini AI." });
     }
 });
 

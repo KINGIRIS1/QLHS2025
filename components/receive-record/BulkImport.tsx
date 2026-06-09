@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, User, Employee } from '../../types';
-import { RECORD_TYPES } from '../../constants';
+import { RECORD_TYPES, EXTENDED_RECORD_TYPES } from '../../constants';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download, Sparkles, Loader2 } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
@@ -67,18 +67,18 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   
                   const newOcrRecords: BulkRecordItem[] = data.records.map((r: any) => {
                       let recordType = r.recordType || 'Đo đạc theo yêu cầu';
-                      if (!RECORD_TYPES.includes(recordType)) {
+                      if (!EXTENDED_RECORD_TYPES.includes(recordType)) {
                           const lower = recordType.toLowerCase();
                           if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
                           else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                           else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
                           else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';
                           else if (lower.includes('cắm mốc')) recordType = 'Cắm mốc';
-                          else if (lower.includes('thuế')) recordType = 'Thuế chính quy';
+                          else if (lower.includes('thuế') || lower.includes('tcq')) recordType = 'Thuế chính quy';
                           else if (lower.includes('tòa án') || lower.includes('ta')) recordType = 'Tòa án';
                           else if (lower.includes('thi hành án') || lower.includes('tha')) recordType = 'Thi hành án';
-                          else if (lower.includes('cmd')) recordType = 'CMD';
-                          else recordType = 'Khác';
+                          else if (lower.includes('cmd') || lower.includes('cmđ') || lower.includes('tặng cho') || lower.includes('khác')) recordType = 'CMD';
+                          else recordType = 'CMD';
                       }
 
                       const deadline = calculateDeadline(recordType, receivedDate);
@@ -222,8 +222,12 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
                   else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';
                   else if (lower.includes('cắm mốc')) recordType = 'Cắm mốc';
-                  else if (rawType) recordType = rawType;
-                  else recordType = RECORD_TYPES[0];
+                  else if (lower.includes('thuế') || lower.includes('tcq')) recordType = 'Thuế chính quy';
+                  else if (lower.includes('tòa án') || lower.includes('ta')) recordType = 'Tòa án';
+                  else if (lower.includes('thi hành án') || lower.includes('tha')) recordType = 'Thi hành án';
+                  else if (lower.includes('cmd') || lower.includes('cmđ') || lower.includes('tặng cho') || lower.includes('khác')) recordType = 'CMD';
+                  else if (rawType && EXTENDED_RECORD_TYPES.includes(rawType)) recordType = rawType;
+                  else recordType = EXTENDED_RECORD_TYPES[0];
               }
               
               const authorizedBy = String(getVal(['NGƯỜI ỦY QUYỀN', 'ỦY QUYỀN', 'AUTHORIZED BY']) || '');
@@ -353,21 +357,30 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                 {bulkRecords.length > 0 && <span className="text-xs text-orange-600 italic">Lưu ý: Bấm "Tạo mã" &rarr; "Lưu" cho từng dòng.</span>}
             </div>
             <div className="overflow-auto flex-1">
-                <table className="w-full text-left table-fixed min-w-[1200px]">
+                <table className="w-full text-left table-fixed min-w-[2450px]">
                     <thead className="bg-gray-100 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm z-10">
                         <tr>
-                            <th className="p-3 w-10 text-center">#</th>
-                            <th className="p-3 w-[160px]">Mã Hồ Sơ</th>
-                            <th className="p-3 w-[200px]">Chủ Sử Dụng</th>
-                            <th className="p-3 w-[150px]">Loại Hồ Sơ</th>
-                            <th className="p-3 w-[120px]">Xã / Phường</th>
-                            <th className="p-3 w-[120px]">Hẹn Trả</th>
-                            <th className="p-3 w-[200px] text-center">Thao Tác</th>
+                            <th className="p-3 w-12 text-center">#</th>
+                            <th className="p-3 w-[170px]">Mã Hồ Sơ</th>
+                            <th className="p-3 w-[220px]">Chủ Sử Dụng</th>
+                            <th className="p-3 w-[135px]">Số Điện Thoại</th>
+                            <th className="p-3 w-[140px]">Xã / Phường</th>
+                            <th className="p-3 w-[220px]">Địa Chỉ Chi Tiết</th>
+                            <th className="p-3 w-[95px] text-center">Số Thửa</th>
+                            <th className="p-3 w-[95px] text-center">Tờ BĐ</th>
+                            <th className="p-3 w-[110px] text-center">Diện Tích</th>
+                            <th className="p-3 w-[230px]">Loại Hồ Sơ</th>
+                            <th className="p-3 w-[140px]">Ngày Nhận</th>
+                            <th className="p-3 w-[140px]">Hẹn Trả</th>
+                            <th className="p-3 w-[180px]">Người Ủy Quyền</th>
+                            <th className="p-3 w-[180px]">Loại Ủy Quyền</th>
+                            <th className="p-3 w-[240px]">Nội Dung Yêu Cầu</th>
+                            <th className="p-3 w-[180px] text-center sticky right-0 bg-gray-100 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] z-20">Thao Tác</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {bulkRecords.length > 0 ? bulkRecords.map((item, idx) => (
-                            <tr key={item.tempId} className={`hover:bg-blue-50/30 ${item.isSaved ? 'bg-green-50' : ''}`}>
+                            <tr key={item.tempId} className={`hover:bg-blue-50/30 transition-colors ${item.isSaved ? 'bg-green-50' : ''}`}>
                                 <td className="p-3 text-center text-gray-400">{idx + 1}</td>
                                 <td className="p-3">
                                     <div className="flex gap-1">
@@ -375,11 +388,48 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                                         {!item.isSaved && <button onClick={() => handleGenerateBulkCode(idx)} className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200" title="Tạo mã"><Wand2 size={14} /></button>}
                                     </div>
                                 </td>
-                                <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.customerName ?? ''} onChange={(e) => updateBulkRecord(idx, 'customerName', e.target.value)} readOnly={item.isSaved} /></td>
-                                <td className="p-3"><select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none" value={item.recordType ?? ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}> {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)} </select></td>
-                                <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.ward ?? ''} onChange={(e) => updateBulkRecord(idx, 'ward', e.target.value)} readOnly={item.isSaved} /></td>
-                                <td className="p-3"><input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.deadline ?? ''} onChange={(e) => updateBulkRecord(idx, 'deadline', e.target.value)} readOnly={item.isSaved} /></td>
-                                <td className="p-3 text-center">
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.customerName ?? ''} onChange={(e) => updateBulkRecord(idx, 'customerName', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono" placeholder="SĐT..." value={item.phoneNumber ?? ''} onChange={(e) => updateBulkRecord(idx, 'phoneNumber', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.ward ?? ''} onChange={(e) => updateBulkRecord(idx, 'ward', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="Thôn/KP..." value={item.address ?? ''} onChange={(e) => updateBulkRecord(idx, 'address', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center font-bold text-slate-700" placeholder="Thửa" value={item.landPlot ?? ''} onChange={(e) => updateBulkRecord(idx, 'landPlot', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center font-bold text-slate-700" placeholder="Tờ" value={item.mapSheet ?? ''} onChange={(e) => updateBulkRecord(idx, 'mapSheet', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="number" step="any" className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center font-bold text-slate-700" placeholder="0" value={item.area || ''} onChange={(e) => updateBulkRecord(idx, 'area', parseFloat(e.target.value) || 0)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none font-medium text-blue-800 bg-blue-50/50" value={item.recordType ?? ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}>
+                                        {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </td>
+                                <td className="p-3">
+                                    <input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.receivedDate ?? ''} onChange={(e) => updateBulkRecord(idx, 'receivedDate', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.deadline ?? ''} onChange={(e) => updateBulkRecord(idx, 'deadline', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="Họ tên..." value={item.authorizedBy ?? ''} onChange={(e) => updateBulkRecord(idx, 'authorizedBy', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="Ủy quyền..." value={item.authDocType ?? ''} onChange={(e) => updateBulkRecord(idx, 'authDocType', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-slate-600" placeholder="Ghi chú nội dung..." value={item.content ?? ''} onChange={(e) => updateBulkRecord(idx, 'content', e.target.value)} readOnly={item.isSaved} />
+                                </td>
+                                <td className={`p-3 text-center sticky right-0 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] z-10 transition-colors ${item.isSaved ? 'bg-green-50' : 'bg-white'}`}>
                                     <div className="flex justify-center gap-2">
                                         {item.isSaved ? <span className="flex items-center gap-1 text-green-600 font-bold px-3 py-1 bg-green-100 rounded text-xs"><Check size={14} /> Đã lưu</span> : <button onClick={() => handleSaveBulkRecord(idx)} disabled={!item.code} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50 text-xs font-bold"><Save size={14} /> Lưu</button>}
                                         <button onClick={() => onPreview(item)} className="p-1.5 text-purple-600 border border-purple-200 rounded hover:bg-purple-50" title="In biên nhận"><Printer size={16} /></button>
@@ -387,7 +437,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                                     </div>
                                 </td>
                             </tr>
-                        )) : <tr><td colSpan={7} className="p-12 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>}
+                        )) : <tr><td colSpan={16} className="p-12 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>}
                     </tbody>
                 </table>
             </div>

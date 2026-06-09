@@ -3,7 +3,7 @@ import { User, Employee, UserRole } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive, rawUpsertArchiveRecords } from '../../services/apiArchive';
 import { fetchEmployees, fetchUsers } from '../../services/apiPeople';
-import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload } from 'lucide-react';
+import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload, Building } from 'lucide-react';
 import { confirmAction, toTitleCase, removeVietnameseTones } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 import DeleteAllModal from './DeleteAllModal';
@@ -11,6 +11,7 @@ import AssignModal from '../AssignModal';
 
 import RecordDetailModal from './RecordDetailModal';
 import ReturnReasonModal from './ReturnReasonModal';
+import IGateView from './IGateView';
 
 interface DangKyViewProps {
     currentUser: User;
@@ -36,6 +37,7 @@ interface DangKyFormData {
 }
 
 const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
+    const [subView, setSubView] = useState<'record_dangky' | 'igate'>('record_dangky');
     const [activeTab, setActiveTab] = useState<'all' | 'xu_ly' | 'thue' | 'gcn'>('all');
     const [thueSubTab, setThueSubTab] = useState<'tham_tra_thue' | 'chuyen_thue' | 'dong_thue'>('tham_tra_thue');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
@@ -700,68 +702,98 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
 
     return (
         <div className="flex flex-col h-full bg-white">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        Đăng ký
-                    </h2>
-                    <div className="relative flex-1 sm:w-64 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                            placeholder="Tìm Mã HS, Chủ sử dụng, CCCD..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                        />
-                    </div>
+            {/* Top Sub-tabs navigation */}
+            <div className="px-4 pt-3 pb-0 border-b border-gray-200 flex gap-4 bg-gray-50 flex-shrink-0">
+                <button
+                    onClick={() => { setSubView('record_dangky'); }}
+                    className={`pb-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                        subView === 'record_dangky' 
+                            ? 'border-blue-600 text-blue-700' 
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
+                    }`}
+                >
+                    <ClipboardList size={16} /> Hồ sơ Đăng ký
+                </button>
+                <button
+                    onClick={() => { setSubView('igate'); }}
+                    className={`pb-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                        subView === 'igate' 
+                            ? 'border-indigo-600 text-indigo-700' 
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
+                    }`}
+                >
+                    <Building size={16} /> Quản lý hồ sơ IGate
+                </button>
+            </div>
+
+            {subView === 'igate' ? (
+                <div className="flex-1 overflow-auto p-4">
+                    <IGateView currentUser={currentUser} wards={wards} />
                 </div>
+            ) : (
+                <>
+                    {/* Header */}
+                    <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                Đăng ký
+                            </h2>
+                            <div className="relative flex-1 sm:w-64 max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input 
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    placeholder="Tìm Mã HS, Chủ sử dụng, CCCD..." 
+                                    value={searchTerm} 
+                                    onChange={e => setSearchTerm(e.target.value)} 
+                                />
+                            </div>
+                        </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Calendar size={16} className="text-gray-500"/>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-                        <span className="text-gray-400">-</span>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
-                    </div>
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                            <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                                <Calendar size={16} className="text-gray-500"/>
+                                <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                                <span className="text-gray-400">-</span>
+                                <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                            </div>
 
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <MapPin size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
-                            <option value="">Tất cả Xã/Phường</option>
-                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                        </select>
-                    </div>
-                </div>
+                            <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                                <MapPin size={16} className="text-gray-500"/>
+                                <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
+                                    <option value="">Tất cả Xã/Phường</option>
+                                    {wards.map(w => <option key={w} value={w}>{w}</option>)}
+                                </select>
+                            </div>
+                        </div>
 
-                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
-                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
-                        <button 
-                            onClick={() => setActiveTab('all')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-gray-100 text-gray-800 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            <LayoutGrid size={16}/> Tất cả hồ sơ
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('xu_ly')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'xu_ly' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            <ClipboardList size={16}/> Xử lý hồ sơ
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('thue')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'thue' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            <FileText size={16}/> Thuế
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('gcn')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'gcn' ? 'bg-teal-100 text-teal-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            <FileSignature size={16}/> GCN
-                        </button>
-                    </div>
+                        <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
+                            <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+                                <button 
+                                    onClick={() => setActiveTab('all')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-gray-100 text-gray-800 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    <LayoutGrid size={16}/> Tất cả hồ sơ
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('xu_ly')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'xu_ly' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    <ClipboardList size={16}/> Xử lý hồ sơ
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('thue')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'thue' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    <FileText size={16}/> Thuế
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('gcn')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'gcn' ? 'bg-teal-100 text-teal-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    <FileSignature size={16}/> GCN
+                                </button>
+                            </div>
 
                     {activeTab === 'thue' && (
                         <>
@@ -1067,6 +1099,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                     </div>
                 )}
             </div>
+            </>
+            )}
 
             <DeleteAllModal
                 isOpen={showDeleteAllModal}

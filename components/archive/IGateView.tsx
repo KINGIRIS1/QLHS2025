@@ -4,7 +4,7 @@ import {
     Search, Plus, Trash2, Edit, Save, X, Calendar, Phone, FileSpreadsheet, 
     Download, LayoutGrid, FileText, ClipboardList, BookOpen, User as UserIcon, 
     Building, CheckCircle2, AlertTriangle, FilePieChart, TrendingUp, BarChart3,
-    ArrowUpRight, AlertCircle, RefreshCw, Printer, Filter, Upload
+    ArrowUpRight, AlertCircle, RefreshCw, Printer, Filter, Upload, Tag
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx-js-style';
@@ -165,6 +165,92 @@ const LINH_VUC_LIST = [
     "Cấp phép xây dựng"
 ];
 
+// Helper chuyển chuỗi ngày tháng đủ kiểu thành đối tượng JS Date
+const parseToDateObject = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr) return null;
+    const trimmed = dateStr.trim();
+    if (!trimmed || trimmed === '' || trimmed.toLowerCase() === 'null') return null;
+    
+    // Tách bộ ngày và giờ
+    const parts = trimmed.split(/\s+/);
+    const datePart = parts[0];
+    const timePart = parts[1] || '';
+    
+    // Định dạng YYYY-MM-DD
+    const yyyymmddMatch = datePart.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+    if (yyyymmddMatch) {
+         const year = parseInt(yyyymmddMatch[1], 10);
+         const month = parseInt(yyyymmddMatch[2], 10) - 1;
+         const day = parseInt(yyyymmddMatch[3], 10);
+         if (timePart) {
+             const tParts = timePart.split(':');
+             const h = parseInt(tParts[0] || '0', 10);
+             const m = parseInt(tParts[1] || '0', 10);
+             const s = parseInt(tParts[2] || '0', 10);
+             return new Date(year, month, day, h, m, s);
+         }
+         return new Date(year, month, day);
+    }
+    
+    // Định dạng DD/MM/YYYY
+    const ddmmyyyyMatch = datePart.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (ddmmyyyyMatch) {
+         const day = parseInt(ddmmyyyyMatch[1], 10);
+         const month = parseInt(ddmmyyyyMatch[2], 10) - 1;
+         const year = parseInt(ddmmyyyyMatch[3], 10);
+         if (timePart) {
+             const tParts = timePart.split(':');
+             const h = parseInt(tParts[0] || '0', 10);
+             const m = parseInt(tParts[1] || '0', 10);
+             const s = parseInt(tParts[2] || '0', 10);
+             return new Date(year, month, day, h, m, s);
+         }
+         return new Date(year, month, day);
+    }
+    
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) {
+        return parsed;
+    }
+    return null;
+};
+
+// Helper hiển thị ngày tháng năm + giờ phút giây một cách an toàn và đẹp đẽ
+const formatDisplayDateInClient = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '-';
+    const parsed = parseToDateObject(dateStr);
+    if (!parsed) return dateStr || '-';
+    
+    const day = parsed.getDate().toString().padStart(2, '0');
+    const month = (parsed.getMonth() + 1).toString().padStart(2, '0');
+    const year = parsed.getFullYear();
+    
+    const h = parsed.getHours();
+    const m = parsed.getMinutes();
+    const s = parsed.getSeconds();
+    
+    if (h === 0 && m === 0 && s === 0) {
+        return `${day}/${month}/${year}`;
+    } else {
+        const hh = h.toString().padStart(2, '0');
+        const mm = m.toString().padStart(2, '0');
+        const ss = s.toString().padStart(2, '0');
+        return `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
+    }
+};
+
+// Helper lấy chuỗi ngày giờ hiện tại định dạng Việt Nam đầy đủ
+const getNowVietnameseString = (): string => {
+    const parsed = new Date();
+    const day = parsed.getDate().toString().padStart(2, '0');
+    const month = (parsed.getMonth() + 1).toString().padStart(2, '0');
+    const year = parsed.getFullYear();
+    const hh = parsed.getHours().toString().padStart(2, '0');
+    const mm = parsed.getMinutes().toString().padStart(2, '0');
+    const ss = parsed.getSeconds().toString().padStart(2, '0');
+    return `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
+};
+
 const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<IGateRecord[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -172,8 +258,19 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [selectedLinhVucFilter, setSelectedLinhVucFilter] = useState<string>('Tất cả');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
+    // State phân trang cho phần hiển thị dữ liệu
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(15);
+    
     // State danh sách cán bộ lọc động
     const [canBoList, setCanBoList] = useState<string[]>(DEFAULT_CAN_BO_LIST);
+    const [dangKyCanBo, setDangKyCanBo] = useState<string[]>([]);
+    const [oneDoorCanBo, setOneDoorCanBo] = useState<string[]>([]);
+    
+    // Popup phân loại hàng loạt
+    const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+    const [batchStatus, setBatchStatus] = useState<string>('');
+    const [batchCanBo, setBatchCanBo] = useState<string>('');
 
     // Modal Form States
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -204,6 +301,11 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         loadData();
     }, []);
 
+    // Tự động chuyển về trang 1 khi thay đổi trạng thái tìm kiếm hoặc bộ lọc
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter]);
+
     // Tải danh sách cán bộ xử lý động (gồm tổ trưởng, tổ phó, nhân viên thuộc tổ đăng ký và cán bộ Một cửa)
     useEffect(() => {
         const loadCanBoList = async () => {
@@ -214,27 +316,47 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 // Cán bộ thuộc tổ đăng ký (department chứa "đăng ký")
                 const dangKyEmps = emps.filter(e => {
                     const dept = (e.department || '').toLowerCase();
-                    return dept.includes('đăng ký') || dept.includes('dang ky');
+                    return dept.includes('đăng ký') || dept.includes('dang ky') || dept.includes('đăng ký đất đai');
                 });
                 
-                // Nhân viên Một cửa (role = 'ONEDOOR')
+                // Nhân viên Một cửa (role = 'ONEDOOR' hoặc department chứa 'một cửa')
                 const oneDoorUsers = uss.filter(u => u.role === UserRole.ONEDOOR);
-                
-                const nameSet = new Set<string>();
-                dangKyEmps.forEach(e => {
-                    if (e.name) nameSet.add(e.name.trim());
-                });
-                oneDoorUsers.forEach(u => {
-                    if (u.name) nameSet.add(u.name.trim());
+                const oneDoorEmps = emps.filter(e => {
+                    const dept = (e.department || '').toLowerCase();
+                    return dept.includes('một cửa') || dept.includes('mot cua') || dept.includes('1 cửa');
                 });
                 
-                if (nameSet.size > 0) {
-                    setCanBoList(Array.from(nameSet));
-                } else {
-                    setCanBoList(DEFAULT_CAN_BO_LIST);
+                const dkNamesSet = new Set<string>();
+                dangKyEmps.forEach(e => { if (e.name) dkNamesSet.add(e.name.trim()); });
+                
+                const odNamesSet = new Set<string>();
+                oneDoorUsers.forEach(u => { if (u.name) odNamesSet.add(u.name.trim()); });
+                oneDoorEmps.forEach(e => { if (e.name) odNamesSet.add(e.name.trim()); });
+                
+                // Fallbacks/Mocks if empty
+                if (dkNamesSet.size === 0) {
+                    dkNamesSet.add("Nguyễn Văn Nam");
+                    dkNamesSet.add("Lê Thị Thu");
+                    dkNamesSet.add("Lê Tiến Anh");
+                    dkNamesSet.add("Nguyễn Hoàng Minh");
                 }
+                if (odNamesSet.size === 0) {
+                    odNamesSet.add("Võ Văn Kiệt");
+                    odNamesSet.add("Trần Quốc Toản");
+                }
+                
+                const dkList = Array.from(dkNamesSet);
+                const odList = Array.from(odNamesSet);
+                
+                setDangKyCanBo(dkList);
+                setOneDoorCanBo(odList);
+                
+                const combined = new Set<string>([...dkList, ...odList]);
+                setCanBoList(Array.from(combined));
             } catch (e) {
                 console.error("Lỗi tải danh sách cán bộ xử lý:", e);
+                setDangKyCanBo(["Nguyễn Văn Nam", "Lê Thị Thu", "Lê Tiến Anh", "Nguyễn Hoàng Minh"]);
+                setOneDoorCanBo(["Võ Văn Kiệt", "Trần Quốc Toản"]);
                 setCanBoList(DEFAULT_CAN_BO_LIST);
             }
         };
@@ -282,6 +404,45 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         setEditingRecord(null);
     };
 
+    // Hàm xử lý phân loại hàng loạt từ popup
+    const handleBatchClassifySubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!batchStatus && !batchCanBo) {
+            alert("Vui lòng chọn Trạng thái hoặc Cán bộ xử lý để thực hiện phân loại!");
+            return;
+        }
+
+        let confirmMsg = `Bạn có chắc chắn muốn cập nhật hàng loạt cho ${selectedIds.size} hồ sơ đã chọn không?`;
+        if (batchStatus) confirmMsg += `\n- Cập nhật trạng thái mới: ${batchStatus}`;
+        if (batchCanBo) confirmMsg += `\n- Phân công cán bộ xử lý: ${batchCanBo}`;
+
+        if (window.confirm(confirmMsg)) {
+            const updated = records.map(r => {
+                if (selectedIds.has(r.id)) {
+                    const updatedRecord = { ...r };
+                    if (batchStatus) {
+                        updatedRecord.trangThai = batchStatus;
+                        if (batchStatus === 'Đã trả kết quả') {
+                            updatedRecord.ngayKetThuc = r.ngayKetThuc || new Date().toISOString().split('T')[1] 
+                                ? new Date().toISOString().split('T')[0] 
+                                : getNowVietnameseString().split(' ')[0];
+                        }
+                    }
+                    if (batchCanBo) {
+                        updatedRecord.canBoXuLy = batchCanBo;
+                    }
+                    return updatedRecord;
+                }
+                return r;
+            });
+
+            await saveRecords(updated);
+            setSelectedIds(new Set());
+            setIsBatchModalOpen(false);
+            alert(`Đã cập nhật phân loại thành công cho ${selectedIds.size} hồ sơ!`);
+        }
+    };
+
     // Hàm mở form thêm mới
     const handleAddNew = () => {
         setEditingRecord(null);
@@ -289,7 +450,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             soHieu: '',
             tenThuTuc: '',
             tenLinhVuc: 'Đất đai',
-            ngayTiepNhan: new Date().toISOString().split('T')[0],
+            ngayTiepNhan: getNowVietnameseString(),
             ngayHenTra: '',
             ngayKetThuc: '',
             donVi: 'Chi nhánh Văn phòng Đăng ký Đất đai',
@@ -308,9 +469,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             soHieu: record.soHieu,
             tenThuTuc: record.tenThuTuc,
             tenLinhVuc: record.tenLinhVuc,
-            ngayTiepNhan: record.ngayTiepNhan,
-            ngayHenTra: record.ngayHenTra,
-            ngayKetThuc: record.ngayKetThuc,
+            ngayTiepNhan: record.ngayTiepNhan ? formatDisplayDateInClient(record.ngayTiepNhan) : '',
+            ngayHenTra: record.ngayHenTra ? formatDisplayDateInClient(record.ngayHenTra) : '',
+            ngayKetThuc: record.ngayKetThuc ? formatDisplayDateInClient(record.ngayKetThuc) : '',
             donVi: record.donVi,
             chuHoSo: record.chuHoSo,
             soDienThoai: record.soDienThoai,
@@ -376,7 +537,8 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         const countTon90Ngay = records.filter(r => {
             if (r.trangThai === 'Đã trả kết quả' || r.ngayKetThuc) return false;
             if (!r.ngayTiepNhan) return false;
-            const tiepNhanDate = new Date(r.ngayTiepNhan);
+            const tiepNhanDate = parseToDateObject(r.ngayTiepNhan);
+            if (!tiepNhanDate) return false;
             const diffTime = Math.abs(today.getTime() - tiepNhanDate.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             return diffDays > 90;
@@ -419,8 +581,8 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         // Lọc những hồ sơ TỒN (Chưa hoàn thành và tiếp nhận trong năm 2026)
         records.forEach(r => {
             if (r.trangThai !== 'Đã trả kết quả' && !r.ngayKetThuc && r.ngayTiepNhan) {
-                const date = new Date(r.ngayTiepNhan);
-                if (date.getFullYear() === 2026) {
+                const date = parseToDateObject(r.ngayTiepNhan);
+                if (date && date.getFullYear() === 2026) {
                     const monthIdx = date.getMonth(); // 0-11
                     if (monthIdx >= 0 && monthIdx < 12) {
                         months[monthIdx].count += 1;
@@ -467,6 +629,17 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         });
     }, [records, searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter]);
 
+    // Các bản ghi iGate sau khi phân trang
+    const paginatedRecords = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredRecords.slice(start, start + itemsPerPage);
+    }, [filteredRecords, currentPage, itemsPerPage]);
+
+    // Tổng số lượng trang
+    const totalPages = useMemo(() => {
+        return Math.ceil(filteredRecords.length / itemsPerPage) || 1;
+    }, [filteredRecords, itemsPerPage]);
+
     // --- CHỨC NĂNG IMPORT SỐ LIỆU EXCEL ---
     const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -511,19 +684,35 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 const parseExcelDate = (val: any) => {
                     if (!val) return '';
                     if (typeof val === 'number') {
-                        const date = new Date((val - 25569) * 86400000);
-                        return date.toISOString().split('T')[0];
+                        // Tính chính xác ngày giờ từ số thực của Excel
+                        const date = new Date(Math.round((val - 25569) * 86400000));
+                        // Điều chỉnh múi giờ địa phương để không bị lệch ngày
+                        const tzOffset = date.getTimezoneOffset() * 60000;
+                        const localDate = new Date(date.getTime() + tzOffset);
+                        const isoStr = localDate.toISOString(); // "YYYY-MM-DDTHH:mm:ss.sssZ"
+                        const datePart = isoStr.split('T')[0];
+                        const timePart = isoStr.split('T')[1].split('.')[0];
+                        return timePart === '00:00:00' ? datePart : `${datePart} ${timePart}`;
                     }
                     const str = String(val).trim();
-                    const parts = str.split(/[-/._]/);
+                    const partsSpace = str.split(/\s+/);
+                    const datePart = partsSpace[0];
+                    const timePart = partsSpace[1] || '';
+                    
+                    const parts = datePart.split(/[-/._]/);
                     if (parts.length === 3) {
+                        let parsedDate = '';
                         // Nếu dạng DD/MM/YYYY
                         if (parts[0].length <= 2 && parts[2].length === 4) {
-                            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                            parsedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                         }
                         // Nếu dạng YYYY-MM-DD
-                        if (parts[0].length === 4) {
-                            return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                        else if (parts[0].length === 4) {
+                            parsedDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                        }
+                        
+                        if (parsedDate) {
+                            return timePart ? `${parsedDate} ${timePart}` : parsedDate;
                         }
                     }
                     return str;
@@ -1075,64 +1264,17 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                        {/* Phân loại trạng thái hàng loạt */}
-                        <div className="flex items-center gap-1.5 border border-slate-200 bg-white rounded-xl px-3 py-1.5 min-w-[210px] shadow-sm">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Trạng thái:</span>
-                            <select
-                                className="text-xs outline-none bg-transparent font-bold text-slate-700 cursor-pointer border-none flex-1 focus:ring-0"
-                                onChange={(e) => {
-                                    const targetStatus = e.target.value;
-                                    if (!targetStatus) return;
-                                    if (window.confirm(`Bạn có chắc chắn muốn phân loại ${selectedIds.size} hồ sơ sang trạng thái [${targetStatus}] không?`)) {
-                                        const updated = records.map(r => {
-                                            if (selectedIds.has(r.id)) {
-                                                const nextNgayKetThuc = targetStatus === 'Đã trả kết quả' ? (r.ngayKetThuc || new Date().toISOString().split('T')[0]) : r.ngayKetThuc;
-                                                return { 
-                                                    ...r, 
-                                                    trangThai: targetStatus,
-                                                    ngayKetThuc: nextNgayKetThuc
-                                                };
-                                            }
-                                            return r;
-                                        });
-                                        saveRecords(updated);
-                                        setSelectedIds(new Set());
-                                        alert(`Đã cập nhật trạng thái phân loại hàng loạt cho ${selectedIds.size} hồ sơ thành công!`);
-                                    }
-                                    e.target.value = ''; // Reset select
-                                }}
-                            >
-                                <option value="">-- Chọn Trạng thái --</option>
-                                {TRANG_THAI_LIST.map(st => <option key={st} value={st}>{st}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Đổi cán bộ xử lý hàng loạt */}
-                        <div className="flex items-center gap-1.5 border border-slate-200 bg-white rounded-xl px-3 py-1.5 min-w-[190px] shadow-sm">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Cán bộ xử lý:</span>
-                            <select
-                                className="text-xs outline-none bg-transparent font-bold text-slate-700 cursor-pointer border-none flex-1 focus:ring-0"
-                                onChange={(e) => {
-                                    const targetUser = e.target.value;
-                                    if (!targetUser) return;
-                                    if (window.confirm(`Bạn có chắc chắn muốn chuyển giao ${selectedIds.size} hồ sơ cho cán bộ [${targetUser}] không?`)) {
-                                        const updated = records.map(r => {
-                                            if (selectedIds.has(r.id)) {
-                                                return { ...r, canBoXuLy: targetUser };
-                                            }
-                                            return r;
-                                        });
-                                        saveRecords(updated);
-                                        setSelectedIds(new Set());
-                                        alert(`Đã chuyển giao xử lý hàng loạt cho ${selectedIds.size} hồ sơ thành công!`);
-                                    }
-                                    e.target.value = ''; // Reset select
-                                }}
-                            >
-                                <option value="">-- Chọn Cán bộ --</option>
-                                {canBoList.map(cb => <option key={cb} value={cb}>{cb}</option>)}
-                            </select>
-                        </div>
+                        {/* Nút Phân loại hàng loạt mở Modal */}
+                        <button
+                            onClick={() => {
+                                setBatchStatus('');
+                                setBatchCanBo('');
+                                setIsBatchModalOpen(true);
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
+                        >
+                            <Tag size={14} /> Phân loại
+                        </button>
 
                         {/* Xóa hàng loạt */}
                         <button
@@ -1197,10 +1339,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                            {filteredRecords.length > 0 ? filteredRecords.map((r, idx) => {
-                                // Kiểm tra quá hạn
-                                const todayStr = new Date().toISOString().split('T')[0];
-                                const isOverdue = r.trangThai !== 'Đã trả kết quả' && r.ngayHenTra && todayStr > r.ngayHenTra;
+                            {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => {
+                                // Kiểm tra quá hạn dùng parseToDateObject
+                                const henTraDate = parseToDateObject(r.ngayHenTra);
+                                const isOverdue = r.trangThai !== 'Đã trả kết quả' && henTraDate && new Date() > henTraDate;
 
                                 // Style Trạng thái
                                 let statusBadge = "bg-slate-100 text-slate-700 border-slate-200";
@@ -1241,7 +1383,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4"
                                             />
                                         </td>
-                                        <td className="p-4 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                        <td className="p-4 text-center text-slate-400 font-bold">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                         <td className="p-4 font-mono font-bold text-slate-900">{r.soHieu}</td>
                                         <td className="p-4">
                                             <div className="flex items-center gap-2">
@@ -1260,17 +1402,17 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                 {r.tenLinhVuc}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-center font-mono">{r.ngayTiepNhan ? new Date(r.ngayTiepNhan).toLocaleDateString('vi-VN') : '-'}</td>
+                                        <td className="p-4 text-center font-mono">{formatDisplayDateInClient(r.ngayTiepNhan)}</td>
                                         <td className="p-4 text-center font-mono">
-                                            <div className="flex flex-col items-center justify-center">
-                                                <span>{r.ngayHenTra ? new Date(r.ngayHenTra).toLocaleDateString('vi-VN') : '-'}</span>
+                                            <div className="flex flex-col items-center justify-center font-medium">
+                                                <span>{formatDisplayDateInClient(r.ngayHenTra)}</span>
                                                 {isOverdue && (
                                                     <span className="text-[10px] text-red-600 font-bold bg-red-100 px-1.5 rounded mt-0.5 animate-pulse">Trễ hẹn</span>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="p-4 text-center font-mono text-emerald-600 font-bold">
-                                            {r.ngayKetThuc ? new Date(r.ngayKetThuc).toLocaleDateString('vi-VN') : '-'}
+                                            {formatDisplayDateInClient(r.ngayKetThuc)}
                                         </td>
                                         <td className="p-4 text-slate-550">{r.donVi}</td>
                                         <td className="p-4 text-slate-700">
@@ -1316,11 +1458,144 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         </tbody>
                     </table>
                 </div>
-                <div className="bg-slate-50/70 p-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
-                    <span>Hiển thị <b>{filteredRecords.length}</b> trên <b>{records.length}</b> hồ sơ iGate lưu trong dữ liệu cục bộ</span>
+                <div className="bg-slate-50/75 p-4 border-t border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center text-xs text-slate-500">
+                    <div className="flex items-center gap-2">
+                        <span>Hiển thị <b>{filteredRecords.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-{Math.min(filteredRecords.length, currentPage * itemsPerPage)}</b> trên tổng số <b>{filteredRecords.length}</b> hồ sơ iGate theo bộ lọc</span>
+                        <span className="text-slate-300">|</span>
+                        <div className="flex items-center gap-1">
+                            <span>Mỗi trang:</span>
+                            <select 
+                                value={itemsPerPage} 
+                                onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option value={10}>10</option>
+                                <option value={15}>15</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    {/* Pagination Controls */}
+                    <div className="flex items-center gap-1.5 font-medium">
+                        <button
+                            onClick={() => setCurrentPage(1)}
+                            disabled={currentPage === 1}
+                            className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs text-slate-700 transition font-semibold"
+                        >
+                            Đầu
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs text-slate-700 transition font-semibold"
+                        >
+                            Trước
+                        </button>
+                        
+                        <div className="flex items-center gap-1 px-1">
+                            <span className="text-slate-600">Trang <b>{currentPage}</b> / {totalPages}</span>
+                        </div>
+                        
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs text-slate-700 transition font-semibold"
+                        >
+                            Sau
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage(totalPages)}
+                            disabled={currentPage === totalPages}
+                            className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs text-slate-700 transition font-semibold"
+                        >
+                            Cuối
+                        </button>
+                    </div>
                     <span>Năm hiện tại: 2026</span>
                 </div>
             </div>
+
+            {/* --- MODAL PHÂN LOẠI HÀNG LOẠT --- */}
+            {isBatchModalOpen && (
+                <div id="igate-batch-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col animate-scale-up">
+                        <div className="bg-gradient-to-r from-indigo-900 to-[#1E293B] p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base">
+                                <Tag size={18} />
+                                Phân loại {selectedIds.size} hồ sơ đã chọn
+                            </h3>
+                            <button onClick={() => setIsBatchModalOpen(false)} className="rounded-lg p-1 hover:bg-white/10 text-white transition-all"><X size={18} /></button>
+                        </div>
+                        
+                        <form onSubmit={handleBatchClassifySubmit} className="p-6 space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-600 block">Trạng thái hồ sơ mới</label>
+                                <select 
+                                    className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 transition-all text-slate-800 cursor-pointer"
+                                    value={batchStatus}
+                                    onChange={(e) => setBatchStatus(e.target.value)}
+                                >
+                                    <option value="">-- Giữ nguyên trạng thái cũ --</option>
+                                    {TRANG_THAI_LIST.map(st => <option key={st} value={st}>{st}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-600 block">Cán bộ xử lý mới</label>
+                                <select 
+                                    className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 transition-all text-slate-800 cursor-pointer"
+                                    value={batchCanBo}
+                                    onChange={(e) => setBatchCanBo(e.target.value)}
+                                >
+                                    <option value="">-- Giữ nguyên cán bộ cũ --</option>
+                                    
+                                    {dangKyCanBo.length > 0 && (
+                                        <optgroup label="✨ Tổ Đăng ký">
+                                            {dangKyCanBo.map(cb => <option key={cb} value={cb}>{cb}</option>)}
+                                        </optgroup>
+                                    )}
+                                    
+                                    {oneDoorCanBo.length > 0 && (
+                                        <optgroup label="🚪 Bộ phận Một cửa">
+                                            {oneDoorCanBo.map(cb => <option key={cb} value={cb}>{cb}</option>)}
+                                        </optgroup>
+                                    )}
+                                </select>
+                            </div>
+
+                            <div className="bg-amber-50 border border-amber-200/60 rounded-xl p-3 flex gap-2.5 text-xs text-amber-800 leading-relaxed">
+                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold mb-0.5">Lưu ý thao tác hàng loạt:</p>
+                                    <p>Các trường chọn <b>"Giữ nguyên..."</b> sẽ không làm thay đổi giá trị hiện tại của các hồ sơ tương ứng.</p>
+                                </div>
+                            </div>
+
+                            <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsBatchModalOpen(false)}
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all"
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button 
+                                    type="submit"
+                                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/10"
+                                >
+                                    Áp dụng phân loại
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* --- MODAL FORM THÊM MỚI / CHỈNH SỬA --- */}
             {isFormOpen && (
@@ -1398,32 +1673,92 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-600 block">Ngày tiếp nhận</label>
-                                    <input 
-                                        type="date" 
-                                        className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
-                                        value={formData.ngayTiepNhan}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ngayTiepNhan: e.target.value }))}
-                                    />
+                                    <div className="flex gap-1 items-center">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ví dụ: 21/11/2025 14:41:12"
+                                            className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
+                                            value={formData.ngayTiepNhan}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayTiepNhan: e.target.value }))}
+                                        />
+                                        <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
+                                            <input 
+                                                type="date"
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val) {
+                                                        const parts = val.split('-');
+                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                        setFormData(prev => ({ ...prev, ngayTiepNhan: formatted }));
+                                                    }
+                                                }}
+                                            />
+                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                <Calendar size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-600 block">Ngày hẹn trả</label>
-                                    <input 
-                                        type="date" 
-                                        className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
-                                        value={formData.ngayHenTra}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ngayHenTra: e.target.value }))}
-                                    />
+                                    <div className="flex gap-1 items-center">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ví dụ: 28/11/2025"
+                                            className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
+                                            value={formData.ngayHenTra}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayHenTra: e.target.value }))}
+                                        />
+                                        <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
+                                            <input 
+                                                type="date"
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val) {
+                                                        const parts = val.split('-');
+                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                        setFormData(prev => ({ ...prev, ngayHenTra: formatted }));
+                                                    }
+                                                }}
+                                            />
+                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                <Calendar size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-600 block">Ngày kết thúc xử lý</label>
-                                    <input 
-                                        type="date" 
-                                        className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
-                                        value={formData.ngayKetThuc}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ngayKetThuc: e.target.value }))}
-                                    />
+                                    <div className="flex gap-1 items-center">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ví dụ: 26/11/2025"
+                                            className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
+                                            value={formData.ngayKetThuc}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayKetThuc: e.target.value }))}
+                                        />
+                                        <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
+                                            <input 
+                                                type="date"
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val) {
+                                                        const parts = val.split('-');
+                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                        setFormData(prev => ({ ...prev, ngayKetThuc: formatted }));
+                                                    }
+                                                }}
+                                            />
+                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                <Calendar size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

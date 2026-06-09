@@ -16,14 +16,57 @@ export interface IGateRecord {
     trangThai: string;      // Trạng thái hồ sơ
 }
 
+function parseSafeDate(dateStr: string | null | undefined): string | null {
+    if (!dateStr) return null;
+    const trimmed = dateStr.trim();
+    if (!trimmed || trimmed === '' || trimmed.toLowerCase() === 'null') return null;
+    
+    // Tách phần ngày và giờ
+    const parts = trimmed.split(/\s+/);
+    const datePart = parts[0];
+    const timePart = parts[1] || '';
+    
+    let parsedDate = '';
+    
+    // Định dạng YYYY-MM-DD chuẩn
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+        parsedDate = datePart;
+    }
+    // Nếu có dạng DD/MM/YYYY hoặc D/M/YYYY, tự chuyển sang YYYY-MM-DD
+    else {
+        const ddmmyyyyMatch = datePart.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+        if (ddmmyyyyMatch) {
+             const day = ddmmyyyyMatch[1].padStart(2, '0');
+             const month = ddmmyyyyMatch[2].padStart(2, '0');
+             const year = ddmmyyyyMatch[3];
+             parsedDate = `${year}-${month}-${day}`;
+        }
+    }
+    
+    if (parsedDate) {
+        return timePart ? `${parsedDate} ${timePart}` : parsedDate;
+    }
+    
+    try {
+        const parsed = new Date(trimmed);
+        if (!isNaN(parsed.getTime())) {
+            const datePartIso = parsed.toISOString().split('T')[0];
+            const timePartIso = parsed.toISOString().split('T')[1].split('.')[0];
+            return timePartIso && timePartIso !== '00:00:00' ? `${datePartIso} ${timePartIso}` : datePartIso;
+        }
+    } catch (e) {}
+
+    return null;
+}
+
 export const mapIGateToDb = (r: IGateRecord) => ({
     id: r.id,
     so_hieu: r.soHieu,
     ten_thu_tuc: r.tenThuTuc,
     ten_linh_vuc: r.tenLinhVuc,
-    ngay_tiep_nhan: r.ngayTiepNhan || null,
-    ngay_hen_tra: r.ngayHenTra || null,
-    ngay_ket_thuc: r.ngayKetThuc || null,
+    ngay_tiep_nhan: parseSafeDate(r.ngayTiepNhan),
+    ngay_hen_tra: parseSafeDate(r.ngayHenTra),
+    ngay_ket_thuc: parseSafeDate(r.ngayKetThuc),
     don_vi: r.donVi,
     chu_ho_so: r.chuHoSo,
     so_dien_thoai: r.soDienThoai,
@@ -58,22 +101,49 @@ export const fetchIGateRecords = async (defaultRecords: IGateRecord[]): Promise<
         return defaultRecords;
     }
     try {
-        const { data, error } = await supabase.from('igate_records').select('*').order('created_at', { ascending: false });
-        if (error) {
-            if (error.code === '42P01') {
-                console.warn("⚠️ Bảng igate_records chưa được khởi tạo trên Supabase Cloud. Tự động chuyển vùng dữ liệu dự phòng LocalStorage.");
-            } else {
-                throw error;
+        let allData: any[] = [];
+        let from = 0;
+        const limit = 1000;
+        let hasMore = true;
+        
+        while (hasMore) {
+            const { data, error } = await supabase
+                .from('igate_records')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .range(from, from + limit - 1);
+                
+            if (error) {
+                if (error.code === '42P01') {
+                    console.warn("⚠️ Bảng igate_records chưa được khởi tạo trên Supabase Cloud. Tự động chuyển vùng dữ liệu dự phòng LocalStorage.");
+                } else {
+                    throw error;
+                }
+                const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : defaultRecords;
             }
-            const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-            return stored ? JSON.parse(stored) : defaultRecords;
+            
+            if (data && data.length > 0) {
+                allData = [...allData, ...data];
+                if (data.length < limit) {
+                    hasMore = false;
+                } else {
+                    from += limit;
+                }
+            } else {
+                hasMore = false;
+            }
         }
-        if (!data || data.length === 0) {
+        
+        if (allData.length === 0) {
             const mappedDefaults = defaultRecords.map(mapIGateToDb);
             await supabase.from('igate_records').insert(mappedDefaults);
             return defaultRecords;
         }
-        return data.map(mapIGateFromDb);
+        
+        const mapped = allData.map(mapIGateFromDb);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+        return mapped;
     } catch (e) {
         logError("fetchIGateRecords", e);
         const stored = localStorage.getItem(LOCAL_STORAGE_KEY);

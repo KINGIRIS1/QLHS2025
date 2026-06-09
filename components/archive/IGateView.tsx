@@ -251,6 +251,14 @@ const getNowVietnameseString = (): string => {
     return `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
 };
 
+const getTodayString = (): string => {
+    const today = new Date();
+    const d = today.getDate().toString().padStart(2, '0');
+    const m = (today.getMonth() + 1).toString().padStart(2, '0');
+    const y = today.getFullYear();
+    return `${d}/${m}/${y}`;
+};
+
 const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<IGateRecord[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -272,6 +280,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
     const [batchStatus, setBatchStatus] = useState<string>('');
     const [batchCanBo, setBatchCanBo] = useState<string>('');
+    const [batchDate, setBatchDate] = useState<string>('');
 
     // Modal Form States
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -291,6 +300,81 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [viewingRecord, setViewingRecord] = useState<IGateRecord | null>(null);
+    const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
+    const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+        try {
+            const saved = localStorage.getItem('igate_visible_columns');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return {
+                    stt: parsed.stt !== undefined ? parsed.stt : true,
+                    thongTinHoSo: parsed.thongTinHoSo !== undefined ? parsed.thongTinHoSo : true,
+                    tenThuTuc: parsed.tenThuTuc !== undefined ? parsed.tenThuTuc : true,
+                    tenLinhVuc: parsed.tenLinhVuc !== undefined ? parsed.tenLinhVuc : true,
+                    thoiHanXuLy: parsed.thoiHanXuLy !== undefined ? parsed.thoiHanXuLy : true,
+                    ngayKetThuc: parsed.ngayKetThuc !== undefined ? parsed.ngayKetThuc : true,
+                    donVi: parsed.donVi !== undefined ? parsed.donVi : true,
+                    canBoXuLy: parsed.canBoXuLy !== undefined ? parsed.canBoXuLy : true,
+                    trangThai: parsed.trangThai !== undefined ? parsed.trangThai : true,
+                };
+            }
+        } catch (e) {
+            console.error('Lỗi khi đọc visibleColumns từ localStorage', e);
+        }
+        return {
+            stt: true,
+            thongTinHoSo: true,
+            tenThuTuc: true,
+            tenLinhVuc: true,
+            thoiHanXuLy: true,
+            ngayKetThuc: true,
+            donVi: true,
+            canBoXuLy: true,
+            trangThai: true,
+        };
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('igate_visible_columns', JSON.stringify(visibleColumns));
+        } catch (e) {
+            console.error('Lỗi khi lưu visibleColumns vào localStorage', e);
+        }
+    }, [visibleColumns]);
+    const columnDropdownRef = useRef<HTMLDivElement>(null);
+
+    const columnsList = [
+        { key: 'stt', label: 'STT' },
+        { key: 'thongTinHoSo', label: 'Thông tin hồ sơ' },
+        { key: 'tenThuTuc', label: 'Tên thủ tục' },
+        { key: 'tenLinhVuc', label: 'Tên lĩnh vực' },
+        { key: 'thoiHanXuLy', label: 'Thời hạn xử lý' },
+        { key: 'ngayKetThuc', label: 'Ngày kết thúc' },
+        { key: 'donVi', label: 'Cơ quan/đơn vị' },
+        { key: 'canBoXuLy', label: 'Cán bộ xử lý' },
+        { key: 'trangThai', label: 'Trạng thái' },
+    ];
+
+    const toggleColumn = (key: string) => {
+        setVisibleColumns(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (columnDropdownRef.current && !columnDropdownRef.current.contains(event.target as Node)) {
+                setIsColumnDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
 
     // Tải dữ liệu từ database / API
     const loadData = async () => {
@@ -413,8 +497,20 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             return;
         }
 
+        const statesWithDate = [
+            "Đã chuyển thông tin thuế",
+            "Đã phát hành thông báo thuế",
+            "Chờ thực hiện nghĩa vụ tài chính",
+            "Đã ký Giấy chứng nhận",
+            "Chưa trả kết quả",
+            "Đã trả kết quả"
+        ];
+
         let confirmMsg = `Bạn có chắc chắn muốn cập nhật hàng loạt cho ${selectedIds.size} hồ sơ đã chọn không?`;
         if (batchStatus) confirmMsg += `\n- Cập nhật trạng thái mới: ${batchStatus}`;
+        if (batchStatus && statesWithDate.includes(batchStatus) && batchDate) {
+            confirmMsg += `\n- Gán ngày của trạng thái: ${batchDate}`;
+        }
         if (batchCanBo) confirmMsg += `\n- Phân công cán bộ xử lý: ${batchCanBo}`;
 
         if (window.confirm(confirmMsg)) {
@@ -423,10 +519,8 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     const updatedRecord = { ...r };
                     if (batchStatus) {
                         updatedRecord.trangThai = batchStatus;
-                        if (batchStatus === 'Đã trả kết quả') {
-                            updatedRecord.ngayKetThuc = r.ngayKetThuc || new Date().toISOString().split('T')[1] 
-                                ? new Date().toISOString().split('T')[0] 
-                                : getNowVietnameseString().split(' ')[0];
+                        if (statesWithDate.includes(batchStatus)) {
+                            updatedRecord.ngayKetThuc = batchDate || r.ngayKetThuc || getTodayString();
                         }
                     }
                     if (batchCanBo) {
@@ -545,6 +639,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             return diffDays > 90;
         }).length;
 
+        // Hồ sơ đã trả kết quả
+        const daTraKQ = records.filter(r => r.trangThai === 'Đã trả kết quả').length;
+
         return {
             total,
             newReceipt,
@@ -558,7 +655,8 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 daKyGCN,
                 chuaTraKQ
             },
-            ton90Ngay: countTon90Ngay
+            ton90Ngay: countTon90Ngay,
+            daTraKQ
         };
     }, [records]);
 
@@ -958,11 +1056,13 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     return (
         <div className="space-y-6">
             {/* --- DASHBOARD METRICS CONTROLS --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 {/* 1. Tổng số hồ sơ */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Tất cả'); setSelectedLinhVucFilter('Tất cả'); }}
-                    className="cursor-pointer bg-gradient-to-br from-indigo-50 to-white hover:from-indigo-100 rounded-2xl border border-indigo-100 p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group"
+                    onClick={() => { setSelectedTrangThaiFilter('Tất cả'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    className={`cursor-pointer bg-gradient-to-br from-indigo-50 to-white hover:from-indigo-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
+                        selectedTrangThaiFilter === 'Tất cả' && !showOnlyTon90Days ? 'ring-4 ring-indigo-500/30 border-indigo-300' : 'border-indigo-100'
+                    }`}
                 >
                     <div className="absolute right-0 bottom-0 text-indigo-500/10 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform">
                         <Building size={110} />
@@ -977,8 +1077,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 2. Mới tiếp nhận */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Mới tiếp nhận'); setSelectedLinhVucFilter('Tất cả'); }}
-                    className="cursor-pointer bg-gradient-to-br from-sky-50 to-white hover:from-sky-100 rounded-2xl border border-sky-100 p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group"
+                    onClick={() => { setSelectedTrangThaiFilter('Mới tiếp nhận'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    className={`cursor-pointer bg-gradient-to-br from-sky-50 to-white hover:from-sky-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
+                        selectedTrangThaiFilter === 'Mới tiếp nhận' && !showOnlyTon90Days ? 'ring-4 ring-sky-500/30 border-sky-300' : 'border-sky-100'
+                    }`}
                 >
                     <div className="absolute right-0 bottom-0 text-sky-500/10 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform">
                         <ClipboardList size={110} />
@@ -993,8 +1095,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 3. Chờ thuế */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Đã chuyển thông tin thuế'); setSelectedLinhVucFilter('Tất cả'); }}
-                    className="cursor-pointer bg-gradient-to-br from-orange-50 to-white hover:from-orange-100 rounded-2xl border border-orange-100 p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group"
+                    onClick={() => { setSelectedTrangThaiFilter('Đã chuyển thông tin thuế'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    className={`cursor-pointer bg-gradient-to-br from-orange-50 to-white hover:from-orange-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
+                        (selectedTrangThaiFilter === 'Đã chuyển thông tin thuế' || selectedTrangThaiFilter === 'Chờ thực hiện nghĩa vụ tài chính') && !showOnlyTon90Days ? 'ring-4 ring-orange-500/30 border-orange-300' : 'border-orange-100'
+                    }`}
                 >
                     <div className="absolute right-0 bottom-0 text-orange-500/10 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform">
                         <FileText size={110} />
@@ -1021,8 +1125,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 4. Chờ trả kết quả */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Đã ký Giấy chứng nhận'); setSelectedLinhVucFilter('Tất cả'); }}
-                    className="cursor-pointer bg-gradient-to-br from-teal-50 to-white hover:from-teal-100 rounded-2xl border border-teal-100 p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group"
+                    onClick={() => { setSelectedTrangThaiFilter('Đã ký Giấy chứng nhận'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    className={`cursor-pointer bg-gradient-to-br from-teal-50 to-white hover:from-teal-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
+                        (selectedTrangThaiFilter === 'Đã ký Giấy chứng nhận' || selectedTrangThaiFilter === 'Chưa trả kết quả') && !showOnlyTon90Days ? 'ring-4 ring-teal-500/30 border-teal-300' : 'border-teal-100'
+                    }`}
                 >
                     <div className="absolute right-0 bottom-0 text-teal-500/10 translate-x-3 translate-y-3 group-hover:scale-110 transition-transform">
                         <CheckCircle2 size={110} />
@@ -1047,7 +1153,25 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     </div>
                 </div>
 
-                {/* 5. Tồn trên 90 ngày */}
+                {/* 5. Đã trả kết quả */}
+                <div 
+                    onClick={() => { setSelectedTrangThaiFilter('Đã trả kết quả'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    className={`cursor-pointer bg-gradient-to-br from-emerald-50 to-white hover:from-emerald-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
+                        selectedTrangThaiFilter === 'Đã trả kết quả' && !showOnlyTon90Days ? 'ring-4 ring-emerald-500/30 border-emerald-300' : 'border-emerald-100'
+                    }`}
+                >
+                    <div className="absolute right-0 bottom-0 text-emerald-500/10 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform">
+                        <CheckCircle2 size={110} />
+                    </div>
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="p-2.5 bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-500/20"><CheckCircle2 size={20} /></span>
+                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Hoàn tất</span>
+                    </div>
+                    <h3 className="text-xs font-bold text-emerald-900/60 uppercase tracking-widest">Đã trả kết quả</h3>
+                    <p className="text-3xl font-bold text-emerald-950 mt-1">{stats.daTraKQ}</p>
+                </div>
+
+                {/* 6. Tồn trên 90 ngày */}
                 <div 
                     onClick={() => {
                         setShowOnlyTon90Days(!showOnlyTon90Days);
@@ -1211,21 +1335,82 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         />
                     </div>
                     
-                    {/* Chọn lĩnh vực */}
-                    <div className="w-full md:w-auto flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 min-w-[200px]">
-                        <Filter size={16} className="text-slate-500" />
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Lĩnh vực:</span>
-                        <select 
-                            className="text-xs outline-none bg-transparent text-slate-700 font-semibold cursor-pointer border-none flex-1 focus:ring-0"
-                            value={selectedLinhVucFilter}
-                            onChange={(e) => {
-                                setSelectedLinhVucFilter(e.target.value);
-                                setSelectedIds(new Set());
-                            }}
-                        >
-                            <option value="Tất cả">Tất cả lĩnh vực</option>
-                            {LINH_VUC_LIST.map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
+                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        {/* Chọn lĩnh vực */}
+                        <div className="w-full sm:w-auto md:w-auto flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 min-w-[200px]">
+                            <Filter size={16} className="text-slate-500" />
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Lĩnh vực:</span>
+                            <select 
+                                className="text-xs outline-none bg-transparent text-slate-700 font-semibold cursor-pointer border-none flex-1 focus:ring-0"
+                                value={selectedLinhVucFilter}
+                                onChange={(e) => {
+                                    setSelectedLinhVucFilter(e.target.value);
+                                    setSelectedIds(new Set());
+                                }}
+                            >
+                                <option value="Tất cả">Tất cả lĩnh vực</option>
+                                {LINH_VUC_LIST.map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Cột hiển thị */}
+                        <div className="relative" ref={columnDropdownRef}>
+                            <button 
+                                onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all cursor-pointer w-full sm:w-auto justify-center"
+                                title="Tùy chọn cột hiển thị"
+                            >
+                                <LayoutGrid size={15} className="text-indigo-650" />
+                                <span>Cột hiển thị</span>
+                            </button>
+                            {isColumnDropdownOpen && (
+                                <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white border border-slate-150 shadow-lg z-30 p-3.5 space-y-2 text-xs text-slate-700 font-medium">
+                                    <p className="font-bold text-indigo-950 mb-1.5 pb-1 border-b border-slate-100 flex items-center justify-between">
+                                        <span>Chọn cột hiển thị</span>
+                                    </p>
+                                    <div className="max-h-60 overflow-y-auto space-y-2">
+                                        {columnsList.map(col => (
+                                            <label key={col.key} className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 font-semibold text-slate-600 transition-colors select-none">
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={visibleColumns[col.key]}
+                                                    onChange={() => toggleColumn(col.key)}
+                                                    className="rounded border-slate-300 text-indigo-600 h-3.5 w-3.5 focus:ring-0"
+                                                />
+                                                <span>{col.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <div className="pt-2 border-t border-slate-100 flex justify-between gap-2">
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                const allOn = { ...visibleColumns };
+                                                Object.keys(allOn).forEach(k => allOn[k] = true);
+                                                setVisibleColumns(allOn);
+                                            }}
+                                            className="text-[10px] text-indigo-650 hover:underline font-bold cursor-pointer"
+                                        >
+                                            Hiện tất cả
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                const defaultOn = {
+                                                    stt: true, thongTinHoSo: true,
+                                                    tenThuTuc: true, tenLinhVuc: true, thoiHanXuLy: true,
+                                                    ngayKetThuc: true, donVi: true, canBoXuLy: true, trangThai: true
+                                                };
+                                                setVisibleColumns(defaultOn);
+                                            }}
+                                            className="text-[10px] text-slate-500 hover:underline font-bold cursor-pointer"
+                                        >
+                                            Mặc định
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -1310,32 +1495,35 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             onClick={() => {
                                 setBatchStatus('');
                                 setBatchCanBo('');
+                                setBatchDate(getTodayString());
                                 setIsBatchModalOpen(true);
                             }}
                             className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
                         >
-                            <Tag size={14} /> Phân loại
+                            <Tag size={14} /> Phân loại hay chuyển cán bộ
                         </button>
 
-                        {/* Xóa hàng loạt */}
-                        <button
-                            onClick={() => {
-                                if (window.confirm(`CẢNH BÁO: Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedIds.size} hồ sơ iGate đã chọn không?`)) {
-                                    const updated = records.filter(r => !selectedIds.has(r.id));
-                                    saveRecords(updated);
-                                    setSelectedIds(new Set());
-                                    alert(`Đã xóa thành công ${selectedIds.size} hồ sơ!`);
-                                }
-                            }}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all shadow-xs"
-                        >
-                            <Trash2 size={14} /> Xóa đã chọn
-                        </button>
+                        {/* Xóa hàng loạt - Chỉ Admin mới có nút này */}
+                        {currentUser?.role === UserRole.ADMIN && (
+                            <button
+                                onClick={() => {
+                                    if (window.confirm(`CẢNH BÁO: Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedIds.size} hồ sơ iGate đã chọn không?`)) {
+                                        const updated = records.filter(r => !selectedIds.has(r.id));
+                                        saveRecords(updated);
+                                        setSelectedIds(new Set());
+                                        alert(`Đã xóa thành công ${selectedIds.size} hồ sơ!`);
+                                    }
+                                }}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            >
+                                <Trash2 size={14} /> Xóa đã chọn
+                            </button>
+                        )}
                         
                         {/* Hủy chọn */}
                         <button
                             onClick={() => setSelectedIds(new Set())}
-                            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
                             title="Bỏ chọn tất cả"
                         >
                             <X size={16} />
@@ -1347,10 +1535,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             {/* --- PRIMARY DATA TABLE --- */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left table-fixed min-w-[2000px]">
-                        <thead className="bg-[#1E293B] text-slate-300 text-xs font-bold uppercase sticky top-0 z-10">
+                    <table className="w-full text-left table-fixed min-w-[1720px]">
+                        <thead className="bg-[#1E293B] text-slate-300 text-xs font-semibold uppercase sticky top-0 z-10">
                             <tr>
-                                <th className="p-4 w-12 text-center">
+                                <th className="px-3 py-3.5 w-11 text-center">
                                     <input 
                                         type="checkbox"
                                         checked={filteredRecords.length > 0 && filteredRecords.every(r => selectedIds.has(r.id))}
@@ -1364,19 +1552,16 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         className="rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 cursor-pointer h-4 w-4"
                                     />
                                 </th>
-                                <th className="p-4 w-12 text-center text-slate-400">STT</th>
-                                <th className="p-4 w-[180px]">Số hồ sơ</th>
-                                <th className="p-4 w-[220px]">Chủ hồ sơ</th>
-                                <th className="p-4 w-[130px]">Số điện thoại</th>
-                                <th className="p-4 w-[420px]">Tên thủ tục hành chính</th>
-                                <th className="p-4 w-[160px]">Tên lĩnh vực</th>
-                                <th className="p-4 w-[130px] text-center">Tiếp nhận</th>
-                                <th className="p-4 w-[130px] text-center">Hẹn trả</th>
-                                <th className="p-4 w-[130px] text-center">Kết thúc</th>
-                                <th className="p-4 w-[240px]">Cơ quan/đơn vị</th>
-                                <th className="p-4 w-[180px]">Cán bộ xử lý</th>
-                                <th className="p-4 w-[200px] text-center">Trạng thái hồ sơ</th>
-                                <th className="p-4 w-[120px] text-center sticky right-0 bg-[#1E293B] shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">Hành động</th>
+                                {visibleColumns.stt && <th className="px-3 py-3.5 w-12 text-center text-slate-400">STT</th>}
+                                {visibleColumns.thongTinHoSo && <th className="px-3 py-3.5 w-[240px]">Thông tin hồ sơ</th>}
+                                {visibleColumns.tenThuTuc && <th className="px-3 py-3.5 w-[280px]">Tên thủ tục hành chính</th>}
+                                {visibleColumns.tenLinhVuc && <th className="px-3 py-3.5 w-[160px]">Tên lĩnh vực</th>}
+                                {visibleColumns.thoiHanXuLy && <th className="px-3 py-3.5 w-[200px] text-center">Thời hạn xử lý</th>}
+                                {visibleColumns.ngayKetThuc && <th className="px-3 py-3.5 w-[120px] text-center">Kết thúc</th>}
+                                {visibleColumns.donVi && <th className="px-3 py-3.5 w-[180px]">Cơ quan/đơn vị</th>}
+                                {visibleColumns.canBoXuLy && <th className="px-3 py-3.5 w-[160px]">Cán bộ xử lý</th>}
+                                {visibleColumns.trangThai && <th className="px-3 py-3.5 w-[170px] text-center">Trạng thái hồ sơ</th>}
+                                <th className="px-3 py-3.5 w-[140px] text-center sticky right-0 bg-[#1E293B] shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
@@ -1384,17 +1569,17 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 // Kiểm tra quá hạn dùng parseToDateObject
                                 const henTraDate = parseToDateObject(r.ngayHenTra);
                                 const isOverdue = r.trangThai !== 'Đã trả kết quả' && henTraDate && new Date() > henTraDate;
-
+ 
                                 // Style Trạng thái
                                 let statusBadge = "bg-slate-100 text-slate-700 border-slate-200";
                                 if (r.trangThai === 'Mới tiếp nhận') statusBadge = "bg-sky-50 text-sky-700 border-sky-100";
                                 else if (r.trangThai === 'Đã chuyển thông tin thuế') statusBadge = "bg-orange-50 text-orange-600 border-orange-100";
                                 else if (r.trangThai === 'Đã phát hành thông báo thuế') statusBadge = "bg-amber-100 text-amber-800 border-amber-200";
-                                else if (r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính') statusBadge = "bg-orange-150 text-orange-800 border-orange-200";
+                                else if (r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính') statusBadge = "bg-orange-150 text-orange-850 border-orange-200";
                                 else if (r.trangThai === 'Đã ký Giấy chứng nhận') statusBadge = "bg-teal-50 text-teal-700 border-teal-150";
                                 else if (r.trangThai === 'Chưa trả kết quả') statusBadge = "bg-yellow-50 text-yellow-800 border-yellow-200 font-medium";
                                 else if (r.trangThai === 'Đã trả kết quả') statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-100 font-bold";
-
+ 
                                 return (
                                     <tr 
                                         key={r.id} 
@@ -1408,7 +1593,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                         : ''
                                         }`}
                                     >
-                                        <td className="p-4 text-center">
+                                        <td className="px-3 py-3 text-center text-xs align-middle">
                                             <input 
                                                 type="checkbox"
                                                 checked={selectedIds.has(r.id)}
@@ -1424,72 +1609,127 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4"
                                             />
                                         </td>
-                                        <td className="p-4 text-center text-slate-400 font-bold">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                                        <td className="p-4 font-mono font-bold text-slate-900">{r.soHieu}</td>
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
-                                                    {r.chuHoSo.charAt(0).toUpperCase()}
+                                        {visibleColumns.stt && <td className="px-3 py-3 text-center text-slate-400 font-bold text-xs align-middle">{(currentPage - 1) * itemsPerPage + idx + 1}</td>}
+                                        {visibleColumns.thongTinHoSo && (
+                                            /* test comment */
+                                            <td className="px-3 py-3 text-xs align-middle">
+                                                <div className="flex flex-col gap-1">
+                                                    {/* Số hồ sơ */}
+                                                    <div className="flex items-center gap-1.5 mb-0.5 bg-indigo-50/60 border border-indigo-100 px-2 py-0.5 rounded-lg w-fit">
+                                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Mã số:</span>
+                                                        <span className="font-mono font-extrabold text-[#1E293B] text-[14px]">{r.soHieu}</span>
+                                                    </div>
+                                                    {/* Chủ hồ sơ */}
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                                                            {r.chuHoSo ? r.chuHoSo.charAt(0).toUpperCase() : '?'}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <span className="font-bold text-slate-800 block truncate max-w-[180px] text-[14px]" title={r.chuHoSo}>{r.chuHoSo}</span>
+                                                        </div>
+                                                    </div>
+                                                    {/* Số điện thoại */}
+                                                    {r.soDienThoai ? (
+                                                        <div className="flex items-center gap-1 mt-0.5 text-xs text-slate-500 font-mono">
+                                                            <Phone size={12} className="text-slate-400 shrink-0" />
+                                                            <span>{r.soDienThoai}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400 italic text-[11px] mt-0.5">- Không SĐT -</span>
+                                                    )}
                                                 </div>
-                                                <div>
-                                                    <span className="font-semibold text-slate-800 block">{r.chuHoSo}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.tenThuTuc && (
+                                            <td className="px-3 py-3 text-slate-600 leading-tight text-xs align-middle" title={r.tenThuTuc}>
+                                                <div className="line-clamp-2 text-xs font-semibold text-slate-700 leading-snug max-w-[250px]" title={r.tenThuTuc}>
+                                                    {r.tenThuTuc || '-'}
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 font-mono text-slate-550">{r.soDienThoai || '-'}</td>
-                                        <td className="p-4 text-slate-600 leading-tight pr-6">{r.tenThuTuc}</td>
-                                        <td className="p-4">
-                                            <span className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.8 rounded-md font-bold">
-                                                {r.tenLinhVuc}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-center font-mono">{formatDisplayDateInClient(r.ngayTiepNhan)}</td>
-                                        <td className="p-4 text-center font-mono">
-                                            <div className="flex flex-col items-center justify-center font-medium">
-                                                <span>{formatDisplayDateInClient(r.ngayHenTra)}</span>
-                                                {isOverdue && (
-                                                    <span className="text-[10px] text-red-600 font-bold bg-red-100 px-1.5 rounded mt-0.5 animate-pulse">Trễ hẹn</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center font-mono text-emerald-600 font-bold">
-                                            {formatDisplayDateInClient(r.ngayKetThuc)}
-                                        </td>
-                                        <td className="p-4 text-slate-550">{r.donVi}</td>
-                                        <td className="p-4 text-slate-700">
-                                            <div className="flex items-center gap-1.5">
-                                                <UserIcon size={14} className="text-slate-400" />
-                                                <span>{r.canBoXuLy || '-'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${statusBadge}`}>
-                                                {r.trangThai}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-center sticky right-0 bg-white shadow-[-4px_0_10px_rgba(0,0,0,0.04)]">
-                                            <div className="flex justify-center gap-1">
+                                            </td>
+                                        )}
+                                        {visibleColumns.tenLinhVuc && (
+                                            <td className="px-3 py-3 text-xs align-middle">
+                                                <span className="text-xs bg-slate-100/80 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-bold inline-block max-w-[140px] truncate" title={r.tenLinhVuc}>
+                                                    {r.tenLinhVuc || '-'}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.thoiHanXuLy && (
+                                            <td className="px-3 py-3 text-center text-xs align-middle">
+                                                <div className="flex flex-col gap-1.5 items-center justify-center animate-fade-in">
+                                                    <div className="flex items-center gap-1.5 text-xs">
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[64px] text-right">T/Nhận:</span>
+                                                        <span className="font-mono text-slate-700 font-semibold bg-slate-100 border border-slate-150 px-1.5 py-0.5 rounded-md">{formatDisplayDateInClient(r.ngayTiepNhan)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider w-[64px] text-right whitespace-nowrap">Hẹn trả:</span>
+                                                        <span className="font-mono text-indigo-900 font-bold bg-indigo-50/50 border border-indigo-150 px-1.5 py-0.5 rounded-md">{formatDisplayDateInClient(r.ngayHenTra)}</span>
+                                                    </div>
+                                                    {isOverdue && (
+                                                        <span className="text-[9px] text-red-650 font-bold bg-red-100 border border-red-150 px-2 py-0.5 rounded-md mt-1 animate-pulse uppercase tracking-wider">Trễ hẹn</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.ngayKetThuc && (
+                                            <td className="px-3 py-3 text-center font-mono text-emerald-650 font-bold bg-emerald-50/10 text-xs align-middle">
+                                                {formatDisplayDateInClient(r.ngayKetThuc) || '-'}
+                                            </td>
+                                        )}
+                                        {visibleColumns.donVi && (
+                                            <td className="px-3 py-3 text-slate-550 text-xs align-middle" title={r.donVi}>
+                                                <div className="truncate max-w-[150px] text-xs font-semibold text-slate-600" title={r.donVi}>
+                                                    {r.donVi}
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.canBoXuLy && (
+                                            <td className="px-3 py-3 text-slate-700 text-xs align-middle">
+                                                <div className="flex items-center gap-1.5 max-w-[140px] truncate" title={r.canBoXuLy || '-'}>
+                                                    <UserIcon size={14} className="text-slate-400 shrink-0" />
+                                                    <span className="truncate text-xs font-semibold text-slate-700">{r.canBoXuLy || '-'}</span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.trangThai && (
+                                            <td className="px-3 py-3 text-center text-xs align-middle">
+                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadge}`}>
+                                                    {r.trangThai}
+                                                </span>
+                                            </td>
+                                        )}
+                                        <td className="px-3 py-3 text-center sticky right-0 bg-white shadow-[-4px_0_10px_rgba(0,0,0,0.04)] text-xs align-middle">
+                                            <div className="flex justify-center gap-1 shadow-[-8px_0_10px_-4px_rgba(0,0,0,0.04)]">
+                                                <button 
+                                                    onClick={() => setViewingRecord(r)} 
+                                                    className="p-1 px-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 rounded text-xs font-bold transition-all cursor-pointer"
+                                                    title="Xem chi tiết đầy đủ hồ sơ"
+                                                >
+                                                    Xem
+                                                </button>
                                                 <button 
                                                     onClick={() => handleEdit(r)} 
-                                                    className="p-1 px-2.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg text-xs font-bold transition-all"
+                                                    className="p-1 px-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700 rounded text-xs font-bold transition-all cursor-pointer"
                                                     title="Chỉnh sửa chi tiết"
                                                 >
                                                     Sửa
                                                 </button>
-                                                <button 
-                                                    onClick={() => handleDelete(r.id, r.soHieu)} 
-                                                    className="p-1 px-2.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg text-xs font-bold transition-all"
-                                                    title="Xóa hồ sơ"
-                                                >
-                                                    Xóa
-                                                </button>
+                                                {currentUser?.role === UserRole.ADMIN && (
+                                                    <button 
+                                                        onClick={() => handleDelete(r.id, r.soHieu)} 
+                                                        className="p-1 px-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded text-xs font-bold transition-all cursor-pointer"
+                                                        title="Xóa hồ sơ"
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
                                 );
                             }) : (
                                 <tr>
-                                    <td colSpan={13} className="p-16 text-center text-slate-400">
+                                    <td colSpan={Object.values(visibleColumns).filter(v => v).length + 2} className="p-16 text-center text-slate-400">
                                         <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
                                         <p className="font-bold">Không tìm thấy hồ sơ iGate nào phù hợp</p>
                                         <p className="text-xs text-slate-400 mt-1">Vui lòng thay đổi từ khóa tìm kiếm hoặc lọc phân loại khác</p>
@@ -1586,6 +1826,47 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     {TRANG_THAI_LIST.map(st => <option key={st} value={st}>{st}</option>)}
                                 </select>
                             </div>
+
+                            {/* Trường chọn ngày gán cho trạng thái mới từ Đã chuyển thông tin thuế trở đi */}
+                            {batchStatus && [
+                                "Đã chuyển thông tin thuế",
+                                "Đã phát hành thông báo thuế",
+                                "Chờ thực hiện nghĩa vụ tài chính",
+                                "Đã ký Giấy chứng nhận",
+                                "Chưa trả kết quả",
+                                "Đã trả kết quả"
+                            ].includes(batchStatus) && (
+                                <div className="space-y-1.5 animate-fade-in bg-slate-50 border border-slate-150 p-3 rounded-xl">
+                                    <label className="text-xs font-bold text-indigo-900 block">Ngày áp dụng cho [{batchStatus}]</label>
+                                    <div className="flex gap-1 items-center mt-1">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ví dụ: 28/11/2025"
+                                            className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg outline-none text-slate-800 font-semibold focus:border-indigo-500 transition-all"
+                                            value={batchDate}
+                                            onChange={(e) => setBatchDate(e.target.value)}
+                                        />
+                                        <div className="relative shrink-0 w-8 h-8 flex items-center justify-center">
+                                            <input 
+                                                type="date"
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val) {
+                                                        const parts = val.split('-');
+                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                        setBatchDate(formatted);
+                                                    }
+                                                }}
+                                            />
+                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center transition-all" title="Chọn ngày">
+                                                <Calendar size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Bỏ trống nếu muốn giữ nguyên ngày hiện tại của hồ sơ.</p>
+                                </div>
+                            )}
 
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-600 block">Cán bộ xử lý mới</label>
@@ -1711,7 +1992,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-600 block">Ngày tiếp nhận</label>
                                     <div className="flex gap-1 items-center">
@@ -1771,36 +2052,6 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Ngày kết thúc xử lý</label>
-                                    <div className="flex gap-1 items-center">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Ví dụ: 26/11/2025"
-                                            className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
-                                            value={formData.ngayKetThuc}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayKetThuc: e.target.value }))}
-                                        />
-                                        <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
-                                            <input 
-                                                type="date"
-                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val) {
-                                                        const parts = val.split('-');
-                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                                                        setFormData(prev => ({ ...prev, ngayKetThuc: formatted }));
-                                                    }
-                                                }}
-                                            />
-                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
-                                                <Calendar size={15} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1817,14 +2068,60 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-600 block">Trạng thái hồ sơ iGate</label>
                                     <select 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-indigo-900 bg-indigo-50"
+                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-indigo-900 bg-indigo-50 font-bold"
                                         value={formData.trangThai}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, trangThai: e.target.value }))}
+                                        onChange={(e) => {
+                                            const newStatus = e.target.value;
+                                            setFormData(prev => ({ 
+                                                ...prev, 
+                                                trangThai: newStatus,
+                                                ngayKetThuc: newStatus !== 'Mới tiếp nhận' && !prev.ngayKetThuc ? getTodayString() : prev.ngayKetThuc
+                                            }));
+                                        }}
                                     >
                                         {TRANG_THAI_LIST.map(t => <option key={t} value={t}>{t}</option>)}
                                     </select>
                                 </div>
                             </div>
+
+                            {formData.trangThai !== 'Mới tiếp nhận' && (
+                                <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-2 animate-fade-in text-left">
+                                    <label className="text-xs font-extrabold text-indigo-950 block flex items-center gap-1.5">
+                                        <Calendar size={14} className="text-indigo-600" />
+                                        <span>Ngày áp dụng cho trạng thái [{formData.trangThai}] <span className="text-red-500">*</span></span>
+                                    </label>
+                                    <div className="flex gap-2 items-center">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ví dụ: 26/11/2025"
+                                            className="w-full text-sm p-3 bg-white border border-slate-200 rounded-xl outline-none text-slate-800 font-bold focus:border-indigo-500 transition-all"
+                                            value={formData.ngayKetThuc}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayKetThuc: e.target.value }))}
+                                            required
+                                        />
+                                        <div className="relative shrink-0 w-11 h-11 flex items-center justify-center">
+                                            <input 
+                                                type="date"
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val) {
+                                                        const parts = val.split('-');
+                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                        setFormData(prev => ({ ...prev, ngayKetThuc: formatted }));
+                                                    }
+                                                }}
+                                            />
+                                            <button type="button" className="w-full h-full p-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-200 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                <Calendar size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-indigo-600 font-semibold italic">
+                                        * Phục vụ cho mục đích thống kê tiến độ từng trạng thái hồ sơ iGate.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-600 block">Cán bộ thụ lý hiện tại</label>
@@ -1841,7 +2138,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 <button 
                                     type="button" 
                                     onClick={() => setIsFormOpen(false)}
-                                    className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl text-sm font-bold transition-all"
+                                    className="px-4 py-2 text-slate-550 hover:bg-slate-100 rounded-xl text-sm font-bold transition-all"
                                 >
                                     Đóng
                                 </button>
@@ -1853,6 +2150,130 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL XEM CHI TIẾT HỒ SƠ --- */}
+            {viewingRecord && (
+                <div id="igate-view-detail-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col animate-scale-up">
+                        <div className="bg-gradient-to-r from-slate-900 via-[#1E293B] to-slate-800 p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base">
+                                <BookOpen size={18} className="text-indigo-400" />
+                                Chi tiết hồ sơ: <span className="font-mono text-indigo-300 font-extrabold">{viewingRecord.soHieu}</span>
+                            </h3>
+                            <button onClick={() => setViewingRecord(null)} className="rounded-lg p-1 hover:bg-white/10 text-white transition-all cursor-pointer"><X size={18} /></button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto max-h-[75vh] space-y-5 text-left">
+                            {/* Khối Trạng thái to làm điểm nhấn */}
+                            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Trạng thái hồ sơ</span>
+                                    <span className={`inline-flex px-3.5 py-1.5 rounded-full text-xs font-bold border ${(() => {
+                                        let b = "bg-slate-100 text-slate-700 border-slate-200";
+                                        if (viewingRecord.trangThai === 'Mới tiếp nhận') b = "bg-sky-50 text-sky-700 border-sky-100";
+                                        else if (viewingRecord.trangThai === 'Đã chuyển thông tin thuế') b = "bg-orange-50 text-orange-600 border-orange-100";
+                                        else if (viewingRecord.trangThai === 'Đã phát hành thông báo thuế') b = "bg-amber-100 text-amber-800 border-amber-200";
+                                        else if (viewingRecord.trangThai === 'Chờ thực hiện nghĩa vụ tài chính') b = "bg-orange-150 text-orange-850 border-orange-200";
+                                        else if (viewingRecord.trangThai === 'Đã ký Giấy chứng nhận') b = "bg-teal-50 text-teal-700 border-teal-150";
+                                        else if (viewingRecord.trangThai === 'Chưa trả kết quả') b = "bg-yellow-50 text-yellow-800 border-yellow-200";
+                                        else if (viewingRecord.trangThai === 'Đã trả kết quả') b = "bg-emerald-50 text-emerald-700 border-emerald-100";
+                                        return b;
+                                    })()}`}>
+                                        {viewingRecord.trangThai}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Cán bộ phụ trách</span>
+                                    <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 font-sans">
+                                        <UserIcon size={14} className="text-slate-400" />
+                                        {viewingRecord.canBoXuLy || 'Chưa gán cán bộ'}
+                                    </span>
+                                </div>
+                                {(() => {
+                                    const henTraDate = parseToDateObject(viewingRecord.ngayHenTra);
+                                    const isOverdue = viewingRecord.trangThai !== 'Đã trả kết quả' && henTraDate && new Date() > henTraDate;
+                                    if (isOverdue) {
+                                        return (
+                                            <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-1.5 rounded-xl text-xs font-bold animate-pulse flex items-center gap-1.5">
+                                                <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                                                <span>Trễ hẹn xử lý</span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                                {/* Cột Trái: Thông tin hành chính */}
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-extrabold text-indigo-900 border-b border-slate-100 pb-1.5 uppercase tracking-wider">Thông tin hành chính</h4>
+                                    
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">CHỦ HỒ SƠ</span>
+                                        <span className="text-sm font-bold text-slate-850 uppercase">{viewingRecord.chuHoSo}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">SỐ ĐIỆN THOẠI</span>
+                                        <span className="text-sm font-mono font-bold text-slate-800">{viewingRecord.soDienThoai || 'Không cung cấp'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">LĨNH VỰC HỒ SƠ</span>
+                                        <span className="text-sm font-semibold text-slate-800">{viewingRecord.tenLinhVuc}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">THỦ TỤC HÀNH CHÍNH</span>
+                                        <span className="text-sm font-medium text-slate-700 leading-relaxed block">{viewingRecord.tenThuTuc}</span>
+                                    </div>
+                                </div>
+
+                                {/* Cột Phải: Lịch trình & Tiến độ */}
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-extrabold text-indigo-900 border-b border-slate-100 pb-1.5 uppercase tracking-wider">Lịch trình & Tiến độ</h4>
+                                    
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">CƠ QUAN THỰC HIỆN</span>
+                                        <span className="text-sm font-semibold text-slate-800">{viewingRecord.donVi}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-indigo-600 block">NGÀY TIẾP NHẬN</span>
+                                        <span className="text-sm font-mono font-bold text-slate-800">{formatDisplayDateInClient(viewingRecord.ngayTiepNhan) || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-orange-600 block">NGÀY HẸN TRẢ</span>
+                                        <span className="text-sm font-mono font-bold text-slate-800">{formatDisplayDateInClient(viewingRecord.ngayHenTra) || 'Chưa lập giấy hẹn'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-emerald-600 block">NGÀY KẾT THÚC THỰC TẾ</span>
+                                        <span className="text-sm font-mono font-bold text-slate-800">{formatDisplayDateInClient(viewingRecord.ngayKetThuc) || 'Đang thụ lý'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-sm">
+                            <button 
+                                onClick={() => {
+                                    setViewingRecord(null);
+                                }}
+                                className="px-4 py-2 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer"
+                            >
+                                Đóng
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const item = viewingRecord;
+                                    setViewingRecord(null);
+                                    handleEdit(item);
+                                }}
+                                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
+                            >
+                                Chỉnh sửa hồ sơ này
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

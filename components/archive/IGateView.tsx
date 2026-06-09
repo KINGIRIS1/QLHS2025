@@ -256,6 +256,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTrangThaiFilter, setSelectedTrangThaiFilter] = useState<string>('Tất cả');
     const [selectedLinhVucFilter, setSelectedLinhVucFilter] = useState<string>('Tất cả');
+    const [showOnlyTon90Days, setShowOnlyTon90Days] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
     // State phân trang cho phần hiển thị dữ liệu
@@ -596,6 +597,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
     // --- BỘ LỌC DANH SÁCH ---
     const filteredRecords = useMemo(() => {
+        const today = new Date();
         return records.filter(r => {
             // Lọc theo từ khóa tìm kiếm (chủ hồ sơ, số hồ sơ, số điện thoại, cán bộ xử lý)
             const keyword = searchTerm.toLowerCase();
@@ -625,9 +627,28 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             // Lọc theo lĩnh vực
             const matchLinhVuc = selectedLinhVucFilter === 'Tất cả' || r.tenLinhVuc === selectedLinhVucFilter;
 
-            return matchSearch && matchTrangThai && matchLinhVuc;
+            // Lọc theo tồn trên 90 ngày
+            let matchTon90Days = true;
+            if (showOnlyTon90Days) {
+                if (r.trangThai === 'Đã trả kết quả' || r.ngayKetThuc) {
+                    matchTon90Days = false;
+                } else if (!r.ngayTiepNhan) {
+                    matchTon90Days = false;
+                } else {
+                    const tiepNhanDate = parseToDateObject(r.ngayTiepNhan);
+                    if (!tiepNhanDate) {
+                        matchTon90Days = false;
+                    } else {
+                        const diffTime = Math.abs(today.getTime() - tiepNhanDate.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        matchTon90Days = diffDays > 90;
+                    }
+                }
+            }
+
+            return matchSearch && matchTrangThai && matchLinhVuc && matchTon90Days;
         });
-    }, [records, searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter]);
+    }, [records, searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter, showOnlyTon90Days]);
 
     // Các bản ghi iGate sau khi phân trang
     const paginatedRecords = useMemo(() => {
@@ -1028,17 +1049,24 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 5. Tồn trên 90 ngày */}
                 <div 
-                    className={`rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
-                        stats.ton90Ngay > 0 
-                            ? 'bg-gradient-to-br from-red-50 to-white border-red-100 hover:from-red-100/80' 
-                            : 'bg-gradient-to-br from-slate-50 to-white border-slate-200'
+                    onClick={() => {
+                        setShowOnlyTon90Days(!showOnlyTon90Days);
+                        setSelectedIds(new Set());
+                        setCurrentPage(1);
+                    }}
+                    className={`rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group cursor-pointer ${
+                        showOnlyTon90Days 
+                            ? 'ring-4 ring-red-500/30 border-red-300 bg-red-100/50' 
+                            : stats.ton90Ngay > 0 
+                                ? 'bg-gradient-to-br from-red-50 to-white border-red-100 hover:from-red-100/80 shadow-red-100/50' 
+                                : 'bg-gradient-to-br from-slate-50 to-white border-slate-200 hover:bg-slate-100/50'
                     }`}
                 >
-                    <div className={`absolute right-0 bottom-0 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform ${stats.ton90Ngay > 0 ? 'text-red-500/10' : 'text-slate-500/5'}`}>
+                    <div className={`absolute right-0 bottom-0 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform ${showOnlyTon90Days || stats.ton90Ngay > 0 ? 'text-red-500/10' : 'text-slate-500/5'}`}>
                         <AlertTriangle size={110} />
                     </div>
                     <div className="flex items-center justify-between mb-4">
-                        <span className={`p-2.5 rounded-xl shadow-md ${stats.ton90Ngay > 0 ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-slate-500 text-white'}`}>
+                        <span className={`p-2.5 rounded-xl shadow-md ${showOnlyTon90Days || stats.ton90Ngay > 0 ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-slate-500 text-white'}`}>
                             <AlertTriangle size={20} />
                         </span>
                         {stats.ton90Ngay > 0 && (
@@ -1048,7 +1076,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         )}
                     </div>
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tồn trên 90 ngày</h3>
-                    <p className={`text-3xl font-bold mt-1 ${stats.ton90Ngay > 0 ? 'text-red-600' : 'text-slate-700'}`}>{stats.ton90Ngay}</p>
+                    <p className={`text-3xl font-bold mt-1 ${showOnlyTon90Days || stats.ton90Ngay > 0 ? 'text-red-600' : 'text-slate-700'}`}>{stats.ton90Ngay}</p>
                 </div>
             </div>
 
@@ -1249,6 +1277,19 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         );
                     })}
                 </div>
+                
+                {showOnlyTon90Days && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-150 text-red-800 px-3 py-2 rounded-xl text-xs font-semibold animate-fade-in mt-2">
+                        <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                        <span>Đang lọc: <b>Hồ sơ tồn đọng trên 90 ngày</b> ({filteredRecords.length} hồ sơ)</span>
+                        <button 
+                            onClick={() => setShowOnlyTon90Days(false)} 
+                            className="ml-auto font-bold text-red-600 hover:text-red-800 bg-red-100/50 hover:bg-red-200/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                            Tắt lọc
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* --- BULK ACTION BAR --- */}

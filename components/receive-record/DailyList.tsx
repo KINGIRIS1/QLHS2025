@@ -87,7 +87,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
           const isSaoLuc = (r.recordType || '').toLowerCase().includes('sao lục');
           const isTax = (r.recordType || '').toLowerCase().includes('thuế chính quy');
           if (isSaoLuc || isTax) return false;
-          if (['CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return false;
+          if (['Cung cấp thông tin', 'CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return false;
           return r.receivedDate === filterDate;
       });
   }, [records, filterDate]);

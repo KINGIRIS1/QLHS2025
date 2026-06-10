@@ -64,6 +64,12 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const [showExportModal, setShowExportModal] = useState(false);
     const [showExportReturnedModal, setShowExportReturnedModal] = useState(false);
 
+    // Return Result Popup State
+    const [showReturnResultModal, setShowReturnResultModal] = useState(false);
+    const [returnResultRecord, setReturnResultRecord] = useState<ArchiveRecord | null>(null);
+    const [receiptNumberInput, setReceiptNumberInput] = useState('');
+    const [receiverNameInput, setReceiverNameInput] = useState('');
+
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
         so_hieu: '',
@@ -372,6 +378,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             return;
         }
 
+        if (newStatus === 'returned') {
+            setReturnResultRecord(record);
+            setReceiptNumberInput(record.data?.so_bien_lai || '');
+            // Đề xuất mặc định người nhận kết quả là chủ sử dụng
+            setReceiverNameInput(record.noi_nhan_gui || record.data?.chu_su_dung || '');
+            setShowReturnResultModal(true);
+            return;
+        }
+
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
@@ -379,7 +394,6 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
             case 'pending_sign': confirmMsg = 'Trình ký hồ sơ này?'; actionName = 'Trình ký'; break;
             case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
-            case 'returned': confirmMsg = 'Xác nhận đã trả kết quả?'; actionName = 'Đã trả kết quả'; break;
             default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 
@@ -402,6 +416,37 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             });
             loadData();
         }
+    };
+
+    const confirmReturnResultSaoLuc = async () => {
+        if (!returnResultRecord) return;
+
+        const historyEntry = {
+            action: 'Đã trả kết quả',
+            status: 'returned',
+            timestamp: new Date().toISOString(),
+            user: currentUser.name
+        };
+        const oldHistory = Array.isArray(returnResultRecord.data?.history) ? returnResultRecord.data.history : [];
+        const newHistory = [...oldHistory, historyEntry];
+
+        const today = new Date().toISOString().split('T')[0];
+
+        await saveArchiveRecord({
+            ...returnResultRecord,
+            status: 'returned',
+            data: {
+                ...returnResultRecord.data,
+                history: newHistory,
+                so_bien_lai: receiptNumberInput,
+                nguoi_nhan_kq: receiverNameInput,
+                ngay_tra_ket_qua: today
+            }
+        });
+
+        setShowReturnResultModal(false);
+        setReturnResultRecord(null);
+        loadData();
     };
 
     const handleBatchStatusChange = async (newStatus: ArchiveRecord['status']) => {
@@ -871,6 +916,74 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     record={detailRecord}
                     getEmployeeName={getEmployeeName}
                 />
+
+                {/* Modal Nhập Số Biên Lai và Người Nhận Kết Quả khi trả */}
+                {showReturnResultModal && returnResultRecord && (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up border border-slate-100">
+                            
+                            {/* Header */}
+                            <div className="p-5 border-b border-emerald-100 bg-emerald-50/50 flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-emerald-800 text-lg flex items-center gap-2">
+                                        <FileCheck size={20} className="text-emerald-600" /> Trả Kết Quả Sao Lục
+                                    </h3>
+                                    <p className="text-xs text-emerald-600 font-medium font-mono bg-emerald-100/50 px-2 py-0.5 rounded w-fit mt-1">Mã HS: {returnResultRecord.so_hieu}</p>
+                                </div>
+                                <button onClick={() => { setShowReturnResultModal(false); setReturnResultRecord(null); }} className="text-slate-400 hover:text-red-500 bg-white/50 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                            </div>
+
+                            <div className="p-6 space-y-5">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                            <FileCheck size={14} className="text-blue-500"/> Số Biên Lai
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none font-medium text-slate-800 placeholder-slate-400 bg-slate-50/50"
+                                            placeholder="Nhập số biên lai..."
+                                            value={receiptNumberInput}
+                                            onChange={(e) => setReceiptNumberInput(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                            <UserIcon size={14} className="text-purple-500"/> Người nhận kết quả <span className="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            required
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none font-medium text-slate-800 placeholder-slate-400 bg-slate-50/50"
+                                            placeholder="Họ tên người nhận kết quả..."
+                                            value={receiverNameInput}
+                                            onChange={(e) => setReceiverNameInput(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-xl text-xs text-slate-500 leading-relaxed border border-slate-100 flex gap-2">
+                                    <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                                    <span>Lưu ý: Hệ thống sẽ tự động cập nhật trạng thái hồ sơ thành <strong>Đã trả kết quả</strong> và lưu lại lịch sử thay đổi.</span>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-3">
+                                    <button type="button" onClick={() => { setShowReturnResultModal(false); setReturnResultRecord(null); }} className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-bold text-sm transition-colors">
+                                        Hủy bỏ
+                                    </button>
+                                    <button 
+                                        onClick={confirmReturnResultSaoLuc}
+                                        disabled={!receiverNameInput.trim()}
+                                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <CheckCircle size={16} /> Xác nhận trả
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Handover List Modal */}
                 <HandoverListModal 

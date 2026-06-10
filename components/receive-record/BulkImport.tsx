@@ -411,7 +411,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                                 </td>
                                 <td className="p-3">
                                     <select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none font-medium text-blue-800 bg-blue-50/50" value={item.recordType ?? ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}>
-                                        {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                     </select>
                                 </td>
                                 <td className="p-3">

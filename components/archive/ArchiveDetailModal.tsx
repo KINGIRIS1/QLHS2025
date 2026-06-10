@@ -143,6 +143,24 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                         <div className="font-bold text-purple-600">{record.data.hen_tra.split('-').reverse().join('/')}</div>
                                     </div>
                                 )}
+                                {record.data?.so_bien_lai && (
+                                    <div className="flex justify-between items-center pt-2 border-t border-blue-100/60">
+                                        <label className="text-xs text-gray-500">Số Biên lai</label>
+                                        <div className="font-bold text-slate-800">{record.data.so_bien_lai}</div>
+                                    </div>
+                                )}
+                                {record.data?.nguoi_nhan_kq && (
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs text-gray-500">Người nhận kết quả</label>
+                                        <div className="font-bold text-slate-800">{record.data.nguoi_nhan_kq}</div>
+                                    </div>
+                                )}
+                                {record.data?.ngay_tra_ket_qua && (
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs text-gray-500">Ngày trả kết quả</label>
+                                        <div className="font-bold text-slate-800">{record.data.ngay_tra_ket_qua.split('-').reverse().join('/')}</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

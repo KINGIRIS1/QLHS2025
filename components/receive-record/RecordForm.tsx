@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
-import { EXTENDED_RECORD_TYPES } from '../../constants';
+import { RECORD_TYPES } from '../../constants';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map } from 'lucide-react';
 
 interface RecordFormProps {
@@ -179,7 +179,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
                     <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2"><span className="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><FileCheck size={16} /></span> Nội dung yêu cầu</h3>
                     <div className="space-y-5 flex-1">
-                        <div className="relative"><label className={labelClass}>Loại hồ sơ <span className="text-red-500">*</span></label><BookOpen size={16} className={iconWrapperClass} /><select className={`${inputClass} appearance-none bg-white cursor-pointer`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}><option value="">-- Chọn loại hồ sơ --</option>{EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                        <div className="relative"><label className={labelClass}>Loại hồ sơ <span className="text-red-500">*</span></label><BookOpen size={16} className={iconWrapperClass} /><select className={`${inputClass} appearance-none bg-white cursor-pointer`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}><option value="">-- Chọn loại hồ sơ --</option>{RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                         <div className="relative"><label className={labelClass}>Nội dung chi tiết</label><textarea rows={6} className="w-full p-4 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white resize-none" value={formData.content || ''} onChange={(e) => handleChange('content', e.target.value)} placeholder="Nhập ghi chú..." /></div>
                         <div className="relative"><label className={labelClass}>Giấy tờ kèm theo</label><Map size={16} className={iconWrapperClass} /><input type="text" className={inputClass} value={formData.otherDocs || ''} onChange={(e) => handleChange('otherDocs', e.target.value)} placeholder="Sổ đỏ, CMND..." /></div>
                     </div>

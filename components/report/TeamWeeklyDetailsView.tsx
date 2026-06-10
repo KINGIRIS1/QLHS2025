@@ -638,9 +638,9 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                     const printArea = document.getElementById("report_1_visual_area")?.innerHTML;
                     if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 active:scale-95 rounded-xl text-xs font-bold transition-all shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
-                  <Printer size={14} /> In Báo Cáo
+                  <FileText size={14} /> Xuất PDF
                 </button>
                 <button 
                   onClick={() => setShowReport1Modal(false)}
@@ -1031,9 +1031,9 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                     const printArea = document.getElementById("report_2_visual_area")?.innerHTML;
                     if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-indigo-900 hover:bg-indigo-50 active:scale-95 rounded-xl text-xs font-bold transition-all shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
-                  <Printer size={14} /> In Báo Cáo
+                  <FileText size={14} /> Xuất PDF
                 </button>
                 <button 
                   onClick={() => setShowReport2Modal(false)}

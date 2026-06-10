@@ -380,8 +380,8 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
   }, [records, employees, schedules, effectiveDates2, dateMode2]);
 
 
-  // --- IN ẤN BÁO CÁO TRONG SUỐT QUA IFRAME (Bảo toàn màu sắc, kẻ bảng như trên phần mềm) ---
-  const printReportContent = (title: string, innerHtml: string) => {
+  // --- IN ẤN VÀ TẢI BÁO CÁO QUA IFRAME (Bảo toàn màu sắc, kẻ bảng như trên phần mềm) ---
+  const printReportContent = (title: string, innerHtml: string, isDownload: boolean = false) => {
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.left = '-9999px';
@@ -399,6 +399,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
         <head>
           <title>${title}</title>
           <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
           <script>
             window.tailwind.config = {
               theme: {
@@ -476,12 +477,29 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       `);
       doc.close();
       
-      // Chờ Tailwind CDN hoàn thành biên dịch và nạp đầy đủ font trước khi đưa ra lệnh in
+      // Chờ Tailwind CDN hoàn thành biên dịch và nạp đầy đủ font trước khi đưa ra lệnh in hoặc tải xuống
       setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        document.body.removeChild(iframe);
-      }, 1000);
+        if (isDownload) {
+          const element = doc.body;
+          const opt = {
+            margin:       [10, 10, 10, 10],
+            filename:     `${title}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2.5, useCORS: true, letterRendering: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          };
+          (iframe.contentWindow as any).html2pdf().set(opt).from(element).save().then(() => {
+            document.body.removeChild(iframe);
+          }).catch((err: any) => {
+            console.error(err);
+            document.body.removeChild(iframe);
+          });
+        } else {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          document.body.removeChild(iframe);
+        }
+      }, 1500);
     }
   };
 
@@ -628,19 +646,22 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleExportWord}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 rounded-xl text-xs font-bold transition-all"
+                  onClick={() => {
+                    const printArea = document.getElementById("report_1_visual_area")?.innerHTML;
+                    if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea, false);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
-                  <Download size={14} /> Xuất Word
+                  <Printer size={14} /> In Báo cáo
                 </button>
                 <button
                   onClick={() => {
                     const printArea = document.getElementById("report_1_visual_area")?.innerHTML;
-                    if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea);
+                    if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea, true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md"
                 >
-                  <FileText size={14} /> Xuất PDF
+                  <Download size={14} /> Tải file PDF
                 </button>
                 <button 
                   onClick={() => setShowReport1Modal(false)}
@@ -1029,11 +1050,20 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 <button
                   onClick={() => {
                     const printArea = document.getElementById("report_2_visual_area")?.innerHTML;
-                    if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea);
+                    if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea, false);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
-                  <FileText size={14} /> Xuất PDF
+                  <Printer size={14} /> In Báo cáo
+                </button>
+                <button
+                  onClick={() => {
+                    const printArea = document.getElementById("report_2_visual_area")?.innerHTML;
+                    if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea, true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                >
+                  <Download size={14} /> Tải file PDF
                 </button>
                 <button 
                   onClick={() => setShowReport2Modal(false)}

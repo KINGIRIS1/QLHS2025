@@ -282,6 +282,17 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [batchCanBo, setBatchCanBo] = useState<string>('');
     const [batchDate, setBatchDate] = useState<string>('');
 
+    // State cho công cụ phân loại hồ sơ bằng Excel
+    const [showExcelClassifyModal, setShowExcelClassifyModal] = useState(false);
+    const [excelMatchedRecords, setExcelMatchedRecords] = useState<IGateRecord[]>([]);
+    const [excelSelectedIds, setExcelSelectedIds] = useState<Set<string>>(new Set());
+    const [excelStatusUpdate, setExcelStatusUpdate] = useState<string>('');
+    const [excelCanBoUpdate, setExcelCanBoUpdate] = useState<string>('');
+    const [excelDateUpdate, setExcelDateUpdate] = useState<string>('');
+    const [excelTotalScanned, setExcelTotalScanned] = useState<number>(0);
+    const [excelFileName, setExcelFileName] = useState<string>('');
+    const excelFileInputRef = useRef<HTMLInputElement>(null);
+
     // Modal Form States
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<IGateRecord | null>(null);
@@ -535,6 +546,141 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             setSelectedIds(new Set());
             setIsBatchModalOpen(false);
             alert(`Đã cập nhật phân loại thành công cho ${selectedIds.size} hồ sơ!`);
+        }
+    };
+
+    // Hàm xử lý tải file Excel trong Công cụ phân loại bằng Excel
+    const handleExcelClassifySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setExcelFileName(file.name);
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const workbook = XLSX.read(bstr, { type: 'binary' });
+                const wsname = workbook.SheetNames[0];
+                const ws = workbook.Sheets[wsname];
+                
+                // Đọc dưới dạng mảng 2 chiều (header: 1) để duyệt dễ dàng
+                const data = XLSX.utils.sheet_to_json<any>(ws, { header: 1 });
+
+                if (data.length === 0) {
+                    alert('File Excel rỗng!');
+                    return;
+                }
+
+                const scannedCodesSet = new Set<string>();
+                
+                // Duyệt qua tất cả các hàng và ô để thu thập mã hồ sơ
+                data.forEach((row: any) => {
+                    if (Array.isArray(row)) {
+                        row.forEach((cell: any) => {
+                            if (cell !== undefined && cell !== null && cell !== '') {
+                                const cellStr = String(cell).trim();
+                                // Mã hồ sơ iGate thường chứa ký tự và số, độ dài phù hợp (ví dụ >= 5 ký tự)
+                                if (cellStr.length >= 5) {
+                                    scannedCodesSet.add(cellStr);
+                                }
+                            }
+                        });
+                    }
+                });
+
+                const scannedUnion = Array.from(scannedCodesSet);
+                setExcelTotalScanned(scannedUnion.length);
+
+                if (scannedUnion.length === 0) {
+                    alert('Không tìm thấy mã hồ sơ khả dụng nào trong file Excel!');
+                    setExcelMatchedRecords([]);
+                    setExcelSelectedIds(new Set());
+                    return;
+                }
+
+                // Thực hiện quét trong danh sách hồ sơ hiện tại (records)
+                // Tìm những hồ sơ có soHieu trùng khớp chính xác (không phân biệt hoa thường)
+                const matched = records.filter(r => 
+                    scannedUnion.some(code => r.soHieu.toLowerCase() === code.toLowerCase())
+                );
+
+                setExcelMatchedRecords(matched);
+                // Mặc định chọn tất cả các hồ sơ khớp tìm thấy
+                setExcelSelectedIds(new Set(matched.map(m => m.id)));
+                
+                if (matched.length === 0) {
+                    alert(`Đã quét được ${scannedUnion.length} mã hồ sơ khác nhau từ tệp Excel, nhưng không có hồ sơ nào trùng khớp với mã hồ sơ trong hệ thống.`);
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert('Có lỗi xảy ra khi đọc file Excel này!');
+            }
+        };
+
+        reader.readAsBinaryString(file);
+        e.target.value = ''; // Reset input
+    };
+
+    // Áp dụng cập nhật phân loại theo Excel hàng loạt
+    const handleExcelClassifyApply = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (excelSelectedIds.size === 0) {
+            alert('Vui lòng chọn ít nhất một hồ sơ trong danh sách khớp để phân loại!');
+            return;
+        }
+
+        if (!excelStatusUpdate && !excelCanBoUpdate) {
+            alert('Vui lòng chọn trạng thái mới hoặc cán bộ xử lý mới để áp dụng cập nhật!');
+            return;
+        }
+
+        const statesWithDate = [
+            "Đã chuyển thông tin thuế",
+            "Đã phát hành thông báo thuế",
+            "Chờ thực hiện nghĩa vụ tài chính",
+            "Đã ký Giấy chứng nhận",
+            "Chưa trả kết quả",
+            "Đã trả kết quả"
+        ];
+
+        let confirmMsg = `Bạn có chắc muốn áp dụng cập nhật phân loại cho ${excelSelectedIds.size} hồ sơ được tích chọn không?`;
+        if (excelStatusUpdate) confirmMsg += `\n- Trạng thái mới: ${excelStatusUpdate}`;
+        if (excelStatusUpdate && statesWithDate.includes(excelStatusUpdate) && excelDateUpdate) {
+            confirmMsg += `\n- Ngày của trạng thái: ${excelDateUpdate}`;
+        }
+        if (excelCanBoUpdate) confirmMsg += `\n- Cán bộ thụ lý mới: ${excelCanBoUpdate}`;
+
+        if (window.confirm(confirmMsg)) {
+            const updated = records.map(r => {
+                if (excelSelectedIds.has(r.id)) {
+                    const clone = { ...r };
+                    if (excelStatusUpdate) {
+                        clone.trangThai = excelStatusUpdate;
+                        if (statesWithDate.includes(excelStatusUpdate)) {
+                            clone.ngayKetThuc = excelDateUpdate || r.ngayKetThuc || getTodayString();
+                        }
+                    }
+                    if (excelCanBoUpdate) {
+                        clone.canBoXuLy = excelCanBoUpdate;
+                    }
+                    return clone;
+                }
+                return r;
+            });
+
+            await saveRecords(updated);
+            
+            alert(`Đã phân loại và phân công thành công cho ${excelSelectedIds.size} hồ sơ iGate!`);
+            setShowExcelClassifyModal(false);
+            setExcelMatchedRecords([]);
+            setExcelSelectedIds(new Set());
+            setExcelStatusUpdate('');
+            setExcelCanBoUpdate('');
+            setExcelDateUpdate('');
+            setExcelFileName('');
+            setExcelTotalScanned(0);
         }
     };
 
@@ -1270,13 +1416,14 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             <Plus size={16} /> Thêm Hồ sơ iGate thủ công
                         </button>
 
-                        {/* 2. Nhập từ Excel */}
-                        <div className="flex gap-2">
+                        {/* 2. Nhập từ Excel & Công cụ phân loại từ Excel */}
+                        <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl border border-slate-700 text-xs transition-all active:scale-[0.98]"
+                                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-3 rounded-xl border border-slate-700 text-xs transition-all active:scale-[0.98]"
+                                title="Thêm hồ sơ mới từ file Excel"
                             >
-                                <Upload size={14} className="text-slate-400" /> Nhập Excel đầu vào
+                                <Upload size={14} className="text-slate-400 font-bold" /> Nhập Excel
                             </button>
                             <input 
                                 type="file" 
@@ -1286,14 +1433,31 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 onChange={handleExcelImport} 
                             />
 
-                            {/* 3. Lập báo cáo */}
                             <button
-                                onClick={handleExportReportExcel}
-                                className="flex-1 flex items-center justify-center gap-2 bg-indigo-950 text-indigo-200 border border-indigo-800 hover:bg-indigo-900 font-bold py-2 px-3 rounded-xl text-xs transition-all active:scale-[0.98]"
+                                onClick={() => {
+                                    setExcelMatchedRecords([]);
+                                    setExcelSelectedIds(new Set());
+                                    setExcelStatusUpdate('');
+                                    setExcelCanBoUpdate('');
+                                    setExcelDateUpdate(getTodayString());
+                                    setExcelFileName('');
+                                    setExcelTotalScanned(0);
+                                    setShowExcelClassifyModal(true);
+                                }}
+                                className="flex items-center justify-center gap-2 bg-indigo-900 border border-indigo-800 hover:bg-indigo-800 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all active:scale-[0.98]"
+                                title="Phân loại hàng loạt hồ sơ iGate bằng file Excel"
                             >
-                                <Printer size={14} /> Xuất Báo Cáo
+                                <Tag size={14} className="text-indigo-300" /> Phân loại (Excel)
                             </button>
                         </div>
+
+                        {/* 3. Lập báo cáo */}
+                        <button
+                            onClick={handleExportReportExcel}
+                            className="w-full flex items-center justify-center gap-2 bg-indigo-950 text-indigo-200 border border-indigo-800 hover:bg-indigo-900 font-bold py-2.5 px-3 rounded-xl text-xs transition-all active:scale-[0.98]"
+                        >
+                            <Printer size={14} /> Xuất Báo Cáo Thống Kê
+                        </button>
 
                         {/* 4. Khôi phục dữ liệu mẫu & Xóa dữ liệu (chỉ hiển thị cho admin) */}
                         <div className="flex flex-col gap-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
@@ -1801,6 +1965,253 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     <span>Năm hiện tại: 2026</span>
                 </div>
             </div>
+
+            {/* --- MODAL CÔNG CỤ PHÂN LOẠI HỒ SƠ QUA EXCEL --- */}
+            {showExcelClassifyModal && (
+                <div id="igate-excel-classify-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-up">
+                        <div className="bg-gradient-to-r from-indigo-900 to-[#1E293B] p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base col-span-2">
+                                <Tag size={18} className="text-indigo-400" />
+                                Công cụ phân loại hồ sơ bằng Excel
+                            </h3>
+                            <button 
+                                onClick={() => {
+                                    setShowExcelClassifyModal(false);
+                                    setExcelMatchedRecords([]);
+                                    setExcelSelectedIds(new Set());
+                                }} 
+                                className="rounded-lg p-1 hover:bg-white/10 text-white transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                            {/* KHỐI 1: TẢI FILE EXCEL */}
+                            <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl p-5 text-center transition-all bg-slate-50 relative group">
+                                <input 
+                                    type="file" 
+                                    ref={excelFileInputRef}
+                                    onChange={handleExcelClassifySelect}
+                                    accept=".xlsx, .xls"
+                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                                />
+                                <div className="flex flex-col items-center justify-center space-y-2">
+                                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 group-hover:bg-indigo-100 transition-all">
+                                        <FileSpreadsheet size={24} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-700">Tải tệp danh sách mã hồ sơ của bạn lên đây</p>
+                                        <p className="text-[11px] text-slate-400 mt-1">Hỗ trợ tệp định dạng .xlsx, .xls. Hệ thống tự động quét tất cả các mã hợp lệ trong tệp.</p>
+                                    </div>
+                                    {excelFileName && (
+                                        <div className="mt-2.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-bold border border-emerald-100 inline-flex items-center gap-1.5 max-w-full">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            <span className="truncate max-w-[250px]">{excelFileName}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {excelTotalScanned > 0 && (
+                                <div className="bg-indigo-50/50 border border-indigo-100/60 rounded-2xl p-4 flex items-center justify-between text-xs">
+                                    <div className="space-y-0.5 text-left">
+                                        <div className="text-slate-600">Đã quét thấy: <b className="text-slate-800 text-sm font-extrabold">{excelTotalScanned}</b> mã hồ sơ khác nhau trong Excel.</div>
+                                        <div className="text-indigo-950 font-bold">Số lượng hồ sơ trùng khớp hệ thống: <span className="text-indigo-600 text-sm font-extrabold">{excelMatchedRecords.length}</span> / {records.length} hồ sơ.</div>
+                                    </div>
+                                    {excelMatchedRecords.length > 0 && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                if (excelSelectedIds.size === excelMatchedRecords.length) {
+                                                    setExcelSelectedIds(new Set());
+                                                } else {
+                                                    setExcelSelectedIds(new Set(excelMatchedRecords.map(m => m.id)));
+                                                }
+                                            }}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 font-bold hover:bg-slate-100 text-slate-700 rounded-xl text-[11px] transition-all cursor-pointer shadow-xs"
+                                        >
+                                            {excelSelectedIds.size === excelMatchedRecords.length ? "Bỏ chọn tất cả" : "Chọn tất cả khớp"}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* KHỐI 2: DANH SÁCH KHỚP ĐƯỢC */}
+                            {excelMatchedRecords.length > 0 ? (
+                                <div className="space-y-2 text-left">
+                                    <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Danh sách hồ sơ khớp ({excelSelectedIds.size}/{excelMatchedRecords.length})</h4>
+                                    <div className="border border-slate-150 rounded-2xl overflow-hidden max-h-[180px] overflow-y-auto">
+                                        <table className="w-full text-left text-xs bg-white">
+                                            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-150 sticky top-0">
+                                                <tr>
+                                                    <th className="p-2.5 text-center w-10">Chọn</th>
+                                                    <th className="p-2.5 font-sans">Số hiệu / Mã iGate</th>
+                                                    <th className="p-2.5 font-sans">Chủ hồ sơ</th>
+                                                    <th className="p-2.5 text-center font-sans">Trạng thái gốc</th>
+                                                    <th className="p-2.5 font-sans">Cán bộ phụ trách</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                {excelMatchedRecords.map((r) => {
+                                                    const isChecked = excelSelectedIds.has(r.id);
+                                                    return (
+                                                        <tr 
+                                                            key={r.id} 
+                                                            onClick={() => {
+                                                                const nextChecked = new Set(excelSelectedIds);
+                                                                if (isChecked) {
+                                                                    nextChecked.delete(r.id);
+                                                                } else {
+                                                                    nextChecked.add(r.id);
+                                                                }
+                                                                setExcelSelectedIds(nextChecked);
+                                                            }}
+                                                            className={`hover:bg-slate-50 transition-colors cursor-pointer ${isChecked ? "bg-indigo-50/20" : ""}`}
+                                                        >
+                                                            <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={isChecked}
+                                                                    className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer"
+                                                                    onChange={() => {
+                                                                        const nextChecked = new Set(excelSelectedIds);
+                                                                        if (isChecked) {
+                                                                            nextChecked.delete(r.id);
+                                                                        } else {
+                                                                            nextChecked.add(r.id);
+                                                                        }
+                                                                        setExcelSelectedIds(nextChecked);
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                            <td className="p-2.5 font-mono font-bold text-slate-900">{r.soHieu}</td>
+                                                            <td className="p-2.5 text-slate-800 font-semibold">{r.chuHoSo}</td>
+                                                            <td className="p-2.5 text-center">
+                                                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-150">{r.trangThai}</span>
+                                                            </td>
+                                                            <td className="p-2.5 text-slate-500">{r.canBoXuLy || "-"}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ) : excelFileName ? (
+                                <div className="p-8 text-center bg-amber-50 text-amber-800 border border-amber-150 rounded-2xl flex flex-col items-center">
+                                    <AlertCircle size={32} className="text-amber-500 mb-2" />
+                                    <p className="font-bold text-sm">Không tìm thấy bất kỳ hồ sơ trùng khớp nào!</p>
+                                    <p className="text-[11px] text-slate-500 mt-1">Vui lòng kiểm tra lại cấu trúc mã hồ sơ trong file Excel xem có trùng khớp với số hồ sơ nào của hệ thống không.</p>
+                                </div>
+                            ) : null}
+
+                            {/* KHỐI 3: THIẾT LẬP THAY ĐỔI */}
+                            <form onSubmit={handleExcelClassifyApply} className="bg-slate-50/50 p-4 border border-slate-150 rounded-2xl space-y-4 text-left">
+                                <h4 className="text-xs font-extrabold text-[#1E293B] block border-b border-slate-150 pb-1.5 uppercase tracking-wider">Cấu hình cập nhật cho hồ sơ được chọn</h4>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-600 block">Chọn trạng thái áp dụng mới</label>
+                                        <select 
+                                            className="w-full text-xs font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all text-slate-800 cursor-pointer"
+                                            value={excelStatusUpdate}
+                                            onChange={(e) => setExcelStatusUpdate(e.target.value)}
+                                        >
+                                            <option value="">-- Giữ nguyên trạng thái cũ --</option>
+                                            {TRANG_THAI_LIST.map(st => <option key={st} value={st}>{st}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-600 block">Phân công cán bộ xử lý mới</label>
+                                        <select 
+                                            className="w-full text-xs font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all text-slate-800 cursor-pointer"
+                                            value={excelCanBoUpdate}
+                                            onChange={(e) => setExcelCanBoUpdate(e.target.value)}
+                                        >
+                                            <option value="">-- Giữ nguyên cán bộ cũ --</option>
+                                            {dangKyCanBo.length > 0 && (
+                                                <optgroup label="✨ Tổ Đăng ký">
+                                                    {dangKyCanBo.map(cb => <option key={cb} value={cb}>{cb}</option>)}
+                                                </optgroup>
+                                            )}
+                                            {oneDoorCanBo.length > 0 && (
+                                                <optgroup label="🚪 Bộ phận Một cửa">
+                                                    {oneDoorCanBo.map(cb => <option key={cb} value={cb}>{cb}</option>)}
+                                                </optgroup>
+                                            )}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Trường gán ngày cho trạng thái khi thay đổi */}
+                                {excelStatusUpdate && [
+                                    "Đã chuyển thông tin thuế",
+                                    "Đã phát hành thông báo thuế",
+                                    "Chờ thực hiện nghĩa vụ tài chính",
+                                    "Đã ký Giấy chứng nhận",
+                                    "Chưa trả kết quả",
+                                    "Đã trả kết quả"
+                                ].includes(excelStatusUpdate) && (
+                                    <div className="space-y-1.5 animate-scale-up bg-white border border-slate-150 p-3.5 rounded-xl">
+                                        <label className="text-xs font-bold text-indigo-950 block font-sans">Ngày áp dụng của trạng thái [{excelStatusUpdate}]</label>
+                                        <div className="flex gap-1 items-center mt-1">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 28/11/2025"
+                                                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-semibold focus:border-indigo-500 focus:bg-white transition-all"
+                                                value={excelDateUpdate}
+                                                onChange={(e) => setExcelDateUpdate(e.target.value)}
+                                                required
+                                            />
+                                            <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
+                                                <input 
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const parts = val.split('-');
+                                                            const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                            setExcelDateUpdate(formatted);
+                                                        }
+                                                    }}
+                                                />
+                                                <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center transition-all" title="Chọn ngày">
+                                                    <Calendar size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="pt-3 border-t border-slate-150/60 flex items-center justify-end gap-3 text-sm">
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setShowExcelClassifyModal(false);
+                                            setExcelMatchedRecords([]);
+                                            setExcelSelectedIds(new Set());
+                                        }}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                                    >
+                                        Hủy bỏ
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={excelSelectedIds.size === 0 || (!excelStatusUpdate && !excelCanBoUpdate)}
+                                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-colors shadow-md shadow-indigo-600/10 cursor-pointer"
+                                    >
+                                        Áp dụng thay đổi ({excelSelectedIds.size} hồ sơ)
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- MODAL PHÂN LOẠI HÀNG LOẠT --- */}
             {isBatchModalOpen && (

@@ -70,26 +70,42 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
 
   // --- TÍNH TOÁN KỲ THỜI GIAN ĐỘC LẬP BÁO CÁO 1 ---
   const effectiveDates1 = useMemo(() => {
-    let start = new Date(customFromDate1);
-    let end = new Date(customToDate1);
     const now = new Date();
+    let start: Date;
+    let end: Date;
+
+    const parseWithFallback = (val: string, fallbackVal: string): Date => {
+      if (!val) {
+        const fb = new Date(fallbackVal);
+        return isNaN(fb.getTime()) ? new Date() : fb;
+      }
+      const parsed = new Date(val);
+      if (isNaN(parsed.getTime())) {
+        const fb = new Date(fallbackVal);
+        return isNaN(fb.getTime()) ? new Date() : fb;
+      }
+      return parsed;
+    };
 
     if (dateMode1 === 'week') {
       const currentDay = now.getDay();
       const diffToMon = now.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
-      start = new Date(now.setDate(diffToMon));
-      start.setHours(0, 0, 0, 0);
+      start = new Date(now.getFullYear(), now.getMonth(), diffToMon, 0, 0, 0, 0);
       end = new Date(start);
       end.setDate(start.getDate() + 6);
       end.setHours(23, 59, 59, 999);
     } else if (dateMode1 === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-      start.setHours(0, 0, 0, 0);
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     } else {
+      start = parseWithFallback(customFromDate1, fromDate);
       start.setHours(0, 0, 0, 0);
+      end = parseWithFallback(customToDate1, toDate);
       end.setHours(23, 59, 59, 999);
     }
+
+    if (isNaN(start.getTime())) start = new Date();
+    if (isNaN(end.getTime())) end = new Date();
 
     return {
       start,
@@ -97,13 +113,26 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       fromDateStr: start.toISOString().split('T')[0],
       toDateStr: end.toISOString().split('T')[0],
     };
-  }, [dateMode1, customFromDate1, customToDate1]);
+  }, [dateMode1, customFromDate1, customToDate1, fromDate, toDate]);
 
   // --- TÍNH TOÁN KỲ THỜI GIAN ĐỘC LẬP BÁO CÁO 2 ---
   const effectiveDates2 = useMemo(() => {
-    let start = new Date(customFromDate2);
-    let end = new Date(customToDate2);
     const now = new Date();
+    let start: Date;
+    let end: Date;
+
+    const parseWithFallback = (val: string, fallbackVal: string): Date => {
+      if (!val) {
+        const fb = new Date(fallbackVal);
+        return isNaN(fb.getTime()) ? new Date() : fb;
+      }
+      const parsed = new Date(val);
+      if (isNaN(parsed.getTime())) {
+        const fb = new Date(fallbackVal);
+        return isNaN(fb.getTime()) ? new Date() : fb;
+      }
+      return parsed;
+    };
 
     if (dateMode2 === 'week') {
       const day = now.getDay();
@@ -116,11 +145,14 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     } else {
-      start = new Date(customFromDate2);
+      start = parseWithFallback(customFromDate2, fromDate);
       start.setHours(0, 0, 0, 0);
-      end = new Date(customToDate2);
+      end = parseWithFallback(customToDate2, toDate);
       end.setHours(23, 59, 59, 999);
     }
+
+    if (isNaN(start.getTime())) start = new Date();
+    if (isNaN(end.getTime())) end = new Date();
 
     return {
       start,
@@ -128,7 +160,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       fromDateStr: start.toISOString().split('T')[0],
       toDateStr: end.toISOString().split('T')[0],
     };
-  }, [dateMode2, customFromDate2, customToDate2]);
+  }, [dateMode2, customFromDate2, customToDate2, fromDate, toDate]);
 
 
   // --- PROCESSING BÁO CÁO 1 ---
@@ -245,28 +277,28 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       return d >= s && d <= e;
     };
 
-    // Chỉ đếm hồ sơ khi trạng thái hiện tại là COMPLETED_WORK
+    // Đếm theo ngày hệ thống ghi nhận bấm nút Đã thực hiện (workCompletedDate) nằm trong khoảng ngày lọc và TRẠNG THÁI HIỆN TẠI là COMPLETED_WORK
     const listCompletedWork = records.filter(r => {
       if (r.status !== RecordStatus.COMPLETED_WORK) return false;
       const d = r.workCompletedDate || r.assignedDate || r.receivedDate;
       return isDateInRange(d, start, end);
     });
     
-    // Chỉ đếm hồ sơ khi trạng thái hiện tại là PENDING_SIGN
+    // Đếm theo ngày hệ thống ghi nhận bấm nút Đang trình ký (submissionDate) nằm trong khoảng ngày lọc và TRẠNG THÁI HIỆN TẠI là PENDING_SIGN
     const listPendingSign = records.filter(r => {
       if (r.status !== RecordStatus.PENDING_SIGN) return false;
       const d = r.submissionDate || r.workCompletedDate || r.assignedDate || r.receivedDate;
       return isDateInRange(d, start, end);
     });
     
-    // Chỉ đếm hồ sơ khi trạng thái hiện tại là SIGNED
+    // Đếm theo ngày hệ thống ghi nhận bấm nút Đã ký duyệt (approvalDate) nằm trong khoảng ngày lọc và TRẠNG THÁI HIỆN TẠI là SIGNED
     const listApproved = records.filter(r => {
       if (r.status !== RecordStatus.SIGNED) return false;
       const d = r.approvalDate || r.submissionDate || r.workCompletedDate || r.assignedDate || r.receivedDate;
       return isDateInRange(d, start, end);
     });
     
-    // Chỉ đếm hồ sơ khi trạng thái hiện tại là HANDOVER hoặc RETURNED
+    // Đếm theo ngày hệ thống ghi nhận bấm nút Đã chuyển 1 cửa hoặc Trả kết quả (completedDate hoặc resultReturnedDate) nằm trong khoảng ngày lọc và TRẠNG THÁI HIỆN TẠI là HANDOVER hoặc RETURNED
     const listHandover = records.filter(r => {
       if (r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED) return false;
       const d = r.completedDate || r.resultReturnedDate || r.exportDate || r.approvalDate || r.submissionDate || r.workCompletedDate || r.assignedDate || r.receivedDate;
@@ -380,8 +412,8 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
   }, [records, employees, schedules, effectiveDates2, dateMode2]);
 
 
-  // --- IN ẤN VÀ TẢI BÁO CÁO QUA IFRAME (Bảo toàn màu sắc, kẻ bảng như trên phần mềm) ---
-  const printReportContent = (title: string, innerHtml: string, isDownload: boolean = false) => {
+  // --- IN BÁO CÁO CHUYÊN NGHIỆP QUA IFRAME ẨN (Sử dụng trực tiếp hộp thoại in) ---
+  const printReportContent = (title: string, innerHtml: string) => {
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.left = '-9999px';
@@ -399,7 +431,6 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
         <head>
           <title>${title}</title>
           <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
           <script>
             window.tailwind.config = {
               theme: {
@@ -444,11 +475,9 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
               margin: 0; 
               padding: 0; 
             }
-            /* Đảm bảo khi in giữ nguyên grid */
             .grid {
               display: grid !important;
             }
-            /* Định dạng table đẹp đẽ trong in ấn */
             table {
               border-collapse: collapse !important;
               width: 100% !important;
@@ -457,11 +486,11 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
               border-width: 1px !important;
               border-style: solid !important;
               border-color: #e2e8f0 !important;
+              padding: 8px 12px !important;
             }
             th {
               background-color: #f8fafc !important;
             }
-            /* Bảo vệ ngắt trang thông minh */
             tr, .bg-white, li, .rounded-2xl {
               page-break-inside: avoid;
               break-inside: avoid;
@@ -477,29 +506,163 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
       `);
       doc.close();
       
-      // Chờ Tailwind CDN hoàn thành biên dịch và nạp đầy đủ font trước khi đưa ra lệnh in hoặc tải xuống
+      // Chờ Tailwind CDN hoàn thành biên dịch và nạp đầy đủ font trước khi in
       setTimeout(() => {
-        if (isDownload) {
-          const element = doc.body;
-          const opt = {
-            margin:       [10, 10, 10, 10],
-            filename:     `${title}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2.5, useCORS: true, letterRendering: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          };
-          (iframe.contentWindow as any).html2pdf().set(opt).from(element).save().then(() => {
-            document.body.removeChild(iframe);
-          }).catch((err: any) => {
-            console.error(err);
-            document.body.removeChild(iframe);
-          });
-        } else {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-          document.body.removeChild(iframe);
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        document.body.removeChild(iframe);
+      }, 1000);
+    }
+  };
+
+  // --- TẢI FILE BÁO CÁO PDF CHẤT LƯỢNG CAO QUA IFRAME TRUNG GIAN (Tránh lỗi trắng trang & giữ nguyên vẹn định dạng) ---
+  const downloadPDFReport = (title: string, innerHtml: string) => {
+    // Tạo iframe ẩn để render nội dung độc lập, giúp cô lập CSS và đảm bảo Tailwind biên dịch đúng
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '-9999px';
+    iframe.style.width = '1024px';
+    iframe.style.height = '1420px';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(`
+        <html>
+        <head>
+          <title>${title}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <script>
+            window.tailwind.config = {
+              theme: {
+                extend: {
+                  colors: {
+                    indigo: {
+                      650: '#4f46e5',
+                      750: '#4338ca',
+                      850: '#312e81',
+                    },
+                    pink: {
+                      650: '#db2777',
+                    },
+                    emerald: {
+                      150: '#a7f3d0',
+                    },
+                    slate: {
+                      55: '#f1f5f9',
+                      150: '#e2e8f0',
+                      250: '#cbd5e1',
+                    }
+                  }
+                }
+              }
+            }
+          </script>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap');
+            
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+            body { 
+              font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+              color: #1e293b; 
+              background: white !important; 
+              margin: 0; 
+              padding: 24px; 
+            }
+            .grid {
+              display: grid !important;
+            }
+            table {
+              border-collapse: collapse !important;
+              width: 100% !important;
+              margin: 15px 0 !important;
+            }
+            th, td {
+              border-width: 1px !important;
+              border-style: solid !important;
+              border-color: #cbd5e1 !important;
+              padding: 8px 12px !important;
+              text-align: left;
+            }
+            th {
+              background-color: #f1f5f9 !important;
+              color: #1e293b !important;
+              font-weight: bold !important;
+            }
+            tr, .bg-white, li, .rounded-2xl {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+          </style>
+        </head>
+        <body class="bg-white p-4">
+          <div class="w-full max-w-4xl mx-auto space-y-6">
+            ${innerHtml}
+          </div>
+        </body>
+        </html>
+      `);
+      doc.close();
+
+      const runExport = () => {
+        const html2pdf = (window as any).html2pdf;
+        if (!html2pdf) {
+          setTimeout(runExport, 300);
+          return;
         }
-      }, 1500);
+
+        const opt = {
+          margin:       [10, 10, 10, 10], 
+          filename:     `${title}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { 
+            scale: 2, 
+            useCORS: true, 
+            letterRendering: true,
+            logging: false,
+            scrollY: 0,
+            scrollX: 0
+          },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Chờ 1.5 giây để đảm bảo Tailwind CDN bên trong iframe tải và biên dịch hoàn thành CSS
+        setTimeout(() => {
+          const contentElement = iframe.contentWindow?.document.body;
+          if (contentElement) {
+            html2pdf().set(opt).from(contentElement).save().then(() => {
+              document.body.removeChild(iframe);
+            }).catch((err: any) => {
+              console.error("Lỗi xuất PDF qua iframe: ", err);
+              document.body.removeChild(iframe);
+              // Fallback khi gặp lỗi bảo mật: dùng hộp thoại in ấn chuẩn của thiết bị
+              alert("Việc tải file trực tiếp gặp lỗi do bảo mật trình duyệt. Hệ thống sẽ mở hộp thoại in. Vui lòng chọn 'Lưu dưới dạng PDF' tại phần máy in.");
+              printReportContent(title, innerHtml);
+            });
+          } else {
+            document.body.removeChild(iframe);
+            printReportContent(title, innerHtml);
+          }
+        }, 1500);
+      };
+
+      // Nạp thư viện html2pdf.js vào trang cha để thực hiện tiến trình export
+      if (!(window as any).html2pdf) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        script.async = true;
+        script.onload = runExport;
+        document.head.appendChild(script);
+      } else {
+        runExport();
+      }
     }
   };
 
@@ -648,7 +811,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 <button
                   onClick={() => {
                     const printArea = document.getElementById("report_1_visual_area")?.innerHTML;
-                    if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea, false);
+                    if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
@@ -657,7 +820,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 <button
                   onClick={() => {
                     const printArea = document.getElementById("report_1_visual_area")?.innerHTML;
-                    if (printArea) printReportContent("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea, true);
+                    if (printArea) downloadPDFReport("Báo cáo Số lượng Hồ sơ tiếp nhận và hoàn thành", printArea);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md"
                 >
@@ -738,7 +901,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                   <p className="normal-text">- Tổng số lượng thửa đất ghi nhận theo hồ sơ mới: <span className="bold">{report1Data.totalReceivedPlots} thửa</span>.</p>
                   <p className="normal-text">- Tổng số hồ sơ hoàn thành thực tế trong số tiếp nhận mới này: <span className="bold">{report1Data.totalCompleted} hồ sơ</span>.</p>
                   <p className="normal-text">- Tổng số thửa đất hoàn thành từ danh sách trên: <span className="bold">{report1Data.totalCompletedPlots} thửa</span>.</p>
-                  <p className="normal-text">- Tổng lượt thi hành lịch trình công tác thực tế liên quan: <span className="bold">{report1Data.totalSchedules} lượt</span>.</p>
+                  <p className="normal-text">- Tổng số lịch công tác thực tế liên quan: <span className="bold">{report1Data.totalSchedules}</span>.</p>
 
                   <div className="section-title">II. TÌNH HÌNH TIẾP NHẬN CHI TIẾT</div>
                   <p className="normal-text"><span className="bold">1. Phân bổ hồ sơ tiếp nhận theo loại:</span></p>
@@ -871,7 +1034,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                   </div>
                   <div className="bg-amber-50/40 p-4 rounded-2xl border border-amber-100 flex flex-col justify-between">
                     <span className="text-amber-700 text-[10px] uppercase font-bold tracking-wider">Lịch ngoại nghiệp</span>
-                    <span className="text-2xl font-black text-amber-700 block mt-2">{report1Data.totalSchedules} <sub className="text-xs font-normal text-slate-500">chuyến</sub></span>
+                    <span className="text-2xl font-black text-amber-700 block mt-2">{report1Data.totalSchedules}</span>
                   </div>
                 </div>
 
@@ -962,7 +1125,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                           <th className="p-3 text-center">Mới nhận</th>
                           <th className="p-3 text-center">Thửa đất giao</th>
                           <th className="p-3 text-center">Hoàn thành</th>
-                          <th className="p-3 text-center">Chuyến công tác</th>
+                          <th className="p-3 text-center">Lịch công tác</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -976,7 +1139,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                             <td className="p-3 text-center font-bold">{empS.receivedCount}</td>
                             <td className="p-3 text-center font-bold text-violet-650">{empS.receivedPlots}</td>
                             <td className="p-3 text-center font-black text-emerald-600">{empS.completedCount > 0 ? `${empS.completedCount} hồ sơ` : '-'}</td>
-                            <td className="p-3 text-center font-bold">{empS.schedulesCount} chuyến</td>
+                            <td className="p-3 text-center font-bold">{empS.schedulesCount}</td>
                           </tr>
                         ))}
                         {report1Data.employeesStats.length === 0 && (
@@ -1050,7 +1213,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 <button
                   onClick={() => {
                     const printArea = document.getElementById("report_2_visual_area")?.innerHTML;
-                    if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea, false);
+                    if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
@@ -1059,7 +1222,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 <button
                   onClick={() => {
                     const printArea = document.getElementById("report_2_visual_area")?.innerHTML;
-                    if (printArea) printReportContent("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea, true);
+                    if (printArea) downloadPDFReport("Báo cáo Tiến độ Hoàn thành hồ sơ kỹ thuật", printArea);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md"
                 >
@@ -1312,7 +1475,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                             <th className="p-3.5 text-center">Đã ký duyệt</th>
                             <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>
                             <th className="p-3.5 text-center">Thửa đất đo đạc</th>
-                            <th className="p-3.5 text-center">Đo đạc thực địa</th>
+                            <th className="p-3.5 text-center">Lịch công tác</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1324,7 +1487,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                               <td className="p-3.5 text-center font-extrabold text-emerald-600 bg-emerald-50/5">{item.signed}</td>
                               <td className="p-3.5 text-center font-bold text-blue-600">{item.handover}</td>
                               <td className="p-3.5 text-center font-bold text-slate-500 bg-slate-50/10">{item.plots}</td>
-                              <td className="p-3.5 text-center font-extrabold text-violet-600 bg-violet-50/20">{item.schedules} lượt</td>
+                              <td className="p-3.5 text-center font-extrabold text-violet-600 bg-violet-50/20">{item.schedules}</td>
                             </tr>
                           ))}
                           {report2Data.active.employeeStats.length === 0 && (

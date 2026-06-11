@@ -1,4 +1,3 @@
-
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
 import { MOCK_RECORDS, API_BASE_URL } from '../constants';
@@ -18,6 +17,47 @@ const RECORD_DB_COLUMNS = [
     'createdBy' // Người tiếp nhận hồ sơ
 ];
 
+// Helper functions to serialize and deserialize workCompletedDate inside privateNotes securely
+export const packRecord = (record: RecordFile): RecordFile => {
+    const copy = { ...record };
+    
+    // If workCompletedDate exists, save it inside privateNotes to preserve it on Supabase!
+    // Format: "[WCD:YYYY-MM-DD]" at the end of the text.
+    if (copy.workCompletedDate) {
+        let cleanNotes = copy.privateNotes || '';
+        // Remove any existing WCD tags
+        cleanNotes = cleanNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+        copy.privateNotes = cleanNotes ? `${cleanNotes} [WCD:${copy.workCompletedDate}]` : `[WCD:${copy.workCompletedDate}]`;
+    } else {
+        // If workCompletedDate is null/empty but privateNotes has it, we should clean it up
+        if (copy.privateNotes) {
+            copy.privateNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+            if (copy.privateNotes === '') {
+                copy.privateNotes = null;
+            }
+        }
+    }
+    return copy;
+};
+
+export const unpackRecord = (record: RecordFile): RecordFile => {
+    const copy = { ...record };
+    
+    // If privateNotes contains [WCD:YYYY-MM-DD], parse it and populate workCompletedDate!
+    if (copy.privateNotes) {
+        const match = copy.privateNotes.match(/\[WCD:(\d{4}-\d{2}-\d{2})\]/);
+        if (match) {
+            copy.workCompletedDate = match[1];
+            // Remove the WCD tag from privateNotes so it's clean for the UI
+            copy.privateNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+            if (copy.privateNotes === '') {
+                copy.privateNotes = null;
+            }
+        }
+    }
+    return copy;
+};
+
 let CACHED_RECORDS: RecordFile[] = [];
 let IS_CACHED_RECORDS_LOADED = false;
 let IS_REALTIME_SUBSCRIBED = false;
@@ -36,17 +76,19 @@ export const initRealtimeRecords = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'records' }, (payload) => {
             let changed = false;
             if (payload.eventType === 'INSERT') {
-                if (!CACHED_RECORDS.find(r => r.id === payload.new.id)) {
-                    CACHED_RECORDS.unshift(payload.new as RecordFile);
+                const unpackedNew = unpackRecord(payload.new as RecordFile);
+                if (!CACHED_RECORDS.find(r => r.id === unpackedNew.id)) {
+                    CACHED_RECORDS.unshift(unpackedNew);
                     changed = true;
                 }
             } else if (payload.eventType === 'UPDATE') {
-                const idx = CACHED_RECORDS.findIndex(r => r.id === payload.new.id);
+                const unpackedNew = unpackRecord(payload.new as RecordFile);
+                const idx = CACHED_RECORDS.findIndex(r => r.id === unpackedNew.id);
                 if (idx !== -1) {
-                    CACHED_RECORDS[idx] = payload.new as RecordFile;
+                    CACHED_RECORDS[idx] = unpackedNew;
                     changed = true;
                 } else {
-                    CACHED_RECORDS.unshift(payload.new as RecordFile);
+                    CACHED_RECORDS.unshift(unpackedNew);
                     changed = true;
                 }
             } else if (payload.eventType === 'DELETE') {
@@ -94,7 +136,8 @@ export const fetchRecords = async (forceUpdate: boolean = false): Promise<Record
             if (error) throw error;
 
             if (data && data.length > 0) {
-                allRecords = [...allRecords, ...data];
+                const unpackedData = data.map(r => unpackRecord(r as RecordFile));
+                allRecords = [...allRecords, ...unpackedData];
                 from += step;
                 if (data.length < step) hasMore = false;
             } else {
@@ -134,7 +177,8 @@ export const fetchRecords = async (forceUpdate: boolean = false): Promise<Record
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
     if (!isConfigured) return { ...record, createdBy: record.createdBy || null };
     try {
-        const payload = sanitizeData(record, RECORD_DB_COLUMNS);
+        const packed = packRecord(record);
+        const payload = sanitizeData(packed, RECORD_DB_COLUMNS);
         const { data, error } = await supabase.from('records').insert([payload]).select();
         
         if (error) {
@@ -149,31 +193,34 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
                 }
-                const fallbackPayload = sanitizeData(record, fallbackColumns);
+                const fallbackPayload = sanitizeData(packed, fallbackColumns);
                 const { data: fbData, error: fbError } = await supabase.from('records').insert([fallbackPayload]).select();
                 
                 if (fbError) {
                     // Thử an toàn hoàn toàn bằng cách loại bỏ cả plotCount lẫn createdBy
                     const safeColumns = RECORD_DB_COLUMNS.filter(col => col !== 'plotCount' && col !== 'createdBy');
-                    const safePayload = sanitizeData(record, safeColumns);
+                    const safePayload = sanitizeData(packed, safeColumns);
                     const { data: safeData, error: safeError } = await supabase.from('records').insert([safePayload]).select();
                     if (safeError) throw safeError;
                     if (safeData?.[0]) {
-                        if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(safeData[0] as RecordFile);
-                        return safeData[0] as RecordFile;
+                        const unpacked = unpackRecord(safeData[0] as RecordFile);
+                        if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
+                        return unpacked;
                     }
                 }
                 if (fbData?.[0]) {
-                    if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(fbData[0] as RecordFile);
-                    return fbData[0] as RecordFile;
+                    const unpacked = unpackRecord(fbData[0] as RecordFile);
+                    if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
+                    return unpacked;
                 }
             }
             throw error;
         }
         
         if (data?.[0]) {
-            if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(data[0] as RecordFile);
-            return data[0] as RecordFile;
+            const unpacked = unpackRecord(data[0] as RecordFile);
+            if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
+            return unpacked;
         }
         return null;
     } catch (error) {
@@ -185,7 +232,8 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
     if (!isConfigured) return record;
     try {
-        const payload = sanitizeData(record, RECORD_DB_COLUMNS);
+        const packed = packRecord(record);
+        const payload = sanitizeData(packed, RECORD_DB_COLUMNS);
         const { data, error } = await supabase.from('records').update(payload).eq('id', record.id).select();
         
         if (error) {
@@ -200,39 +248,42 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
                 }
-                const fallbackPayload = sanitizeData(record, fallbackColumns);
+                const fallbackPayload = sanitizeData(packed, fallbackColumns);
                 const { data: fbData, error: fbError } = await supabase.from('records').update(fallbackPayload).eq('id', record.id).select();
                 
                 if (fbError) {
                     const safeColumns = RECORD_DB_COLUMNS.filter(col => col !== 'plotCount' && col !== 'createdBy');
-                    const safePayload = sanitizeData(record, safeColumns);
+                    const safePayload = sanitizeData(packed, safeColumns);
                     const { data: safeData, error: safeError } = await supabase.from('records').update(safePayload).eq('id', record.id).select();
                     if (safeError) throw safeError;
                     if (safeData?.[0]) {
+                        const unpacked = unpackRecord(safeData[0] as RecordFile);
                         if (IS_CACHED_RECORDS_LOADED) {
-                            const idx = CACHED_RECORDS.findIndex(r => r.id === safeData[0].id);
-                            if (idx !== -1) CACHED_RECORDS[idx] = safeData[0] as RecordFile;
+                            const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
+                            if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
                         }
-                        return safeData[0] as RecordFile;
+                        return unpacked;
                     }
                 }
                 if (fbData?.[0]) {
+                    const unpacked = unpackRecord(fbData[0] as RecordFile);
                     if (IS_CACHED_RECORDS_LOADED) {
-                        const idx = CACHED_RECORDS.findIndex(r => r.id === fbData[0].id);
-                        if (idx !== -1) CACHED_RECORDS[idx] = fbData[0] as RecordFile;
+                        const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
+                        if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
                     }
-                    return fbData[0] as RecordFile;
+                    return unpacked;
                 }
             }
             throw error;
         }
         
         if (data?.[0]) {
+            const unpacked = unpackRecord(data[0] as RecordFile);
             if (IS_CACHED_RECORDS_LOADED) {
-                const idx = CACHED_RECORDS.findIndex(r => r.id === data[0].id);
-                if (idx !== -1) CACHED_RECORDS[idx] = data[0] as RecordFile;
+                const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
+                if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
             }
-            return data[0] as RecordFile;
+            return unpacked;
         }
         return null;
     } catch (error) {
@@ -262,12 +313,13 @@ export const deleteRecordApi = async (id: string): Promise<boolean> => {
 export const createRecordsBatchApi = async (records: RecordFile[]): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const payload = records.map(r => sanitizeData(r, RECORD_DB_COLUMNS));
+        const payload = records.map(r => sanitizeData(packRecord(r), RECORD_DB_COLUMNS));
         const { error, data } = await supabase.from('records').insert(payload).select();
         if (error) throw error;
         
         if (data && IS_CACHED_RECORDS_LOADED) {
-            CACHED_RECORDS = [...(data as RecordFile[]), ...CACHED_RECORDS];
+            const unpackedData = data.map(r => unpackRecord(r as RecordFile));
+            CACHED_RECORDS = [...unpackedData, ...CACHED_RECORDS];
         }
         return true;
     } catch (error) {
@@ -388,23 +440,28 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
             const dbRecord = dbMap.get(normCode);
             
             if (dbRecord) {
-                const merged = { ...dbRecord };
+                // Ensure dbRecord is unpacked first so we can merge with incoming excel record
+                const unpackedDbRecord = unpackRecord(dbRecord);
+                const merged = { ...unpackedDbRecord };
+                const mergedAny = merged as any;
+                const excelRecordAny = excelRecord as any;
                 let hasChange = false;
 
                 Object.keys(excelRecord).forEach(key => {
-                    const newVal = (excelRecord as any)[key];
+                    const newVal = excelRecordAny[key];
                     const isValidValue = newVal !== null && newVal !== undefined && newVal !== '';
                     
                     if (isValidValue && key !== 'id') {
-                        if (String(merged[key]) !== String(newVal)) {
-                            merged[key] = newVal;
+                        if (String(mergedAny[key]) !== String(newVal)) {
+                            mergedAny[key] = newVal;
                             hasChange = true;
                         }
                     }
                 });
 
                 if (hasChange) {
-                    updatesToPush.push(sanitizeData(merged, RECORD_DB_COLUMNS));
+                    const packedMerged = packRecord(merged);
+                    updatesToPush.push(sanitizeData(packedMerged, RECORD_DB_COLUMNS));
                     updateCount++;
                 }
             }
@@ -416,8 +473,9 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
             
             if (data && IS_CACHED_RECORDS_LOADED) {
                data.forEach((r: any) => {
-                   const idx = CACHED_RECORDS.findIndex(c => c.id === r.id);
-                   if (idx !== -1) CACHED_RECORDS[idx] = r as RecordFile;
+                   const unpacked = unpackRecord(r as RecordFile);
+                   const idx = CACHED_RECORDS.findIndex(c => c.id === unpacked.id);
+                   if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
                });
             }
         }

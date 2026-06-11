@@ -582,6 +582,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     };
 
     const isManager = (currentUser.role as string) === 'ADMIN' || (currentUser.role as string) === 'SUBADMIN' || (currentUser.role as string) === 'admin' || (currentUser.role as string) === 'subadmin';
+    const isOneDoor = (currentUser.role as string) === 'ONEDOOR';
 
     const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
     const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -868,7 +869,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 <FileCheck size={16}/> Đã giao 1 cửa ({selectedIds.size})
                             </button>
                         )}
-                        {subTab === 'completed' && isManager && selectedIds.size > 0 && (
+                        {subTab === 'completed' && (isManager || isOneDoor) && selectedIds.size > 0 && (
                             <button onClick={() => handleBatchStatusChange('returned')} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm animate-pulse">
                                 <CheckCircle size={16}/> Đã trả kết quả ({selectedIds.size})
                             </button>
@@ -1203,9 +1204,11 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                                     </>
                                                 )}
 
-                                                {r.status === 'completed' && isManager && (
+                                                {r.status === 'completed' && (isManager || isOneDoor) && (
                                                     <>
-                                                        <button onClick={() => handleStatusChange(r, 'signed')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
+                                                        {isManager && (
+                                                            <button onClick={() => handleStatusChange(r, 'signed')} className="p-1.5 text-orange-600 bg-orange-50 rounded hover:bg-orange-100" title="Trả lại"><RotateCcw size={14}/></button>
+                                                        )}
                                                         <button onClick={() => handleStatusChange(r, 'returned')} className="p-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100" title="Đã trả kết quả"><CheckCircle size={14}/></button>
                                                     </>
                                                 )}

@@ -302,7 +302,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                  const newHistory = [...oldHistory, historyEntry];
                  
                  await saveArchiveRecord({
-                     id: record.id,
+                     ...currentArchive,
                      status: 'executed',
                      data: { ...currentArchive.data, history: newHistory }
                  });
@@ -336,7 +336,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                  const newHistory = [...oldHistory, historyEntry];
                  
                  await saveArchiveRecord({
-                     id: record.id,
+                     ...currentArchive,
                      status: 'pending_sign',
                      data: { ...currentArchive.data, history: newHistory }
                  });

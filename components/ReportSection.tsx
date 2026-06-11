@@ -81,28 +81,61 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             case 'executed': return RecordStatus.COMPLETED_WORK;
                             case 'pending_sign': return RecordStatus.PENDING_SIGN;
                             case 'signed': return RecordStatus.SIGNED;
-                            case 'completed': return RecordStatus.RETURNED;
+                            case 'completed': return RecordStatus.HANDOVER;
+                            case 'returned': return RecordStatus.RETURNED;
                             default: return RecordStatus.RECEIVED;
                         }
                     };
 
-                    const mapped: RecordFile[] = all.map(r => ({
-                        id: r.id,
-                        code: r.so_hieu,
-                        customerName: r.noi_nhan_gui,
-                        ward: r.data?.xa_phuong,
-                        mapSheet: r.data?.so_to,
-                        landPlot: r.data?.so_thua,
-                        receivedDate: r.ngay_thang,
-                        deadline: r.data?.hen_tra,
-                        status: mapStatus(r.status),
-                        assignedTo: r.data?.assigned_to,
-                        notes: r.trich_yeu,
-                        recordType: r.type === 'saoluc' ? 'Sao lục' : r.type === 'vaoso' ? 'Vào sổ' : 'Công văn',
-                        address: r.data?.xa_phuong,
-                        phoneNumber: '',
-                        content: r.trich_yeu
-                    } as RecordFile));
+                    const getHistoryDate = (history: any[], statusVal: string, fallbackDate: string | null = null): string | null => {
+                        if (!Array.isArray(history)) return fallbackDate;
+                        const entry = [...history].reverse().find(e => 
+                            e.status === statusVal || 
+                            (statusVal === 'executed' && (e.action === 'Thực hiện xong' || e.action === 'Đã thực hiện')) ||
+                            (statusVal === 'pending_sign' && e.action === 'Trình ký') ||
+                            (statusVal === 'signed' && e.action === 'Ký duyệt') ||
+                            (statusVal === 'completed' && e.action === 'Đã giao 1 cửa') ||
+                            (statusVal === 'returned' && e.action === 'Đã trả kết quả')
+                        );
+                        if (entry && entry.timestamp) {
+                            return entry.timestamp.split('T')[0];
+                        }
+                        return fallbackDate;
+                    };
+
+                    const mapped: RecordFile[] = all.map(r => {
+                        const history = r.data?.history || [];
+                        const statusMapped = mapStatus(r.status);
+                        
+                        const workCompletedDate = getHistoryDate(history, 'executed');
+                        const submissionDate = getHistoryDate(history, 'pending_sign');
+                        const approvalDate = getHistoryDate(history, 'signed');
+                        const completedDate = getHistoryDate(history, 'completed', r.data?.ngay_hoan_thanh || null);
+                        const resultReturnedDate = getHistoryDate(history, 'returned', r.data?.ngay_tra_ket_qua || null);
+
+                        return {
+                            id: r.id,
+                            code: r.so_hieu,
+                            customerName: r.noi_nhan_gui,
+                            ward: r.data?.xa_phuong,
+                            mapSheet: r.data?.so_to,
+                            landPlot: r.data?.so_thua,
+                            receivedDate: r.ngay_thang,
+                            deadline: r.data?.hen_tra,
+                            status: statusMapped,
+                            assignedTo: r.data?.assigned_to,
+                            notes: r.trich_yeu,
+                            recordType: r.type === 'saoluc' ? 'Sao lục' : r.type === 'vaoso' ? 'Vào sổ' : 'Công văn',
+                            address: r.data?.xa_phuong,
+                            phoneNumber: '',
+                            content: r.trich_yeu,
+                            workCompletedDate,
+                            submissionDate,
+                            approvalDate,
+                            completedDate,
+                            resultReturnedDate
+                        } as RecordFile;
+                    });
                     setArchiveRecords(mapped);
                 } catch (e) {
                     console.error("Error loading archive records for report", e);

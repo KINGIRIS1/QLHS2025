@@ -14,28 +14,19 @@ const RECORD_DB_COLUMNS = [
     'receiptNumber', 'resultReturnedDate', 'receiverName',
     'needsMapCorrection', // Cột mới
     'plotCount',
-    'createdBy' // Người tiếp nhận hồ sơ
+    'createdBy', // Người tiếp nhận hồ sơ
+    'workCompletedDate' // Cột vật lý lưu ngày Đã thực hiện
 ];
 
 // Helper functions to serialize and deserialize workCompletedDate inside privateNotes securely
 export const packRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
     
-    // If workCompletedDate exists, save it inside privateNotes to preserve it on Supabase!
-    // Format: "[WCD:YYYY-MM-DD]" at the end of the text.
-    if (copy.workCompletedDate) {
-        let cleanNotes = copy.privateNotes || '';
-        // Remove any existing WCD tags
-        cleanNotes = cleanNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
-        copy.privateNotes = cleanNotes ? `${cleanNotes} [WCD:${copy.workCompletedDate}]` : `[WCD:${copy.workCompletedDate}]`;
-    } else {
-        // If workCompletedDate is null/empty but privateNotes has it, we should clean it up
-        if (copy.privateNotes) {
-            copy.privateNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
-            if (copy.privateNotes === '') {
-                copy.privateNotes = null;
-            }
-        }
+    // Vì đã có cột vật lý trực tiếp 'workCompletedDate' nên không cần đóng gói vào privateNotes nữa.
+    // Tuy nhiên, ta vẫn dọn dẹp các thẻ [WCD:...] cũ nếu có trong privateNotes để ghi chú luôn sạch sẽ.
+    if (copy.privateNotes) {
+        const cleanedNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+        copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
     }
     return copy;
 };
@@ -43,16 +34,17 @@ export const packRecord = (record: RecordFile): RecordFile => {
 export const unpackRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
     
-    // If privateNotes contains [WCD:YYYY-MM-DD], parse it and populate workCompletedDate!
+    // Nếu privateNotes có chứa [WCD:YYYY-MM-DD], ta vẫn phân tích để lấy giá trị cho trường hợp dữ liệu cũ lưu dưới dạng text
     if (copy.privateNotes) {
         const match = copy.privateNotes.match(/\[WCD:(\d{4}-\d{2}-\d{2})\]/);
         if (match) {
-            copy.workCompletedDate = match[1];
-            // Remove the WCD tag from privateNotes so it's clean for the UI
-            copy.privateNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
-            if (copy.privateNotes === '') {
-                copy.privateNotes = null;
+            // Ưu tiên cột vật lý có sẵn, nếu chưa có thì fallback về dữ liệu cũ trong privateNotes
+            if (!copy.workCompletedDate) {
+                copy.workCompletedDate = match[1];
             }
+            // Dọn dẹp thẻ tag trong privateNotes cho giao diện sạch sẽ
+            const cleanedNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+            copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
         }
     }
     return copy;
@@ -184,7 +176,7 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         if (error) {
             const errCode = (error as any).code;
             const errMsg = String((error as any).message || '');
-            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount')) {
+            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate')) {
                 console.warn("⚠️ [Database out of sync] Thử lại createRecordApi loại bỏ cột lỗi...");
                 let fallbackColumns = RECORD_DB_COLUMNS.slice();
                 if (errCode === '42703' || errMsg.includes('createdBy')) {
@@ -192,6 +184,9 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 }
                 if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
+                }
+                if (errMsg.includes('workCompletedDate')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'workCompletedDate');
                 }
                 const fallbackPayload = sanitizeData(packed, fallbackColumns);
                 const { data: fbData, error: fbError } = await supabase.from('records').insert([fallbackPayload]).select();
@@ -239,7 +234,7 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         if (error) {
             const errCode = (error as any).code;
             const errMsg = String((error as any).message || '');
-            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount')) {
+            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate')) {
                 console.warn("⚠️ [Database out of sync] Thử lại updateRecordApi loại bỏ cột lỗi...");
                 let fallbackColumns = RECORD_DB_COLUMNS.slice();
                 if (errCode === '42703' || errMsg.includes('createdBy')) {
@@ -247,6 +242,9 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 }
                 if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
+                }
+                if (errMsg.includes('workCompletedDate')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'workCompletedDate');
                 }
                 const fallbackPayload = sanitizeData(packed, fallbackColumns);
                 const { data: fbData, error: fbError } = await supabase.from('records').update(fallbackPayload).eq('id', record.id).select();

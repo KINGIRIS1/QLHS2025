@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabaseClient';
-import { RecordFile } from '../types';
+import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, normalizeCode } from './apiCore';
 
@@ -485,3 +485,66 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[]): Promise
         return { success: false, count: 0 };
     }
 };
+
+/**
+ * Tự động rà soát và đồng bộ hóa các hồ sơ cũ chưa có giá trị vật lý ở cột workCompletedDate.
+ */
+export const syncLegacyCompletedDatesApi = async (): Promise<{ success: boolean; count: number }> => {
+    if (!isConfigured) return { success: true, count: 0 };
+    try {
+        const { data, error } = await supabase.from('records').select('*');
+        if (error) throw error;
+        if (!data || data.length === 0) return { success: true, count: 0 };
+
+        const updatesToPush: any[] = [];
+        let countObj = 0;
+
+        for (const raw of data) {
+            const r = unpackRecord(raw as RecordFile);
+            
+            // Điều kiện: Trạng thái nằm trong các bước đã thực hiện xong trở đi
+            const isCompletedOrBeyond = [
+                RecordStatus.COMPLETED_WORK,
+                RecordStatus.PENDING_SIGN,
+                RecordStatus.SIGNED,
+                RecordStatus.HANDOVER,
+                RecordStatus.RETURNED
+            ].includes(r.status);
+
+            const hasNoPhysicalWCD = !raw.workCompletedDate;
+
+            if (isCompletedOrBeyond && hasNoPhysicalWCD) {
+                let targetWCD: string | null = null;
+
+                // 1. Lấy từ tag ẩn [WCD:...] trong privateNotes cũ (đã được unpackRecord tự động bọc tách)
+                if (r.workCompletedDate) {
+                    targetWCD = r.workCompletedDate;
+                } else {
+                    // 2. Fallback logic nếu hoàn toàn không có tag [WCD:...]
+                    targetWCD = r.submissionDate || r.completedDate || r.resultReturnedDate || r.assignedDate || r.receivedDate || new Date().toISOString().split('T')[0];
+                }
+
+                if (targetWCD) {
+                    r.workCompletedDate = targetWCD;
+                    const packed = packRecord(r);
+                    const cleanPayload = sanitizeData(packed, RECORD_DB_COLUMNS);
+                    updatesToPush.push(cleanPayload);
+                    countObj++;
+                }
+            }
+        }
+
+        if (updatesToPush.length > 0) {
+            const { error: upsertError } = await supabase.from('records').upsert(updatesToPush);
+            if (upsertError) throw upsertError;
+            
+            clearRecordsCache();
+        }
+
+        return { success: true, count: countObj };
+    } catch (error) {
+        logError("syncLegacyCompletedDatesApi", error);
+        return { success: false, count: 0 };
+    }
+};
+

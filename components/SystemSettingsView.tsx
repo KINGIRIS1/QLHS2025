@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
@@ -38,6 +38,33 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [tempIsLunar, setTempIsLunar] = useState(false);
   
   const [savingHolidays, setSavingHolidays] = useState(false);
+
+  // Sync Legacy completed status dates
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [syncCount, setSyncCount] = useState<number>(0);
+
+  const handleSyncLegacyDates = async () => {
+      if (!(await confirmAction("Bạn có muốn rà soát toàn bộ hồ sơ cũ chưa có cột vật lý 'Ngày Đã thực hiện' và tự động khôi phục chúng lên cơ sở dữ liệu Supabase dựa trên các ghi chú nội bộ [WCD:...] hoặc các mốc thời gian liên quan không?"))) {
+          return;
+      }
+      setSyncStatus('syncing');
+      try {
+          const { syncLegacyCompletedDatesApi } = await import('../services/apiRecords');
+          const res = await syncLegacyCompletedDatesApi();
+          if (res.success) {
+              setSyncCount(res.count);
+              setSyncStatus('success');
+              if (onHolidaysChanged) {
+                  onHolidaysChanged();
+              }
+          } else {
+              setSyncStatus('error');
+          }
+      } catch (e) {
+          console.error(e);
+          setSyncStatus('error');
+      }
+  };
 
   useEffect(() => {
       loadHolidays();
@@ -235,6 +262,28 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             {dbTestStatus === 'error' && <div className="text-xs font-black text-red-600 uppercase tracking-wider">{dbTestMsg || 'Lỗi!'}</div>}
                             <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full md:w-auto px-6 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 font-medium text-sm rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2"> 
                                 {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : 'Kiểm tra kết nối'} 
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Sync Legacy Completed Dates (workCompletedDate) */}
+                    <div className="bg-white border border-indigo-100 rounded-2xl p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+                        <div className="text-center md:text-left">
+                            <h3 className="font-black text-indigo-800 flex items-center justify-center md:justify-start gap-2 mb-1 tracking-tight"> 
+                                <RefreshCw size={18} className="text-indigo-600 animate-spin-slow" /> Đồng bộ ngày Đã thực hiện (workCompletedDate) 
+                            </h3>
+                            <p className="text-xs text-indigo-600 font-medium">Bổ sung ngày Đã thực hiện vật lý vào Supabase cho các hồ sơ cũ bấm trước đây.</p>
+                        </div>
+                        <div className="flex flex-col items-center gap-3 w-full md:w-auto">
+                            {syncStatus === 'success' && <div className="text-xs font-black text-green-600 flex items-center gap-1 uppercase tracking-wider"><CheckCircle size={16} /> Đồng bộ thành công {syncCount} hồ sơ!</div>}
+                            {syncStatus === 'error' && <div className="text-xs font-black text-red-600 uppercase tracking-wider">Lỗi đồng bộ.</div>}
+                            <button 
+                                onClick={handleSyncLegacyDates} 
+                                disabled={syncStatus === 'syncing'} 
+                                className="w-full md:w-auto px-6 py-2.5 bg-indigo-600 text-white font-medium text-sm rounded-xl hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                            > 
+                                {syncStatus === 'syncing' ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />} 
+                                {syncStatus === 'syncing' ? 'Đang đồng bộ...' : 'Đồng bộ dữ liệu'} 
                             </button>
                         </div>
                     </div>

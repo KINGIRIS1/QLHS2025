@@ -669,7 +669,7 @@ export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
         diachiap: d.diachiap || null,
         soke_tang: d.soke_tang || null,
         so_o: d.so_o || null,
-        So_tep: d.So_tep || null,
+        so_tep: d.so_tep || d.So_tep || null,
         sott_tep: d.sott_tep || null,
         nguoinhap: d.nguoinhap || null,
         ngaynhap: d.ngaynhap || null,
@@ -723,7 +723,8 @@ export const mapFromWarehouseRecord = (w: any): ArchiveRecord => {
             diachiap: w.diachiap,
             soke_tang: w.soke_tang,
             so_o: w.so_o,
-            So_tep: w.So_tep,
+            so_tep: w.so_tep,
+            So_tep: w.so_tep,
             sott_tep: w.sott_tep,
             nguoinhap: w.nguoinhap,
             ngaynhap: w.ngaynhap,
@@ -785,7 +786,7 @@ export const fetchWarehouseRecordsPaginated = async (
         }
         if (filters.advHopSo) {
             const term = filters.advHopSo.toLowerCase();
-            list = list.filter(r => (r.data?.so_o || '').toLowerCase().includes(term) || (r.data?.So_tep || '').toLowerCase().includes(term));
+            list = list.filter(r => (r.data?.so_o || '').toLowerCase().includes(term) || (r.data?.so_tep || r.data?.So_tep || '').toLowerCase().includes(term));
         }
         if (filters.advSoPhatHanh) {
             list = list.filter(r => (r.data?.sophathanhgcnmoi || '').toLowerCase().includes(filters.advSoPhatHanh!.toLowerCase()));
@@ -841,7 +842,7 @@ export const fetchWarehouseRecordsPaginated = async (
             }
             if (filters.advHopSo && filters.advHopSo.trim() !== '') {
                 const term = `%${filters.advHopSo.trim()}%`;
-                query = query.or(`so_o.ilike.${term},So_tep.ilike.${term}`);
+                query = query.or(`so_o.ilike.${term},so_tep.ilike.${term}`);
             }
             if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
                 query = query.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
@@ -901,7 +902,7 @@ export const fetchWarehouseRecordsPaginated = async (
                 }
                 if (filters.advHopSo && filters.advHopSo.trim() !== '') {
                     const term = `%${filters.advHopSo.trim()}%`;
-                    query = query.or(`data->>so_o.ilike.${term},data->>So_tep.ilike.${term}`);
+                    query = query.or(`data->>so_o.ilike.${term},data->>so_tep.ilike.${term}`);
                 }
                 if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
                     query = query.ilike('data->>sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);

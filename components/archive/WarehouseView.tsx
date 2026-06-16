@@ -226,7 +226,15 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                     ];
 
                     excelFields.forEach(field => {
-                        rowData[field] = row[field] !== undefined ? row[field] : null;
+                        if (row[field] !== undefined) {
+                            rowData[field] = row[field];
+                        } else if (field === 'So_tep' && row['so_tep'] !== undefined) {
+                            rowData['So_tep'] = row['so_tep'];
+                        } else if (field === 'So_tep' && row['SO_TEP'] !== undefined) {
+                            rowData['So_tep'] = row['SO_TEP'];
+                        } else {
+                            rowData[field] = null;
+                        }
                     });
 
                     // Định dạng lại ngày nhập

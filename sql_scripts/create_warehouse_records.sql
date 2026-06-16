@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS warehouse_records (
     diachiap TEXT,
     soke_tang TEXT,
     so_o TEXT,
-    So_tep TEXT,
+    so_tep TEXT,
     sott_tep TEXT,
     nguoinhap TEXT,
     ngaynhap DATE,

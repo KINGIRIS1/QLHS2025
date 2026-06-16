@@ -15,6 +15,8 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import SystemReceiptTemplate from '../SystemReceiptTemplate';
 import PhieuXinLoiModal from '../PhieuXinLoiModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
+import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../../services/apiSystem';
+
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -48,6 +50,30 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   const [liquidationInfo, setLiquidationInfo] = useState<{ amount: number, content: string } | null>(null);
 
   const [activeTab, setActiveTab] = useState<'info' | 'timeline' | 'notes'>('info');
+
+  const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchContactSettingsCached()
+        .then(setContactSettings)
+        .catch(err => console.error("Error fetching contact settings in MobileDetailModal", err));
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleCacheUpdate = () => {
+      fetchContactSettingsCached()
+        .then(setContactSettings)
+        .catch(err => console.error(err));
+    };
+
+    window.addEventListener('contact_settings_cache_updated', handleCacheUpdate);
+    return () => {
+      window.removeEventListener('contact_settings_cache_updated', handleCacheUpdate);
+    };
+  }, []);
+
 
   useEffect(() => {
     if (record) {
@@ -166,11 +192,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
     
-    let sdtLienHe = "";
-    const wRaw = (record.ward || "").toLowerCase();
-    if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
-    else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
-    else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
+    const sdtLienHe = getContactInfo(contactSettings, record.ward || "", type);
+
 
     const day = rDate.getDate().toString().padStart(2, '0');
     const month = (rDate.getMonth() + 1).toString().padStart(2, '0');

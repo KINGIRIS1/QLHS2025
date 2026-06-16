@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { RecordFile, Employee, User, UserRole, Holiday } from '../types';
+import { RecordFile, Employee, User, UserRole, Holiday, RecordStatus } from '../types';
 import { STATUS_LABELS } from '../constants';
 import { COLUMN_DEFS } from '../utils/appHelpers';
 
@@ -131,13 +131,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     // --- RENDER RECORD LIST (Extracted to be used in switch) ---
     const renderRecordList = () => {
         // Kiểm tra xem có đang ở chế độ xem Hồ sơ đo đạc (bao gồm tất cả các tab con)
-        const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
+        const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
         const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list'].includes(currentView);
         
         let title = 'Danh sách Hồ sơ';
         if (currentView === 'check_list' || currentView === 'other_check_list') title = 'Danh sách Trình Ký';
         else if (currentView === 'handover_list' || currentView === 'other_handover_list') title = 'Danh sách Giao 1 cửa';
         else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks') title = 'Hồ sơ chưa giao';
+        else if (currentView === 'completed_work_list') title = 'Hồ sơ đã thực hiện';
         else if (currentView === 'all_records') title = 'Hồ sơ đo đạc';
         else if (currentView === 'other_records') title = 'Hồ sơ khác';
 
@@ -162,6 +163,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                                 <UserPlusIcon size={16} /> Chưa giao
                             </button>
                         )}
+
+                        <button 
+                            onClick={() => props.setCurrentView('completed_work_list')}
+                            className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === 'completed_work_list' ? 'border-cyan-600 text-cyan-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <CheckSquare size={16} /> Đã thực hiện
+                        </button>
 
                         {(isAdmin || isSubadmin) && (
                             <button 
@@ -387,7 +395,20 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                             <tr>
                                 <th className="p-3 w-10 text-center">
-                                    {canPerformAction ? <button onClick={props.toggleSelectAll}>{props.selectedRecordIds.size === props.paginatedRecords.length && props.paginatedRecords.length > 0 ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-gray-400" />}</button> : '#'}
+                                    {canPerformAction ? (
+                                        (() => {
+                                            const selectableRecords = props.paginatedRecords.filter(r => {
+                                                const isHandover = (r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED;
+                                                return r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.HANDOVER && !isHandover;
+                                            });
+                                            const isAllSelected = selectableRecords.length > 0 && selectableRecords.every(r => props.selectedRecordIds.has(r.id));
+                                            return (
+                                                <button onClick={props.toggleSelectAll}>
+                                                    {isAllSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-gray-400" />}
+                                                </button>
+                                            );
+                                        })()
+                                    ) : '#'}
                                 </th>
                                 {COLUMN_DEFS.map(col => props.visibleColumns[col.key] && (
                                     <th key={col.key} className={`p-3 cursor-pointer hover:bg-gray-100 transition-colors group select-none ${col.className || ''}`} onClick={() => { if (props.sortConfig.key === col.sortKey) { props.setSortConfig({ key: col.sortKey, direction: props.sortConfig.direction === 'asc' ? 'desc' : 'asc' }); } else { props.setSortConfig({ key: col.sortKey, direction: 'asc' }); } }}>
@@ -498,6 +519,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     currentUser={currentUser}
                     records={records}
                     holidays={holidays}
+                    onReturnResult={props.handleOpenReturnModal}
                 />
             );
         case 'receive_contract':

@@ -750,7 +750,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
           </div>
           
           <h3 className="text-base font-extrabold text-slate-800 mt-5 group-hover:text-indigo-700 transition-colors">
-            2. Báo cáo hồ sơ hoàn thành (Tiến trình)
+            2. Báo cáo hồ sơ đã thực hiện
           </h3>
           <p className="text-xs text-slate-500 mt-2.5 leading-relaxed">
             Phân tích số liệu và tác vụ chuyển trạng thái lũy tiến của nhân viên như: <b>Đã thực hiện, Đang trình ký, Đã ký duyệt, Chuyển Một cửa</b>.
@@ -1383,7 +1383,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 {/* VISUAL TRÊN CHƯƠNG TRÌNH */}
                 <div id="report_2_visual_area" className="space-y-6">
                   <div className="text-center border-b pb-6">
-                    <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Thống kê tiến trình hoàn thành nội bộ</h1>
+                    <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Thống kê số lượng hồ sơ đã thực hiện tại Tổ đo đạc</h1>
                   <p className="text-xs text-indigo-700 font-bold mt-1">Hệ thống ghi nhận tình trạng hồ sơ hiện hành</p>
                 </div>
 

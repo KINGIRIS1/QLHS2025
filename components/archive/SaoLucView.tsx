@@ -293,13 +293,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
+            const selectableRecords = filteredRecords.filter(r => r.status !== 'completed' && r.status !== 'returned');
+            setSelectedIds(new Set(selectableRecords.map(r => r.id)));
         } else {
             setSelectedIds(new Set());
         }
     };
 
     const handleSelectRow = (id: string) => {
+        const r = records.find(rec => rec.id === id);
+        if (r && (r.status === 'completed' || r.status === 'returned')) return;
+
         const newSet = new Set(selectedIds);
         if (newSet.has(id)) newSet.delete(id);
         else newSet.add(id);
@@ -1113,7 +1117,18 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                             <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th className="p-3 w-10 text-center">
-                                        <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
+                                        {(() => {
+                                            const selectableRecords = filteredRecords.filter(r => r.status !== 'completed' && r.status !== 'returned');
+                                            const isAllSelected = selectableRecords.length > 0 && selectableRecords.every(r => selectedIds.has(r.id));
+                                            return (
+                                                <input 
+                                                    type="checkbox" 
+                                                    onChange={handleSelectAll} 
+                                                    checked={isAllSelected}
+                                                    disabled={selectableRecords.length === 0}
+                                                />
+                                            );
+                                        })()}
                                     </th>
                                     <th className="p-3 w-10 text-center">#</th>
                                     <th className="p-3 w-32 text-center">Mã HS</th>
@@ -1134,7 +1149,16 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                 {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => (
                                     <tr key={r.id} className={`hover:bg-blue-50/50 group ${selectedIds.has(r.id) ? 'bg-blue-50' : ''}`}>
                                         <td className="p-3 text-center">
-                                            <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
+                                            {r.status !== 'completed' && r.status !== 'returned' ? (
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedIds.has(r.id)} 
+                                                    onChange={() => handleSelectRow(r.id)} 
+                                                    className="cursor-pointer"
+                                                />
+                                            ) : (
+                                                <div className="w-4 h-4 mx-auto" title="Hồ sơ đã chuyển 1 cửa hoặc đã trả kết quả, không thể giao việc" />
+                                            )}
                                         </td>
                                         <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                         <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>

@@ -7,7 +7,7 @@ export interface ArchiveRecord {
     id: string;
     created_at: string;
     created_by: string;
-    type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky';
+    type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky' | 'kho';
     status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed' | 'returned' | 'tiep_nhan' | 'xu_ly' | 'tham_tra_thue' | 'chuyen_thue' | 'dong_thue' | 'ky_gcn' | 'hoan_thanh'; // Nháp | Đã giao | Đã thực hiện | Trình ký | Đã ký | Đã giao 1 cửa | Đã trả kết quả | Tiếp nhận | Xử lý | Thẩm tra thuế | Chuyển thuế | Đóng thuế | Ký GCN | Hoàn thành
     so_hieu: string; // Số hiệu/Số hồ sơ
     trich_yeu: string; // Nội dung/Trích yếu
@@ -22,23 +22,23 @@ let MOCK_ARCHIVE: ArchiveRecord[] = [];
 
 // In-Memory Cache for fetched records to solve high egress without breaking UI
 let CACHED_ARCHIVE_RECORDS: Record<string, ArchiveRecord[]> = {
-    saoluc: [], vaoso: [], congvan: [], dangky: []
+    saoluc: [], vaoso: [], congvan: [], dangky: [], kho: []
 };
 let IS_CACHED_LOADED: Record<string, boolean> = {
-    saoluc: false, vaoso: false, congvan: false, dangky: false
+    saoluc: false, vaoso: false, congvan: false, dangky: false, kho: false
 };
 let IS_REALTIME_ARCHIVE_SUBSCRIBED = false;
 
 const CACHE_KEY_ARCHIVE = 'offline_archive_records';
 
 // Function to clear cache (e.g. for refresh button)
-export const clearArchiveCache = (type?: 'saoluc' | 'vaoso' | 'congvan' | 'dangky') => {
+export const clearArchiveCache = (type?: 'saoluc' | 'vaoso' | 'congvan' | 'dangky' | 'kho') => {
     if (type) {
         IS_CACHED_LOADED[type] = false;
         CACHED_ARCHIVE_RECORDS[type] = [];
     } else {
-        IS_CACHED_LOADED = { saoluc: false, vaoso: false, congvan: false, dangky: false };
-        CACHED_ARCHIVE_RECORDS = { saoluc: [], vaoso: [], congvan: [], dangky: [] };
+        IS_CACHED_LOADED = { saoluc: false, vaoso: false, congvan: false, dangky: false, kho: false };
+        CACHED_ARCHIVE_RECORDS = { saoluc: [], vaoso: [], congvan: [], dangky: [], kho: [] };
     }
 };
 
@@ -99,7 +99,7 @@ export const initRealtimeArchive = () => {
 
 // --- API ---
 
-export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky', forceUpdate: boolean = false, allowedWards?: string[]): Promise<ArchiveRecord[]> => {
+export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky' | 'kho', forceUpdate: boolean = false, allowedWards?: string[]): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
@@ -186,6 +186,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         
         // KIỂM TRA TRÙNG LẶP SỐ HIỆU (Chống Lỗ hổng 4)
         if (payload.so_hieu && payload.so_hieu.trim() !== '') {
+            // Kiểm tra trên archive_records
             let query = supabase.from('archive_records')
                 .select('id')
                 .eq('type', payload.type)
@@ -197,8 +198,27 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             
             const { data: existing, error: errCheck } = await query.limit(1);
             if (errCheck) throw errCheck;
+            
             if (existing && existing.length > 0) {
                 throw new Error("Mã hồ sơ / Số hiệu đã tồn tại trong hệ thống!");
+            }
+
+            // Đồng thời kiểm tra trên warehouse_records nếu type là kho
+            if (payload.type === 'kho') {
+                try {
+                    let wQuery = supabase.from('warehouse_records')
+                        .select('id')
+                        .eq('so_hieu', payload.so_hieu.trim());
+                    if (record.id) {
+                        wQuery = wQuery.neq('id', record.id);
+                    }
+                    const { data: wExisting } = await wQuery.limit(1);
+                    if (wExisting && wExisting.length > 0) {
+                        throw new Error("Mã hồ sơ / Số hiệu đã tồn tại trong hệ thống kho!");
+                    }
+                } catch (e) {
+                    // Bỏ qua nếu bảng warehouse_records chưa tồn tại
+                }
             }
         }
 
@@ -216,6 +236,16 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             
             if (error) throw error;
             
+            // Đồng bộ sang bảng warehouse_records chuyên dụng
+            if (payload.type === 'kho') {
+                try {
+                    const wPayload = mapToWarehousePayload(data);
+                    await supabase.from('warehouse_records').upsert(wPayload);
+                } catch (wErr) {
+                    // Bỏ qua nếu table chưa được tạo
+                }
+            }
+
             // Mutate cache
             if (IS_CACHED_LOADED[data.type]) {
                 const arr = CACHED_ARCHIVE_RECORDS[data.type];
@@ -244,6 +274,16 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             const { data, error } = await supabase.from('archive_records').insert([insertPayload]).select().single();
             if (error) throw error;
             
+            // Đồng bộ sang bảng warehouse_records chuyên dụng
+            if (payload.type === 'kho') {
+                try {
+                    const wPayload = mapToWarehousePayload(data);
+                    await supabase.from('warehouse_records').insert(wPayload);
+                } catch (wErr) {
+                    // Bỏ qua nếu table chưa được tạo
+                }
+            }
+
             // Mutate cache
             if (IS_CACHED_LOADED[data.type]) {
                 CACHED_ARCHIVE_RECORDS[data.type].unshift(data as ArchiveRecord);
@@ -271,6 +311,13 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
         return true;
     }
     try {
+        // Đồng thời xóa bên warehouse_records (nếu có bảng)
+        try {
+            await supabase.from('warehouse_records').delete().eq('id', id);
+        } catch (we) {
+            // Bỏ qua lỗi bảng chưa tồn tại
+        }
+
         const { data, error } = await supabase.from('archive_records').delete().eq('id', id).select().single();
         if (error) {
             // It might fail to select if it was already deleted, just fallback to return true unless it's a real error
@@ -298,6 +345,14 @@ export const deleteAllArchiveRecordsByType = async (type: string): Promise<boole
         return true;
     }
     try {
+        if (type === 'kho') {
+            try {
+                await supabase.from('warehouse_records').delete().neq('id', 'dummy_id_prevent_error');
+            } catch (we) {
+                // Bỏ qua lỗi bảng chưa tồn tại
+            }
+        }
+
         const { error } = await supabase.from('archive_records').delete().eq('type', type);
         if (error) throw error;
         
@@ -483,7 +538,7 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string)
     }
 };
 
-export const findArchiveRecordBySoHieu = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky', soHieu: string): Promise<ArchiveRecord | null> => {
+export const findArchiveRecordBySoHieu = async (type: 'saoluc' | 'vaoso' | 'congvan' | 'dangky' | 'kho', soHieu: string): Promise<ArchiveRecord | null> => {
     if (!isConfigured) {
         return MOCK_ARCHIVE.find(r => r.type === type && r.so_hieu === soHieu) || null;
     }
@@ -503,3 +558,356 @@ export const findArchiveRecordBySoHieu = async (type: 'saoluc' | 'vaoso' | 'cong
         return null;
     }
 };
+
+export const fetchArchiveRecordById = async (id: string): Promise<ArchiveRecord | null> => {
+    if (!isConfigured) {
+        return MOCK_ARCHIVE.find(r => r.id === id) || null;
+    }
+    try {
+        // Thử tìm ở table warehouse_records trước
+        const { data: wData, error: wError } = await supabase
+            .from('warehouse_records')
+            .select('*')
+            .eq('id', id)
+            .limit(1);
+        if (!wError && wData && wData.length > 0) {
+            return mapFromWarehouseRecord(wData[0]);
+        }
+
+        const { data, error } = await supabase
+            .from('archive_records')
+            .select('*')
+            .eq('id', id)
+            .limit(1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) return data[0] as ArchiveRecord;
+        return null;
+    } catch (e) {
+        logError("fetchArchiveRecordById", e);
+        return null;
+    }
+};
+
+// --- HỖ TRỢ PHÂN TRANG KHO DỮ LIỆU ĐỒ SỘ (300K DÒNG) ---
+
+export interface WarehouseFilters {
+    searchTerm?: string;
+    advMaBienNhan?: string;
+    advLoaiHoSo?: string;
+    advChuSuDung?: string;
+    advCccd?: string;
+    advToThua?: string;
+    advKeTang?: string;
+    advHopSo?: string;
+    advSoPhatHanh?: string;
+    advNguoiNhap?: string;
+}
+
+export interface PaginatedWarehouseResponse {
+    records: ArchiveRecord[];
+    totalCount: number;
+}
+
+// Convert payload cho table warehouse_records riêng
+export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
+    const d = record.data || {};
+    return {
+        id: record.id,
+        created_by: record.created_by,
+        type: 'kho',
+        status: record.status || 'completed',
+        so_hieu: record.so_hieu,
+        trich_yeu: record.trich_yeu,
+        ngay_thang: record.ngay_thang || null,
+        noi_nhan_gui: record.noi_nhan_gui || d.hoten1 || '',
+        attached_files: record.attached_files || [],
+        
+        // Cột cấu trúc tối ưu index hóa
+        loaihoso: d.loaihoso || null,
+        hoten1: d.hoten1 || null,
+        namsinh1: d.namsinh1 ? parseInt(d.namsinh1.toString()) : null,
+        loaicccd1: d.loaicccd1 || null,
+        socccd: d.socccd || null,
+        diachitt1: d.diachitt1 || null,
+        hoten2: d.hoten2 || null,
+        namsinh2: d.namsinh2 ? parseInt(d.namsinh2.toString()) : null,
+        loaicccd2: d.loaicccd2 || null,
+        socccd2: d.socccd2 || null,
+        diachitt2: d.diachitt2 || null,
+        matd: d.matd || record.so_hieu || null,
+        tobando: d.tobando || null,
+        sothua: d.sothua || null,
+        dientich: d.dientich ? parseFloat(d.dientich.toString()) : null,
+        hinhthucsd: d.hinhthucsd || null,
+        loaidato: d.loaidato || null,
+        dientichdato: d.dientichdato ? parseFloat(d.dientichdato.toString()) : null,
+        mavach: d.mavach || null,
+        maxa: d.maxa || null,
+        manam: d.manam || null,
+        sophathanhgcnmoi: d.sophathanhgcnmoi || null,
+        sovaosomoi: d.sovaosomoi || null,
+        ngaycapgcnmoi: d.ngaycapgcnmoi || null,
+        diachiap: d.diachiap || null,
+        soke_tang: d.soke_tang || null,
+        so_o: d.so_o || null,
+        So_tep: d.So_tep || null,
+        sott_tep: d.sott_tep || null,
+        nguoinhap: d.nguoinhap || null,
+        ngaynhap: d.ngaynhap || null,
+        ghichu: d.ghichu || null,
+        
+        // Dư phòng toàn bộ JSON nâng cao
+        data: d
+    };
+};
+
+// Khôi phục từ table warehouse_records sang kiểu ArchiveRecord tương thích tuyệt đối hệ thống
+export const mapFromWarehouseRecord = (w: any): ArchiveRecord => {
+    if (!w) return {} as ArchiveRecord;
+    return {
+        id: w.id,
+        created_at: w.created_at,
+        created_by: w.created_by,
+        type: 'kho',
+        status: w.status,
+        so_hieu: w.so_hieu,
+        trich_yeu: w.trich_yeu,
+        ngay_thang: w.ngay_thang,
+        noi_nhan_gui: w.noi_nhan_gui,
+        attached_files: w.attached_files,
+        data: {
+            sott: w.sott,
+            loaihoso: w.loaihoso,
+            hoten1: w.hoten1,
+            namsinh1: w.namsinh1,
+            loaicccd1: w.loaicccd1,
+            socccd: w.socccd,
+            diachitt1: w.diachitt1,
+            hoten2: w.hoten2,
+            namsinh2: w.namsinh2,
+            loaicccd2: w.loaicccd2,
+            socccd2: w.socccd2,
+            diachitt2: w.diachitt2,
+            matd: w.matd,
+            tobando: w.tobando,
+            sothua: w.sothua,
+            dientich: w.dientich,
+            hinhthucsd: w.hinhthucsd,
+            loaidato: w.loaidato,
+            dientichdato: w.dientichdato,
+            mavach: w.mavach,
+            maxa: w.maxa,
+            manam: w.manam,
+            sophathanhgcnmoi: w.sophathanhgcnmoi,
+            sovaosomoi: w.sovaosomoi,
+            ngaycapgcnmoi: w.ngaycapgcnmoi,
+            diachiap: w.diachiap,
+            soke_tang: w.soke_tang,
+            so_o: w.so_o,
+            So_tep: w.So_tep,
+            sott_tep: w.sott_tep,
+            nguoinhap: w.nguoinhap,
+            ngaynhap: w.ngaynhap,
+            ghichu: w.ghichu,
+            ...(w.data || {})
+        }
+    };
+};
+
+export const fetchWarehouseRecordsPaginated = async (
+    page: number, // 1-indexed
+    limit: number,
+    filters: WarehouseFilters
+): Promise<PaginatedWarehouseResponse> => {
+    if (!isConfigured) {
+        // Fallback offline khi server chưa config kết nối
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+        let list = MOCK_ARCHIVE.filter(r => r.type === 'kho');
+
+        if (filters.searchTerm) {
+            const term = filters.searchTerm.toLowerCase();
+            list = list.filter(r => {
+                const d = r.data || {};
+                return (r.so_hieu || '').toLowerCase().includes(term) ||
+                    (d.loaihoso || '').toLowerCase().includes(term) ||
+                    (d.hoten1 || '').toLowerCase().includes(term) ||
+                    (d.hoten2 || '').toLowerCase().includes(term) ||
+                    (d.socccd || '').toLowerCase().includes(term) ||
+                    (d.socccd2 || '').toLowerCase().includes(term) ||
+                    (d.sophathanhgcnmoi || '').toLowerCase().includes(term) ||
+                    (d.sovaosomoi || '').toLowerCase().includes(term) ||
+                    (d.soke_tang || '').toLowerCase().includes(term) ||
+                    (d.so_o || '').toLowerCase().includes(term) ||
+                    (d.matd || '').toLowerCase().includes(term);
+            });
+        }
+
+        if (filters.advMaBienNhan) {
+            list = list.filter(r => (r.so_hieu || '').toLowerCase().includes(filters.advMaBienNhan!.toLowerCase()));
+        }
+        if (filters.advLoaiHoSo) {
+            list = list.filter(r => ((r.data?.loaihoso || '')).toLowerCase().includes(filters.advLoaiHoSo!.toLowerCase()));
+        }
+        if (filters.advChuSuDung) {
+            const term = filters.advChuSuDung.toLowerCase();
+            list = list.filter(r => (r.data?.hoten1 || '').toLowerCase().includes(term) || (r.data?.hoten2 || '').toLowerCase().includes(term));
+        }
+        if (filters.advCccd) {
+            const term = filters.advCccd.toLowerCase();
+            list = list.filter(r => (r.data?.socccd || '').toLowerCase().includes(term) || (r.data?.socccd2 || '').toLowerCase().includes(term));
+        }
+        if (filters.advToThua) {
+            const term = filters.advToThua.toLowerCase();
+            list = list.filter(r => (r.data?.tobando || '').toString().includes(term) || (r.data?.sothua || '').toString().includes(term));
+        }
+        if (filters.advKeTang) {
+            list = list.filter(r => (r.data?.soke_tang || '').toLowerCase().includes(filters.advKeTang!.toLowerCase()));
+        }
+        if (filters.advHopSo) {
+            const term = filters.advHopSo.toLowerCase();
+            list = list.filter(r => (r.data?.so_o || '').toLowerCase().includes(term) || (r.data?.So_tep || '').toLowerCase().includes(term));
+        }
+        if (filters.advSoPhatHanh) {
+            list = list.filter(r => (r.data?.sophathanhgcnmoi || '').toLowerCase().includes(filters.advSoPhatHanh!.toLowerCase()));
+        }
+        if (filters.advNguoiNhap) {
+            list = list.filter(r => (r.data?.nguoinhap || '').toLowerCase().includes(filters.advNguoiNhap!.toLowerCase()));
+        }
+
+        const totalCount = list.length;
+        const startIndex = (page - 1) * limit;
+        return {
+            records: list.slice(startIndex, startIndex + limit),
+            totalCount
+        };
+    }
+
+    try {
+        const fromIndex = (page - 1) * limit;
+        const toIndex = page * limit - 1;
+
+        // BƯỚC 1: THỬ TRUY VẤN TRÊN BẢNG CHUYÊN DỤNG VIP 'warehouse_records' TRƯỚC
+        try {
+            let query = supabase
+                .from('warehouse_records')
+                .select('*', { count: 'exact' });
+
+            if (filters.searchTerm && filters.searchTerm.trim() !== '') {
+                const term = `%${filters.searchTerm.trim()}%`;
+                query = query.or(`so_hieu.ilike.${term},loaihoso.ilike.${term},hoten1.ilike.${term},hoten2.ilike.${term},socccd.ilike.${term},socccd2.ilike.${term},sophathanhgcnmoi.ilike.${term},sovaosomoi.ilike.${term},soke_tang.ilike.${term},so_o.ilike.${term},matd.ilike.${term}`);
+            }
+
+            // Bộ lọc nâng cao trên các cột index siêu tốc
+            if (filters.advMaBienNhan && filters.advMaBienNhan.trim() !== '') {
+                query = query.ilike('so_hieu', `%${filters.advMaBienNhan.trim()}%`);
+            }
+            if (filters.advLoaiHoSo && filters.advLoaiHoSo.trim() !== '') {
+                query = query.ilike('loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
+            }
+            if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
+                const term = `%${filters.advChuSuDung.trim()}%`;
+                query = query.or(`hoten1.ilike.${term},hoten2.ilike.${term}`);
+            }
+            if (filters.advCccd && filters.advCccd.trim() !== '') {
+                const term = `%${filters.advCccd.trim()}%`;
+                query = query.or(`socccd.ilike.${term},socccd2.ilike.${term}`);
+            }
+            if (filters.advToThua && filters.advToThua.trim() !== '') {
+                const term = `%${filters.advToThua.trim()}%`;
+                query = query.or(`tobando.ilike.${term},sothua.ilike.${term}`);
+            }
+            if (filters.advKeTang && filters.advKeTang.trim() !== '') {
+                query = query.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
+            }
+            if (filters.advHopSo && filters.advHopSo.trim() !== '') {
+                const term = `%${filters.advHopSo.trim()}%`;
+                query = query.or(`so_o.ilike.${term},So_tep.ilike.${term}`);
+            }
+            if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
+                query = query.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
+            }
+            if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
+                query = query.ilike('nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
+            }
+
+            const { data, count, error } = await query
+                .order('created_at', { ascending: false })
+                .range(fromIndex, toIndex);
+
+            if (error) {
+                // Nếu code === '42P01' tức là table warehouse_records chưa được chạy migration SQL, ta nhảy sang khối catch để fallback
+                if (error.code === '42P01') throw error;
+                throw error;
+            }
+
+            return {
+                records: (data || []).map(mapFromWarehouseRecord),
+                totalCount: count || 0
+            };
+        } catch (innerError: any) {
+            // Chỉ fallback sang archive_records nếu chưa tạo bảng warehouse_records
+            if (innerError.code === '42P01') {
+                // FALLBACK SANG BẢNG GỐC 'archive_records' (mặc dù chậm hơn đối với 300k, nhưng giúp app KHÔNG BỊ CRASH)
+                let query = supabase
+                    .from('archive_records')
+                    .select('*', { count: 'exact' })
+                    .eq('type', 'kho');
+
+                if (filters.searchTerm && filters.searchTerm.trim() !== '') {
+                    const term = `%${filters.searchTerm.trim()}%`;
+                    query = query.or(`so_hieu.ilike.${term},data->>hoten1.ilike.${term},data->>hoten2.ilike.${term},data->>socccd.ilike.${term},data->>socccd2.ilike.${term},data->>sophathanhgcnmoi.ilike.${term},data->>sovaosomoi.ilike.${term},data->>soke_tang.ilike.${term},data->>so_o.ilike.${term},data->>matd.ilike.${term},data->>loaihoso.ilike.${term}`);
+                }
+
+                if (filters.advMaBienNhan && filters.advMaBienNhan.trim() !== '') {
+                    query = query.ilike('so_hieu', `%${filters.advMaBienNhan.trim()}%`);
+                }
+                if (filters.advLoaiHoSo && filters.advLoaiHoSo.trim() !== '') {
+                    query = query.ilike('data->>loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
+                }
+                if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
+                    const term = `%${filters.advChuSuDung.trim()}%`;
+                    query = query.or(`data->>hoten1.ilike.${term},data->>hoten2.ilike.${term}`);
+                }
+                if (filters.advCccd && filters.advCccd.trim() !== '') {
+                    const term = `%${filters.advCccd.trim()}%`;
+                    query = query.or(`data->>socccd.ilike.${term},data->>socccd2.ilike.${term}`);
+                }
+                if (filters.advToThua && filters.advToThua.trim() !== '') {
+                    const term = `%${filters.advToThua.trim()}%`;
+                    query = query.or(`data->>tobando.ilike.${term},data->>sothua.ilike.${term}`);
+                }
+                if (filters.advKeTang && filters.advKeTang.trim() !== '') {
+                    query = query.ilike('data->>soke_tang', `%${filters.advKeTang.trim()}%`);
+                }
+                if (filters.advHopSo && filters.advHopSo.trim() !== '') {
+                    const term = `%${filters.advHopSo.trim()}%`;
+                    query = query.or(`data->>so_o.ilike.${term},data->>So_tep.ilike.${term}`);
+                }
+                if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
+                    query = query.ilike('data->>sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
+                }
+                if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
+                    query = query.ilike('data->>nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
+                }
+
+                const { data, count, error } = await query
+                    .order('created_at', { ascending: false })
+                    .range(fromIndex, toIndex);
+
+                if (error) throw error;
+
+                return {
+                    records: (data || []) as ArchiveRecord[],
+                    totalCount: count || 0
+                };
+            }
+            throw innerError;
+        }
+    } catch (e) {
+        logError('fetchWarehouseRecordsPaginated', e);
+        return { records: [], totalCount: 0 };
+    }
+};
+

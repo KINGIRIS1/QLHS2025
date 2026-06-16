@@ -1,7 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { RecordFile } from '../types';
 import { getFullWard } from '../constants';
 import { Printer } from 'lucide-react';
+import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
+
 
 interface SystemReceiptTemplateProps {
     data: Partial<RecordFile>;
@@ -11,6 +13,25 @@ interface SystemReceiptTemplateProps {
 
 const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, receivingWard, onClose }) => {
     const printRef = useRef<HTMLDivElement>(null);
+    const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
+
+    useEffect(() => {
+        fetchContactSettingsCached()
+            .then(setContactSettings)
+            .catch(err => console.error("Error fetching contact settings in SystemReceiptTemplate", err));
+
+        const handleCacheUpdate = () => {
+            fetchContactSettingsCached()
+                .then(setContactSettings)
+                .catch(err => console.error(err));
+        };
+
+        window.addEventListener('contact_settings_cache_updated', handleCacheUpdate);
+        return () => {
+            window.removeEventListener('contact_settings_cache_updated', handleCacheUpdate);
+        };
+    }, []);
+
 
     const handlePrint = () => {
         if (!printRef.current) return;
@@ -120,15 +141,8 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
 
-    let sdtLienHe = "";
-    const wRaw = (data.ward || "").toLowerCase();
-    if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
-        sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
-    } else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) {
-        sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
-    } else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) {
-        sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
-    }
+    const sdtLienHe = getContactInfo(contactSettings, data.ward || "", type);
+
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

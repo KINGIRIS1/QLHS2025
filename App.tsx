@@ -11,7 +11,7 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi } from './services/api';
+import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, saveArchiveRecord, fetchArchiveRecordById } from './services/api';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -292,18 +292,39 @@ function App() {
       }
   };
 
+  const isRecordSelectable = useCallback((r: RecordFile) => {
+      const isHandover = (r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED;
+      return r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.HANDOVER && !isHandover;
+  }, []);
+
   const toggleSelectAll = useCallback(() => {
-      if (selectedRecordIds.size === recordFilterProps.paginatedRecords.length && recordFilterProps.paginatedRecords.length > 0) setSelectedRecordIds(new Set());
-      else setSelectedRecordIds(new Set(recordFilterProps.paginatedRecords.map(r => r.id)));
-  }, [selectedRecordIds, recordFilterProps.paginatedRecords]);
+      const selectableRecords = recordFilterProps.paginatedRecords.filter(isRecordSelectable);
+      const allSelectableSelected = selectableRecords.length > 0 && selectableRecords.every(r => selectedRecordIds.has(r.id));
+      if (allSelectableSelected) {
+          setSelectedRecordIds(prev => {
+              const newSet = new Set(prev);
+              selectableRecords.forEach(r => newSet.delete(r.id));
+              return newSet;
+          });
+      } else {
+          setSelectedRecordIds(prev => {
+              const newSet = new Set(prev);
+              selectableRecords.forEach(r => newSet.add(r.id));
+              return newSet;
+          });
+      }
+  }, [selectedRecordIds, recordFilterProps.paginatedRecords, isRecordSelectable]);
 
   const toggleSelectRecord = useCallback((id: string) => {
       setSelectedRecordIds(prev => {
+          const r = records.find(rec => rec.id === id);
+          if (r && !isRecordSelectable(r)) return prev;
+          
           const newSet = new Set(prev);
           if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
           return newSet;
       });
-  }, []);
+  }, [records, isRecordSelectable]);
 
   const confirmAssign = async (employeeId: string) => {
       const today = new Date().toISOString().split('T')[0];
@@ -434,12 +455,49 @@ function App() {
   const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string) => {
       if (!returnRecord) return;
       const today = new Date().toISOString().split('T')[0];
-      const updates = { resultReturnedDate: today, status: RecordStatus.RETURNED, receiptNumber: receiptNumber, receiverName: receiverName }; 
-      setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
-      await updateRecordApi({ ...returnRecord, ...updates });
+      
+      if (returnRecord.recordType === 'Sao lục hồ sơ') {
+          try {
+              const origArchive = await fetchArchiveRecordById(returnRecord.id);
+              if (origArchive) {
+                  const historyEntry = {
+                      action: 'Đã trả kết quả',
+                      status: 'returned',
+                      timestamp: new Date().toISOString(),
+                      user: currentUser?.name || 'Hệ thống'
+                  };
+                  const oldHistory = Array.isArray(origArchive.data?.history) ? origArchive.data.history : [];
+                  const newHistory = [...oldHistory, historyEntry];
+
+                  await saveArchiveRecord({
+                      ...origArchive,
+                      status: 'returned',
+                      data: {
+                          ...origArchive.data,
+                          history: newHistory,
+                          so_bien_lai: receiptNumber,
+                          nguoi_nhan_kq: receiverName,
+                          ngay_tra_ket_qua: today
+                      }
+                  });
+
+                  // Phát một Event để các component đang lắng nghe "archive_realtime_update" nạp lại dữ liệu
+                  window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: 'saoluc' } }));
+              } else {
+                  console.error("Không tìm thấy hồ sơ sao lục gốc.");
+              }
+          } catch (e) {
+              console.error("Lỗi khi trả kết quả sao lục hồ sơ:", e);
+          }
+      } else {
+          const updates = { resultReturnedDate: today, status: RecordStatus.RETURNED, receiptNumber: receiptNumber, receiverName: receiverName }; 
+          setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
+          await updateRecordApi({ ...returnRecord, ...updates });
+      }
+
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
-  }, [returnRecord]);
+  }, [returnRecord, currentUser]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
       const newValue = !record.needsMapCorrection;

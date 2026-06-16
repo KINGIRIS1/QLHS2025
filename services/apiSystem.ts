@@ -200,3 +200,114 @@ export const deleteAllDataApi = async (): Promise<boolean> => {
         return false;
     }
 };
+
+export interface ContactSettings {
+  ward_minhhung: string;
+  ward_nhabich: string;
+  ward_chonthanh: string;
+  type_saoluc: string;
+  type_thue: string;
+}
+
+export const DEFAULT_CONTACT_SETTINGS: ContactSettings = {
+  ward_minhhung: "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757",
+  ward_nhabich: "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344",
+  ward_chonthanh: "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691",
+  type_saoluc: "Nhân viên phụ trách Hoàng Anh Thanh: 0961 239 393",
+  type_thue: "Nhân viên phụ trách [Tên phụ trách]: [Số điện thoại]"
+};
+
+// Global in-memory cache to make lookups synchronous and lightning-fast!
+let cachedContactSettings: ContactSettings | null = null;
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('contact_settings_changed', (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail) {
+            try {
+                const parsed = typeof detail === 'string' ? JSON.parse(detail) : detail;
+                cachedContactSettings = {
+                    ...DEFAULT_CONTACT_SETTINGS,
+                    ...parsed
+                };
+                localStorage.setItem('contact_settings_v2', typeof detail === 'string' ? detail : JSON.stringify(detail));
+                window.dispatchEvent(new CustomEvent('contact_settings_cache_updated'));
+                console.log("[DEBUG] Realtime updated contact settings cache", cachedContactSettings);
+            } catch (err) {
+                console.error("Error updating contact settings cache via realtime", err);
+            }
+        }
+    });
+}
+
+export const fetchContactSettingsCached = async (): Promise<ContactSettings> => {
+    if (cachedContactSettings) return cachedContactSettings;
+    const settings = await fetchContactSettings();
+    cachedContactSettings = settings;
+    return settings;
+};
+
+export const fetchContactSettings = async (): Promise<ContactSettings> => {
+    try {
+        const value = await getSystemSetting('contact_settings_v2');
+        if (value) {
+            const parsed = JSON.parse(value);
+            return {
+                ...DEFAULT_CONTACT_SETTINGS,
+                ...parsed
+            };
+        }
+    } catch (e) {
+        logError("fetchContactSettings", e);
+    }
+    // Also try local storage as fallback
+    try {
+        const local = localStorage.getItem('contact_settings_v2');
+        if (local) {
+            return {
+                ...DEFAULT_CONTACT_SETTINGS,
+                ...JSON.parse(local)
+            };
+        }
+    } catch (_) {}
+    return DEFAULT_CONTACT_SETTINGS;
+};
+
+export const saveContactSettings = async (settings: ContactSettings): Promise<boolean> => {
+    cachedContactSettings = settings;
+    const value = JSON.stringify(settings);
+    // Save to local storage as redundant copy
+    try {
+        localStorage.setItem('contact_settings_v2', value);
+    } catch (_) {}
+    
+    if (!isConfigured) return true;
+    return await saveSystemSetting('contact_settings_v2', value);
+};
+
+export const getContactInfo = (settings: ContactSettings, ward: string, type: string): string => {
+    const tLower = (type || "").toLowerCase();
+    
+    // Check type-specific settings first
+    if (tLower.includes("sao lục") || tLower.includes("saoluc")) {
+        return settings.type_saoluc || DEFAULT_CONTACT_SETTINGS.type_saoluc;
+    }
+    if (tLower.includes("thuế") || tLower.includes("thue")) {
+        return settings.type_thue || DEFAULT_CONTACT_SETTINGS.type_thue;
+    }
+    
+    // Fallback to ward-specific settings
+    const wLower = (ward || "").toLowerCase();
+    if (wLower.includes("minh hưng") || wLower.includes("minh hung")) {
+        return settings.ward_minhhung || DEFAULT_CONTACT_SETTINGS.ward_minhhung;
+    }
+    if (wLower.includes("nha bích") || wLower.includes("nha bich")) {
+        return settings.ward_nhabich || DEFAULT_CONTACT_SETTINGS.ward_nhabich;
+    }
+    if (wLower.includes("chơn thành") || wLower.includes("chon thanh")) {
+        return settings.ward_chonthanh || DEFAULT_CONTACT_SETTINGS.ward_chonthanh;
+    }
+    
+    return "";
+};
+

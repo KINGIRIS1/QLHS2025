@@ -18,34 +18,49 @@ const RECORD_DB_COLUMNS = [
     'workCompletedDate' // Cột vật lý lưu ngày Đã thực hiện
 ];
 
-// Helper functions to serialize and deserialize workCompletedDate inside privateNotes securely
+// Helper functions to serialize and deserialize workCompletedDate and extendedDeadline inside privateNotes securely
 export const packRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
+    let notes = copy.privateNotes || '';
     
-    // Vì đã có cột vật lý trực tiếp 'workCompletedDate' nên không cần đóng gói vào privateNotes nữa.
-    // Tuy nhiên, ta vẫn dọn dẹp các thẻ [WCD:...] cũ nếu có trong privateNotes để ghi chú luôn sạch sẽ.
-    if (copy.privateNotes) {
-        const cleanedNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
-        copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
+    // Xoá các tag cũ để chèn lại chuẩn xác
+    notes = notes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+    notes = notes.replace(/\[EXT_DL:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+    
+    if (copy.extendedDeadline) {
+        notes = `${notes} [EXT_DL:${copy.extendedDeadline}]`.trim();
     }
+    
+    copy.privateNotes = notes === '' ? null : notes;
     return copy;
 };
 
 export const unpackRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
+    copy.extendedDeadline = null;
     
-    // Nếu privateNotes có chứa [WCD:YYYY-MM-DD], ta vẫn phân tích để lấy giá trị cho trường hợp dữ liệu cũ lưu dưới dạng text
     if (copy.privateNotes) {
+        // Parse EXT_DL
+        const extMatch = copy.privateNotes.match(/\[EXT_DL:(\d{4}-\d{2}-\d{2})\]/);
+        if (extMatch) {
+            copy.extendedDeadline = extMatch[1];
+        }
+        
+        // Parse WCD (nếu có để bảo toàn nghiệp vụ cũ)
         const match = copy.privateNotes.match(/\[WCD:(\d{4}-\d{2}-\d{2})\]/);
         if (match) {
-            // Ưu tiên cột vật lý có sẵn, nếu chưa có thì fallback về dữ liệu cũ trong privateNotes
             if (!copy.workCompletedDate) {
                 copy.workCompletedDate = match[1];
             }
-            // Dọn dẹp thẻ tag trong privateNotes cho giao diện sạch sẽ
-            const cleanedNotes = copy.privateNotes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
-            copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
         }
+        
+        // Dọn dẹp hết các tag hiển thị
+        const cleanedNotes = copy.privateNotes
+            .replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '')
+            .replace(/\[EXT_DL:\d{4}-\d{2}-\d{2}\]/g, '')
+            .trim();
+            
+        copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
     }
     return copy;
 };

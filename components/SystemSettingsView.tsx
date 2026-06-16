@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
 import { supabase, presenceChannel } from '../services/supabaseClient';
+import { ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
@@ -43,6 +44,38 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncCount, setSyncCount] = useState<number>(0);
 
+  // Contact settings state
+  const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
+  const [isSavingContacts, setIsSavingContacts] = useState(false);
+
+  const loadContactSettings = async () => {
+      try {
+          const { fetchContactSettings } = await import('../services/apiSystem');
+          const data = await fetchContactSettings();
+          setContactSettings(data);
+      } catch (e) {
+          console.error("Error loading contact settings", e);
+      }
+  };
+
+  const handleSaveContactSettings = async () => {
+      setIsSavingContacts(true);
+      try {
+          const { saveContactSettings } = await import('../services/apiSystem');
+          const success = await saveContactSettings(contactSettings);
+          if (success) {
+              alert("Lưu cấu hình thông tin liên hệ thành công!");
+          } else {
+              alert("Lỗi khi lưu cấu hình.");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("Gặp sự cố khi lưu cấu hình.");
+      } finally {
+          setIsSavingContacts(false);
+      }
+  };
+
   const handleSyncLegacyDates = async () => {
       if (!(await confirmAction("Bạn có muốn rà soát toàn bộ hồ sơ cũ chưa có cột vật lý 'Ngày Đã thực hiện' và tự động khôi phục chúng lên cơ sở dữ liệu Supabase dựa trên các ghi chú nội bộ [WCD:...] hoặc các mốc thời gian liên quan không?"))) {
           return;
@@ -69,6 +102,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   useEffect(() => {
       loadHolidays();
       loadUpdateConfig();
+      loadContactSettings();
+
+      const handleCacheUpdate = () => {
+          loadContactSettings();
+      };
+
+      window.addEventListener('contact_settings_cache_updated', handleCacheUpdate);
+
 
       const updatePresence = () => {
           const state = presenceChannel.presenceState();
@@ -86,6 +127,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
       return () => {
           window.removeEventListener('presence_state_changed', updatePresence);
+          window.removeEventListener('contact_settings_cache_updated', handleCacheUpdate);
           clearInterval(interval);
       };
   }, []);
@@ -287,6 +329,95 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             </button>
                         </div>
                     </div>
+
+                    {/* Cấu hình Số điện thoại & Nhân viên phụ trách */}
+                    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-6">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
+                            <div>
+                                <h3 className="font-black text-emerald-800 flex items-center gap-2 tracking-tight">
+                                    <PhoneCall size={18} className="text-emerald-500 animate-pulse" /> Cấu hình Liên hệ & Nhân viên phụ trách
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1">Cài đặt thông tin người nhận cuộc gọi, xử lý hiển thị trên giấy tiếp nhận, biên nhận nhận kết quả.</p>
+                            </div>
+                            <button 
+                                onClick={handleSaveContactSettings} 
+                                disabled={isSavingContacts}
+                                className="w-full md:w-auto bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95 disabled:opacity-50 font-bold"
+                            >
+                                {isSavingContacts ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+                                {isSavingContacts ? 'Đang lưu...' : 'Lưu cấu hình liên hệ'}
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-5">
+                            <div>
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                                    <span className="w-1.5 h-3 bg-emerald-500 rounded-full"></span> Theo đơn vị Hành chính (Phường/Xã)
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-emerald-50/20 p-4 rounded-xl border border-emerald-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Phường Minh Hưng</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại..."
+                                            value={contactSettings.ward_minhhung || ''}
+                                            onChange={e => setContactSettings({...contactSettings, ward_minhhung: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="bg-emerald-50/20 p-4 rounded-xl border border-emerald-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Xã Nha Bích</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại..."
+                                            value={contactSettings.ward_nhabich || ''}
+                                            onChange={e => setContactSettings({...contactSettings, ward_nhabich: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="bg-emerald-50/20 p-4 rounded-xl border border-emerald-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Phường Chơn Thành</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại..."
+                                            value={contactSettings.ward_chonthanh || ''}
+                                            onChange={e => setContactSettings({...contactSettings, ward_chonthanh: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5 pt-2">
+                                    <span className="w-1.5 h-3 bg-blue-500 rounded-full"></span> Loại hồ sơ đặc thù (Được ưu tiên hiển thị trước)
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Hồ sơ Sao lục</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại cho hồ sơ Sao lục..."
+                                            value={contactSettings.type_saoluc || ''}
+                                            onChange={e => setContactSettings({...contactSettings, type_saoluc: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Thuế chính quy</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại cho hồ sơ Thuế..."
+                                            value={contactSettings.type_thue || ''}
+                                            onChange={e => setContactSettings({...contactSettings, type_thue: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
 
                     {/* Manual Update Config */}
                     <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">

@@ -1,32 +1,56 @@
 
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Employee, User, Holiday } from '../types';
+import { RecordFile, Employee, User, Holiday, RecordStatus } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
-import { fetchArchiveRecords } from '../services/apiArchive';
+import { fetchArchiveRecords, saveArchiveRecord } from '../services/apiArchive';
+import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
+
+
+const mapStatusToEnum = (s: string): RecordStatus => {
+    switch((s || '').toLowerCase().trim()) {
+        case 'draft': return RecordStatus.RECEIVED;
+        case 'assigned': return RecordStatus.ASSIGNED;
+        case 'executed': return RecordStatus.COMPLETED_WORK;
+        case 'pending_sign': return RecordStatus.PENDING_SIGN;
+        case 'signed': return RecordStatus.SIGNED;
+        case 'completed': return RecordStatus.HANDOVER;
+        case 'returned': return RecordStatus.RETURNED;
+        default: return RecordStatus.RECEIVED;
+    }
+};
 
 // Hàm map từ dữ liệu ArchiveRecord sang RecordFile dạng ảo dùng riêng cho Tiếp nhận hôm nay
 const mapArchiveToRecordFile = (ar: any): RecordFile => {
     const d = ar.data || {};
+    let rType = 'Sao lục hồ sơ';
+    if (ar.type === 'vaoso') rType = 'Vào sổ';
+    else if (ar.type === 'dangky') rType = 'Đăng ký biến động';
+    else if (ar.type === 'congvan') rType = 'Công văn';
+
     return {
         id: ar.id,
         code: ar.so_hieu || d.so_hieu || '',
-        customerName: ar.noi_nhan_gui || d.chu_su_dung || '',
-        content: ar.trich_yeu || d.noi_dung || '',
+        customerName: ar.noi_nhan_gui || d.chu_su_dung || d.ten_chu_su_dung || '',
+        content: ar.trich_yeu || d.noi_dung || d.loai_bien_dong || '',
         receivedDate: ar.ngay_thang || d.ngay_nhan || '',
         deadline: d.hen_tra || '',
-        ward: d.xa_phuong || '',
-        mapSheet: d.to_ban_do || '',
-        landPlot: d.thua_dat || '',
-        area: d.dien_tich || 0,
+        ward: d.xa_phuong || d.dia_danh || '',
+        mapSheet: d.to_ban_do || d.so_to || '',
+        landPlot: d.thua_dat || d.so_thua || '',
+        area: d.dien_tich || d.tong_dien_tich || 0,
         phoneNumber: d.so_dien_thoai || d.so_dt || '',
         cccd: d.cccd || '',
-        status: ar.status || 'draft',
-        recordType: 'Sao lục hồ sơ',
-        createdBy: ar.created_by
+        status: mapStatusToEnum(ar.status || 'draft'),
+        recordType: rType,
+        createdBy: ar.created_by,
+        assignedTo: d.assigned_to || null,
+        exportBatch: d.danh_sach || d.exportBatch || null,
+        exportDate: d.ngay_hoan_thanh || d.exportDate || null,
+        extendedDeadline: d.extendedDeadline || null
     };
 };
 
@@ -34,6 +58,7 @@ const mapArchiveToRecordFile = (ar: any): RecordFile => {
 import RecordForm from './receive-record/RecordForm';
 import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
+import { RecordSearchView } from './receive-record/RecordSearchView';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
@@ -47,6 +72,7 @@ interface ReceiveRecordProps {
   currentUser: User;
   records?: RecordFile[];
   holidays: Holiday[]; // New prop
+  onReturnResult?: (record: RecordFile) => void;
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -81,13 +107,16 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk'>('create');
-  // Removed local holidays state and useEffect
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onReturnResult }) => {
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search'>('create');
+  const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   
   // State quản lý danh sách hồ sơ Sao lục lấy từ Archive
+
   const [archiveSaoLucRecords, setArchiveSaoLucRecords] = useState<RecordFile[]>([]);
   const [archiveVaoSoRecords, setArchiveVaoSoRecords] = useState<RecordFile[]>([]);
+  const [archiveDangKyRecords, setArchiveDangKyRecords] = useState<RecordFile[]>([]);
+  const [archiveCongVanRecords, setArchiveCongVanRecords] = useState<RecordFile[]>([]);
 
   const loadArchiveSaoLuc = async () => {
       try {
@@ -109,23 +138,62 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       }
   };
 
-  useEffect(() => {
-      loadArchiveSaoLuc();
-      loadArchiveVaoSo();
-      
-      const handleArchiveUpdate = (e: Event) => {
-          const detail = (e as CustomEvent).detail;
-          if (detail && detail.type === 'saoluc') {
-              loadArchiveSaoLuc();
-          } else if (detail && detail.type === 'vaoso') {
-              loadArchiveVaoSo();
-          }
-      };
-      window.addEventListener('archive_realtime_update', handleArchiveUpdate);
-      return () => {
-          window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
-      };
-  }, []);
+  const loadArchiveDangKy = async () => {
+      try {
+          const list = await fetchArchiveRecords('dangky', true);
+          const mapped = list.map(mapArchiveToRecordFile);
+          setArchiveDangKyRecords(mapped);
+      } catch (err) {
+          console.error("Lỗi lấy danh sách đăng ký trong Tiếp nhận:", err);
+      }
+  };
+
+  const loadArchiveCongVan = async () => {
+      try {
+          const list = await fetchArchiveRecords('congvan', true);
+          const mapped = list.map(mapArchiveToRecordFile);
+          setArchiveCongVanRecords(mapped);
+      } catch (err) {
+          console.error("Lỗi lấy danh sách công văn trong Tiếp nhận:", err);
+      }
+  };
+
+   useEffect(() => {
+       loadArchiveSaoLuc();
+       loadArchiveVaoSo();
+       loadArchiveDangKy();
+       loadArchiveCongVan();
+       fetchContactSettingsCached()
+           .then(setContactSettings)
+           .catch(err => console.error(err));
+       
+       const handleArchiveUpdate = (e: Event) => {
+
+           const detail = (e as CustomEvent).detail;
+           if (detail && detail.type === 'saoluc') {
+               loadArchiveSaoLuc();
+           } else if (detail && detail.type === 'vaoso') {
+               loadArchiveVaoSo();
+           } else if (detail && detail.type === 'dangky') {
+               loadArchiveDangKy();
+           } else if (detail && detail.type === 'congvan') {
+               loadArchiveCongVan();
+           }
+       };
+
+       const handleCacheUpdate = () => {
+           fetchContactSettingsCached()
+               .then(setContactSettings)
+               .catch(err => console.error(err));
+       };
+
+       window.addEventListener('archive_realtime_update', handleArchiveUpdate);
+       window.addEventListener('contact_settings_cache_updated', handleCacheUpdate);
+       return () => {
+           window.removeEventListener('archive_realtime_update', handleArchiveUpdate);
+           window.removeEventListener('contact_settings_cache_updated', handleCacheUpdate);
+       };
+   }, []);
 
   const handleSaveWithArchiveRefresh = async (record: RecordFile) => {
       const isSaoLuc = record.recordType === 'Sao lục hồ sơ';
@@ -133,8 +201,53 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       if (success) {
           await loadArchiveSaoLuc();
           await loadArchiveVaoSo();
+          await loadArchiveDangKy();
+          await loadArchiveCongVan();
       }
       return success;
+  };
+
+  const handleExtendRecord = async (record: RecordFile, extDate: string): Promise<boolean> => {
+      const isArchive = ['Sao lục hồ sơ', 'Vào sổ', 'Đăng ký biến động', 'Công văn', 'Sao lục'].includes(record.recordType || '');
+      if (isArchive) {
+          let type: 'saoluc' | 'vaoso' | 'dangky' | 'congvan' = 'saoluc';
+          const rType = record.recordType || '';
+          if (rType.includes('ổ') || rType === 'Vào sổ') type = 'vaoso';
+          else if (rType.includes('độn') || rType === 'Đăng ký biến động') type = 'dangky';
+          else if (rType.includes('vă') || rType === 'Công văn') type = 'congvan';
+          
+          try {
+              const rawList = await fetchArchiveRecords(type, true);
+              const found = rawList.find(r => r.id === record.id || r.so_hieu === record.code);
+              if (found) {
+                  const updatedData = {
+                      ...found.data,
+                      extendedDeadline: extDate
+                  };
+                  const success = await saveArchiveRecord({
+                      ...found,
+                      data: updatedData
+                  });
+                  if (success) {
+                      if (type === 'saoluc') await loadArchiveSaoLuc();
+                      else if (type === 'vaoso') await loadArchiveVaoSo();
+                      else if (type === 'dangky') await loadArchiveDangKy();
+                      else if (type === 'congvan') await loadArchiveCongVan();
+                      return true;
+                  }
+              }
+              return false;
+          } catch (error) {
+              console.error("Lỗi khi gia hạn hồ sơ Archive:", error);
+              return false;
+          }
+      } else {
+          const success = await onSave({
+              ...record,
+              extendedDeadline: extDate
+          });
+          return success;
+      }
   };
 
   // State chỉnh sửa
@@ -277,15 +390,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
 
-    let sdtLienHe = "";
-    const wRaw = (dataToUse.ward || "").toLowerCase();
-    if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
-        sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
-    } else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) {
-        sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
-    } else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) {
-        sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
-    }
+    const sdtLienHe = getContactInfo(contactSettings, dataToUse.ward || "", rType);
+
 
     const dayRec = rDate.getDate().toString().padStart(2, '0');
     const monthRec = (rDate.getMonth() + 1).toString().padStart(2, '0');
@@ -429,6 +535,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <LayoutList size={16} /> Danh sách hôm nay
             </button>
+            <button onClick={() => setViewMode('search')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <Search size={16} /> Tra cứu hồ sơ
+            </button>
         </div>
         
         {viewMode === 'create' && (
@@ -479,6 +588,23 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}
                 onPrint={handlePreviewDocx}
+            />
+        )}
+
+        {viewMode === 'search' && (
+            <RecordSearchView 
+                records={[
+                    ...records, 
+                    ...archiveSaoLucRecords, 
+                    ...archiveVaoSoRecords, 
+                    ...archiveDangKyRecords, 
+                    ...archiveCongVanRecords
+                ]}
+                wards={wards}
+                currentUser={currentUser}
+                employees={employees}
+                onReturnResult={onReturnResult || (() => {})}
+                onExtendRecord={handleExtendRecord}
             />
         )}
       </div>

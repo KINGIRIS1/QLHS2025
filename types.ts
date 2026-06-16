@@ -91,6 +91,7 @@ export interface RecordFile {
   // Tính năng Chỉnh lý bản đồ (Mới)
   needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý
   createdBy?: string | null;    // Người tiếp nhận hồ sơ
+  extendedDeadline?: string | null; // Ngày gia hạn trả kết quả mới (Mới)
 }
 
 // Interface cho Item tách thửa

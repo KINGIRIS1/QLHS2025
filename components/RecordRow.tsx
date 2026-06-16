@@ -64,6 +64,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
   
   const displayStatus = getDisplayStatus(record);
 
+  const isSelectable = displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.RETURNED;
+
   // Class chung cho các ô: Căn trên (align-top)
   const cellClass = "p-3 align-top";
 
@@ -71,12 +73,12 @@ const RecordRow: React.FC<RecordRowProps> = ({
     <tr className={`transition-all duration-200 group border-l-4 ${isOverdue ? 'bg-red-50 border-l-red-500 hover:bg-red-100' : isApproaching ? 'bg-orange-50 border-l-orange-500 hover:bg-orange-100' : isSelected ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100' : 'border-l-transparent hover:bg-blue-50/60 hover:shadow-sm'}`} onDoubleClick={() => onView(record)}>
       <td className={`${cellClass} text-center`}>
         <div className="mt-1">
-            {canPerformAction ? (
+            {canPerformAction && isSelectable ? (
             <button onClick={() => onToggleSelect(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
                 {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
             </button>
             ) : (
-            <div className="w-4 h-4" />
+            <div className="w-4 h-4 mx-auto" title={!isSelectable ? "Hồ sơ đã chuyển 1 cửa hoặc đã trả kết quả, không thể giao việc" : ""} />
             )}
         </div>
       </td>
@@ -256,7 +258,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 </button>
             )}
 
-            {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && (
+            {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.RETURNED && (
               <button onClick={() => onAdvanceStatus(record)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Chuyển bước"><ArrowRight size={16} /></button>
             )}
             <button onClick={() => onEdit(record)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa"><Pencil size={16} /></button>

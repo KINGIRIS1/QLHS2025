@@ -41,7 +41,7 @@ function removeVietnameseTones(str: string): string {
 
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   // Thêm tab 'completed_work' và 'pending_sign'
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report' | 'approaching' | 'overdue'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report' | 'approaching' | 'overdue' | 'extended'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -226,6 +226,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
+  // 8. Hồ sơ Gia hạn (Nhân viên tự theo dõi hồ sơ hẹn thêm ngày)
+  const extendedRecords = useMemo(() => {
+      let list = myRecords.filter(r => 
+          r.extendedDeadline !== null && 
+          r.extendedDeadline !== undefined && 
+          r.extendedDeadline !== '' &&
+          !isRecordFinished(r)
+      );
+      return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig, isRecordFinished]);
+
   // Helper filter & sort chung
   function filterAndSort(list: RecordFile[], term: string, sort: any) {
       if (term) {
@@ -260,6 +271,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       activeTab === 'finished' ? finishedRecords :
       activeTab === 'approaching' ? approachingRecords :
       activeTab === 'overdue' ? overdueRecords :
+      activeTab === 'extended' ? extendedRecords :
       reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
@@ -436,6 +448,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           case 'reminder': return 'Nhắc việc';
           case 'approaching': return 'Sắp tới hạn';
           case 'overdue': return 'Trễ hạn';
+          case 'extended': return 'Hồ sơ gia hạn';
           default: return 'danh sách';
       }
   };
@@ -506,6 +519,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                     }`}
                 >
                     <Clock size={16} /> Đang thực hiện ({pendingRecords.length})
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('extended'); setCurrentPage(1); setSearchTerm(''); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                        activeTab === 'extended' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    <CalendarClock size={16} /> Hồ sơ gia hạn ({extendedRecords.length})
                 </button>
                 <button 
                     onClick={() => { setActiveTab('completed_work'); setCurrentPage(1); setSearchTerm(''); }}
@@ -592,11 +613,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                             <th className="p-3 w-[120px]">{renderSortHeader('Mã HS', 'code')}</th>
                             <th className="p-3 w-[180px]">{renderSortHeader('Chủ sử dụng', 'customerName')}</th>
                             <th className="p-3 w-[130px]">{renderSortHeader('Loại hồ sơ', 'recordType')}</th>
-                            <th className="p-3 w-[110px]">{renderSortHeader('Ngày trình', 'submissionDate')}</th>
+                            {activeTab === 'completed_work' ? (
+                                <th className="p-3 w-[110px]">{renderSortHeader('Ngày thực hiện', 'workCompletedDate')}</th>
+                            ) : activeTab === 'extended' ? (
+                                <th className="p-3 w-[110px]">{renderSortHeader('Hạn gốc', 'deadline')}</th>
+                            ) : (
+                                <th className="p-3 w-[110px]">{renderSortHeader('Ngày trình', 'submissionDate')}</th>
+                            )}
                             
                             <th className="p-3 w-[150px]">
                                 {activeTab === 'reminder' 
                                     ? <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>
+                                    : activeTab === 'extended'
+                                    ? <div className="flex items-center gap-1 text-amber-600"><CalendarClock size={14}/> Ngày hẹn mới</div>
                                     : renderSortHeader('Hẹn trả', 'deadline')
                                 }
                             </th>
@@ -617,13 +646,24 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                     <td className="p-3 font-medium text-blue-600 align-middle"><div className="truncate" title={r.code || ''}>{r.code}</div></td>
                                     <td className="p-3 font-medium text-gray-800 align-middle"><div className="truncate" title={r.customerName || ''}>{r.customerName}</div></td>
                                     <td className="p-3 text-gray-600 align-middle"><div className="truncate" title={r.recordType || ''}>{getShortRecordType(r.recordType || undefined)}</div></td>
-                                    <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.submissionDate || undefined)}</td>
+                                    {activeTab === 'completed_work' ? (
+                                        <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.workCompletedDate || undefined)}</td>
+                                    ) : activeTab === 'extended' ? (
+                                        <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.deadline || undefined)}</td>
+                                    ) : (
+                                        <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.submissionDate || undefined)}</td>
+                                    )}
                                     
                                     <td className="p-3 align-middle">
                                         {activeTab === 'reminder' ? (
                                             <div className="flex items-center gap-1.5 text-pink-700 font-bold bg-pink-100 px-2 py-1 rounded w-fit text-xs">
                                                 <Bell size={12} className="fill-pink-700"/>
                                                 {formatDateTime(r.reminderDate || undefined)}
+                                            </div>
+                                        ) : activeTab === 'extended' ? (
+                                            <div className="flex items-center gap-1.5 text-amber-700 font-bold bg-amber-100 px-2 py-1 rounded w-fit text-xs">
+                                                <CalendarClock size={12} className="text-amber-700"/>
+                                                {formatDate(r.extendedDeadline || undefined)}
                                             </div>
                                         ) : (
                                             <div className={`flex items-center gap-1.5 ${deadlineStatus.color}`}>

@@ -114,13 +114,15 @@ export const useRecordFilter = (
                     });
                 }
             }
+        } else if (currentView === 'completed_work_list') {
+            result = result.filter(r => r.status === RecordStatus.COMPLETED_WORK);
         } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks') {
             result = result.filter(r => r.status === RecordStatus.RECEIVED);
         }
 
         // Filter by recordType based on view group
         const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list'].includes(currentView);
-        const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
+        const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
         
         if (isOtherView) {
             result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(r.recordType || ''));
@@ -214,7 +216,7 @@ export const useRecordFilter = (
         let approaching = 0;
         if (records.length > 0 && currentUser) {
             const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list'].includes(currentView);
-            const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list'].includes(currentView);
+            const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
 
             records.forEach(r => {
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 

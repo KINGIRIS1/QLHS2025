@@ -80,10 +80,15 @@ if (typeof window !== 'undefined' && isConfigured) {
             { event: '*', schema: 'public', table: 'system_settings' },
             (payload: any) => {
                 const row = payload.new;
-                if (row && row.key === 'app_version') {
-                    console.log("[DEBUG] app_version changed in DB", row);
-                    // Bắn event để hook useAppData gọi fetchUpdateInfo() và hiện popup ngay
-                    window.dispatchEvent(new CustomEvent('system_update_available'));
+                if (row) {
+                    if (row.key === 'app_version') {
+                        console.log("[DEBUG] app_version changed in DB", row);
+                        // Bắn event để hook useAppData gọi fetchUpdateInfo() và hiện popup ngay
+                        window.dispatchEvent(new CustomEvent('system_update_available'));
+                    } else if (row.key === 'contact_settings_v2') {
+                        console.log("[DEBUG] contact_settings_v2 changed in DB", row);
+                        window.dispatchEvent(new CustomEvent('contact_settings_changed', { detail: row.value }));
+                    }
                 }
             }
         )

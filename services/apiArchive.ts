@@ -650,15 +650,19 @@ export const parseAndFormatDateSafe = (val: any): string | null => {
     }
     
     const str = String(val).trim();
-    if (!str || str === '-' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined') return null;
+    if (!str || str === '-' || str === '0' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined') return null;
 
-    // Định dạng dd/mm/yyyy phổ biến ở Việt Nam
-    const dmyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
+    // Định dạng dd/mm/yyyy hoặc dd/mm/yy phổ biến ở Việt Nam
+    const dmyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2}|\d{4})$/;
     const dmyMatch = str.match(dmyRegex);
     if (dmyMatch) {
         const day = parseInt(dmyMatch[1], 10);
         const month = parseInt(dmyMatch[2], 10);
-        const year = parseInt(dmyMatch[3], 10);
+        let year = parseInt(dmyMatch[3], 10);
+        
+        if (year < 100) {
+            year = year >= 50 ? 1900 + year : 2000 + year;
+        }
         
         if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
             // Kiểm tra tính hợp lệ bằng Constructor Date (Ví dụ tránh 30/02)
@@ -670,13 +674,18 @@ export const parseAndFormatDateSafe = (val: any): string | null => {
         return null;
     }
 
-    // Định dạng yyyy-mm-dd
-    const ymdRegex = /^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})$/;
+    // Định dạng yyyy-mm-dd hoặc yy-mm-dd
+    const ymdRegex = /^(\d{2}|\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})$/;
     const ymdMatch = str.match(ymdRegex);
     if (ymdMatch) {
-         const year = parseInt(ymdMatch[1], 10);
+         let year = parseInt(ymdMatch[1], 10);
          const month = parseInt(ymdMatch[2], 10);
          const day = parseInt(ymdMatch[3], 10);
+         
+         if (year < 100) {
+             year = year >= 50 ? 1900 + year : 2000 + year;
+         }
+         
          if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
              const dateObj = new Date(year, month - 1, day);
              if (dateObj.getFullYear() === year && dateObj.getMonth() === month - 1 && dateObj.getDate() === day) {
@@ -714,6 +723,19 @@ export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
     if (d.ngaynhap !== undefined && d.ngaynhap !== null) d.ngaynhap = parsedNgayNhap;
     if (d.ngaycapgcnmoi !== undefined && d.ngaycapgcnmoi !== null) d.ngaycapgcnmoi = parsedNgayCapGCN;
 
+    // Hàm chống NaN khi ép kiểu số
+    const toIntSafe = (val: any) => {
+        if (val === undefined || val === null || val === '') return null;
+        const parsed = parseInt(val.toString(), 10);
+        return isNaN(parsed) ? null : parsed;
+    };
+
+    const toFloatSafe = (val: any) => {
+        if (val === undefined || val === null || val === '') return null;
+        const parsed = parseFloat(val.toString());
+        return isNaN(parsed) ? null : parsed;
+    };
+
     return {
         id: record.id,
         created_by: record.created_by,
@@ -725,25 +747,25 @@ export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
         noi_nhan_gui: record.noi_nhan_gui || d.hoten1 || '',
         attached_files: record.attached_files || [],
         
-        // Cột cấu trúc tối ưu index hóa
+        // Cột cấu trúc tối ưu index hóa có bảo vệ chống NaN
         loaihoso: d.loaihoso || null,
         hoten1: d.hoten1 || null,
-        namsinh1: d.namsinh1 ? parseInt(d.namsinh1.toString()) : null,
+        namsinh1: toIntSafe(d.namsinh1),
         loaicccd1: d.loaicccd1 || null,
         socccd: d.socccd || null,
         diachitt1: d.diachitt1 || null,
         hoten2: d.hoten2 || null,
-        namsinh2: d.namsinh2 ? parseInt(d.namsinh2.toString()) : null,
+        namsinh2: toIntSafe(d.namsinh2),
         loaicccd2: d.loaicccd2 || null,
         socccd2: d.socccd2 || null,
         diachitt2: d.diachitt2 || null,
         matd: d.matd || record.so_hieu || null,
         tobando: d.tobando || null,
         sothua: d.sothua || null,
-        dientich: d.dientich ? parseFloat(d.dientich.toString()) : null,
+        dientich: toFloatSafe(d.dientich),
         hinhthucsd: d.hinhthucsd || null,
         loaidato: d.loaidato || null,
-        dientichdato: d.dientichdato ? parseFloat(d.dientichdato.toString()) : null,
+        dientichdato: toFloatSafe(d.dientichdato),
         mavach: d.mavach || null,
         maxa: d.maxa || null,
         manam: d.manam || null,

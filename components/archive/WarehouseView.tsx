@@ -5,6 +5,24 @@ import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Lo
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
+const WARD_MAPPING: Record<string, string> = {
+    '25432': 'Hưng Long',
+    '25433': 'Thành Tâm',
+    '25435': 'Minh Lập',
+    '25439': 'Quang Minh',
+    '25441': 'Minh Hưng',
+    '25444': 'Minh Long',
+    '25447': 'Minh Thành',
+    '25450': 'Nha Bích',
+    '25453': 'Minh Thắng'
+};
+
+const getWardName = (maxa: any): string => {
+    if (!maxa) return '-';
+    const code = String(maxa).trim();
+    return WARD_MAPPING[code] || code;
+};
+
 interface WarehouseViewProps {
     currentUser: User;
 }
@@ -212,15 +230,17 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                 setImportStatusText(`Đang ánh xạ dữ liệu (${rows.length} dòng)...`);
 
                 // Chuyển đổi dữ liệu và chuẩn hóa các cột
-                const parsedRecords: Partial<ArchiveRecord>[] = rows.map((row: any) => {
-                    const maBienNhan = (row.matd || row.mavach || `KB-${Math.floor(100000 + Math.random() * 900000)}`).toString().trim();
+                const parsedRecords: Partial<ArchiveRecord>[] = rows.map((row: any, rIdx: number) => {
+                    const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+                    // Sinh mã biên nhận duy nhất tuyệt đối dựa trên Số phát hành GCN mới hoặc tự sinh KB-
+                    const maBienNhan = (row.sophathanhgcnmoi ? String(row.sophathanhgcnmoi).trim() : null) || `KB-${Date.now().toString().slice(-6)}-${rIdx}-${uniqueSuffix}`;
                     const trichYeuValue = `Hồ sơ kho: ${row.hoten1 || ''} - Sổ thửa: ${row.sothua || ''} / Tờ bđ: ${row.tobando || ''}`;
 
                     const rowData: any = {};
                     const excelFields = [
-                        'sott', 'loaihoso', 'hoten1', 'namsinh1', 'loaicccd1', 'socccd', 'diachitt1',
-                        'hoten2', 'namsinh2', 'loaicccd2', 'socccd2', 'diachitt2', 'matd', 'tobando',
-                        'sothua', 'dientich', 'hinhthucsd', 'loaidato', 'dientichdato', 'mavach', 'maxa',
+                        'sott', 'loaihoso', 'hoten1', 'namsinh1', 'socccd', 'diachitt1',
+                        'hoten2', 'namsinh2', 'socccd2', 'diachitt2', 'tobando',
+                        'sothua', 'dientich', 'hinhthucsd', 'loaidato', 'dientichdato', 'maxa',
                         'manam', 'sophathanhgcnmoi', 'sovaosomoi', 'ngaycapgcnmoi', 'diachiap', 'soke_tang',
                         'so_o', 'So_tep', 'sott_tep', 'nguoinhap', 'ngaynhap', 'ghichu'
                     ];
@@ -236,6 +256,12 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                             rowData[field] = null;
                         }
                     });
+
+                    // Các trường đã loại khỏi excel nhưng được khởi tạo null để giữ cấu trúc không lỗi
+                    rowData['loaicccd1'] = null;
+                    rowData['loaicccd2'] = null;
+                    rowData['matd'] = null;
+                    rowData['mavach'] = null;
 
                     // Định dạng lại ngày nhập
                     let rawNgayNhap = rowData.ngaynhap;
@@ -361,13 +387,13 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
     // Hàm tải tệp Excel mẫu cho người dùng
     const downloadTemplate = () => {
         const headers = [
-            ['sott', 'loaihoso', 'hoten1', 'namsinh1', 'loaicccd1', 'socccd', 'diachitt1', 'hoten2', 'namsinh2', 'loaicccd2', 'socccd2', 'diachitt2', 'matd', 'tobando', 'sothua', 'dientich', 'hinhthucsd', 'loaidato', 'dientichdato', 'mavach', 'maxa', 'manam', 'sophathanhgcnmoi', 'sovaosomoi', 'ngaycapgcnmoi', 'diachiap', 'soke_tang', 'so_o', 'So_tep', 'sott_tep', 'nguoinhap', 'ngaynhap', 'ghichu']
+            ['sott', 'loaihoso', 'hoten1', 'namsinh1', 'socccd', 'diachitt1', 'hoten2', 'namsinh2', 'socccd2', 'diachitt2', 'tobando', 'sothua', 'dientich', 'hinhthucsd', 'loaidato', 'dientichdato', 'maxa', 'manam', 'sophathanhgcnmoi', 'sovaosomoi', 'ngaycapgcnmoi', 'diachiap', 'soke_tang', 'so_o', 'So_tep', 'sott_tep', 'nguoinhap', 'ngaynhap', 'ghichu']
         ];
         const sampleData = [
             [
-                1, 'Đo đạc theo yêu cầu', 'Nguyễn Văn A', 1985, 'CCCD', '012345678912', 'Hà Nội', 
-                'Trần Thị B', 1988, 'CCCD', '098765432109', 'Hà Nội', 'BN123456', '05', '124', 150.5, 
-                'Sử dụng riêng', 'Đất ở', 100, 'MV999888', 'MX12', '2026', 'GCN-123456', 'VS-555666', 
+                1, 'Đo đạc theo yêu cầu', 'Nguyễn Văn A', 1985, '012345678912', 'Hà Nội', 
+                'Trần Thị B', 1988, '098765432109', 'Hà Nội', '05', '124', 150.5, 
+                'Sử dụng riêng', 'Đất ở', 100, '25432', '2026', 'GCN-123456', 'VS-555666', 
                 '2026-05-12', 'Ấp 1', 'Kệ 01A', 'Tầng 3', 'Hộp 12', 'STT 124', 'Trần Văn C', '2026-06-16', 'Hồ sơ đã lưu kho hoàn thiện'
             ]
         ];
@@ -452,7 +478,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             type="text"
-                            placeholder="Nhập Mã biên nhận, Chủ sử dụng, CMND, Số GCN để tìm nhanh hồ sơ..."
+                            placeholder="Nhập Chủ sử dụng, CMND, Số GCN để tìm nhanh hồ sơ..."
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium transition-all"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -492,18 +518,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                 {/* KHU VỰC TÌM KIẾM NÂNG CAO */}
                 {showAdvancedSearch && (
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 pt-4 border-t border-slate-100 animate-slide-down">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mã biên nhận</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Ví dụ: BN123..."
-                                value={advMaBienNhan}
-                                onChange={(e) => setAdvMaBienNhan(e.target.value)}
-                            />
-                        </div>
-
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-100 animate-slide-down">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loại hồ sơ</label>
                             <input
@@ -602,9 +617,8 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                         <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10 text-xs font-bold text-slate-600 uppercase tracking-wider">
                             <tr>
                                 <th className="p-3.5 w-12 text-center">STT</th>
-                                <th className="p-3.5 w-[140px]">Mã biên nhận</th>
                                 <th className="p-3.5 min-w-[200px]">Thông tin chủ sử dụng</th>
-                                <th className="p-3.5 w-[150px]">Tờ / Thửa / Diện tích</th>
+                                <th className="p-3.5 w-[150px]">Tờ / Thửa / Diện tích / Xã</th>
                                 <th className="p-3.5 w-[160px]">Loại hồ sơ</th>
                                 <th className="p-3.5 w-[180px]">Vị trí lưu kho</th>
                                 <th className="p-3.5 w-[140px]">Người nhập</th>
@@ -614,7 +628,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                         <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-705">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={8} className="p-12 text-center">
+                                    <td colSpan={7} className="p-12 text-center">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Loader2 size={32} className="animate-spin text-indigo-600" />
                                             <span className="text-sm text-slate-500 font-bold">Đang tải danh sách kho hồ sơ...</span>
@@ -623,7 +637,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                 </tr>
                             ) : records.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={7} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy hồ sơ nào đáp ứng điều kiện tìm kiếm.
                                     </td>
                                 </tr>
@@ -634,10 +648,6 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                         <tr key={r.id} className="hover:bg-indigo-50/20 group transition-all">
                                             <td className="p-3.5 text-center text-slate-400 font-mono">
                                                 {(currentPage - 1) * itemsPerPage + index + 1}
-                                            </td>
-                                            
-                                            <td className="p-3.5 text-indigo-700 font-bold tracking-tight">
-                                                {r.so_hieu}
                                             </td>
 
                                             <td className="p-3.5">
@@ -654,6 +664,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                             <td className="p-3.5">
                                                 <div>Tờ: <strong className="text-slate-800">{d.tobando || '-'}</strong> / Thửa: <strong className="text-slate-800">{d.sothua || '-'}</strong></div>
                                                 {d.dientich !== undefined && <div className="text-xs text-slate-500 mt-0.5">Diện tích: <strong className="text-indigo-600">{d.dientich} m²</strong></div>}
+                                                {d.maxa && <div className="text-xs text-indigo-700 mt-0.5 font-semibold">Xã: {getWardName(d.maxa)}</div>}
                                             </td>
 
                                             <td className="p-3.5">
@@ -788,7 +799,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                 </div>
                                 <div>
                                     <h3 className="text-md font-bold">Chi Tiết Hồ Sơ Kho</h3>
-                                    <p className="text-[11px] opacity-80">Mã biên nhận: {selectedRecord.so_hieu}</p>
+                                    <p className="text-[11px] opacity-80">Số GCN: {selectedRecord.data?.sophathanhgcnmoi || '-'}</p>
                                 </div>
                             </div>
                             <button 
@@ -808,8 +819,8 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                 </h4>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <div className="text-[11px] text-slate-400">Mã biên nhận:</div>
-                                        <div className="font-bold text-slate-800 text-indigo-750">{selectedRecord.so_hieu}</div>
+                                        <div className="text-[11px] text-slate-400">Số GCN phát hành:</div>
+                                        <div className="font-bold text-slate-800 text-indigo-750">{selectedRecord.data?.sophathanhgcnmoi || 'Chưa cập nhật'}</div>
                                     </div>
                                     <div>
                                         <div className="text-[11px] text-slate-400">Loại hồ sơ:</div>
@@ -904,7 +915,11 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Xã / Phường:</div>
+                                        <div className="font-bold text-indigo-700">{getWardName(selectedRecord.data?.maxa)}</div>
+                                    </div>
                                     <div>
                                         <div className="text-[11px] text-slate-400">Địa chỉ thửa đất:</div>
                                         <div className="font-semibold text-slate-800">{selectedRecord.data?.diachiap || '-'}</div>
@@ -1031,18 +1046,8 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                         {/* Form scrollable */}
                         <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="font-bold text-slate-700">Mã biên nhận (BN/MBN) <span className="text-rose-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        required
-                                        className="w-full px-3.5 py-2 md:py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-bold text-slate-800"
-                                        value={editFormData.so_hieu || ''}
-                                        onChange={(e) => handleFormChange('so_hieu', e.target.value)}
-                                    />
-                                </div>
-
+                            <input type="hidden" value={editFormData.so_hieu || ''} />
+                            <div className="grid grid-cols-1 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="font-bold text-slate-700">Loại hồ sơ</label>
                                     <input

@@ -379,29 +379,47 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
         return true;
     }
     try {
-        // Chuẩn hóa dữ liệu trước khi insert
-        const payload = records.map(r => {
-            const p: any = { ...r };
-            delete p.id; // Để DB tự sinh UUID
-            if (p.ngay_thang === '' || !p.ngay_thang) {
-                p.ngay_thang = null;
-            } else {
-                // Ensure it's a valid YYYY-MM-DD format, otherwise set to null
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(p.ngay_thang)) {
-                    p.ngay_thang = null;
-                }
-            }
-            return p;
-        });
+        // Tách biệt bản ghi 'kho' và bản ghi khác để lưu đúng bảng tối ưu hóa
+        const warehouseRecords = records.filter(r => r.type === 'kho');
+        const normalRecords = records.filter(r => r.type !== 'kho');
 
-        const { data, error } = await supabase.from('archive_records').insert(payload).select();
-        if (error) throw error;
-        
-        if (data) {
-            data.forEach((r: any) => {
-                const arr = CACHED_ARCHIVE_RECORDS[r.type];
-                if (arr) arr.unshift(r as ArchiveRecord);
+        if (warehouseRecords.length > 0) {
+            const wPayloads = warehouseRecords.map(r => {
+                const mapped = mapToWarehousePayload(r);
+                delete mapped.id; // Để DB tự sinh UUID
+                return mapped;
             });
+
+            // Ghi trực tiếp hàng loạt vào bảng warehouse_records chuyên dụng
+            const { error: wErr } = await supabase.from('warehouse_records').insert(wPayloads);
+            if (wErr) throw wErr;
+        }
+
+        if (normalRecords.length > 0) {
+            // Chuẩn hóa dữ liệu trước khi insert vào archive_records gốc
+            const payload = normalRecords.map(r => {
+                const p: any = { ...r };
+                delete p.id; // Để DB tự sinh UUID
+                if (p.ngay_thang === '' || !p.ngay_thang) {
+                    p.ngay_thang = null;
+                } else {
+                    // Đảm bảo định dạng YYYY-MM-DD
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.ngay_thang)) {
+                        p.ngay_thang = null;
+                    }
+                }
+                return p;
+            });
+
+            const { data, error } = await supabase.from('archive_records').insert(payload).select();
+            if (error) throw error;
+            
+            if (data) {
+                data.forEach((r: any) => {
+                    const arr = CACHED_ARCHIVE_RECORDS[r.type];
+                    if (arr) arr.unshift(r as ArchiveRecord);
+                });
+            }
         }
         
         return true;

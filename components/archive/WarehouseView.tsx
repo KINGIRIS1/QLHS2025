@@ -36,6 +36,18 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editFormData, setEditFormData] = useState<Partial<ArchiveRecord>>({});
 
+    // State cho quá trình import Excel nâng cao theo lô (batching) chống đơ RAM và API Timeout
+    const [isImporting, setIsImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState(0);
+    const [importTotal, setImportTotal] = useState(0);
+    const [importSuccess, setImportSuccess] = useState(0);
+    const [importErrors, setImportErrors] = useState(0);
+    const [importCurrentBatch, setImportCurrentBatch] = useState(0);
+    const [importTotalBatches, setImportTotalBatches] = useState(0);
+    const [importStatusText, setImportStatusText] = useState('');
+    const [showImportSummary, setShowImportSummary] = useState(false);
+    const importCancelRef = useRef(false);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Dynamic load với cơ chế debounce 300ms tránh spam API
@@ -166,38 +178,44 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
         setIsEditOpen(true);
     };
 
-    // Nhập dữ liệu Excel
+    // Nhập dữ liệu Excel thông minh hỗ trợ 300k dòng theo lô (batching) cực lớn
     const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         const reader = new FileReader();
+        setImportStatusText("Đang mở tệp tin...");
+        setIsImporting(true);
+        setImportProgress(0);
+        setImportSuccess(0);
+        setImportErrors(0);
+        setShowImportSummary(false);
+        importCancelRef.current = false;
+
         reader.onload = async (evt) => {
-            setIsLoading(true);
             try {
+                setImportStatusText("Đang phân tích cấu trúc tệp Excel, vui lòng đợi...");
                 const bstr = evt.target?.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
                 
-                // Read as JSON with headers
+                // Đọc tệp thành mảng JSON
                 const rows = XLSX.utils.sheet_to_json<any>(ws);
                 if (rows.length === 0) {
                     alert("Tệp Excel trống hoặc không đúng định dạng!");
-                    setIsLoading(false);
+                    setIsImporting(false);
                     return;
                 }
 
+                setImportTotal(rows.length);
+                setImportStatusText(`Đang ánh xạ dữ liệu (${rows.length} dòng)...`);
+
                 // Chuyển đổi dữ liệu và chuẩn hóa các cột
-                // Ánh xạ từ các trường Excel sang dạng data lưu trữ
                 const parsedRecords: Partial<ArchiveRecord>[] = rows.map((row: any) => {
-                    // Lấy ra mã biên nhận làm so_hieu chính
-                    // Có thể dùng matd, nếu trống dùng mạvach, nếu vẫn trống dùng ngẫu nhiên mã tự sinh
                     const maBienNhan = (row.matd || row.mavach || `KB-${Math.floor(100000 + Math.random() * 900000)}`).toString().trim();
-                    const loaiHoSo = (row.loaihoso || 'Chưa phân loại').toString().trim();
                     const trichYeuValue = `Hồ sơ kho: ${row.hoten1 || ''} - Sổ thửa: ${row.sothua || ''} / Tờ bđ: ${row.tobando || ''}`;
 
-                    // Toàn bộ dữ liệu của hàng được đưa vào object config data
                     const rowData: any = {};
                     const excelFields = [
                         'sott', 'loaihoso', 'hoten1', 'namsinh1', 'loaicccd1', 'socccd', 'diachitt1',
@@ -211,13 +229,12 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                         rowData[field] = row[field] !== undefined ? row[field] : null;
                     });
 
-                    // Định dạng lại ngày nhập cho đúng chuẩn
+                    // Định dạng lại ngày nhập
                     let rawNgayNhap = rowData.ngaynhap;
                     let formattedNgayNhap = new Date().toISOString().split('T')[0];
                     if (rawNgayNhap) {
                         try {
                             if (typeof rawNgayNhap === 'number') {
-                                // Excel Date serial format
                                 const parsedDate = new Date((rawNgayNhap - 25569) * 86400 * 1000);
                                 if (!isNaN(parsedDate.getTime())) {
                                     formattedNgayNhap = parsedDate.toISOString().split('T')[0];
@@ -235,7 +252,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                     return {
                         type: 'kho',
-                        status: 'completed', // Bặc định là lưu trữ xong
+                        status: 'completed',
                         so_hieu: maBienNhan,
                         trich_yeu: trichYeuValue,
                         ngay_thang: formattedNgayNhap,
@@ -245,25 +262,86 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                     };
                 });
 
-                // Thực hiện lưu dữ liệu hàng loạt
-                let successCount = 0;
-                let failureCount = 0;
+                // PHƯƠNG ÁN CHIA LÔ TIÊN TIẾN: Mỗi lô từ 1000 đến 1500 hồ sơ đất
+                const BATCH_SIZE = 1000;
+                const totalBatches = Math.ceil(parsedRecords.length / BATCH_SIZE);
+                setImportTotalBatches(totalBatches);
 
-                // Để an toàn chống lỗi trùng lặp mã hồ sơ, ta import từng bản ghi hoặc kiểm tra trùng lặp
-                // Chúng ta dùng hàm importArchiveRecords
-                const success = await importArchiveRecords(parsedRecords);
-                if (success) {
-                    alert(`Nhập tập tin Excel thành công! Đã thêm ${parsedRecords.length} hồ sơ vào Kho lưu trữ.`);
-                    loadData();
-                } else {
-                    // Nếu lỗi hàng loạt, ta thử chèn từng bản ghi (không kén trùng lắp)
-                    alert("Nhập hàng loạt bị từ chối do có mã hồ sơ trùng lặp trong tệp Excel hoặc hệ thống. Vui lòng kiểm tra lại cột 'matd'.");
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (let i = 0; i < totalBatches; i++) {
+                    // Kiểm tra xem người dùng có bấm dừng hay không
+                    if (importCancelRef.current) {
+                        setImportStatusText("Đã hủy bỏ quá trình nhập Excel.");
+                        break;
+                    }
+
+                    const start = i * BATCH_SIZE;
+                    const end = Math.min(start + BATCH_SIZE, parsedRecords.length);
+                    const batch = parsedRecords.slice(start, end);
+                    
+                    setImportCurrentBatch(i + 1);
+                    setImportStatusText(`Đang truyền tải lô ${i + 1}/${totalBatches} (Dòng ${start + 1} - ${end})...`);
+
+                    try {
+                        const success = await importArchiveRecords(batch);
+                        if (success) {
+                            successCount += batch.length;
+                            setImportSuccess(successCount);
+                        } else {
+                            // Lô này bị lỗi (có thể do trùng lặp dữ liệu)
+                            // Ta sẽ cố gắng cứu bằng cách chèn từng dòng một trong lô đó (giải pháp phục hồi thông minh)
+                            setImportStatusText(`Phát hiện lỗi ở lô ${i + 1}. Đang tự động cứu chữa dữ liệu từng dòng...`);
+                            for (const singleRec of batch) {
+                                if (importCancelRef.current) break;
+                                try {
+                                    const itemSuccess = await importArchiveRecords([singleRec]);
+                                    if (itemSuccess) {
+                                        successCount++;
+                                    } else {
+                                        errorCount++;
+                                    }
+                                } catch {
+                                    errorCount++;
+                                }
+                                setImportSuccess(successCount);
+                                setImportErrors(errorCount);
+                            }
+                        }
+                    } catch (batchErr) {
+                        console.error(`Lỗi nghiêm trọng tại lô ${i+1}:`, batchErr);
+                        // Cứu chữa từng dòng của lô lỗi
+                        for (const singleRec of batch) {
+                            if (importCancelRef.current) break;
+                            try {
+                                const itemSuccess = await importArchiveRecords([singleRec]);
+                                if (itemSuccess) {
+                                    successCount++;
+                                } else {
+                                    errorCount++;
+                                }
+                            } catch {
+                                errorCount++;
+                            }
+                            setImportSuccess(successCount);
+                            setImportErrors(errorCount);
+                        }
+                    }
+
+                    // Cập nhật % tiến trình thực tế
+                    const progressVal = Math.round(((i + 1) / totalBatches) * 100);
+                    setImportProgress(progressVal);
                 }
+
+                setImportStatusText(importCancelRef.current ? "Đã dừng import!" : "Hoàn thành!");
+                setShowImportSummary(true);
+                loadData(1); // Tải lại trang đầu tiên của kho dữ liệu mới
             } catch (err: any) {
-                console.error("Lỗi Import Excel:", err);
-                alert("Đã xảy ra lỗi khi phân tích dữ liệu Excel!");
+                console.error("Lỗi phân tích Excel:", err);
+                alert("Đã xảy ra lỗi khi phân tích hoặc truyền tải dữ liệu Excel!");
+                setIsImporting(false);
             } finally {
-                setIsLoading(false);
                 if (fileInputRef.current) {
                     fileInputRef.current.value = '';
                 }
@@ -1182,6 +1260,87 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                             </button>
                         </div>
                     </form>
+                </div>
+            )}
+
+            {/* MODAL TIẾN TRÌNH IMPORT EXCEL BÁO CÁO REALTIME VIP CHIA LÔ */}
+            {isImporting && (
+                <div id="import-excel-modal" className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in animate-duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden flex flex-col p-6 space-y-6 md:p-8 animate-scale-up">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl">
+                                <FileSpreadsheet size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Tiến trình nhập tài liệu Excel</h3>
+                                <p className="text-xs text-slate-500">Đang thực hiện phân rã dữ liệu và lưu trữ vào đám mây</p>
+                            </div>
+                        </div>
+
+                        {/* Thanh tiến trình */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-700">{importStatusText}</span>
+                                <span className="font-mono text-emerald-600 font-extrabold">{importProgress}%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5 border border-slate-200/50">
+                                <div 
+                                    className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-300"
+                                    style={{ width: `${importProgress}%` }}
+                                ></div>
+                            </div>
+                        </div>
+
+                        {/* Thống kê tiến trình */}
+                        <div className="grid grid-cols-3 gap-2 bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
+                            <div className="space-y-0.5">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng số dòng</div>
+                                <div className="text-base font-extrabold text-slate-700 font-mono">{importTotal.toLocaleString()}</div>
+                            </div>
+                            <div className="space-y-0.5 border-x border-slate-200">
+                                <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Đã lưu</div>
+                                <div className="text-base font-extrabold text-emerald-600 font-mono">{importSuccess.toLocaleString()}</div>
+                            </div>
+                            <div className="space-y-0.5">
+                                <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Bản ghi lỗi</div>
+                                <div className="text-base font-extrabold text-red-500 font-mono">{importErrors.toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        {/* Chi tiết theo lô */}
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                            <span>Lô xử lý: <strong>{importCurrentBatch}</strong> / <strong>{importTotalBatches}</strong></span>
+                            {importErrors > 0 && <span className="text-amber-600 flex items-center gap-1"><AlertCircle size={12} /> Tự động bỏ qua trùng hoặc lỗi</span>}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="pt-2 flex justify-end gap-3">
+                            {!showImportSummary ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        importCancelRef.current = true;
+                                        setImportStatusText("Đang dừng quá trình...");
+                                    }}
+                                    className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold border border-rose-100 text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                    <X size={16} /> Dừng/Hủy Nhập Excel
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsImporting(false);
+                                        setShowImportSummary(false);
+                                        loadData(1);
+                                    }}
+                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/10 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                    <CheckCircle2 size={16} /> Hoàn tất & Tải lại trang
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

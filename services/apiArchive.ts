@@ -228,7 +228,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 status: payload.status,
                 so_hieu: payload.so_hieu,
                 trich_yeu: payload.trich_yeu,
-                ngay_thang: payload.ngay_thang,
+                ngay_thang: parseAndFormatDateSafe(payload.ngay_thang),
                 noi_nhan_gui: payload.noi_nhan_gui,
                 attached_files: payload.attached_files,
                 data: payload.data
@@ -240,7 +240,10 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             if (payload.type === 'kho') {
                 try {
                     const wPayload = mapToWarehousePayload(data);
-                    await supabase.from('warehouse_records').upsert(wPayload);
+                    const { error: wErr } = await supabase.from('warehouse_records').upsert(wPayload);
+                    if (wErr) {
+                        console.error("❌ Lỗi đồng bộ sang warehouse_records (update):", wErr);
+                    }
                 } catch (wErr) {
                     // Bỏ qua nếu table chưa được tạo
                 }
@@ -264,7 +267,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 status: payload.status,
                 so_hieu: payload.so_hieu,
                 trich_yeu: payload.trich_yeu,
-                ngay_thang: payload.ngay_thang,
+                ngay_thang: parseAndFormatDateSafe(payload.ngay_thang),
                 noi_nhan_gui: payload.noi_nhan_gui,
                 attached_files: payload.attached_files,
                 data: payload.data,
@@ -278,7 +281,10 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             if (payload.type === 'kho') {
                 try {
                     const wPayload = mapToWarehousePayload(data);
-                    await supabase.from('warehouse_records').insert(wPayload);
+                    const { error: wErr } = await supabase.from('warehouse_records').insert(wPayload);
+                    if (wErr) {
+                        console.error("❌ Lỗi đồng bộ sang warehouse_records (insert):", wErr);
+                    }
                 } catch (wErr) {
                     // Bỏ qua nếu table chưa được tạo
                 }
@@ -627,9 +633,87 @@ export interface PaginatedWarehouseResponse {
     totalCount: number;
 }
 
+// Hàm chuẩn hóa & định dạng ngày tháng cực kỳ an toàn, chống mọi lỗi 22007, 22P07, 22008 của PostgreSQL
+export const parseAndFormatDateSafe = (val: any): string | null => {
+    if (val === undefined || val === null || val === '') return null;
+    
+    // Nếu là số SERIAL từ Excel (ví dụ: 45132)
+    if (typeof val === 'number') {
+        try {
+            const parsedDate = new Date((val - 25569) * 86400 * 1000);
+            if (!isNaN(parsedDate.getTime())) {
+                return parsedDate.toISOString().split('T')[0];
+            }
+        } catch {
+            return null;
+        }
+    }
+    
+    const str = String(val).trim();
+    if (!str || str === '-' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined') return null;
+
+    // Định dạng dd/mm/yyyy phổ biến ở Việt Nam
+    const dmyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
+    const dmyMatch = str.match(dmyRegex);
+    if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const month = parseInt(dmyMatch[2], 10);
+        const year = parseInt(dmyMatch[3], 10);
+        
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            // Kiểm tra tính hợp lệ bằng Constructor Date (Ví dụ tránh 30/02)
+            const dateObj = new Date(year, month - 1, day);
+            if (dateObj.getFullYear() === year && dateObj.getMonth() === month - 1 && dateObj.getDate() === day) {
+                return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+        }
+        return null;
+    }
+
+    // Định dạng yyyy-mm-dd
+    const ymdRegex = /^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})$/;
+    const ymdMatch = str.match(ymdRegex);
+    if (ymdMatch) {
+         const year = parseInt(ymdMatch[1], 10);
+         const month = parseInt(ymdMatch[2], 10);
+         const day = parseInt(ymdMatch[3], 10);
+         if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+             const dateObj = new Date(year, month - 1, day);
+             if (dateObj.getFullYear() === year && dateObj.getMonth() === month - 1 && dateObj.getDate() === day) {
+                 return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+             }
+         }
+         return null;
+    }
+
+    // Parse chung qua Javascript Date
+    try {
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+            const yr = d.getFullYear();
+            if (yr > 1900 && yr < 2100) {
+                return d.toISOString().split('T')[0];
+            }
+        }
+    } catch {
+        // bỏ qua
+    }
+    
+    return null;
+};
+
 // Convert payload cho table warehouse_records riêng
 export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
-    const d = record.data || {};
+    const d = { ...(record.data || {}) };
+    
+    // Đảm bảo dữ liệu thời gian luôn sạch sẽ kể cả bên trong data JSONB và bên ngoài cột vật lý
+    const parsedNgayNhap = parseAndFormatDateSafe(d.ngaynhap);
+    const parsedNgayCapGCN = parseAndFormatDateSafe(d.ngaycapgcnmoi);
+    const parsedNgayThang = parseAndFormatDateSafe(record.ngay_thang) || parsedNgayNhap;
+    
+    if (d.ngaynhap !== undefined && d.ngaynhap !== null) d.ngaynhap = parsedNgayNhap;
+    if (d.ngaycapgcnmoi !== undefined && d.ngaycapgcnmoi !== null) d.ngaycapgcnmoi = parsedNgayCapGCN;
+
     return {
         id: record.id,
         created_by: record.created_by,
@@ -637,7 +721,7 @@ export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
         status: record.status || 'completed',
         so_hieu: record.so_hieu,
         trich_yeu: record.trich_yeu,
-        ngay_thang: record.ngay_thang || null,
+        ngay_thang: parsedNgayThang,
         noi_nhan_gui: record.noi_nhan_gui || d.hoten1 || '',
         attached_files: record.attached_files || [],
         
@@ -665,14 +749,14 @@ export const mapToWarehousePayload = (record: Partial<ArchiveRecord>): any => {
         manam: d.manam || null,
         sophathanhgcnmoi: d.sophathanhgcnmoi || null,
         sovaosomoi: d.sovaosomoi || null,
-        ngaycapgcnmoi: d.ngaycapgcnmoi || null,
+        ngaycapgcnmoi: parsedNgayCapGCN,
         diachiap: d.diachiap || null,
         soke_tang: d.soke_tang || null,
         so_o: d.so_o || null,
         so_tep: d.so_tep || d.So_tep || null,
         sott_tep: d.sott_tep || null,
         nguoinhap: d.nguoinhap || null,
-        ngaynhap: d.ngaynhap || null,
+        ngaynhap: parsedNgayNhap,
         ghichu: d.ghichu || null,
         
         // Dư phòng toàn bộ JSON nâng cao

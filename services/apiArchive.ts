@@ -396,8 +396,9 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
                 return mapped;
             });
 
-            // Ghi trực tiếp hàng loạt vào bảng warehouse_records chuyên dụng
-            const { error: wErr } = await supabase.from('warehouse_records').insert(wPayloads);
+            // Ghi trực tiếp hàng loạt vào bảng warehouse_records chuyên dụng sử dụng UPSERT thông minh
+            // giúp tự động cập nhật hồ sơ cũ và lưu hồ sơ mới khi trùng mã biên nhận (so_hieu/matd)
+            const { error: wErr } = await supabase.from('warehouse_records').upsert(wPayloads, { onConflict: 'so_hieu' });
             if (wErr) throw wErr;
         }
 

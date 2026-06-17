@@ -68,3 +68,4 @@ CREATE INDEX IF NOT EXISTS idx_warehouse_soke_tang ON warehouse_records (soke_ta
 CREATE INDEX IF NOT EXISTS idx_warehouse_so_o ON warehouse_records (so_o);
 CREATE INDEX IF NOT EXISTS idx_warehouse_loaihoso ON warehouse_records (loaihoso);
 CREATE INDEX IF NOT EXISTS idx_warehouse_sophathanhgcnmoi ON warehouse_records (sophathanhgcnmoi);
+CREATE INDEX IF NOT EXISTS idx_warehouse_created_at ON warehouse_records (created_at DESC);

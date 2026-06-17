@@ -396,9 +396,10 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
                 return mapped;
             });
 
-            // Ghi trực tiếp hàng loạt vào bảng warehouse_records chuyên dụng sử dụng UPSERT thông minh
-            // giúp tự động cập nhật hồ sơ cũ và lưu hồ sơ mới khi trùng mã biên nhận (so_hieu/matd)
-            const { error: wErr } = await supabase.from('warehouse_records').upsert(wPayloads, { onConflict: 'so_hieu' });
+            // Sử dụng INSERT thay vì UPSERT để phát hiện chính xác các bản ghi trùng lặp khóa chính (sophathanhgcnmoi hoặc so_hieu)
+            // Khi có bất cứ bản ghi nào trùng, lô này sẽ báo lỗi và rơi vào block cứu chữa từng dòng (Single Row Rescue)
+            // giúp lọc ra chính xác các bản ghi lỗi đẩy vào danh sách xuất Excel lỗi cho người dùng sửa.
+            const { error: wErr } = await supabase.from('warehouse_records').insert(wPayloads);
             if (wErr) throw wErr;
         }
 
@@ -433,6 +434,53 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
     } catch (error) {
         logError("importArchiveRecords", error);
         return false;
+    }
+};
+
+export interface ImportSingleResult {
+    success: boolean;
+    errorMsg?: string;
+    code?: string;
+}
+
+export const importSingleWarehouseRecord = async (record: Partial<ArchiveRecord>): Promise<ImportSingleResult> => {
+    if (!isConfigured) {
+        const newRec = { 
+            ...record, 
+            id: Math.random().toString(36).substr(2, 9), 
+            created_at: new Date().toISOString() 
+        } as ArchiveRecord;
+        MOCK_ARCHIVE.unshift(newRec);
+        saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+        return { success: true };
+    }
+    try {
+        const payload = mapToWarehousePayload(record);
+        delete payload.id; // Để DB tự sinh UUID
+
+        // Thử chèn bản ghi riêng
+        const { error } = await supabase.from('warehouse_records').insert(payload);
+        if (error) {
+            let userFriendlyMsg = error.message || 'Lỗi lưu trữ dữ liệu';
+            if (error.code === '23505') {
+                userFriendlyMsg = `Trùng Số hiệu / Số GCN phát hành mới [${record.so_hieu}] đã tồn tại trong hệ thống.`;
+            } else if (error.code === '23502') {
+                userFriendlyMsg = 'Thiếu trường thông tin bắt buộc.';
+            } else if (error.code === '22P02') {
+                userFriendlyMsg = 'Sai định dạng kiểu dữ liệu (ngày tháng hoặc ký số không hợp lệ).';
+            }
+            return { 
+                success: false, 
+                errorMsg: userFriendlyMsg, 
+                code: error.code 
+            };
+        }
+        return { success: true };
+    } catch (e: any) {
+        return { 
+            success: false, 
+            errorMsg: e.message || String(e) 
+        };
     }
 };
 
@@ -918,11 +966,13 @@ export const fetchWarehouseRecordsPaginated = async (
         try {
             let query = supabase
                 .from('warehouse_records')
-                .select('*', { count: 'exact' });
+                .select('*', { count: 'estimated' });
 
             if (filters.searchTerm && filters.searchTerm.trim() !== '') {
                 const term = `%${filters.searchTerm.trim()}%`;
-                query = query.or(`so_hieu.ilike.${term},loaihoso.ilike.${term},hoten1.ilike.${term},hoten2.ilike.${term},socccd.ilike.${term},socccd2.ilike.${term},sophathanhgcnmoi.ilike.${term},sovaosomoi.ilike.${term},soke_tang.ilike.${term},so_o.ilike.${term},matd.ilike.${term}`);
+                // Tối ưu hóa cực hạn: Chỉ tìm kiếm trên các trường chủ chốt có INDEX (so_hieu, hoten1, socccd, sophathanhgcnmoi)
+                // giúp Postgres sử dụng Index Scan siêu tốc thay vì quét toàn bộ bảng và bị Timeout.
+                query = query.or(`so_hieu.ilike.${term},hoten1.ilike.${term},socccd.ilike.${term},sophathanhgcnmoi.ilike.${term}`);
             }
 
             // Bộ lọc nâng cao trên các cột index siêu tốc
@@ -933,12 +983,10 @@ export const fetchWarehouseRecordsPaginated = async (
                 query = query.ilike('loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
             }
             if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
-                const term = `%${filters.advChuSuDung.trim()}%`;
-                query = query.or(`hoten1.ilike.${term},hoten2.ilike.${term}`);
+                query = query.ilike('hoten1', `%${filters.advChuSuDung.trim()}%`);
             }
             if (filters.advCccd && filters.advCccd.trim() !== '') {
-                const term = `%${filters.advCccd.trim()}%`;
-                query = query.or(`socccd.ilike.${term},socccd2.ilike.${term}`);
+                query = query.ilike('socccd', `%${filters.advCccd.trim()}%`);
             }
             if (filters.advToThua && filters.advToThua.trim() !== '') {
                 const term = `%${filters.advToThua.trim()}%`;
@@ -948,8 +996,7 @@ export const fetchWarehouseRecordsPaginated = async (
                 query = query.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
             }
             if (filters.advHopSo && filters.advHopSo.trim() !== '') {
-                const term = `%${filters.advHopSo.trim()}%`;
-                query = query.or(`so_o.ilike.${term},so_tep.ilike.${term}`);
+                query = query.ilike('so_o', `%${filters.advHopSo.trim()}%`);
             }
             if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
                 query = query.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
@@ -973,12 +1020,70 @@ export const fetchWarehouseRecordsPaginated = async (
                 totalCount: count || 0
             };
         } catch (innerError: any) {
+            // PHÒNG VỆ CHỐNG TIMEOUT: Nếu bị timeout hoặc quá tải, chạy chế độ siêu phục hồi loại bỏ COUNT
+            if (innerError.code === '57014' || (innerError.message && innerError.message.includes('timeout'))) {
+                console.warn("⚠️ Phát hiện Timeout cơ sở dữ liệu. Đang kích hoạt chế độ siêu cứu hộ KHÔNG COUNT...");
+                try {
+                    let query = supabase
+                        .from('warehouse_records')
+                        .select('*');
+
+                    if (filters.searchTerm && filters.searchTerm.trim() !== '') {
+                        const term = `%${filters.searchTerm.trim()}%`;
+                        query = query.or(`so_hieu.ilike.${term},hoten1.ilike.${term},socccd.ilike.${term},sophathanhgcnmoi.ilike.${term}`);
+                    }
+
+                    if (filters.advMaBienNhan && filters.advMaBienNhan.trim() !== '') {
+                        query = query.ilike('so_hieu', `%${filters.advMaBienNhan.trim()}%`);
+                    }
+                    if (filters.advLoaiHoSo && filters.advLoaiHoSo.trim() !== '') {
+                        query = query.ilike('loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
+                    }
+                    if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
+                        query = query.ilike('hoten1', `%${filters.advChuSuDung.trim()}%`);
+                    }
+                    if (filters.advCccd && filters.advCccd.trim() !== '') {
+                        query = query.ilike('socccd', `%${filters.advCccd.trim()}%`);
+                    }
+                    if (filters.advToThua && filters.advToThua.trim() !== '') {
+                        const term = `%${filters.advToThua.trim()}%`;
+                        query = query.or(`tobando.ilike.${term},sothua.ilike.${term}`);
+                    }
+                    if (filters.advKeTang && filters.advKeTang.trim() !== '') {
+                        query = query.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
+                    }
+                    if (filters.advHopSo && filters.advHopSo.trim() !== '') {
+                        query = query.ilike('so_o', `%${filters.advHopSo.trim()}%`);
+                    }
+                    if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
+                        query = query.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
+                    }
+                    if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
+                        query = query.ilike('nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
+                    }
+
+                    const { data, error } = await query
+                        .order('created_at', { ascending: false })
+                        .range(fromIndex, toIndex);
+
+                    if (error) throw error;
+
+                    const mappedList = (data || []).map(mapFromWarehouseRecord);
+                    return {
+                        records: mappedList,
+                        totalCount: mappedList.length < limit ? fromIndex + mappedList.length : fromIndex + limit + 100
+                    };
+                } catch (retryErr) {
+                    console.error("❌ Chế độ khôi phục không count cũng thất bại:", retryErr);
+                }
+            }
+
             // Chỉ fallback sang archive_records nếu chưa tạo bảng warehouse_records
             if (innerError.code === '42P01') {
                 // FALLBACK SANG BẢNG GỐC 'archive_records' (mặc dù chậm hơn đối với 300k, nhưng giúp app KHÔNG BỊ CRASH)
                 let query = supabase
                     .from('archive_records')
-                    .select('*', { count: 'exact' })
+                    .select('*', { count: 'estimated' })
                     .eq('type', 'kho');
 
                 if (filters.searchTerm && filters.searchTerm.trim() !== '') {

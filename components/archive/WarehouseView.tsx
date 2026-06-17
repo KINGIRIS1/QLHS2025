@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User } from '../../types';
-import { ArchiveRecord, fetchWarehouseRecordsPaginated, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, initRealtimeArchive } from '../../services/apiArchive';
+import { ArchiveRecord, fetchWarehouseRecordsPaginated, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, initRealtimeArchive, importSingleWarehouseRecord } from '../../services/apiArchive';
 import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2 } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
@@ -64,6 +64,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
     const [importTotalBatches, setImportTotalBatches] = useState(0);
     const [importStatusText, setImportStatusText] = useState('');
     const [showImportSummary, setShowImportSummary] = useState(false);
+    const [failedImports, setFailedImports] = useState<{ rowNumber: number; data: any; errorReason: string }[]>([]);
     const importCancelRef = useRef(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +209,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
         setImportSuccess(0);
         setImportErrors(0);
         setShowImportSummary(false);
+        setFailedImports([]);
         importCancelRef.current = false;
 
         reader.onload = async (evt) => {
@@ -303,6 +305,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                 let successCount = 0;
                 let errorCount = 0;
+                const errorsList: { rowNumber: number; data: any; errorReason: string }[] = [];
 
                 for (let i = 0; i < totalBatches; i++) {
                     // Kiểm tra xem người dùng có bấm dừng hay không
@@ -327,36 +330,66 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                             // Lô này bị lỗi (có thể do trùng lặp dữ liệu)
                             // Ta sẽ cố gắng cứu bằng cách chèn từng dòng một trong lô đó (giải pháp phục hồi thông minh)
                             setImportStatusText(`Phát hiện lỗi ở lô ${i + 1}. Đang tự động cứu chữa dữ liệu từng dòng...`);
-                            for (const singleRec of batch) {
+                            for (let j = 0; j < batch.length; j++) {
                                 if (importCancelRef.current) break;
+                                const singleRec = batch[j];
+                                const excelRowIdx = start + j;
+                                const originalExcelRow = rows[excelRowIdx];
+                                const rowNumInExcel = excelRowIdx + 2; // Dòng 1 là header
+
                                 try {
-                                    const itemSuccess = await importArchiveRecords([singleRec]);
-                                    if (itemSuccess) {
+                                    const result = await importSingleWarehouseRecord(singleRec);
+                                    if (result.success) {
                                         successCount++;
                                     } else {
                                         errorCount++;
+                                        errorsList.push({
+                                            rowNumber: rowNumInExcel,
+                                            data: originalExcelRow || singleRec.data,
+                                            errorReason: result.errorMsg || "Lỗi trùng Số phát hành GCN hoặc dữ liệu không hợp lệ"
+                                        });
                                     }
-                                } catch {
+                                } catch (singleErr: any) {
                                     errorCount++;
+                                    errorsList.push({
+                                        rowNumber: rowNumInExcel,
+                                        data: originalExcelRow || singleRec.data,
+                                        errorReason: singleErr.message || "Lỗi hệ thống khi cứu hộ"
+                                    });
                                 }
                                 setImportSuccess(successCount);
                                 setImportErrors(errorCount);
                             }
                         }
-                    } catch (batchErr) {
+                    } catch (batchErr: any) {
                         console.error(`Lỗi nghiêm trọng tại lô ${i+1}:`, batchErr);
                         // Cứu chữa từng dòng của lô lỗi
-                        for (const singleRec of batch) {
+                        for (let j = 0; j < batch.length; j++) {
                             if (importCancelRef.current) break;
+                            const singleRec = batch[j];
+                            const excelRowIdx = start + j;
+                            const originalExcelRow = rows[excelRowIdx];
+                            const rowNumInExcel = excelRowIdx + 2;
+
                             try {
-                                const itemSuccess = await importArchiveRecords([singleRec]);
-                                if (itemSuccess) {
+                                const result = await importSingleWarehouseRecord(singleRec);
+                                if (result.success) {
                                     successCount++;
                                 } else {
                                     errorCount++;
+                                    errorsList.push({
+                                        rowNumber: rowNumInExcel,
+                                        data: originalExcelRow || singleRec.data,
+                                        errorReason: result.errorMsg || String(batchErr?.message || batchErr)
+                                    });
                                 }
-                            } catch {
+                            } catch (singleErr: any) {
                                 errorCount++;
+                                errorsList.push({
+                                    rowNumber: rowNumInExcel,
+                                    data: originalExcelRow || singleRec.data,
+                                    errorReason: singleErr.message || "Lỗi ngoại lệ khi đẩy"
+                                });
                             }
                             setImportSuccess(successCount);
                             setImportErrors(errorCount);
@@ -364,10 +397,12 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                     }
 
                     // Cập nhật % tiến trình thực tế
-                    const progressVal = Math.round(((i + 1) / totalBatches) * 100);
-                    setImportProgress(progressVal);
+                    const progressVal = Math.round(((i + 1) / totalBatches) * 105); // một chút buffer cảm quan
+                    setImportProgress(progressVal > 100 ? 100 : progressVal);
                 }
 
+                setFailedImports(errorsList);
+                setImportProgress(100);
                 setImportStatusText(importCancelRef.current ? "Đã dừng import!" : "Hoàn thành!");
                 setShowImportSummary(true);
                 loadData(1); // Tải lại trang đầu tiên của kho dữ liệu mới
@@ -402,6 +437,54 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Mau_Nhap_Kho');
         XLSX.writeFile(workbook, 'Mau_Nhap_Lieu_Kho.xlsx');
+    };
+
+    // Hàm xuất danh sách lỗi ra Excel đầy đủ định dạng cột gốc kèm Lý do lỗi
+    const exportFailedToExcel = () => {
+        if (failedImports.length === 0) {
+            alert("Không có dữ liệu lỗi để xuất!");
+            return;
+        }
+
+        const excelFields = [
+            'sott', 'loaihoso', 'hoten1', 'namsinh1', 'socccd', 'diachitt1',
+            'hoten2', 'namsinh2', 'socccd2', 'diachitt2', 'tobando',
+            'sothua', 'dientich', 'hinhthucsd', 'loaidato', 'dientichdato', 'maxa',
+            'manam', 'sophathanhgcnmoi', 'sovaosomoi', 'ngaycapgcnmoi', 'diachiap', 'soke_tang',
+            'so_o', 'So_tep', 'sott_tep', 'nguoinhap', 'ngaynhap', 'ghichu'
+        ];
+
+        // Tạo mảng dạng AOA (Array of Arrays) cho XLSX
+        const headers = ['Dòng Excel Gốc', ...excelFields, 'Lý do lỗi'];
+        
+        const rowsData = failedImports.map(errorItem => {
+            const originalRow = errorItem.data || {};
+            const rowValueList = excelFields.map(field => {
+                if (originalRow[field] !== undefined) return originalRow[field];
+                
+                // Trường hợp đặc biệt chữ hoa/thường trong tên cột ban đầu
+                const fieldLower = field.toLowerCase();
+                const matchedKey = Object.keys(originalRow).find(k => k.toLowerCase() === fieldLower);
+                if (matchedKey) return originalRow[matchedKey];
+
+                return '';
+            });
+            return [errorItem.rowNumber, ...rowValueList, errorItem.errorReason];
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsData]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'DanhSanhLoi_Khonhap');
+
+        // Định dạng cột một chút
+        ws['!cols'] = [
+            { wch: 15 }, // Dòng Excel Gốc
+            ...excelFields.map(() => ({ wch: 15 })),
+            { wch: 60 } // Lý do lỗi rộng hơn
+        ];
+
+        const timeStamp = new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
+        XLSX.writeFile(wb, `Danh_Sach_Ho_So_Loi_Kho_${timeStamp}.xlsx`);
     };
 
     const handleFormChange = (field: string, value: any) => {
@@ -1321,13 +1404,53 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                         </div>
 
                         {/* Chi tiết theo lô */}
-                        <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                            <span>Lô xử lý: <strong>{importCurrentBatch}</strong> / <strong>{importTotalBatches}</strong></span>
-                            {importErrors > 0 && <span className="text-amber-600 flex items-center gap-1"><AlertCircle size={12} /> Tự động bỏ qua trùng hoặc lỗi</span>}
+                        <div className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
+                            <div className="flex items-center justify-between">
+                                <span>Lô xử lý: <strong>{importCurrentBatch}</strong> / <strong>{importTotalBatches}</strong></span>
+                                {importErrors > 0 && <span className="text-amber-600 flex items-center gap-1"><AlertCircle size={12} /> Bản ghi lỗi hoặc trùng: <strong>{importErrors.toLocaleString()}</strong></span>}
+                            </div>
+                            
+                            {/* KHU VỰC HIỂN THỊ LỖI THỰC TẾ & NÚT CHI TIẾT */}
+                            {failedImports.length > 0 && (
+                                <div className="mt-2 space-y-2 border border-slate-200 rounded-2xl p-3 bg-slate-50 select-none">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                            <AlertCircle size={14} className="text-rose-500" />
+                                            Chi tiết lỗi ({failedImports.length.toLocaleString()} dòng):
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={exportFailedToExcel}
+                                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition-all shadow-sm shadow-amber-500/10 cursor-pointer"
+                                        >
+                                            <Download size={11} /> Xuất Excel Lỗi
+                                        </button>
+                                    </div>
+                                    <div className="max-h-[140px] overflow-y-auto border border-slate-200 rounded-xl bg-white text-[10px] divide-y divide-slate-100 font-mono">
+                                        {failedImports.slice(0, 100).map((errItem, idx) => (
+                                            <div key={idx} className="p-2 flex items-start gap-2 hover:bg-slate-50 transition-colors">
+                                                <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded font-bold shrink-0">Dòng {errItem.rowNumber}</span>
+                                                <div className="flex flex-col text-left">
+                                                    <span className="text-slate-800 font-bold">
+                                                        {errItem.data?.hoten1 ? String(errItem.data.hoten1).trim() : 'Không rõ tên'} 
+                                                        {errItem.data?.sophathanhgcnmoi ? ` (${errItem.data.sophathanhgcnmoi})` : ''}
+                                                    </span>
+                                                    <span className="text-rose-500 text-[9px] font-medium mt-0.5">{errItem.errorReason}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {failedImports.length > 100 && (
+                                            <div className="p-2 text-center text-slate-500 text-[10px] font-bold italic bg-slate-50 border-t border-slate-150">
+                                                ... và {failedImports.length - 100} dòng lỗi nữa. Vui lòng bấm "Xuất Excel Lỗi" để tải về sửa đổi toàn bộ!
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Action buttons */}
-                        <div className="pt-2 flex justify-end gap-3">
+                        <div className="pt-2 flex flex-col sm:flex-row gap-3">
                             {!showImportSummary ? (
                                 <button
                                     type="button"
@@ -1340,17 +1463,29 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                     <X size={16} /> Dừng/Hủy Nhập Excel
                                 </button>
                             ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsImporting(false);
-                                        setShowImportSummary(false);
-                                        loadData(1);
-                                    }}
-                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/10 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
-                                >
-                                    <CheckCircle2 size={16} /> Hoàn tất & Tải lại trang
-                                </button>
+                                <>
+                                    {failedImports.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={exportFailedToExcel}
+                                            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/10 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                        >
+                                            <Download size={16} /> Tải file Excel sửa ngay ({failedImports.length})
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsImporting(false);
+                                            setShowImportSummary(false);
+                                            setFailedImports([]);
+                                            loadData(1);
+                                        }}
+                                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/10 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                    >
+                                        <CheckCircle2 size={16} /> Hoàn tất & Đóng
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

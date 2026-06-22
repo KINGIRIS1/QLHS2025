@@ -26,6 +26,7 @@ const ScheduleSummary: React.FC<ScheduleSummaryProps> = ({ schedules }) => {
 
         // Filter schedules based on selected time period
         const filteredSchedules = schedules.filter(s => {
+            if (s.partner === 'DANG_KY_MAY_DO') return false;
             const date = new Date(s.date);
             if (filterType === 'year') {
                 return date.getFullYear() === currentYear;

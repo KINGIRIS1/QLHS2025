@@ -54,6 +54,9 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
 
     const filteredList = useMemo(() => {
         return schedules.filter(s => {
+            // Loại bỏ các bản ghi của lịch máy đo
+            if (s.partner === 'DANG_KY_MAY_DO') return false;
+
             // Search Text
             const lowerSearch = searchTerm.toLowerCase();
             const matchText = 

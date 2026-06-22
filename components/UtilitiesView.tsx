@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet } from 'lucide-react';
-import { User as UserType, RecordFile, NotifyFunction, NotifyType } from '../types';
+import { User as UserType, RecordFile, NotifyFunction, NotifyType, UserRole } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
 import VPHCTab from './utilities/VPHCTab';
@@ -16,7 +16,10 @@ interface UtilitiesViewProps {
 }
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi'>('bienban');
+  const isOneDoor = currentUser.role === UserRole.ONEDOOR;
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi'>(
+      currentUser.role === UserRole.ONEDOOR ? 'vphc' : 'bienban'
+  );
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -91,42 +94,48 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
       {/* Header Tabs */}
       <div className="bg-white border-b border-slate-300 p-2 flex items-center gap-4 shrink-0 shadow-sm z-20">
           <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto">
-              <button 
-                  onClick={() => setActiveTab('bienban')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'bienban' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <FileText size={16} /> Soạn Biên Bản
-              </button>
+              {!isOneDoor && (
+                  <button 
+                      onClick={() => setActiveTab('bienban')}
+                      className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'bienban' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      <FileText size={16} /> Soạn Biên Bản
+                  </button>
+              )}
               <button 
                   onClick={() => setActiveTab('vphc')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'vphc' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                   <Gavel size={16} /> Biên bản VPHC
               </button>
-              <button 
-                  onClick={() => setActiveTab('thongtin')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'thongtin' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <Info size={16} /> Cung Cấp Thông Tin
-              </button>
-              <button 
-                  onClick={() => setActiveTab('chinhly')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chinhly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <Table2 size={16} /> Hồ sơ Chỉnh lý
-              </button>
-              <button 
-                  onClick={() => setActiveTab('tachthua')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'tachthua' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <Grid size={16} /> Hồ sơ Tách thửa
-              </button>
-              <button 
-                  onClick={() => setActiveTab('saiso')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'saiso' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <Calculator size={16} /> Tính sai số
-              </button>
+              {!isOneDoor && (
+                  <>
+                      <button 
+                          onClick={() => setActiveTab('thongtin')}
+                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'thongtin' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <Info size={16} /> Cung Cấp Thông Tin
+                      </button>
+                      <button 
+                          onClick={() => setActiveTab('chinhly')}
+                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chinhly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <Table2 size={16} /> Hồ sơ Chỉnh lý
+                      </button>
+                      <button 
+                          onClick={() => setActiveTab('tachthua')}
+                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'tachthua' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <Grid size={16} /> Hồ sơ Tách thửa
+                      </button>
+                      <button 
+                          onClick={() => setActiveTab('saiso')}
+                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'saiso' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <Calculator size={16} /> Tính sai số
+                      </button>
+                  </>
+              )}
               <button 
                   onClick={() => setActiveTab('chuyendoi')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chuyendoi' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}

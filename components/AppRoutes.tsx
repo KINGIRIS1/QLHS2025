@@ -20,6 +20,7 @@ import ArchiveRecords from './ArchiveRecords';
 import SystemView from './SystemView';
 
 import DangKyView from './archive/DangKyView';
+import WarehouseView from './archive/WarehouseView';
 import BlockingRecordsView from './BlockingRecordsView';
 
 // Icons
@@ -557,6 +558,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         case 'archive_records':
             return (
                 <ArchiveRecords currentUser={currentUser} wards={wards} />
+            );
+        case 'warehouse_records':
+            return (
+                <WarehouseView currentUser={currentUser} />
             );
         case 'dangky_records':
             return (

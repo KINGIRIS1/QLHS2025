@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
@@ -59,6 +59,7 @@ import RecordForm from './receive-record/RecordForm';
 import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
 import { RecordSearchView } from './receive-record/RecordSearchView';
+import { ExtendedList } from './receive-record/ExtendedList';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
@@ -108,7 +109,7 @@ const formatDateKey = (date: Date): string => {
 };
 
 const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onReturnResult }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search'>('create');
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended'>('create');
   const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   
   // State quản lý danh sách hồ sơ Sao lục lấy từ Archive
@@ -538,6 +539,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <button onClick={() => setViewMode('search')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <Search size={16} /> Tra cứu hồ sơ
             </button>
+            <button onClick={() => setViewMode('extended')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'extended' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <Clock size={16} /> Hồ sơ gia hạn
+            </button>
         </div>
         
         {viewMode === 'create' && (
@@ -605,6 +609,20 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 employees={employees}
                 onReturnResult={onReturnResult || (() => {})}
                 onExtendRecord={handleExtendRecord}
+            />
+        )}
+
+        {viewMode === 'extended' && (
+            <ExtendedList 
+                records={records}
+                archiveSaoLucRecords={archiveSaoLucRecords}
+                archiveVaoSoRecords={archiveVaoSoRecords}
+                archiveDangKyRecords={archiveDangKyRecords}
+                archiveCongVanRecords={archiveCongVanRecords}
+                wards={wards}
+                currentUser={currentUser}
+                employees={employees}
+                onPrint={handlePreviewDocx}
             />
         )}
       </div>

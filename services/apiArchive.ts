@@ -670,11 +670,14 @@ export interface WarehouseFilters {
     advLoaiHoSo?: string;
     advChuSuDung?: string;
     advCccd?: string;
-    advToThua?: string;
+    advToBando?: string;
+    advSoThua?: string;
     advKeTang?: string;
     advHopSo?: string;
     advSoPhatHanh?: string;
     advNguoiNhap?: string;
+    advSoVaoSo?: string;
+    advXaPhuong?: string;
 }
 
 export interface PaginatedWarehouseResponse {
@@ -932,9 +935,11 @@ export const fetchWarehouseRecordsPaginated = async (
             const term = filters.advCccd.toLowerCase();
             list = list.filter(r => (r.data?.socccd || '').toLowerCase().includes(term) || (r.data?.socccd2 || '').toLowerCase().includes(term));
         }
-        if (filters.advToThua) {
-            const term = filters.advToThua.toLowerCase();
-            list = list.filter(r => (r.data?.tobando || '').toString().includes(term) || (r.data?.sothua || '').toString().includes(term));
+        if (filters.advToBando) {
+            list = list.filter(r => (r.data?.tobando || '').toString().toLowerCase().includes(filters.advToBando!.toLowerCase()));
+        }
+        if (filters.advSoThua) {
+            list = list.filter(r => (r.data?.sothua || '').toString().toLowerCase().includes(filters.advSoThua!.toLowerCase()));
         }
         if (filters.advKeTang) {
             list = list.filter(r => (r.data?.soke_tang || '').toLowerCase().includes(filters.advKeTang!.toLowerCase()));
@@ -949,6 +954,12 @@ export const fetchWarehouseRecordsPaginated = async (
         if (filters.advNguoiNhap) {
             list = list.filter(r => (r.data?.nguoinhap || '').toLowerCase().includes(filters.advNguoiNhap!.toLowerCase()));
         }
+        if (filters.advSoVaoSo) {
+            list = list.filter(r => (r.data?.sovaosomoi || '').toLowerCase().includes(filters.advSoVaoSo!.toLowerCase()));
+        }
+        if (filters.advXaPhuong) {
+            list = list.filter(r => (r.data?.maxa || '').toString().toLowerCase() === filters.advXaPhuong!.toLowerCase());
+        }
 
         const totalCount = list.length;
         const startIndex = (page - 1) * limit;
@@ -962,125 +973,118 @@ export const fetchWarehouseRecordsPaginated = async (
         const fromIndex = (page - 1) * limit;
         const toIndex = page * limit - 1;
 
-        // BƯỚC 1: THỬ TRUY VẤN TRÊN BẢNG CHUYÊN DỤNG VIP 'warehouse_records' TRƯỚC
-        try {
-            let query = supabase
-                .from('warehouse_records')
-                .select('*', { count: 'estimated' });
-
+        // Hàm helper áp dụng bộ lọc substring thông minh - PHÙ HỢP HOÀN HẢO VỚI INDEX GIN TRIGRAM
+        const applyFilters = (baseQuery: any) => {
+            let q = baseQuery;
             if (filters.searchTerm && filters.searchTerm.trim() !== '') {
-                const term = `%${filters.searchTerm.trim()}%`;
-                // Tối ưu hóa cực hạn: Chỉ tìm kiếm trên các trường chủ chốt có INDEX (so_hieu, hoten1, socccd, sophathanhgcnmoi)
-                // giúp Postgres sử dụng Index Scan siêu tốc thay vì quét toàn bộ bảng và bị Timeout.
-                query = query.or(`so_hieu.ilike.${term},hoten1.ilike.${term},socccd.ilike.${term},sophathanhgcnmoi.ilike.${term}`);
-            }
+                const termClean = filters.searchTerm.trim().replace(/%/g, '');
+                const hasVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(termClean);
+                const isNumeric = /^\d+$/.test(termClean);
 
-            // Bộ lọc nâng cao trên các cột index siêu tốc
-            if (filters.advMaBienNhan && filters.advMaBienNhan.trim() !== '') {
-                query = query.ilike('so_hieu', `%${filters.advMaBienNhan.trim()}%`);
-            }
-            if (filters.advLoaiHoSo && filters.advLoaiHoSo.trim() !== '') {
-                query = query.ilike('loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
-            }
-            if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
-                query = query.ilike('hoten1', `%${filters.advChuSuDung.trim()}%`);
-            }
-            if (filters.advCccd && filters.advCccd.trim() !== '') {
-                query = query.ilike('socccd', `%${filters.advCccd.trim()}%`);
-            }
-            if (filters.advToThua && filters.advToThua.trim() !== '') {
-                const term = `%${filters.advToThua.trim()}%`;
-                query = query.or(`tobando.ilike.${term},sothua.ilike.${term}`);
-            }
-            if (filters.advKeTang && filters.advKeTang.trim() !== '') {
-                query = query.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
-            }
-            if (filters.advHopSo && filters.advHopSo.trim() !== '') {
-                query = query.ilike('so_o', `%${filters.advHopSo.trim()}%`);
-            }
-            if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
-                query = query.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
-            }
-            if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
-                query = query.ilike('nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
-            }
-
-            const { data, count, error } = await query
-                .order('created_at', { ascending: false })
-                .range(fromIndex, toIndex);
-
-            if (error) {
-                // Nếu code === '42P01' tức là table warehouse_records chưa được chạy migration SQL, ta nhảy sang khối catch để fallback
-                if (error.code === '42P01') throw error;
-                throw error;
-            }
-
-            return {
-                records: (data || []).map(mapFromWarehouseRecord),
-                totalCount: count || 0
-            };
-        } catch (innerError: any) {
-            // PHÒNG VỆ CHỐNG TIMEOUT: Nếu bị timeout hoặc quá tải, chạy chế độ siêu phục hồi loại bỏ COUNT
-            if (innerError.code === '57014' || (innerError.message && innerError.message.includes('timeout'))) {
-                console.warn("⚠️ Phát hiện Timeout cơ sở dữ liệu. Đang kích hoạt chế độ siêu cứu hộ KHÔNG COUNT...");
-                try {
-                    let query = supabase
-                        .from('warehouse_records')
-                        .select('*');
-
-                    if (filters.searchTerm && filters.searchTerm.trim() !== '') {
-                        const term = `%${filters.searchTerm.trim()}%`;
-                        query = query.or(`so_hieu.ilike.${term},hoten1.ilike.${term},socccd.ilike.${term},sophathanhgcnmoi.ilike.${term}`);
-                    }
-
-                    if (filters.advMaBienNhan && filters.advMaBienNhan.trim() !== '') {
-                        query = query.ilike('so_hieu', `%${filters.advMaBienNhan.trim()}%`);
-                    }
-                    if (filters.advLoaiHoSo && filters.advLoaiHoSo.trim() !== '') {
-                        query = query.ilike('loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
-                    }
-                    if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
-                        query = query.ilike('hoten1', `%${filters.advChuSuDung.trim()}%`);
-                    }
-                    if (filters.advCccd && filters.advCccd.trim() !== '') {
-                        query = query.ilike('socccd', `%${filters.advCccd.trim()}%`);
-                    }
-                    if (filters.advToThua && filters.advToThua.trim() !== '') {
-                        const term = `%${filters.advToThua.trim()}%`;
-                        query = query.or(`tobando.ilike.${term},sothua.ilike.${term}`);
-                    }
-                    if (filters.advKeTang && filters.advKeTang.trim() !== '') {
-                        query = query.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
-                    }
-                    if (filters.advHopSo && filters.advHopSo.trim() !== '') {
-                        query = query.ilike('so_o', `%${filters.advHopSo.trim()}%`);
-                    }
-                    if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
-                        query = query.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
-                    }
-                    if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
-                        query = query.ilike('nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
-                    }
-
-                    const { data, error } = await query
-                        .order('created_at', { ascending: false })
-                        .range(fromIndex, toIndex);
-
-                    if (error) throw error;
-
-                    const mappedList = (data || []).map(mapFromWarehouseRecord);
-                    return {
-                        records: mappedList,
-                        totalCount: mappedList.length < limit ? fromIndex + mappedList.length : fromIndex + limit + 100
-                    };
-                } catch (retryErr) {
-                    console.error("❌ Chế độ khôi phục không count cũng thất bại:", retryErr);
+                if (hasVietnamese) {
+                    // Có dấu tiếng Việt: chỉ tìm trên tên (hoten1)
+                    q = q.ilike('hoten1', `%${termClean}%`);
+                } else if (isNumeric) {
+                    // Chỉ có số: tìm trên các trường mã số/cccd/số hiệu/số thửa để ăn index chính xác
+                    q = q.or(`so_hieu.ilike.%${termClean}%,socccd.ilike.%${termClean}%,sophathanhgcnmoi.ilike.%${termClean}%,sothua.ilike.%${termClean}%`);
+                } else {
+                    // Chuỗi không dấu: tìm trên các cột text chính
+                    q = q.or(`so_hieu.ilike.%${termClean}%,hoten1.ilike.%${termClean}%,socccd.ilike.%${termClean}%,sophathanhgcnmoi.ilike.%${termClean}%`);
                 }
             }
 
-            // Chỉ fallback sang archive_records nếu chưa tạo bảng warehouse_records
+            // Các bộ lọc nâng cao (Tìm kiếm nâng cao)
+            if (filters.advMaBienNhan && filters.advMaBienNhan.trim() !== '') {
+                q = q.ilike('so_hieu', `%${filters.advMaBienNhan.trim()}%`);
+            }
+            if (filters.advLoaiHoSo && filters.advLoaiHoSo.trim() !== '') {
+                q = q.ilike('loaihoso', `%${filters.advLoaiHoSo.trim()}%`);
+            }
+            if (filters.advChuSuDung && filters.advChuSuDung.trim() !== '') {
+                q = q.ilike('hoten1', `%${filters.advChuSuDung.trim()}%`);
+            }
+            if (filters.advCccd && filters.advCccd.trim() !== '') {
+                q = q.ilike('socccd', `%${filters.advCccd.trim()}%`);
+            }
+            if (filters.advToBando && filters.advToBando.trim() !== '') {
+                q = q.ilike('tobando', `%${filters.advToBando.trim()}%`);
+            }
+            if (filters.advSoThua && filters.advSoThua.trim() !== '') {
+                q = q.ilike('sothua', `%${filters.advSoThua.trim()}%`);
+            }
+            if (filters.advKeTang && filters.advKeTang.trim() !== '') {
+                q = q.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
+            }
+            if (filters.advHopSo && filters.advHopSo.trim() !== '') {
+                q = q.ilike('so_o', `%${filters.advHopSo.trim()}%`);
+            }
+            if (filters.advSoPhatHanh && filters.advSoPhatHanh.trim() !== '') {
+                q = q.ilike('sophathanhgcnmoi', `%${filters.advSoPhatHanh.trim()}%`);
+            }
+            if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
+                q = q.ilike('nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
+            }
+            if (filters.advSoVaoSo && filters.advSoVaoSo.trim() !== '') {
+                q = q.ilike('sovaosomoi', `%${filters.advSoVaoSo.trim()}%`);
+            }
+            if (filters.advXaPhuong && filters.advXaPhuong.trim() !== '') {
+                q = q.eq('maxa', filters.advXaPhuong.trim());
+            }
+            return q;
+        };
+
+        // BƯỚC 1: TRUY VẤN TRÊN BẢNG CHUYÊN DỤNG 'warehouse_records'
+        try {
+            // --- CẤP ĐỘ 1: TÌM KIẾM CHUỖI CON ĂN CHỈ MỤC GIN TRIGRAMS (Kèm Sort, Tốc độ cao nhất) ---
+            try {
+                console.log(`[Warehouse Query] Thử cấp độ 1 (GIN Trigram search, Order by created_at DESC) cho trang ${page}`);
+                let query = supabase.from('warehouse_records').select('*', { count: 'estimated' });
+                query = applyFilters(query);
+                
+                const { data, count, error } = await query
+                    .order('created_at', { ascending: false })
+                    .range(fromIndex, toIndex);
+
+                if (error) {
+                    if (error.code === '42P01') throw error; // Chuyển sang fallback bảng archive_records
+                    throw error;
+                }
+
+                const records = (data || []).map(mapFromWarehouseRecord);
+                return {
+                    records,
+                    totalCount: count || 0
+                };
+            } catch (errLevel1: any) {
+                if (errLevel1.code === '42P01') throw errLevel1;
+                
+                const isTimeout = errLevel1.code === '57014' || (errLevel1.message && errLevel1.message.includes('timeout'));
+                if (!isTimeout) throw errLevel1;
+
+                console.warn("🚨 Cấp độ 1 bị Timeout. Kích hoạt CẤP ĐỘ 2: CỨU HỘ KHÔNG SORT...");
+                
+                // --- CẤP ĐỘ 2: CỨU HỘ KHÔNG SORT (Ăn chỉ mục GIN, bỏ Sort Node để tránh lỗi bộ nhớ/thời gian) ---
+                let query2 = supabase.from('warehouse_records').select('*');
+                query2 = applyFilters(query2);
+                
+                const { data, error } = await query2.range(fromIndex, toIndex);
+                if (error) throw error;
+
+                const mappedList = (data || []).map(mapFromWarehouseRecord);
+                const simulatedCount = mappedList.length < limit 
+                    ? fromIndex + mappedList.length 
+                    : fromIndex + limit + 100;
+
+                return {
+                    records: mappedList,
+                    totalCount: simulatedCount
+                };
+            }
+        } catch (innerError: any) {
+            // Chỉ fallback sang archive_records nếu chưa tạo bảng warehouse_records (Lỗi 42P01)
             if (innerError.code === '42P01') {
-                // FALLBACK SANG BẢNG GỐC 'archive_records' (mặc dù chậm hơn đối với 300k, nhưng giúp app KHÔNG BỊ CRASH)
+                console.warn("⚠️ Bảng warehouse_records chưa tồn tại. Đang fallback qua bảng gốc archive_records...");
+                
                 let query = supabase
                     .from('archive_records')
                     .select('*', { count: 'estimated' })
@@ -1105,9 +1109,11 @@ export const fetchWarehouseRecordsPaginated = async (
                     const term = `%${filters.advCccd.trim()}%`;
                     query = query.or(`data->>socccd.ilike.${term},data->>socccd2.ilike.${term}`);
                 }
-                if (filters.advToThua && filters.advToThua.trim() !== '') {
-                    const term = `%${filters.advToThua.trim()}%`;
-                    query = query.or(`data->>tobando.ilike.${term},data->>sothua.ilike.${term}`);
+                if (filters.advToBando && filters.advToBando.trim() !== '') {
+                    query = query.ilike('data->>tobando', `%${filters.advToBando.trim()}%`);
+                }
+                if (filters.advSoThua && filters.advSoThua.trim() !== '') {
+                    query = query.ilike('data->>sothua', `%${filters.advSoThua.trim()}%`);
                 }
                 if (filters.advKeTang && filters.advKeTang.trim() !== '') {
                     query = query.ilike('data->>soke_tang', `%${filters.advKeTang.trim()}%`);
@@ -1122,19 +1128,36 @@ export const fetchWarehouseRecordsPaginated = async (
                 if (filters.advNguoiNhap && filters.advNguoiNhap.trim() !== '') {
                     query = query.ilike('data->>nguoinhap', `%${filters.advNguoiNhap.trim()}%`);
                 }
+                if (filters.advSoVaoSo && filters.advSoVaoSo.trim() !== '') {
+                    query = query.ilike('data->>sovaosomoi', `%${filters.advSoVaoSo.trim()}%`);
+                }
+                if (filters.advXaPhuong && filters.advXaPhuong.trim() !== '') {
+                    query = query.eq('data->>maxa', filters.advXaPhuong.trim());
+                }
 
-                const { data, count, error } = await query
-                    .order('created_at', { ascending: false })
-                    .range(fromIndex, toIndex);
+                try {
+                    const { data, count, error } = await query
+                        .order('created_at', { ascending: false })
+                        .range(fromIndex, toIndex);
 
-                if (error) throw error;
+                    if (error) throw error;
 
-                return {
-                    records: (data || []) as ArchiveRecord[],
-                    totalCount: count || 0
-                };
+                    return {
+                        records: (data || []) as ArchiveRecord[],
+                        totalCount: count || 0
+                    };
+                } catch (fallbackErr: any) {
+                    const isFallbackTimeout = fallbackErr.code === '57014' || (fallbackErr.message && fallbackErr.message.includes('timeout'));
+                    if (isFallbackTimeout) {
+                        console.warn("🚨 Fallback archive_records cũng bị timeout. Trả về rỗng an toàn.");
+                    } else {
+                        throw fallbackErr;
+                    }
+                }
             }
-            throw innerError;
+            
+            // Trả về rỗng thay vì làm crash giao diện
+            return { records: [], totalCount: 0 };
         }
     } catch (e) {
         logError('fetchWarehouseRecordsPaginated', e);

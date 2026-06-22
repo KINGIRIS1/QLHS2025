@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User } from '../../types';
+import { User, UserRole } from '../../types';
 import { ArchiveRecord, fetchWarehouseRecordsPaginated, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, initRealtimeArchive, importSingleWarehouseRecord } from '../../services/apiArchive';
-import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2, User as UserIcon, FileText } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -32,21 +32,52 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const searchTerm = ''; // Loại bỏ tìm kiếm nhanh, dùng hằng số rỗng để tương thích ngược
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-    // Bộ lọc tìm kiếm nâng cao (Advanced Search)
-    const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+    // Bộ lọc tìm kiếm nâng cao (Advanced Search) - Trạng thái thực tế dùng truy vấn API
     const [advMaBienNhan, setAdvMaBienNhan] = useState('');
     const [advLoaiHoSo, setAdvLoaiHoSo] = useState('');
     const [advChuSuDung, setAdvChuSuDung] = useState('');
     const [advCccd, setAdvCccd] = useState('');
-    const [advToThua, setAdvToThua] = useState('');
-    const [advKeTang, setAdvKeTang] = useState('');
-    const [advHopSo, setAdvHopSo] = useState('');
+    const [advToBando, setAdvToBando] = useState('');
+    const [advSoThua, setAdvSoThua] = useState('');
     const [advSoPhatHanh, setAdvSoPhatHanh] = useState('');
-    const [advNguoiNhap, setAdvNguoiNhap] = useState('');
+    const [advSoVaoSo, setAdvSoVaoSo] = useState('');
+    const [advXaPhuong, setAdvXaPhuong] = useState('');
+
+    // Trạng thái tạm thời (Temporary States) để lưu trữ khi gõ phím
+    const [tempAdvMaBienNhan, setTempAdvMaBienNhan] = useState('');
+    const [tempAdvLoaiHoSo, setTempAdvLoaiHoSo] = useState('');
+    const [tempAdvChuSuDung, setTempAdvChuSuDung] = useState('');
+    const [tempAdvCccd, setTempAdvCccd] = useState('');
+    const [tempAdvToBando, setTempAdvToBando] = useState('');
+    const [tempAdvSoThua, setTempAdvSoThua] = useState('');
+    const [tempAdvSoPhatHanh, setTempAdvSoPhatHanh] = useState('');
+    const [tempAdvSoVaoSo, setTempAdvSoVaoSo] = useState('');
+    const [tempAdvXaPhuong, setTempAdvXaPhuong] = useState('');
+
+    // Hàm thực thi tìm kiếm nâng cao (Copy giá trị từ temp sang chính thức để gọi API)
+    const handleExecuteAdvancedSearch = () => {
+        setAdvMaBienNhan(tempAdvMaBienNhan);
+        setAdvLoaiHoSo(tempAdvLoaiHoSo);
+        setAdvChuSuDung(tempAdvChuSuDung);
+        setAdvCccd(tempAdvCccd);
+        setAdvToBando(tempAdvToBando);
+        setAdvSoThua(tempAdvSoThua);
+        setAdvSoPhatHanh(tempAdvSoPhatHanh);
+        setAdvSoVaoSo(tempAdvSoVaoSo);
+        setAdvXaPhuong(tempAdvXaPhuong);
+        setCurrentPage(1);
+    };
+
+    // Hàm lắng nghe phím Enter trên các trường tìm kiếm nâng cao
+    const handleKeyDownAdvanced = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleExecuteAdvancedSearch();
+        }
+    };
 
     // State chi tiết & Chỉnh sửa hồ sơ
     const [selectedRecord, setSelectedRecord] = useState<ArchiveRecord | null>(null);
@@ -69,14 +100,14 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Dynamic load với cơ chế debounce 300ms tránh spam API
+    // Dynamic load với cơ chế debounce 500ms tránh spam API (chỉ lắng nghe các biến chính thức)
     useEffect(() => {
         const timer = setTimeout(() => {
             loadData(currentPage);
-        }, 300);
+        }, 500);
 
         return () => clearTimeout(timer);
-    }, [currentPage, searchTerm, advMaBienNhan, advLoaiHoSo, advChuSuDung, advCccd, advToThua, advKeTang, advHopSo, advSoPhatHanh, advNguoiNhap]);
+    }, [currentPage, searchTerm, advMaBienNhan, advLoaiHoSo, advChuSuDung, advCccd, advToBando, advSoThua, advSoPhatHanh, advSoVaoSo, advXaPhuong]);
 
     useEffect(() => {
         initRealtimeArchive();
@@ -100,11 +131,11 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                 advLoaiHoSo,
                 advChuSuDung,
                 advCccd,
-                advToThua,
-                advKeTang,
-                advHopSo,
+                advToBando,
+                advSoThua,
                 advSoPhatHanh,
-                advNguoiNhap
+                advSoVaoSo,
+                advXaPhuong
             });
             setRecords(data.records);
             setTotalRecords(data.totalCount);
@@ -117,16 +148,26 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
     // Hàm xử lý khi Reset bộ lọc
     const handleResetFilters = () => {
-        setSearchTerm('');
         setAdvMaBienNhan('');
         setAdvLoaiHoSo('');
         setAdvChuSuDung('');
         setAdvCccd('');
-        setAdvToThua('');
-        setAdvKeTang('');
-        setAdvHopSo('');
+        setAdvToBando('');
+        setAdvSoThua('');
         setAdvSoPhatHanh('');
-        setAdvNguoiNhap('');
+        setAdvSoVaoSo('');
+        setAdvXaPhuong('');
+
+        setTempAdvMaBienNhan('');
+        setTempAdvLoaiHoSo('');
+        setTempAdvChuSuDung('');
+        setTempAdvCccd('');
+        setTempAdvToBando('');
+        setTempAdvSoThua('');
+        setTempAdvSoPhatHanh('');
+        setTempAdvSoVaoSo('');
+        setTempAdvXaPhuong('');
+        
         setCurrentPage(1);
     };
 
@@ -134,7 +175,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, advMaBienNhan, advLoaiHoSo, advChuSuDung, advCccd, advToThua, advKeTang, advHopSo, advSoPhatHanh, advNguoiNhap]);
+    }, [searchTerm, advMaBienNhan, advLoaiHoSo, advChuSuDung, advCccd, advToBando, advSoThua, advSoPhatHanh, advSoVaoSo, advXaPhuong]);
 
     // Xóa hồ sơ
     const handleDelete = async (id: string, code: string) => {
@@ -559,143 +600,174 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                 </div>
             </div>
 
-            {/* BỘ LỌC TÌM KIẾM */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4 shrink-0 transition-all">
-                <div className="flex flex-col md:flex-row gap-3">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Nhập Chủ sử dụng, CMND, Số GCN để tìm nhanh hồ sơ..."
-                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium transition-all"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        {searchTerm && (
-                            <button 
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full"
-                            >
-                                <X size={12} />
-                            </button>
-                        )}
+            {/* BỘ LỌC TÌM KIẾM NÂNG CAO CỐ ĐỊNH */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4 shrink-0 transition-all space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* 1. Nhóm Chủ Sử Dụng */}
+                    <div className="p-4 bg-slate-50/40 rounded-xl border border-slate-150/70 space-y-3">
+                        <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                            <div className="p-1 bg-indigo-50 rounded-lg text-indigo-600">
+                                <UserIcon size={14} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Chủ sử dụng</span>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Chủ sử dụng</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="Họ tên chủ sử dụng..."
+                                    value={tempAdvChuSuDung}
+                                    onChange={(e) => setTempAdvChuSuDung(e.target.value)}
+                                    onKeyDown={handleKeyDownAdvanced}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">CCCD / CMND</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="Mã số CCCD..."
+                                    value={tempAdvCccd}
+                                    onChange={(e) => setTempAdvCccd(e.target.value)}
+                                    onKeyDown={handleKeyDownAdvanced}
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                            className={`px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 ${
-                                showAdvancedSearch 
-                                ? 'bg-indigo-650 border-indigo-650 text-white shadow-md shadow-indigo-650/10' 
-                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                            }`}
-                        >
-                            <SlidersHorizontal size={14} /> Tìm kiếm nâng cao
-                        </button>
+                    {/* 2. Nhóm Thửa Đất */}
+                    <div className="p-4 bg-slate-50/40 rounded-xl border border-slate-150/70 space-y-3">
+                        <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                            <div className="p-1 bg-emerald-50 rounded-lg text-emerald-600">
+                                <Layers size={14} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Thửa đất</span>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tờ bản đồ</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        placeholder="Số tờ..."
+                                        value={tempAdvToBando}
+                                        onChange={(e) => setTempAdvToBando(e.target.value)}
+                                        onKeyDown={handleKeyDownAdvanced}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Số thửa</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        placeholder="Số thửa..."
+                                        value={tempAdvSoThua}
+                                        onChange={(e) => setTempAdvSoThua(e.target.value)}
+                                        onKeyDown={handleKeyDownAdvanced}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Xã phường</label>
+                                <select
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    value={tempAdvXaPhuong}
+                                    onChange={(e) => setTempAdvXaPhuong(e.target.value)}
+                                >
+                                    <option value="">Tất cả Xã/Phường</option>
+                                    {Object.entries(WARD_MAPPING).map(([code, name]) => (
+                                        <option key={code} value={code}>{name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
 
-                        {(searchTerm || advMaBienNhan || advLoaiHoSo || advChuSuDung || advCccd || advToThua || advKeTang || advHopSo || advSoPhatHanh || advNguoiNhap) && (
+                    {/* 3. Nhóm Giấy Chứng Nhận */}
+                    <div className="p-4 bg-slate-50/40 rounded-xl border border-slate-150/70 space-y-3">
+                        <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                            <div className="p-1 bg-blue-50 rounded-lg text-blue-600">
+                                <BookOpen size={14} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Giấy chứng nhận</span>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Số vào sổ</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        placeholder="Số vào sổ..."
+                                        value={tempAdvSoVaoSo}
+                                        onChange={(e) => setTempAdvSoVaoSo(e.target.value)}
+                                        onKeyDown={handleKeyDownAdvanced}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Số phát hành GCN</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        placeholder="Số phát hành..."
+                                        value={tempAdvSoPhatHanh}
+                                        onChange={(e) => setTempAdvSoPhatHanh(e.target.value)}
+                                        onKeyDown={handleKeyDownAdvanced}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loại hồ sơ</label>
+                                <select
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    value={tempAdvLoaiHoSo}
+                                    onChange={(e) => setTempAdvLoaiHoSo(e.target.value)}
+                                >
+                                    <option value="">Tất cả loại hồ sơ</option>
+                                    <option value="Chuyển nhượng QSDĐ">Chuyển nhượng QSDĐ</option>
+                                    <option value="Tặng cho QSDĐ">Tặng cho QSDĐ</option>
+                                    <option value="Thừa kế QSDĐ">Thừa kế QSDĐ</option>
+                                    <option value="Tách thửa đất">Tách thửa đất</option>
+                                    <option value="Phân chia QSDĐ">Phân chia QSDĐ</option>
+                                    <option value="Cấp đổi Giấy chứng nhận QSDĐ">Cấp đổi Giấy chứng nhận QSDĐ</option>
+                                    <option value="Hợp thửa đất">Hợp thửa đất</option>
+                                    <option value="Tách, hợp thửa đất">Tách, hợp thửa đất</option>
+                                    <option value="Nhập tài sản vợ chồng">Nhập tài sản vợ chồng</option>
+                                    <option value="Phân chia QSDĐ theo toà án">Phân chia QSDĐ theo toà án</option>
+                                    <option value="Cấp lại GCN QSDĐ">Cấp lại GCN QSDĐ</option>
+                                    <option value="Giao đất">Giao đất</option>
+                                    <option value="Đính chính GCNQSD đất">Đính chính GCNQSD đất</option>
+                                    <option value="Chuyển nhượng 1/2 QSDĐ( m²)">Chuyển nhượng 1/2 QSDĐ( m²)</option>
+                                    <option value="Chuyển mục đích sử dụng đất">Chuyển mục đích sử dụng đất</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-3 border-t border-slate-100">
+                    <div className="text-xs text-slate-500 font-semibold">
+                        Kết quả lọc: <strong className="text-indigo-600">{totalRecords}</strong> hồ sơ tìm thấy
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={handleExecuteAdvancedSearch}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 active:scale-95"
+                        >
+                            <Search size={14} /> Tìm kiếm ngay
+                        </button>
+                        {(advLoaiHoSo || advChuSuDung || advCccd || advToBando || advSoThua || advSoPhatHanh || advSoVaoSo || advXaPhuong) && (
                             <button
                                 onClick={handleResetFilters}
-                                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-all active:scale-95"
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl text-xs font-bold transition-all active:scale-95"
                             >
                                 Xóa bộ lọc
                             </button>
                         )}
                     </div>
                 </div>
-
-                {/* KHU VỰC TÌM KIẾM NÂNG CAO */}
-                {showAdvancedSearch && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-100 animate-slide-down">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loại hồ sơ</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Loại hồ sơ..."
-                                value={advLoaiHoSo}
-                                onChange={(e) => setAdvLoaiHoSo(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Chủ sử dụng</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Họ tên 1, 2..."
-                                value={advChuSuDung}
-                                onChange={(e) => setAdvChuSuDung(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">CCCD/CMND</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Mã số CCCD..."
-                                value={advCccd}
-                                onChange={(e) => setAdvCccd(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tờ bản đồ / Số thửa</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Tờ, thửa..."
-                                value={advToThua}
-                                onChange={(e) => setAdvToThua(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kệ / Tầng</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Vị trí kệ tầng..."
-                                value={advKeTang}
-                                onChange={(e) => setAdvKeTang(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hộp số / Số tệp</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Hộp số, tệp..."
-                                value={advHopSo}
-                                onChange={(e) => setAdvHopSo(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Số Phát hành GCN</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Số mới phát hành..."
-                                value={advSoPhatHanh}
-                                onChange={(e) => setAdvSoPhatHanh(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Người nhập liệu</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550"
-                                placeholder="Tên cán bộ nhập..."
-                                value={advNguoiNhap}
-                                onChange={(e) => setAdvNguoiNhap(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* DANH SÁCH HỒ SƠ KHO */}
@@ -704,19 +776,20 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                     <table className="w-full border-collapse text-left">
                         <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10 text-xs font-bold text-slate-600 uppercase tracking-wider">
                             <tr>
-                                <th className="p-3.5 w-12 text-center">STT</th>
-                                <th className="p-3.5 min-w-[200px]">Thông tin chủ sử dụng</th>
-                                <th className="p-3.5 w-[150px]">Tờ / Thửa / Diện tích / Xã</th>
-                                <th className="p-3.5 w-[160px]">Loại hồ sơ</th>
-                                <th className="p-3.5 w-[180px]">Vị trí lưu kho</th>
-                                <th className="p-3.5 w-[140px]">Người nhập</th>
+                                <th className="p-3.5 w-14 text-center">STT</th>
+                                <th className="p-3.5 w-[280px]">Thông tin chủ sử dụng</th>
+                                <th className="p-3.5 w-[190px]">Tờ / Thửa / Diện tích / Xã</th>
+                                <th className="p-3.5 w-[180px]">Thông tin GCN</th>
+                                <th className="p-3.5 w-[210px]">Loại hồ sơ</th>
+                                <th className="p-3.5 w-[200px]">Vị trí lưu kho</th>
+                                <th className="p-3.5 w-[130px]">Người nhập</th>
                                 <th className="p-3.5 w-28 text-center">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-705">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={7} className="p-12 text-center">
+                                    <td colSpan={8} className="p-12 text-center">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Loader2 size={32} className="animate-spin text-indigo-600" />
                                             <span className="text-sm text-slate-500 font-bold">Đang tải danh sách kho hồ sơ...</span>
@@ -725,7 +798,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                 </tr>
                             ) : records.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={8} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy hồ sơ nào đáp ứng điều kiện tìm kiếm.
                                     </td>
                                 </tr>
@@ -756,16 +829,24 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                             </td>
 
                                             <td className="p-3.5">
-                                                <div className="truncate max-w-[160px] text-slate-600 text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200 font-semibold w-fit" title={d.loaihoso || ''}>
+                                                <div className="text-xs space-y-0.5">
+                                                    <div>Số phát hành: <strong className="text-slate-800">{d.sophathanhgcnmoi || '-'}</strong></div>
+                                                    <div>Số vào sổ: <strong className="text-slate-700">{d.sovaosomoi || '-'}</strong></div>
+                                                    {d.ngaycapgcnmoi && <div>Ngày cấp: <span className="text-indigo-600 font-semibold">{d.ngaycapgcnmoi}</span></div>}
+                                                </div>
+                                            </td>
+
+                                            <td className="p-3.5">
+                                                <div className="truncate max-w-[140px] text-slate-600 text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200 font-semibold w-fit" title={d.loaihoso || ''}>
                                                     {d.loaihoso || 'Chưa phân loại'}
                                                 </div>
                                             </td>
 
                                             <td className="p-3.5">
                                                 <div className="text-xs space-y-0.5">
-                                                    <div>Kệ: <strong className="text-slate-800">{d.soke_tang || '-'}</strong></div>
-                                                    <div>Hộp: <strong className="text-slate-800">{d.so_o || d.So_tep || '-'}</strong> {d.sott_tep && <>- STT: <strong className="text-slate-800">{d.sott_tep}</strong></>}</div>
-                                                </div>
+                                                     <div>Kệ: <strong className="text-slate-800">{d.soke_tang || '-'}</strong> - Tầng: <strong className="text-slate-800">{d.so_o || '-'}</strong></div>
+                                                     <div>Hộp: <strong className="text-slate-800">{d.So_tep || d.so_tep || '-'}</strong> {d.sott_tep && <>- STT: <strong className="text-slate-800">{d.sott_tep}</strong></>}</div>
+                                                 </div>
                                             </td>
 
                                             <td className="p-3.5">
@@ -785,21 +866,25 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                                     >
                                                         <Eye size={14} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => openEditModal(r)}
-                                                        className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
-                                                        title="Sửa hồ sơ"
-                                                    >
-                                                        <Edit size={14} />
-                                                    </button>
-                                                    <button
-                                                        disabled={isSubmitting}
-                                                        onClick={() => handleDelete(r.id, r.so_hieu)}
-                                                        className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all"
-                                                        title="Xóa hồ sơ"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                                    {currentUser.role === UserRole.ADMIN && (
+                                                        <button
+                                                            onClick={() => openEditModal(r)}
+                                                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                                                            title="Sửa hồ sơ"
+                                                        >
+                                                            <Edit size={14} />
+                                                        </button>
+                                                    )}
+                                                    {currentUser.role === UserRole.ADMIN && (
+                                                        <button
+                                                            disabled={isSubmitting}
+                                                            onClick={() => handleDelete(r.id, r.so_hieu)}
+                                                            className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all"
+                                                            title="Xóa hồ sơ"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -900,27 +985,75 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                         {/* Content */}
                         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
-                            {/* Khối Thông tin chung */}
-                            <div className="space-y-3.5">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                    <SlidersHorizontal size={12} /> Thông tin hồ sơ cơ bản
+                            {/* 1. Khối Thửa đất */}
+                            <div className="space-y-3.5 bg-slate-50/30 p-4 rounded-2xl border border-slate-100">
+                                <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
+                                    <Layers size={14} /> Thông tin thửa đất
                                 </h4>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div>
-                                        <div className="text-[11px] text-slate-400">Số GCN phát hành:</div>
-                                        <div className="font-bold text-slate-800 text-indigo-750">{selectedRecord.data?.sophathanhgcnmoi || 'Chưa cập nhật'}</div>
+                                        <div className="text-[11px] text-slate-400">Tờ bản đồ:</div>
+                                        <div className="font-bold text-slate-800">{selectedRecord.data?.tobando || '-'}</div>
                                     </div>
                                     <div>
-                                        <div className="text-[11px] text-slate-400">Loại hồ sơ:</div>
-                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.loaihoso || 'Chưa cập nhật'}</div>
+                                        <div className="text-[11px] text-slate-400">Số thửa:</div>
+                                        <div className="font-bold text-slate-800">{selectedRecord.data?.sothua || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Diện tích:</div>
+                                        <div className="font-bold text-indigo-650">{selectedRecord.data?.dientich || '-'} m²</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Hình thức sử dụng:</div>
+                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.hinhthucsd || '-'}</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Xã / Phường:</div>
+                                        <div className="font-bold text-indigo-700">{getWardName(selectedRecord.data?.maxa)}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Địa chỉ thửa đất:</div>
+                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.diachiap || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Loại đất ở / Diện tích:</div>
+                                        <div className="font-semibold text-slate-800">
+                                            {selectedRecord.data?.loaidato || '-'} {selectedRecord.data?.dientichdato ? `/ ${selectedRecord.data.dientichdato} m²` : ''}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Khối Chủ sử dụng */}
+                            {/* 2. Khối Giấy chứng nhận */}
+                            <div className="space-y-3.5 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                <h4 className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-teal-100 pb-1.5">
+                                    <BookOpen size={14} /> Thông tin Giấy chứng nhận
+                                </h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Số phát hành:</div>
+                                        <div className="font-bold text-indigo-700 text-sm">{selectedRecord.data?.sophathanhgcnmoi || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Số vào sổ:</div>
+                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.sovaosomoi || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-400">Ngày cấp GCN:</div>
+                                        <div className="font-semibold text-slate-800">
+                                            {selectedRecord.data?.ngaycapgcnmoi || '-'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Khối Chủ sử dụng */}
                             <div className="space-y-3.5 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    Thông tin chủ sử dụng đất
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                                    <UserIcon size={14} /> Thông tin chủ sử dụng đất
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-150">
                                     {/* Chủ sử dụng 1 */}
@@ -979,75 +1112,20 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                 </div>
                             </div>
 
-                            {/* Khối Thửa đất */}
-                            <div className="space-y-3.5">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                    <Layers size={12} /> Thông tin thửa đất
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Tờ bản đồ:</div>
-                                        <div className="font-bold text-slate-800">{selectedRecord.data?.tobando || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Số thửa:</div>
-                                        <div className="font-bold text-slate-800">{selectedRecord.data?.sothua || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Diện tích:</div>
-                                        <div className="font-bold text-indigo-650">{selectedRecord.data?.dientich || '-'} m²</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Hình thức sử dụng:</div>
-                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.hinhthucsd || '-'}</div>
-                                    </div>
+                            {/* 4. Loại hồ sơ */}
+                            <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                                    <FileText size={14} /> Loại hồ sơ lưu kho
                                 </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Xã / Phường:</div>
-                                        <div className="font-bold text-indigo-700">{getWardName(selectedRecord.data?.maxa)}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Địa chỉ thửa đất:</div>
-                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.diachiap || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Loại đất ở (ODT/ONT) / Diện tích:</div>
-                                        <div className="font-semibold text-slate-800">
-                                            {selectedRecord.data?.loaidato || '-'} {selectedRecord.data?.dientichdato ? `/ ${selectedRecord.data.dientichdato} m²` : ''}
-                                        </div>
-                                    </div>
+                                <div className="font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-fit text-xs">
+                                    {selectedRecord.data?.loaihoso || 'Chưa phân loại'}
                                 </div>
                             </div>
 
-                            {/* Khối Giấy chứng nhận mới */}
-                            <div className="space-y-3.5">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                    <Layers size={12} /> Giấy chứng nhận mới phát hành
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Số phát hành:</div>
-                                        <div className="font-semibold text-slate-850 text-indigo-700">{selectedRecord.data?.sophathanhgcnmoi || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Số vào sổ:</div>
-                                        <div className="font-semibold text-slate-850">{selectedRecord.data?.sovaosomoi || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Ngày cấp GCN:</div>
-                                        <div className="font-semibold text-slate-850">
-                                            {selectedRecord.data?.ngaycapgcnmoi || '-'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Khối Vị trí lưu kho */}
+                            {/* 5. Vị trí lưu trữ */}
                             <div className="space-y-3.5 bg-indigo-50/40 p-4 rounded-2xl border border-indigo-100/50">
-                                <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
-                                    <Archive size={12} /> Thông tin vị trí lưu trữ trong kho
+                                <h4 className="text-xs font-bold text-indigo-750 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
+                                    <Archive size={14} /> Vị trí lưu trữ trong kho
                                 </h4>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div>
@@ -1069,13 +1147,13 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                 </div>
                             </div>
 
-                            {/* Khối Metadata */}
-                            <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 pt-2 border-t border-slate-100">
+                            {/* 6. Cán bộ nhập, ngày nhập */}
+                            <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 pt-3 border-t border-slate-150">
                                 <div>
-                                    Cán bộ nhập: <strong className="text-slate-650 font-bold">{selectedRecord.data?.nguoinhap || '-'}</strong>
+                                    Cán bộ nhập: <strong className="text-slate-600 font-bold">{selectedRecord.data?.nguoinhap || '-'}</strong>
                                 </div>
                                 <div className="text-right">
-                                    Ngày nhập: <strong className="text-slate-650 font-semibold">{selectedRecord.data?.ngaynhap || '-'}</strong>
+                                    Ngày nhập: <strong className="text-slate-600 font-semibold">{selectedRecord.data?.ngaynhap || '-'}</strong>
                                 </div>
                             </div>
 
@@ -1088,12 +1166,14 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
-                            <button
-                                onClick={() => openEditModal(selectedRecord)}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shadow-sm"
-                            >
-                                <Edit size={14} /> Chỉnh sửa hồ sơ
-                            </button>
+                            {currentUser.role === UserRole.ADMIN && (
+                                <button
+                                    onClick={() => openEditModal(selectedRecord)}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shadow-sm"
+                                >
+                                    <Edit size={14} /> Chỉnh sửa hồ sơ
+                                </button>
+                            )}
                             <button
                                 onClick={() => setIsDetailOpen(false)}
                                 className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95"

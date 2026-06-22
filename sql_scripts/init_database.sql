@@ -150,7 +150,7 @@ CREATE TABLE system_settings (
 -- 4. BẢNG LỊCH CÔNG TÁC (Tab Lịch công tác)
 -- ==========================================
 
-CREATE TABLE work_schedules (
+CREATE TABLE IF NOT EXISTS work_schedules (
     id VARCHAR(50) PRIMARY KEY,
     date DATE NOT NULL,
     executors TEXT NOT NULL, -- Lưu chuỗi tên người thực hiện
@@ -159,6 +159,31 @@ CREATE TABLE work_schedules (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50) NOT NULL
 );
+
+-- ==========================================
+-- 4b. BẢNG ĐĂNG KÝ MÁY ĐO (Tab Đăng ký máy đo)
+-- ==========================================
+
+CREATE TABLE IF NOT EXISTS device_schedules (
+    id VARCHAR(50) PRIMARY KEY,
+    date DATE NOT NULL,
+    session VARCHAR(20) NOT NULL, -- Sáng hoặc Chiều
+    executors TEXT NOT NULL,       -- Nhân viên sử dụng máy
+    note TEXT,                    -- Ghi chú công tác / Loại máy
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(50) NOT NULL
+);
+
+-- Kích hoạt RLS cho bảng device_schedules
+ALTER TABLE IF EXISTS public.device_schedules ENABLE ROW LEVEL SECURITY;
+
+-- Tạo chính sách cho phép tất cả các thao tác trên bảng device_schedules
+DROP POLICY IF EXISTS "Cho phép tất cả thao tác trên device_schedules" ON public.device_schedules;
+CREATE POLICY "Cho phép tất cả thao tác trên device_schedules" 
+ON public.device_schedules 
+FOR ALL 
+USING (true) 
+WITH CHECK (true);
 
 -- ==========================================
 -- 5. BẢNG TIN NHẮN & NHÓM CHAT (Tab Trao đổi)

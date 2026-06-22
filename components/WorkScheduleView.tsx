@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, WorkSchedule } from '../types';
+import { User, WorkSchedule, DeviceSchedule } from '../types';
 import { fetchWorkSchedules, saveWorkSchedule, deleteWorkSchedule } from '../services/apiWorkSchedule';
+import { fetchDeviceSchedules } from '../services/apiDeviceSchedule';
 import ScheduleForm from './work-schedule/ScheduleForm';
 import ScheduleList from './work-schedule/ScheduleList';
 import ScheduleSummary from './work-schedule/ScheduleSummary';
@@ -14,16 +15,23 @@ interface WorkScheduleViewProps {
 const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
     const [activeTab, setActiveTab] = useState<'work_schedule' | 'device_schedule'>('work_schedule');
     const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
+    const [deviceSchedules, setDeviceSchedules] = useState<DeviceSchedule[]>([]);
     const [editingSchedule, setEditingSchedule] = useState<WorkSchedule | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
 
     useEffect(() => {
         loadData();
+        loadDeviceData();
     }, []);
 
     const loadData = async () => {
         const data = await fetchWorkSchedules();
         setSchedules(data);
+    };
+
+    const loadDeviceData = async () => {
+        const data = await fetchDeviceSchedules();
+        setDeviceSchedules(data);
     };
 
     const handleSave = async (data: Partial<WorkSchedule>) => {
@@ -125,8 +133,8 @@ const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
                     <div className="h-full overflow-hidden">
                         <DeviceScheduleTab 
                             currentUser={currentUser}
-                            schedules={schedules}
-                            onRefresh={loadData}
+                            deviceSchedules={deviceSchedules}
+                            onRefresh={loadDeviceData}
                         />
                     </div>
                 )}

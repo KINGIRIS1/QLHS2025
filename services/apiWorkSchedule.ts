@@ -53,7 +53,8 @@ export const saveWorkSchedule = async (schedule: Partial<WorkSchedule>): Promise
             // FIX: Tự động sinh ID trước khi insert để tránh lỗi null value
             const newSchedule = {
                 ...schedule,
-                id: Math.random().toString(36).substr(2, 9)
+                id: Math.random().toString(36).substr(2, 9),
+                created_at: new Date().toISOString()
             };
             const { error } = await supabase
                 .from('work_schedules')

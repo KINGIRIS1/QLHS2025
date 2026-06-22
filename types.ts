@@ -212,6 +212,17 @@ export interface WorkSchedule {
   created_by: string; // Người tạo
 }
 
+// Interface cho Đăng ký lịch máy đo
+export interface DeviceSchedule {
+  id: string;
+  date: string;       // Ngày sử dụng (YYYY-MM-DD)
+  session: 'Sáng' | 'Chiều'; // Buổi đăng ký
+  executors: string;  // Nhân viên sử dụng máy
+  note?: string | null;      // Ghi chú công tác / Loại máy sử dụng
+  created_at?: string;
+  created_by: string; // Người đăng ký (username)
+}
+
 // Interface Notification (Chuyển từ UtilitiesView sang đây để tránh Circular Dependency)
 export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;

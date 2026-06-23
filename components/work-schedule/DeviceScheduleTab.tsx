@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User, DeviceSchedule } from '../../types';
-import { ChevronLeft, ChevronRight, Calendar, Plus, Trash2, ShieldAlert, Cpu } from 'lucide-react';
-import { saveDeviceSchedule, deleteDeviceSchedule } from '../../services/apiDeviceSchedule';
+import { ChevronLeft, ChevronRight, Calendar, Plus, Trash2, ShieldAlert, Cpu, X } from 'lucide-react';
+import { saveDeviceSchedule, deleteDeviceSchedule, fetchDeviceNames } from '../../services/apiDeviceSchedule';
 import { confirmAction } from '../../utils/appHelpers';
 
 interface DeviceScheduleTabProps {
@@ -32,6 +32,29 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
     const [selectedSession, setSelectedSession] = useState<'Sáng' | 'Chiều'>('Sáng');
     const [registerNote, setRegisterNote] = useState('');
     const [registerExecutor, setRegisterExecutor] = useState(currentUser.name);
+    
+    // Tùy chọn thiết bị đo
+    const [deviceOptions, setDeviceOptions] = useState<string[]>([]);
+    const [selectedDevice, setSelectedDevice] = useState<string>('');
+
+    // Load danh sách thiết bị đo mỗi khi màn hình đăng ký mở ra
+    useEffect(() => {
+        const loadDevices = async () => {
+            if (!isRegisterOpen) return;
+            try {
+                const data = await fetchDeviceNames();
+                setDeviceOptions(data);
+                if (data.length > 0) {
+                    setSelectedDevice(data[0]);
+                } else {
+                    setSelectedDevice('');
+                }
+            } catch (e) {
+                console.error("Error fetching device names for selector", e);
+            }
+        };
+        loadDevices();
+    }, [isRegisterOpen]);
 
     // Xem chi tiết lịch đã đăng ký (thay cho popup)
     const [selectedDetailReg, setSelectedDetailReg] = useState<DeviceSchedule | null>(null);
@@ -71,13 +94,17 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
         setSelectedDetailReg(null);
     };
 
-    // Format hiển thị ngày
+    // Format hiển thị ngày bảo toàn múi giờ địa phương
     const formatDate = (date: Date) => {
         const days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+        const yyyy = date.getFullYear();
+        const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+        const dd = date.getDate().toString().padStart(2, '0');
+        const fullDateIso = `${yyyy}-${mm}-${dd}`;
         return {
             dayName: days[date.getDay()],
-            dateStr: `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`,
-            fullDateIso: date.toISOString().split('T')[0]
+            dateStr: `${dd}/${mm}`,
+            fullDateIso
         };
     };
 
@@ -138,6 +165,7 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
             date: selectedDateStr,
             session: selectedSession,
             executors: registerExecutor.trim(),
+            device_name: selectedDevice || null,
             note: registerNote.trim() || null,
             created_by: currentUser.username
         };
@@ -232,7 +260,9 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
                     {daysOfWeek.map((day, idx) => {
                         const { dayName, dateStr, fullDateIso } = formatDate(day);
                         const isSunday = day.getDay() === 0;
-                        const isToday = new Date().toISOString().split('T')[0] === fullDateIso;
+                        const today = new Date();
+                        const todayIso = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+                        const isToday = todayIso === fullDateIso;
 
                         // Tìm lịch Sáng & Chiều
                         const morningReg = findRegistration(fullDateIso, 'Sáng');
@@ -271,6 +301,11 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
                                                 <div className="text-xs font-bold text-emerald-950 leading-tight break-words" title={morningReg.executors}>
                                                     {morningReg.executors}
                                                 </div>
+                                                {morningReg.device_name && (
+                                                    <div className="mt-1 text-[9px] font-bold text-emerald-800 bg-emerald-100/60 border border-emerald-250 rounded px-1 py-0.5 truncate flex items-center gap-1" title={morningReg.device_name}>
+                                                        <Cpu size={8} /> {morningReg.device_name}
+                                                    </div>
+                                                )}
                                                 
                                                 {/* Nút hủy lịch nhanh cho chính chủ hoặc admin */}
                                                 {(currentUser.role === 'ADMIN' || morningReg.created_by === currentUser.username) && (
@@ -315,6 +350,11 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
                                                 <div className="text-xs font-bold text-emerald-950 leading-tight break-words" title={afternoonReg.executors}>
                                                     {afternoonReg.executors}
                                                 </div>
+                                                {afternoonReg.device_name && (
+                                                    <div className="mt-1 text-[9px] font-bold text-emerald-800 bg-emerald-100/60 border border-emerald-250 rounded px-1 py-0.5 truncate flex items-center gap-1" title={afternoonReg.device_name}>
+                                                        <Cpu size={8} /> {afternoonReg.device_name}
+                                                    </div>
+                                                )}
 
                                                 {/* Nút hủy lịch nhanh cho chính chủ hoặc admin */}
                                                 {(currentUser.role === 'ADMIN' || afternoonReg.created_by === currentUser.username) && (
@@ -385,10 +425,20 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
                                 </div>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nội dung công tác & Thiết bị sử dụng</span>
-                                <div className="text-xs font-medium text-slate-700 bg-white border border-slate-150 px-3.5 py-3 rounded-xl min-h-[50px] whitespace-pre-line shadow-sm leading-relaxed">
-                                    {selectedDetailReg.note || 'Sử dụng máy đo công trình.'}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                        <Cpu size={12} className="text-teal-600" /> Thiết bị đo sử dụng
+                                    </span>
+                                    <div className="text-xs font-bold text-teal-800 bg-teal-50/70 border border-teal-150 px-3.5 py-2.5 rounded-xl shadow-sm">
+                                        {selectedDetailReg.device_name || 'Chưa chọn thiết bị đo'}
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nội dung công tác / Ghi chú</span>
+                                    <div className="text-xs font-medium text-slate-700 bg-white border border-slate-150 px-3.5 py-2.5 rounded-xl shadow-sm whitespace-pre-line leading-relaxed min-h-[42px]">
+                                        {selectedDetailReg.note || 'Sử dụng máy đo công trình.'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -517,9 +567,32 @@ export const DeviceScheduleTab: React.FC<DeviceScheduleTabProps> = ({ currentUse
                             </div>
 
                             <div className="space-y-1.5 text-left">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ghi chú công tác / Loại máy sử dụng</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                    <Cpu size={11} className="text-indigo-600" /> Thiết bị đo sử dụng <span className="text-red-500">*</span>
+                                </label>
+                                {deviceOptions.length > 0 ? (
+                                    <select 
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-550 bg-white"
+                                        value={selectedDevice}
+                                        onChange={e => setSelectedDevice(e.target.value)}
+                                        required
+                                    >
+                                        <option value="" disabled>-- Chọn thiết bị đo --</option>
+                                        {deviceOptions.map((opt, i) => (
+                                            <option key={i} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <div className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-250 px-3 py-2 rounded-lg flex items-center gap-1.5 leading-relaxed">
+                                        <ShieldAlert size={14} className="shrink-0" /> Chưa có thiết bị đo nào được lưu trong hệ thống. Vui lòng thêm thiết bị trong mục Admin (Cấu hình hệ thống).
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5 text-left">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ghi chú công tác / Nội dung chi tiết</label>
                                 <textarea 
-                                    rows={2.5}
+                                    rows={2}
                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-550 resize-none placeholder:text-slate-400"
                                     placeholder="Ví dụ: Đo đạc xã Minh Hưng, sử dụng máy Pentax RTK..."
                                     value={registerNote}

@@ -12,9 +12,31 @@ CREATE TABLE IF NOT EXISTS igate_records (
     so_dien_thoai TEXT,
     can_bo_xu_ly TEXT,
     trang_thai TEXT,
+    chuyen_quyen TEXT,
+    so_to TEXT,
+    so_thua TEXT,
+    tong_dien_tich NUMERIC,
+    dien_tich_dat_o NUMERIC,
+    dia_danh TEXT,
+    so_phat_hanh TEXT,
+    thoi_han_su_dung TEXT,
+    cccd TEXT,
+    ghi_chu TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     created_by TEXT
 );
+
+-- Tự động bổ sung các cột mới nếu bảng đã có sẵn từ trước
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS chuyen_quyen TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS so_to TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS so_thua TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS tong_dien_tich NUMERIC;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS dien_tich_dat_o NUMERIC;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS dia_danh TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS so_phat_hanh TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS thoi_han_su_dung TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS cccd TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS ghi_chu TEXT;
 
 -- 2. Bật bảo mật Row Level Security (RLS)
 ALTER TABLE igate_records ENABLE ROW LEVEL SECURITY;

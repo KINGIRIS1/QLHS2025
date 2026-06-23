@@ -20,17 +20,28 @@ import {
 
 interface IGateRecord {
     id: string;
-    soHieu: string;        // Số hồ sơ
-    tenThuTuc: string;      // Tên thủ tục hành chính
+    soHieu: string;        // Mã hồ sơ (thay Số hồ sơ)
+    tenThuTuc: string;      // Loại biến động (thay Tên thủ tục)
     tenLinhVuc: string;     // Tên lĩnh vực
-    ngayTiepNhan: string;   // Ngày tiếp nhận
-    ngayHenTra: string;     // Ngày hẹn trả
+    ngayTiepNhan: string;   // Ngày nhận hồ sơ (thay Ngày tiếp nhận)
+    ngayHenTra: string;     // Ngày trả kết quả (thay Ngày hẹn trả)
     ngayKetThuc: string;    // Ngày kết thúc xử lý
     donVi: string;          // Cơ quan/đơn vị
-    chuHoSo: string;        // Chủ hồ sơ
+    chuHoSo: string;        // CHỦ SỬ DỤNG (thay Chủ hồ sơ)
     soDienThoai: string;    // Số điện thoại
     canBoXuLy: string;      // Cán bộ xử lý hiện tại
     trangThai: string;      // Trạng thái hồ sơ
+    chuyenQuyen?: string;   // CHUYỂN QUYỀN
+    soTo?: string;          // Số tờ
+    soThua?: string;        // Số thửa
+    tongDienTich?: number | null; // Tổng diện tích
+    dienTichDatO?: number | null; // Diện tích Đất ở
+    dienTichDatNongNghiep?: number | null; // Diện tích đất nông nghiệp
+    diaDanh?: string;       // Địa danh
+    soPhatHanh?: string;    // Số phát hành
+    thoiHanSuDung?: string; // Thời hạn sử dụng
+    cccd?: string;          // CCCD
+    ghiChu?: string;        // GHI CHÚ
 }
 
 interface IGateViewProps {
@@ -39,106 +50,7 @@ interface IGateViewProps {
 }
 
 // Seed data mặc định để người dùng nhận diện ngay Dashboard khi mới khởi chạy
-const DEFAULT_IGATE_RECORDS: IGateRecord[] = [
-    {
-        id: "ig-1",
-        soHieu: "HSPT-2026-00342",
-        tenThuTuc: "Đăng ký biến động quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất do thay đổi thông tin về chủ sở hữu",
-        tenLinhVuc: "Đất đai",
-        ngayTiepNhan: "2026-05-15",
-        ngayHenTra: "2026-05-25",
-        ngayKetThuc: "",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Nguyễn Văn Hùng",
-        soDienThoai: "0912345678",
-        canBoXuLy: "Lê Thị Thu",
-        trangThai: "Mới tiếp nhận"
-    },
-    {
-        id: "ig-2",
-        soHieu: "HSPT-2026-00215",
-        tenThuTuc: "Chuyển nhượng quyền sử dụng đất và tài sản gắn liền với đất",
-        tenLinhVuc: "Đất đai",
-        ngayTiepNhan: "2026-04-10",
-        ngayHenTra: "2026-04-24",
-        ngayKetThuc: "",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Trần Thị Lan",
-        soDienThoai: "0987654321",
-        canBoXuLy: "Nguyễn Văn Nam",
-        trangThai: "Đã phát hành thông báo thuế"
-    },
-    {
-        id: "ig-3",
-        soHieu: "HSPT-2026-00104",
-        tenThuTuc: "Cấp đổi Giấy chứng nhận quyền sử dụng đất, quyền sở hữu nhà ở và tài sản khác gắn liền với đất",
-        tenLinhVuc: "Đất đai",
-        ngayTiepNhan: "2026-02-05", // Tồn trên 90 ngày cốc tích
-        ngayHenTra: "2026-02-20",
-        ngayKetThuc: "",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Phạm Minh Đức",
-        soDienThoai: "0905112233",
-        canBoXuLy: "Lê Tiến Anh",
-        trangThai: "Chờ thực hiện nghĩa vụ tài chính"
-    },
-    {
-        id: "ig-4",
-        soHieu: "HSPT-2026-00561",
-        tenThuTuc: "Tặng cho quyền sử dụng đất và tài sản gắn liền với đất",
-        tenLinhVuc: "Đất đai",
-        ngayTiepNhan: "2026-05-22",
-        ngayHenTra: "2026-06-05",
-        ngayKetThuc: "",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Hoàng Minh Tuấn",
-        soDienThoai: "0977889900",
-        canBoXuLy: "Võ Văn Kiệt",
-        trangThai: "Đã chuyển thông tin thuế"
-    },
-    {
-        id: "ig-5",
-        soHieu: "HSPT-2026-00412",
-        tenThuTuc: "Thế chấp quyền sử dụng đất hoặc tài sản gắn liền với đất",
-        tenLinhVuc: "Giao dịch bảo đảm",
-        ngayTiepNhan: "2026-05-18",
-        ngayHenTra: "2026-05-20",
-        ngayKetThuc: "2026-05-20",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Vũ Quỳnh Chi",
-        soDienThoai: "0345678901",
-        canBoXuLy: "Nguyễn Hoàng Minh",
-        trangThai: "Đã trả kết quả"
-    },
-    {
-        id: "ig-6",
-        soHieu: "HSPT-2026-00120",
-        tenThuTuc: "Cấp Giấy chứng nhận quyền sử dụng đất lần đầu",
-        tenLinhVuc: "Đất đai",
-        ngayTiepNhan: "2026-01-10", // Tồn trên 90 ngày
-        ngayHenTra: "2026-02-05",
-        ngayKetThuc: "",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Đoàn Văn Hậu",
-        soDienThoai: "0963221144",
-        canBoXuLy: "Trần Quốc Toản",
-        trangThai: "Đã ký Giấy chứng nhận"
-    },
-    {
-        id: "ig-7",
-        soHieu: "HSPT-2026-00620",
-        tenThuTuc: "Xóa đăng ký thế chấp quyền sử dụng đất",
-        tenLinhVuc: "Giao dịch bảo đảm",
-        ngayTiepNhan: "2026-06-01",
-        ngayHenTra: "2026-06-03",
-        ngayKetThuc: "",
-        donVi: "Chi nhánh Văn phòng Đăng ký Đất đai",
-        chuHoSo: "Bùi Tiến Dũng",
-        soDienThoai: "0981234789",
-        canBoXuLy: "Lê Thị Thu",
-        trangThai: "Chưa trả kết quả"
-    }
-];
+const DEFAULT_IGATE_RECORDS: IGateRecord[] = [];
 
 const DEFAULT_CAN_BO_LIST = [
     "Nguyễn Văn Nam",
@@ -318,7 +230,17 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         chuHoSo: '',
         soDienThoai: '',
         canBoXuLy: '',
-        trangThai: 'Mới tiếp nhận'
+        trangThai: 'Mới tiếp nhận',
+        chuyenQuyen: '',
+        soTo: '',
+        soThua: '',
+        tongDienTich: null,
+        dienTichDatO: null,
+        diaDanh: '',
+        soPhatHanh: '',
+        thoiHanSuDung: '',
+        cccd: '',
+        ghiChu: ''
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -334,12 +256,23 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     stt: parsed.stt !== undefined ? parsed.stt : true,
                     thongTinHoSo: parsed.thongTinHoSo !== undefined ? parsed.thongTinHoSo : true,
                     tenThuTuc: parsed.tenThuTuc !== undefined ? parsed.tenThuTuc : true,
-                    tenLinhVuc: parsed.tenLinhVuc !== undefined ? parsed.tenLinhVuc : true,
+                    tenLinhVuc: parsed.tenLinhVuc !== undefined ? parsed.tenLinhVuc : false,
                     thoiHanXuLy: parsed.thoiHanXuLy !== undefined ? parsed.thoiHanXuLy : true,
-                    ngayKetThuc: parsed.ngayKetThuc !== undefined ? parsed.ngayKetThuc : true,
-                    donVi: parsed.donVi !== undefined ? parsed.donVi : true,
+                    ngayKetThuc: parsed.ngayKetThuc !== undefined ? parsed.ngayKetThuc : false,
+                    donVi: parsed.donVi !== undefined ? parsed.donVi : false,
                     canBoXuLy: parsed.canBoXuLy !== undefined ? parsed.canBoXuLy : true,
                     trangThai: parsed.trangThai !== undefined ? parsed.trangThai : true,
+                    chuyenQuyen: parsed.chuyenQuyen !== undefined ? parsed.chuyenQuyen : true,
+                    soTo: parsed.soTo !== undefined ? parsed.soTo : true,
+                    soThua: parsed.soThua !== undefined ? parsed.soThua : true,
+                    tongDienTich: parsed.tongDienTich !== undefined ? parsed.tongDienTich : true,
+                    dienTichDatO: parsed.dienTichDatO !== undefined ? parsed.dienTichDatO : true,
+                    dienTichDatNongNghiep: parsed.dienTichDatNongNghiep !== undefined ? parsed.dienTichDatNongNghiep : true,
+                    diaDanh: parsed.diaDanh !== undefined ? parsed.diaDanh : true,
+                    soPhatHanh: parsed.soPhatHanh !== undefined ? parsed.soPhatHanh : true,
+                    thoiHanSuDung: parsed.thoiHanSuDung !== undefined ? parsed.thoiHanSuDung : true,
+                    cccd: parsed.cccd !== undefined ? parsed.cccd : true,
+                    ghiChu: parsed.ghiChu !== undefined ? parsed.ghiChu : true,
                 };
             }
         } catch (e) {
@@ -349,12 +282,23 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             stt: true,
             thongTinHoSo: true,
             tenThuTuc: true,
-            tenLinhVuc: true,
+            tenLinhVuc: false,
             thoiHanXuLy: true,
-            ngayKetThuc: true,
-            donVi: true,
+            ngayKetThuc: false,
+            donVi: false,
             canBoXuLy: true,
             trangThai: true,
+            chuyenQuyen: true,
+            soTo: true,
+            soThua: true,
+            tongDienTich: true,
+            dienTichDatO: true,
+            dienTichDatNongNghiep: true,
+            diaDanh: true,
+            soPhatHanh: true,
+            thoiHanSuDung: true,
+            cccd: true,
+            ghiChu: true,
         };
     });
 
@@ -369,14 +313,25 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
     const columnsList = [
         { key: 'stt', label: 'STT' },
-        { key: 'thongTinHoSo', label: 'Thông tin hồ sơ' },
-        { key: 'tenThuTuc', label: 'Tên thủ tục' },
+        { key: 'thongTinHoSo', label: 'Thông tin hồ sơ (Mã HS, Chủ sử dụng...)' },
+        { key: 'tenThuTuc', label: 'Loại biến động' },
+        { key: 'chuyenQuyen', label: 'CHUYỂN QUYỀN' },
+        { key: 'soTo', label: 'Số tờ' },
+        { key: 'soThua', label: 'Số thửa' },
+        { key: 'tongDienTich', label: 'Tổng diện tích' },
+        { key: 'dienTichDatO', label: 'Diện tích Đất ở' },
+        { key: 'dienTichDatNongNghiep', label: 'Diện tích Đất nông nghiệp' },
+        { key: 'diaDanh', label: 'Địa danh' },
+        { key: 'soPhatHanh', label: 'Số phát hành' },
+        { key: 'thoiHanSuDung', label: 'Thời hạn sử dụng' },
+        { key: 'cccd', label: 'CCCD' },
         { key: 'tenLinhVuc', label: 'Tên lĩnh vực' },
-        { key: 'thoiHanXuLy', label: 'Thời hạn xử lý' },
+        { key: 'thoiHanXuLy', label: 'Thời hạn nhận & trả' },
         { key: 'ngayKetThuc', label: 'Ngày kết thúc' },
         { key: 'donVi', label: 'Cơ quan/đơn vị' },
         { key: 'canBoXuLy', label: 'Cán bộ xử lý' },
         { key: 'trangThai', label: 'Trạng thái' },
+        { key: 'ghiChu', label: 'GHI CHÚ' },
     ];
 
     const toggleColumn = (key: string) => {
@@ -1001,16 +956,28 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 };
 
                 const idxSoHieu = findColIndex(['số hồ sơ', 'mã hồ sơ', 'số biên nhận', 'so ksh', 'so hieu', 'shs']);
-                const idxTenThuTuc = findColIndex(['tên thủ tục', 'thuật tục', 'thủ tục hành chính', 'ten thu tuc', 'tên tthc']);
+                const idxTenThuTuc = findColIndex(['tên thủ tục', 'thuật tục', 'thủ tục hành chính', 'ten thu tuc', 'tên tthc', 'loại biến động', 'loai bien dong']);
                 const idxTenLinhVuc = findColIndex(['tên lĩnh vực', 'lĩnh vực', 'linh vuc']);
                 const idxNgayTiepNhan = findColIndex(['ngày tiếp nhận', 'tiếp nhận', 'ngay tiep nhan', 'ngày nhận', 'ngay nhan']);
                 const idxNgayHenTra = findColIndex(['ngày hẹn trả', 'hẹn trả', 'ngay hen tra', 'ngày trả', 'ngay tra']);
-                const idxNgayKetThuc = findColIndex(['kết thúc xử lý', 'ngày kết thúc', 'hoàn thành', 'ngay ket thuc']);
+                const idxNgayKetThuc = findColIndex(['kết thúc xử lý', 'ngày kết thúc', 'hoàn thành', 'ngay ket thuc', 'ngày trả kết quả', 'ngay tra ket qua']);
                 const idxDonVi = findColIndex(['cơ quan', 'đơn vị', 'co quan', 'don vi']);
                 const idxChuHoSo = findColIndex(['chủ hồ sơ', 'chủ sử dụng', 'khách hàng', 'chu ho so', 'chu su dung', 'tên chủ']);
                 const idxSoDienThoai = findColIndex(['số điện thoại', 'sđt', 'điện thoại', 'so dien thoai', 'sdt']);
                 const idxCanBo = findColIndex(['cán bộ xử lý', 'cán bộ', 'can bo xu ly', 'can bo']);
                 const idxTrangThai = findColIndex(['trạng thái', 'trang thai', 'tình trạng']);
+                
+                // 10 Cột bổ sung
+                const idxChuyenQuyen = findColIndex(['chuyển quyền', 'chuyen quyen']);
+                const idxSoTo = findColIndex(['số tờ', 'so to', 'số tơ', 'sờ tờ']);
+                const idxSoThua = findColIndex(['số thửa', 'so thua', 'thửa']);
+                const idxTongDienTich = findColIndex(['tổng diện tích', 'tong dien tich', 'tổng dt', 'tong dt', 'dien tich', 'diện tích', 'tong dtich']);
+                const idxDienTichDatO = findColIndex(['đất ở', 'dat o', 'đất thổ cư', 'dat tho cu', 'thổ cư', 'tho cu', 'dt dat o']);
+                const idxDiaDanh = findColIndex(['địa danh', 'dia danh', 'vị trí', 'vi tri', 'địa chỉ thửa đất', 'dia chi', 'dia ban', 'địa bàn']);
+                const idxSoPhatHanh = findColIndex(['số phát hành', 'so phat hanh', 'phát hành', 'phat hanh']);
+                const idxThoiHanSuDung = findColIndex(['thời hạn sử dụng', 'thoi han su dung', 'thời hạn', 'thoi han']);
+                const idxCCCD = findColIndex(['cccd', 'số cccd', 'cmnd', 'số cmnd', 'chứng minh']);
+                const idxGhiChu = findColIndex(['ghi chú', 'ghi chu', 'nhận xét', 'ghi chu', 'notes']);
 
                 const newRecords: IGateRecord[] = [];
                 
@@ -1076,6 +1043,32 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         else if (lowerTT.includes('đã trả') || lowerTT.includes('hoàn thành')) normalizedTrangThai = 'Đã trả kết quả';
                     }
 
+                    // Đọc & chuyển đổi dạng diện tích số
+                    let tongDienTich = null;
+                    if (idxTongDienTich !== -1 && row[idxTongDienTich] !== undefined && row[idxTongDienTich] !== null) {
+                        const valNum = Number(String(row[idxTongDienTich]).replace(/[^0-9.]/g, ''));
+                        if (!isNaN(valNum)) tongDienTich = valNum;
+                    }
+
+                    let dienTichDatO = null;
+                    if (idxDienTichDatO !== -1 && row[idxDienTichDatO] !== undefined && row[idxDienTichDatO] !== null) {
+                        const valNum = Number(String(row[idxDienTichDatO]).replace(/[^0-9.]/g, ''));
+                        if (!isNaN(valNum)) dienTichDatO = valNum;
+                    }
+
+                    // Tự động tính diện tích đất nông nghiệp
+                    let dienTichDatNongNghiep = null;
+                    if (tongDienTich !== null) {
+                        const areaO = Number(dienTichDatO || 0);
+                        dienTichDatNongNghiep = tongDienTich > areaO ? (tongDienTich - areaO) : 0;
+                    }
+
+                    // Tự động gán thời hạn sử dụng theo yêu cầu đề bài
+                    let thoiHanSuDung = idxThoiHanSuDung !== -1 && row[idxThoiHanSuDung] ? String(row[idxThoiHanSuDung]).trim() : '';
+                    if (!thoiHanSuDung && dienTichDatO && dienTichDatO > 0) {
+                        thoiHanSuDung = '50 năm'; // default cho đất nông nghiệp khi có đất thổ cư
+                    }
+
                     newRecords.push({
                         id: 'ig-' + Math.random().toString(36).substr(2, 9),
                         soHieu: soHieu || `IGATE-${100000 + i}`,
@@ -1088,7 +1081,20 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         chuHoSo: chuHoSo || 'Chưa xác định',
                         soDienThoai: idxSoDienThoai !== -1 ? String(row[idxSoDienThoai] || '').trim() : '',
                         canBoXuLy: idxCanBo !== -1 && row[idxCanBo] ? String(row[idxCanBo]).trim() : (canBoList[0] || 'Chưa phân công'),
-                        trangThai: normalizedTrangThai
+                        trangThai: normalizedTrangThai,
+                        
+                        // Ánh xạ các trường mới
+                        chuyenQuyen: idxChuyenQuyen !== -1 && row[idxChuyenQuyen] ? String(row[idxChuyenQuyen]).trim() : '',
+                        soTo: idxSoTo !== -1 && row[idxSoTo] ? String(row[idxSoTo]).trim() : '',
+                        soThua: idxSoThua !== -1 && row[idxSoThua] ? String(row[idxSoThua]).trim() : '',
+                        tongDienTich: tongDienTich,
+                        dienTichDatO: dienTichDatO,
+                        dienTichDatNongNghiep: dienTichDatNongNghiep,
+                        diaDanh: idxDiaDanh !== -1 && row[idxDiaDanh] ? String(row[idxDiaDanh]).trim() : '',
+                        soPhatHanh: idxSoPhatHanh !== -1 && row[idxSoPhatHanh] ? String(row[idxSoPhatHanh]).trim() : '',
+                        thoiHanSuDung: thoiHanSuDung,
+                        cccd: idxCCCD !== -1 && row[idxCCCD] ? String(row[idxCCCD]).trim() : '',
+                        ghiChu: idxGhiChu !== -1 && row[idxGhiChu] ? String(row[idxGhiChu]).trim() : ''
                     });
                 }
 
@@ -1117,36 +1123,71 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
         const headerRow = [
             'STT',
-            'Số hồ sơ',
-            'Tên thủ tục hành chính',
+            'Mã hồ sơ',
+            'Loại biến động',
+            'CHUYỂN QUYỀN',
+            'Số tờ',
+            'Số thửa',
+            'Tổng diện tích (m²)',
+            'Đất ở (m²)',
+            'Đất nông nghiệp (m²)',
+            'Địa danh thửa đất',
+            'Số phát hành',
+            'Thời hạn sử dụng',
+            'CCCD',
             'Tên lĩnh vực',
             'Ngày tiếp nhận',
-            'Ngày hẹn trả',
-            'Ngày kết thúc xử lý',
+            'Ngày trả kết quả',
+            'Ngày hoàn thành thực tế',
             'Cơ quan/đơn vị',
-            'Chủ hồ sơ',
+            'Chủ sử dụng',
             'Số điện thoại',
-            'Cán bộ xử lý hiện tại',
-            'Trạng thái hồ sơ'
+            'Cán bộ xử lý',
+            'Trạng thái hồ sơ',
+            'GHI CHÚ'
         ];
 
-        const bodyRows = filteredRecords.map((r, idx) => [
-            idx + 1,
-            r.soHieu,
-            r.tenThuTuc,
-            r.tenLinhVuc,
-            r.ngayTiepNhan,
-            r.ngayHenTra,
-            r.ngayKetThuc || 'Chưa kết thúc',
-            r.donVi,
-            r.chuHoSo,
-            r.soDienThoai || '-',
-            r.canBoXuLy || '-',
-            r.trangThai
-        ]);
+        const bodyRows = filteredRecords.map((r, idx) => {
+            const tot = Number(r.tongDienTich || 0);
+            const o = Number(r.dienTichDatO || 0);
+            const nong = tot > 0 ? (tot - o) : 0;
+            
+            let thoiHanShow = '';
+            if (o > 0) {
+                thoiHanShow = `Đất ở: Lâu dài. Đất NN: ${r.thoiHanSuDung || '-'}`;
+            } else {
+                thoiHanShow = r.thoiHanSuDung ? `Đất NN: ${r.thoiHanSuDung}` : '-';
+            }
+
+            return [
+                idx + 1,
+                r.soHieu,
+                r.tenThuTuc,
+                r.chuyenQuyen || '-',
+                r.soTo || '-',
+                r.soThua || '-',
+                r.tongDienTich !== null && r.tongDienTich !== undefined ? r.tongDienTich : '-',
+                r.dienTichDatO !== null && r.dienTichDatO !== undefined ? r.dienTichDatO : '-',
+                tot > 0 ? nong : '-',
+                r.diaDanh || '-',
+                r.soPhatHanh || '-',
+                thoiHanShow,
+                r.cccd || '-',
+                r.tenLinhVuc || '-',
+                r.ngayTiepNhan,
+                r.ngayHenTra,
+                r.ngayKetThuc || 'Đang thụ lý',
+                r.donVi,
+                r.chuHoSo,
+                r.soDienThoai || '-',
+                r.canBoXuLy || '-',
+                r.trangThai,
+                r.ghiChu || '-'
+            ];
+        });
 
         const worksheet = XLSX.utils.aoa_to_sheet([
-            ['BÁO CÁO THỐNG KÊ QUẢN LÝ HỒ SƠ IGATE'],
+            ['BÁO CÁO THỐNG KÊ QUẢN LÝ HỒ SƠ IGATE CHI TIẾT'],
             [`Ngày lập báo cáo: ${new Date().toLocaleDateString('vi-VN')} - Người lập: ${currentUser.name}`],
             [''],
             headerRow,
@@ -1155,24 +1196,35 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
         // Merge cells tiêu đề
         worksheet['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 22 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 22 } }
         ];
 
         // Format Width cho các cột
         worksheet['!cols'] = [
             { wch: 6 },   // STT
-            { wch: 20 },  // Số hồ sơ
-            { wch: 45 },  // Tên thủ tục hành chính
+            { wch: 18 },  // Mã hồ sơ
+            { wch: 35 },  // Loại biến động
+            { wch: 20 },  // CHUYỂN QUYỀN
+            { wch: 10 },  // Số tờ
+            { wch: 10 },  // Số thửa
+            { wch: 18 },  // Tổng diện tích
+            { wch: 14 },  // Đất ở
+            { wch: 18 },  // Đất nông nghiệp
+            { wch: 24 },  // Địa danh thửa đất
+            { wch: 18 },  // Số phát hành
+            { wch: 26 },  // Thời hạn sử dụng
+            { wch: 16 },  // CCCD
             { wch: 18 },  // Tên lĩnh vực
-            { wch: 15 },  // Ngày tiếp nhận
-            { wch: 15 },  // Ngày hẹn trả
+            { wch: 14 },  // Ngày tiếp nhận
+            { wch: 14 },  // Ngày hẹn trả
             { wch: 18 },  // Ngày kết thúc
-            { wch: 25 },  // Đơn vị
-            { wch: 22 },  // Chủ hồ sơ
+            { wch: 25 },  // Cơ quan/đơn vị
+            { wch: 22 },  // Chủ sử dụng
             { wch: 14 },  // Số điện thoại
             { wch: 20 },  // Cán bộ xử lý
-            { wch: 22 }   // Trạng thái hồ sơ
+            { wch: 22 },  // Trạng thái hồ sơ
+            { wch: 25 }   // GHI CHÚ
         ];
 
         // Áp dụng Style nâng cao cho workbook
@@ -1247,9 +1299,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             } else if (r === 3) {
                 cell.s = cellStyleHeader;
             } else if (r > 3) {
-                if (c === 0 || c === 1 || c === 4 || c === 5 || c === 6 || c === 9) {
+                if ([0, 1, 4, 5, 6, 7, 8, 10, 12, 14, 15, 16].includes(c)) {
                     cell.s = cellStyleDataCenter;
-                } else if (c === 11) {
+                } else if (c === 21) {
                     cell.s = cellStyleDataStatus;
                     // Đổi màu nền trạng thái dựa trên giá trị
                     const val = String(cell.v || '');
@@ -1821,7 +1873,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             {/* --- PRIMARY DATA TABLE --- */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left table-fixed min-w-[1720px]">
+                    <table className="w-full text-left table-fixed min-w-[2800px]">
                         <thead className="bg-[#1E293B] text-slate-300 text-xs font-semibold uppercase sticky top-0 z-10">
                             <tr>
                                 <th className="px-3 py-3.5 w-11 text-center">
@@ -1840,13 +1892,24 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 </th>
                                 {visibleColumns.stt && <th className="px-3 py-3.5 w-12 text-center text-slate-400">STT</th>}
                                 {visibleColumns.thongTinHoSo && <th className="px-3 py-3.5 w-[240px]">Thông tin hồ sơ</th>}
-                                {visibleColumns.tenThuTuc && <th className="px-3 py-3.5 w-[280px]">Tên thủ tục hành chính</th>}
+                                {visibleColumns.tenThuTuc && <th className="px-3 py-3.5 w-[280px]">Loại biến động</th>}
+                                {visibleColumns.chuyenQuyen && <th className="px-3 py-3.5 w-[140px]">CHUYỂN QUYỀN</th>}
+                                {visibleColumns.soTo && <th className="px-3 py-3.5 w-[80px] text-center">Số tờ</th>}
+                                {visibleColumns.soThua && <th className="px-3 py-3.5 w-[80px] text-center">Số thửa</th>}
+                                {visibleColumns.tongDienTich && <th className="px-3 py-3.5 w-[120px] text-center">Tổng diện tích</th>}
+                                {visibleColumns.dienTichDatO && <th className="px-3 py-3.5 w-[100px] text-center">Đất ở</th>}
+                                {visibleColumns.dienTichDatNongNghiep && <th className="px-3 py-3.5 w-[140px] text-center">Đất nông nghiệp</th>}
+                                {visibleColumns.diaDanh && <th className="px-3 py-3.5 w-[180px]">Địa danh</th>}
+                                {visibleColumns.soPhatHanh && <th className="px-3 py-3.5 w-[140px]">Số phát hành</th>}
+                                {visibleColumns.thoiHanSuDung && <th className="px-3 py-3.5 w-[180px]">Thời hạn sử dụng</th>}
+                                {visibleColumns.cccd && <th className="px-3 py-3.5 w-[130px] font-mono">CCCD</th>}
                                 {visibleColumns.tenLinhVuc && <th className="px-3 py-3.5 w-[160px]">Tên lĩnh vực</th>}
-                                {visibleColumns.thoiHanXuLy && <th className="px-3 py-3.5 w-[200px] text-center">Thời hạn xử lý</th>}
+                                {visibleColumns.thoiHanXuLy && <th className="px-3 py-3.5 w-[200px] text-center">Thời hạn nhận & trả</th>}
                                 {visibleColumns.ngayKetThuc && <th className="px-3 py-3.5 w-[120px] text-center">Kết thúc</th>}
                                 {visibleColumns.donVi && <th className="px-3 py-3.5 w-[180px]">Cơ quan/đơn vị</th>}
                                 {visibleColumns.canBoXuLy && <th className="px-3 py-3.5 w-[160px]">Cán bộ xử lý</th>}
                                 {visibleColumns.trangThai && <th className="px-3 py-3.5 w-[170px] text-center">Trạng thái hồ sơ</th>}
+                                {visibleColumns.ghiChu && <th className="px-3 py-3.5 w-[180px]">GHI CHÚ</th>}
                                 <th className="px-3 py-3.5 w-[140px] text-center sticky right-0 bg-[#1E293B] shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">Hành động</th>
                             </tr>
                         </thead>
@@ -1933,6 +1996,66 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                 </div>
                                             </td>
                                         )}
+                                        {visibleColumns.chuyenQuyen && (
+                                            <td className="px-3 py-3 text-xs align-middle text-slate-600 font-semibold" title={r.chuyenQuyen}>
+                                                <span className="truncate max-w-[130px] block">{r.chuyenQuyen || '-'}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.soTo && (
+                                            <td className="px-3 py-3 text-center text-xs font-bold align-middle text-slate-750 bg-[#F8FAFC]">
+                                                {r.soTo || '-'}
+                                            </td>
+                                        )}
+                                        {visibleColumns.soThua && (
+                                            <td className="px-3 py-3 text-center text-xs font-bold align-middle text-slate-755 bg-[#F8FAFC]">
+                                                {r.soThua || '-'}
+                                            </td>
+                                        )}
+                                        {visibleColumns.tongDienTich && (
+                                            <td className="px-3 py-3 text-center text-xs font-extrabold align-middle text-slate-900">
+                                                {r.tongDienTich !== null && r.tongDienTich !== undefined ? `${r.tongDienTich.toLocaleString('vi-VN')} m²` : '-'}
+                                            </td>
+                                        )}
+                                        {visibleColumns.dienTichDatO && (
+                                            <td className="px-3 py-3 text-center text-xs font-bold align-middle text-orange-900 bg-orange-50/5">
+                                                {r.dienTichDatO !== null && r.dienTichDatO !== undefined ? `${r.dienTichDatO.toLocaleString('vi-VN')} m²` : '-'}
+                                            </td>
+                                        )}
+                                        {visibleColumns.dienTichDatNongNghiep && (
+                                            <td className="px-3 py-3 text-center text-xs font-bold align-middle text-emerald-800 bg-emerald-50/5">
+                                                {(() => {
+                                                    const tot = Number(r.tongDienTich || 0);
+                                                    const o = Number(r.dienTichDatO || 0);
+                                                    const nong = tot > 0 ? (tot - o) : 0;
+                                                    return tot > 0 ? `${nong.toLocaleString('vi-VN')} m²` : '-';
+                                                })()}
+                                            </td>
+                                        )}
+                                        {visibleColumns.diaDanh && (
+                                            <td className="px-3 py-3 text-xs align-middle text-slate-600" title={r.diaDanh}>
+                                                <div className="truncate max-w-[170px]" title={r.diaDanh}>{r.diaDanh || '-'}</div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.soPhatHanh && (
+                                            <td className="px-3 py-3 text-xs align-middle font-mono text-slate-700 font-bold" title={r.soPhatHanh}>
+                                                <div className="truncate max-w-[130px]" title={r.soPhatHanh}>{r.soPhatHanh || '-'}</div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.thoiHanSuDung && (
+                                            <td className="px-3 py-3 text-xs align-middle">
+                                                <div className="flex flex-col gap-0.5 text-[10px] leading-tight">
+                                                    {Number(r.dienTichDatO || 0) > 0 && (
+                                                        <span className="text-indigo-700 font-bold">Đất ở: Lâu dài</span>
+                                                    )}
+                                                    <span className="text-slate-500 font-semibold" title={r.thoiHanSuDung}>Đất NN: {r.thoiHanSuDung || '-'}</span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.cccd && (
+                                            <td className="px-3 py-3 text-xs align-middle font-mono text-slate-700 font-medium">
+                                                {r.cccd || '-'}
+                                            </td>
+                                        )}
                                         {visibleColumns.tenLinhVuc && (
                                             <td className="px-3 py-3 text-xs align-middle">
                                                 <span className="text-xs bg-slate-100/80 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-bold inline-block max-w-[140px] truncate" title={r.tenLinhVuc}>
@@ -1944,11 +2067,11 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                             <td className="px-3 py-3 text-center text-xs align-middle">
                                                 <div className="flex flex-col gap-1.5 items-center justify-center animate-fade-in">
                                                     <div className="flex items-center gap-1.5 text-xs">
-                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[64px] text-right">T/Nhận:</span>
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[64px] text-right">Nhận:</span>
                                                         <span className="font-mono text-slate-700 font-semibold bg-slate-100 border border-slate-150 px-1.5 py-0.5 rounded-md">{formatDisplayDateInClient(r.ngayTiepNhan)}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider w-[64px] text-right whitespace-nowrap">Hẹn trả:</span>
+                                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider w-[64px] text-right whitespace-nowrap">Trả KQ:</span>
                                                         <span className="font-mono text-indigo-900 font-bold bg-indigo-50/50 border border-indigo-150 px-1.5 py-0.5 rounded-md">{formatDisplayDateInClient(r.ngayHenTra)}</span>
                                                     </div>
                                                     {isOverdue && (
@@ -1982,6 +2105,11 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                 <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadge}`}>
                                                     {r.trangThai}
                                                 </span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.ghiChu && (
+                                            <td className="px-3 py-3 text-xs text-slate-500 italic max-w-[170px] truncate align-middle" title={r.ghiChu}>
+                                                {r.ghiChu || '-'}
                                             </td>
                                         )}
                                         <td className="px-3 py-3 text-center sticky right-0 bg-white shadow-[-4px_0_10px_rgba(0,0,0,0.04)] text-xs align-middle">
@@ -2498,210 +2626,359 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             <button onClick={() => setIsFormOpen(false)} className="rounded-lg p-1 hover:bg-white/10 text-white transition-all"><X size={18} /></button>
                         </div>
                         
-                        <form onSubmit={handleFormSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Số hồ sơ / Mã iGate <span className="text-red-500">*</span></label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
-                                        placeholder="Ví dụ: HSPT-2026-00104"
-                                        value={formData.soHieu}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, soHieu: e.target.value }))}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Chủ hồ sơ (Tên đầy đủ) <span className="text-red-500">*</span></label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
-                                        placeholder="Ví dụ: Nguyễn Văn Hải"
-                                        value={formData.chuHoSo}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, chuHoSo: e.target.value }))}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Số điện thoại liên lạc</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
-                                        placeholder="SĐT di động..."
-                                        value={formData.soDienThoai}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, soDienThoai: e.target.value }))}
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Tên lĩnh vực</label>
-                                    <select 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 transition-all text-slate-800"
-                                        value={formData.tenLinhVuc}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, tenLinhVuc: e.target.value }))}
-                                    >
-                                        {LINH_VUC_LIST.map(v => <option key={v} value={v}>{v}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-600 block">Tên thủ tục hành chính <span className="text-red-500">*</span></label>
-                                <textarea 
-                                    rows={2}
-                                    className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-500 transition-all text-slate-850"
-                                    placeholder="Ví dụ: Chuyển nhượng quyền sử dụng đất..."
-                                    value={formData.tenThuTuc}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, tenThuTuc: e.target.value }))}
-                                    required
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Ngày tiếp nhận</label>
-                                    <div className="flex gap-1 items-center">
+                        <form onSubmit={handleFormSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
+                            {/* KHỐI 1: THÔNG TIN HỒ SƠ & CHỦ SỬ DỤNG */}
+                            <div className="bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl space-y-4">
+                                <h4 className="text-[11px] uppercase tracking-wider font-extrabold text-slate-500">I. Thông tin hồ sơ & Chủ sử dụng</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Mã hồ sơ <span className="text-red-500">*</span></label>
                                         <input 
                                             type="text" 
-                                            placeholder="Ví dụ: 21/11/2025 14:41:12"
-                                            className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
-                                            value={formData.ngayTiepNhan}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayTiepNhan: e.target.value }))}
-                                        />
-                                        <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
-                                            <input 
-                                                type="date"
-                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val) {
-                                                        const parts = val.split('-');
-                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                                                        setFormData(prev => ({ ...prev, ngayTiepNhan: formatted }));
-                                                    }
-                                                }}
-                                            />
-                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
-                                                <Calendar size={15} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Ngày hẹn trả</label>
-                                    <div className="flex gap-1 items-center">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Ví dụ: 28/11/2025"
-                                            className="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-semibold"
-                                            value={formData.ngayHenTra}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayHenTra: e.target.value }))}
-                                        />
-                                        <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
-                                            <input 
-                                                type="date"
-                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val) {
-                                                        const parts = val.split('-');
-                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                                                        setFormData(prev => ({ ...prev, ngayHenTra: formatted }));
-                                                    }
-                                                }}
-                                            />
-                                            <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
-                                                <Calendar size={15} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Cơ quan/đơn vị xử lý</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800"
-                                        value={formData.donVi}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, donVi: e.target.value }))}
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 block">Trạng thái hồ sơ iGate</label>
-                                    <select 
-                                        className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-indigo-900 bg-indigo-50 font-bold"
-                                        value={formData.trangThai}
-                                        onChange={(e) => {
-                                            const newStatus = e.target.value;
-                                            setFormData(prev => ({ 
-                                                ...prev, 
-                                                trangThai: newStatus,
-                                                ngayKetThuc: newStatus !== 'Mới tiếp nhận' && !prev.ngayKetThuc ? getTodayString() : prev.ngayKetThuc
-                                            }));
-                                        }}
-                                    >
-                                        {TRANG_THAI_LIST.map(t => <option key={t} value={t}>{t}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {formData.trangThai !== 'Mới tiếp nhận' && (
-                                <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-2 animate-fade-in text-left">
-                                    <label className="text-xs font-extrabold text-indigo-950 block flex items-center gap-1.5">
-                                        <Calendar size={14} className="text-indigo-600" />
-                                        <span>Ngày áp dụng cho trạng thái [{formData.trangThai}] <span className="text-red-500">*</span></span>
-                                    </label>
-                                    <div className="flex gap-2 items-center">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Ví dụ: 26/11/2025"
-                                            className="w-full text-sm p-3 bg-white border border-slate-200 rounded-xl outline-none text-slate-800 font-bold focus:border-indigo-500 transition-all"
-                                            value={formData.ngayKetThuc}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, ngayKetThuc: e.target.value }))}
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
+                                            placeholder="Ví dụ: HSPT-2026-00104"
+                                            value={formData.soHieu}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, soHieu: e.target.value }))}
                                             required
                                         />
-                                        <div className="relative shrink-0 w-11 h-11 flex items-center justify-center">
-                                            <input 
-                                                type="date"
-                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val) {
-                                                        const parts = val.split('-');
-                                                        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                                                        setFormData(prev => ({ ...prev, ngayKetThuc: formatted }));
-                                                    }
-                                                }}
-                                            />
-                                            <button type="button" className="w-full h-full p-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-200 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
-                                                <Calendar size={16} />
-                                            </button>
-                                        </div>
                                     </div>
-                                    <p className="text-[10px] text-indigo-600 font-semibold italic">
-                                        * Phục vụ cho mục đích thống kê tiến độ từng trạng thái hồ sơ iGate.
-                                    </p>
-                                </div>
-                            )}
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-600 block">Cán bộ thụ lý hiện tại</label>
-                                <select 
-                                    className="w-full text-sm font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800"
-                                    value={formData.canBoXuLy}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, canBoXuLy: e.target.value }))}
-                                >
-                                    {canBoList.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">CHỦ SỬ DỤNG <span className="text-red-500">*</span></label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
+                                            placeholder="Ví dụ: Nguyễn Văn Hải"
+                                            value={formData.chuHoSo}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, chuHoSo: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Số điện thoại liên lạc</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
+                                            placeholder="SĐT di động..."
+                                            value={formData.soDienThoai}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, soDienThoai: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">CCCD chủ sử dụng</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800"
+                                            placeholder="Số CCCD..."
+                                            value={formData.cccd || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, cccd: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-600 block">Loại biến động <span className="text-red-500">*</span></label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all text-slate-850"
+                                            placeholder="Ví dụ: Chuyển nhượng quyền sử dụng đất..."
+                                            value={formData.tenThuTuc}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, tenThuTuc: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-600 block">CHUYỂN QUYỀN</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all text-slate-800"
+                                            placeholder="Ví dụ: Chuyển quyền sử dụng đất, tặng cho, thừa kế..."
+                                            value={formData.chuyenQuyen || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, chuyenQuyen: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
+                            {/* KHỐI 2: THÔNG TIN THỬA ĐẤT (BỔ SUNG) */}
+                            <div className="bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl space-y-4">
+                                <h4 className="text-[11px] uppercase tracking-wider font-extrabold text-slate-500">II. Chi tiết thửa đất & Diện tích</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Số tờ bản đồ</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            placeholder="Tờ số..."
+                                            value={formData.soTo || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, soTo: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Số thửa đất</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            placeholder="Thửa số..."
+                                            value={formData.soThua || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, soThua: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Số phát hành GCN</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            placeholder="Số phát hành..."
+                                            value={formData.soPhatHanh || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, soPhatHanh: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Tổng diện tích (m²)</label>
+                                        <input 
+                                            type="number" 
+                                            step="any"
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-850"
+                                            placeholder="Ví dụ: 300"
+                                            value={formData.tongDienTich !== null ? formData.tongDienTich : ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value === '' ? null : Number(e.target.value);
+                                                setFormData(prev => ({ ...prev, tongDienTich: val }));
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Diện tích Đất ở (m²)</label>
+                                        <input 
+                                            type="number" 
+                                            step="any"
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-850"
+                                            placeholder="Ví dụ: 100"
+                                            value={formData.dienTichDatO !== null ? formData.dienTichDatO : ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value === '' ? null : Number(e.target.value);
+                                                setFormData(prev => ({ ...prev, dienTichDatO: val }));
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Đất nông nghiệp (Tự động)</label>
+                                        <div className="w-full text-sm font-bold p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600">
+                                            {(() => {
+                                                const tot = Number(formData.tongDienTich || 0);
+                                                const o = Number(formData.dienTichDatO || 0);
+                                                const nông = tot > 0 ? (tot - o) : 0;
+                                                return tot > 0 ? `${nông.toLocaleString('vi-VN')} m²` : '- m²';
+                                            })()}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1 md:col-span-3">
+                                        <label className="text-xs font-bold text-slate-600 block">Địa danh thửa đất</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            placeholder="Địa danh, địa chỉ thửa vị trí thửa đất..."
+                                            value={formData.diaDanh || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, diaDanh: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* KHỐI 3: QUẢN LÝ THỜI HẠN, TIẾN ĐỘ & CÁN BỘ */}
+                            <div className="bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl space-y-4">
+                                <h4 className="text-[11px] uppercase tracking-wider font-extrabold text-slate-500">III. Quản lý thời hạn & Quy trình xử lý</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-600 block">Thời hạn sử dụng đất nông nghiệp</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            placeholder="Ví dụ: 50 năm, Hoặc điền mốc ngày cụ thể... "
+                                            value={formData.thoiHanSuDung || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, thoiHanSuDung: e.target.value }))}
+                                        />
+                                        {Number(formData.dienTichDatO || 0) > 0 && (
+                                            <div className="text-[10px] text-indigo-700 font-bold bg-indigo-50 p-2 rounded-lg mt-1.5 border border-indigo-100">
+                                                💡 Có diện tích đất thổ cư (&gt;0 m²): Thời hạn sử dụng của <b>đất ở</b> tự động là <b>Lâu dài</b>. Thời hạn sử dụng ở trên được áp dụng riêng cho <b>đất nông nghiệp</b>.
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Tên lĩnh vực</label>
+                                        <select 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            value={formData.tenLinhVuc}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, tenLinhVuc: e.target.value }))}
+                                        >
+                                            {LINH_VUC_LIST.map(v => <option key={v} value={v}>{v}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Trạng thái hồ sơ iGate</label>
+                                        <select 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-indigo-900 bg-indigo-50 font-bold"
+                                            value={formData.trangThai}
+                                            onChange={(e) => {
+                                                const newStatus = e.target.value;
+                                                setFormData(prev => ({ 
+                                                    ...prev, 
+                                                    trangThai: newStatus,
+                                                    ngayKetThuc: newStatus !== 'Mới tiếp nhận' && !prev.ngayKetThuc ? getTodayString() : prev.ngayKetThuc
+                                                }));
+                                            }}
+                                        >
+                                            {TRANG_THAI_LIST.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Ngày nhận hồ sơ</label>
+                                        <div className="flex gap-1 items-center">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 21/06/2026"
+                                                className="w-full text-sm p-2 bg-white border border-slate-200 rounded-xl outline-none text-slate-850 font-semibold"
+                                                value={formData.ngayTiepNhan}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, ngayTiepNhan: e.target.value }))}
+                                            />
+                                            <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
+                                                <input 
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const parts = val.split('-');
+                                                            const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                            setFormData(prev => ({ ...prev, ngayTiepNhan: formatted }));
+                                                        }
+                                                    }}
+                                                />
+                                                <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                    <Calendar size={15} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Ngày trả kết quả</label>
+                                        <div className="flex gap-1 items-center">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 28/06/2026"
+                                                className="w-full text-sm p-2 bg-white border border-slate-200 rounded-xl outline-none text-slate-850 font-semibold"
+                                                value={formData.ngayHenTra}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, ngayHenTra: e.target.value }))}
+                                            />
+                                            <div className="relative shrink-0 w-9 h-9 flex items-center justify-center">
+                                                <input 
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const parts = val.split('-');
+                                                            const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                            setFormData(prev => ({ ...prev, ngayHenTra: formatted }));
+                                                        }
+                                                    }}
+                                                />
+                                                <button type="button" className="w-full h-full p-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                    <Calendar size={15} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {formData.trangThai !== 'Mới tiếp nhận' && (
+                                    <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-2 animate-fade-in text-left">
+                                        <label className="text-xs font-extrabold text-indigo-950 block flex items-center gap-1.5">
+                                            <Calendar size={14} className="text-indigo-600" />
+                                            <span>Ngày áp dụng cho trạng thái [{formData.trangThai}] <span className="text-red-500">*</span></span>
+                                        </label>
+                                        <div className="flex gap-2 items-center">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 26/11/2025"
+                                                className="w-full text-sm p-3 bg-white border border-slate-200 rounded-xl outline-none text-slate-800 font-bold focus:border-indigo-500 transition-all"
+                                                value={formData.ngayKetThuc}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, ngayKetThuc: e.target.value }))}
+                                                required
+                                            />
+                                            <div className="relative shrink-0 w-11 h-11 flex items-center justify-center">
+                                                <input 
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const parts = val.split('-');
+                                                            const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                            setFormData(prev => ({ ...prev, ngayKetThuc: formatted }));
+                                                        }
+                                                    }}
+                                                />
+                                                <button type="button" className="w-full h-full p-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-200 rounded-xl flex items-center justify-center transition-all" title="Chọn ngày">
+                                                    <Calendar size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-indigo-600 font-semibold italic">
+                                            * Phục vụ cho mục đích thống kê tiến độ từng trạng thái hồ sơ iGate.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Cơ quan/đơn vị xử lý</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            value={formData.donVi}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, donVi: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-600 block">Cán bộ thụ lý hiện tại</label>
+                                        <select 
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-800"
+                                            value={formData.canBoXuLy}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, canBoXuLy: e.target.value }))}
+                                        >
+                                            {canBoList.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-600 block">GHI CHÚ</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full text-sm font-semibold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all text-slate-850"
+                                            placeholder="Ghi chú thêm về thửa đất hoặc quy trình..."
+                                            value={formData.ghiChu || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ghiChu: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-150 flex justify-end gap-2.5">
                                 <button 
                                     type="button" 
                                     onClick={() => setIsFormOpen(false)}
@@ -2724,7 +3001,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             {/* --- MODAL XEM CHI TIẾT HỒ SƠ --- */}
             {viewingRecord && (
                 <div id="igate-view-detail-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col animate-scale-up">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col animate-scale-up">
                         <div className="bg-gradient-to-r from-slate-900 via-[#1E293B] to-slate-800 p-5 text-white flex justify-between items-center">
                             <h3 className="font-bold flex items-center gap-2 text-base">
                                 <BookOpen size={18} className="text-indigo-400" />
@@ -2774,14 +3051,18 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 })()}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
                                 {/* Cột Trái: Thông tin hành chính */}
                                 <div className="space-y-4">
-                                    <h4 className="text-xs font-extrabold text-indigo-900 border-b border-slate-100 pb-1.5 uppercase tracking-wider">Thông tin hành chính</h4>
+                                    <h4 className="text-xs font-extrabold text-blue-900 border-b border-slate-100 pb-1.5 uppercase tracking-wider">Thông tin hành chính</h4>
                                     
                                     <div>
-                                        <span className="text-[10px] font-bold text-slate-400 block">CHỦ HỒ SƠ</span>
+                                        <span className="text-[10px] font-bold text-slate-400 block">CHỦ SỬ DỤNG</span>
                                         <span className="text-sm font-bold text-slate-850 uppercase">{viewingRecord.chuHoSo}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">SỐ CCCD</span>
+                                        <span className="text-sm font-mono font-bold text-slate-800">{viewingRecord.cccd || 'Không cung cấp'}</span>
                                     </div>
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 block">SỐ ĐIỆN THOẠI</span>
@@ -2789,11 +3070,69 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     </div>
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 block">LĨNH VỰC HỒ SƠ</span>
-                                        <span className="text-sm font-semibold text-slate-800">{viewingRecord.tenLinhVuc}</span>
+                                        <span className="text-sm font-semibold text-slate-800">{viewingRecord.tenLinhVuc || 'Quản lý đất đai'}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-bold text-slate-400 block">THỦ TỤC HÀNH CHÍNH</span>
-                                        <span className="text-sm font-medium text-slate-700 leading-relaxed block">{viewingRecord.tenThuTuc}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 block">LOẠI BIẾN ĐỘNG</span>
+                                        <span className="text-xs font-semibold text-slate-700 leading-snug block">{viewingRecord.tenThuTuc}</span>
+                                    </div>
+                                </div>
+
+                                {/* Cột Giữa: Thửa đất & Địa chính */}
+                                <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-150">
+                                    <h4 className="text-xs font-extrabold text-emerald-950 border-b border-emerald-200 pb-1.5 uppercase tracking-wider">Thửa đất & Địa chính</h4>
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 block">SỐ TỜ</span>
+                                            <span className="text-sm font-extrabold text-indigo-900">{viewingRecord.soTo || '-'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 block">SỐ THỬA</span>
+                                            <span className="text-sm font-extrabold text-indigo-900">{viewingRecord.soThua || '-'}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">TỔNG DIỆN TÍCH</span>
+                                        <span className="text-sm font-extrabold text-slate-800">{viewingRecord.tongDienTich !== null && viewingRecord.tongDienTich !== undefined ? `${viewingRecord.tongDienTich.toLocaleString('vi-VN')} m²` : 'Không xác định'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 block">ĐẤT Ở</span>
+                                            <span className="text-xs font-bold text-orange-700">{viewingRecord.dienTichDatO !== null && viewingRecord.dienTichDatO !== undefined ? `${viewingRecord.dienTichDatO.toLocaleString('vi-VN')} m²` : '-'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 block">ĐẤT NÔNG NGHIỆP</span>
+                                            <span className="text-xs font-bold text-emerald-700 font-mono">
+                                                {(() => {
+                                                    const tot = Number(viewingRecord.tongDienTich || 0);
+                                                    const o = Number(viewingRecord.dienTichDatO || 0);
+                                                    const nong = tot > 0 ? (tot - o) : 0;
+                                                    return tot > 0 ? `${nong.toLocaleString('vi-VN')} m²` : '-';
+                                                })()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">ĐỊA DANH THỬA ĐẤT</span>
+                                        <span className="text-xs font-bold text-slate-700 block max-h-[44px] overflow-y-auto" title={viewingRecord.diaDanh}>{viewingRecord.diaDanh || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">CHUYỂN QUYỀN</span>
+                                        <span className="text-xs font-semibold text-slate-600 block">{viewingRecord.chuyenQuyen || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">SỐ PHÁT HÀNH</span>
+                                        <span className="text-xs font-mono font-bold text-slate-700 block">{viewingRecord.soPhatHanh || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 block">THỜI HẠN SỬ DỤNG</span>
+                                        <div className="text-[11px] leading-tight flex flex-col mt-0.5">
+                                            {Number(viewingRecord.dienTichDatO || 0) > 0 && (
+                                                <span className="text-indigo-800 font-bold">Đất ở: Lâu dài</span>
+                                            )}
+                                            <span className="text-slate-500 font-semibold">Đất NN: {viewingRecord.thoiHanSuDung || '-'}</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -2806,19 +3145,27 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         <span className="text-sm font-semibold text-slate-800">{viewingRecord.donVi}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-bold text-indigo-600 block">NGÀY TIẾP NHẬN</span>
-                                        <span className="text-sm font-mono font-bold text-slate-800">{formatDisplayDateInClient(viewingRecord.ngayTiepNhan) || '-'}</span>
+                                        <span className="text-[10px] font-bold text-indigo-600 block">NGÀY TIẾP NHẬN BẢN GỐC</span>
+                                        <span className="text-sm font-mono font-bold text-indigo-950 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">{formatDisplayDateInClient(viewingRecord.ngayTiepNhan) || '-'}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-bold text-orange-600 block">NGÀY HẸN TRẢ</span>
-                                        <span className="text-sm font-mono font-bold text-slate-800">{formatDisplayDateInClient(viewingRecord.ngayHenTra) || 'Chưa lập giấy hẹn'}</span>
+                                        <span className="text-[10px] font-bold text-orange-600 block">NGÀY HẸN TRẢ DỰ KIẾN</span>
+                                        <span className="text-sm font-mono font-bold text-orange-950 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">{formatDisplayDateInClient(viewingRecord.ngayHenTra) || 'Chưa lập giấy hẹn'}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-bold text-emerald-600 block">NGÀY KẾT THÚC THỰC TẾ</span>
-                                        <span className="text-sm font-mono font-bold text-slate-800">{formatDisplayDateInClient(viewingRecord.ngayKetThuc) || 'Đang thụ lý'}</span>
+                                        <span className="text-[10px] font-bold text-emerald-600 block">NGÀY TRẢ KẾT QUẢ THỰC TẾ</span>
+                                        <span className="text-sm font-mono font-bold text-emerald-950 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">{formatDisplayDateInClient(viewingRecord.ngayKetThuc) || 'Đang thụ lý'}</span>
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Ghi chú full-width */}
+                            {viewingRecord.ghiChu && (
+                                <div className="bg-amber-50/50 rounded-xl p-3.5 border border-amber-150 text-xs">
+                                    <span className="text-[10px] font-bold text-amber-800 uppercase tracking-widest block mb-1">Ghi chú & Hồ sơ đính kèm</span>
+                                    <p className="text-slate-700 italic leading-relaxed whitespace-pre-wrap">{viewingRecord.ghiChu}</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-sm">

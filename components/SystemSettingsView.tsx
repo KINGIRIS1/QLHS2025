@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
@@ -17,10 +17,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onDeleteAllData,
   onHolidaysChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'devices' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
+
+  // Device list states
+  const [deviceList, setDeviceList] = useState<string[]>([]);
+  const [newDeviceName, setNewDeviceName] = useState('');
+  const [savingDevices, setSavingDevices] = useState(false);
+  const [loadingDevices, setLoadingDevices] = useState(false);
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -55,6 +61,57 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setContactSettings(data);
       } catch (e) {
           console.error("Error loading contact settings", e);
+      }
+  };
+
+  const loadDeviceNames = async () => {
+      setLoadingDevices(true);
+      try {
+          const { fetchDeviceNames } = await import('../services/apiDeviceSchedule');
+          const data = await fetchDeviceNames();
+          setDeviceList(data);
+      } catch (e) {
+          console.error("Error loading device names", e);
+      } finally {
+          setLoadingDevices(false);
+      }
+  };
+
+  const handleAddDevice = () => {
+      const name = newDeviceName.trim();
+      if (!name) {
+          alert("Vui lòng nhập tên thiết bị đo!");
+          return;
+      }
+      if (deviceList.includes(name)) {
+          alert("Thiết bị này đã có trong danh sách!");
+          return;
+      }
+      setDeviceList(prev => [...prev, name]);
+      setNewDeviceName('');
+  };
+
+  const handleDeleteDevice = async (name: string) => {
+      if (await confirmAction(`Bạn có chắc chắn muốn xóa thiết bị "${name}" khỏi danh sách?`)) {
+          setDeviceList(prev => prev.filter(d => d !== name));
+      }
+  };
+
+  const handleSaveDevices = async () => {
+      setSavingDevices(true);
+      try {
+          const { saveDeviceNames } = await import('../services/apiDeviceSchedule');
+          const success = await saveDeviceNames(deviceList);
+          if (success) {
+              alert("Lưu danh sách thiết bị đo thành công!");
+          } else {
+              alert("Lỗi khi lưu cấu hình thiết bị.");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("Gặp sự cố khi lưu cấu hình thiết bị.");
+      } finally {
+          setSavingDevices(false);
       }
   };
 
@@ -103,6 +160,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       loadHolidays();
       loadUpdateConfig();
       loadContactSettings();
+      loadDeviceNames();
 
       const handleCacheUpdate = () => {
           loadContactSettings();
@@ -281,6 +339,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
                 <Calendar size={16} /> Ngày nghỉ lễ
+            </button>
+            <button 
+                onClick={() => setActiveTab('devices')}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'devices' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+                <Cpu size={16} /> Thiết bị đo
             </button>
             <button 
                 onClick={() => setActiveTab('data')}
@@ -610,6 +674,92 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             ))}
                             {holidays.length === 0 && (
                                 <div className="p-8 text-center text-gray-400 italic font-medium">Chưa có dữ liệu ngày lễ</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'devices' && (
+                <div className="space-y-6 max-w-4xl mx-auto">
+                    <div className="bg-white border border-teal-100 rounded-[2rem] p-6 shadow-sm">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-gray-100">
+                            <div className="text-left">
+                                <h3 className="font-black text-teal-800 text-lg flex items-center gap-2 tracking-tight">
+                                    <Cpu size={20} className="text-teal-600 animate-pulse" /> Quản Lý Thiết Bị Đo
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium">Lưu và cấu hình tên các thiết bị đo hiện có để phục vụ đăng ký lịch đo đạc.</p>
+                            </div>
+                            <button 
+                                onClick={handleSaveDevices} 
+                                disabled={savingDevices}
+                                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md shadow-teal-600/10 active:scale-95 flex items-center gap-2 self-stretch md:self-auto justify-center disabled:opacity-50"
+                            >
+                                {savingDevices ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                                Lưu cấu hình thiết bị
+                            </button>
+                        </div>
+
+                        {/* Form thêm nhanh thiết bị */}
+                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row gap-3.5 mb-6">
+                            <div className="flex-1 text-left">
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tên thiết bị đo mới</label>
+                                <input 
+                                    type="text"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-550"
+                                    placeholder="Điền tên máy đo (VD: Máy GNSS RTK Pentax G7)..."
+                                    value={newDeviceName}
+                                    onChange={e => setNewDeviceName(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            handleAddDevice();
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <button 
+                                onClick={handleAddDevice}
+                                className="sm:self-end px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-widest rounded-lg h-[34px] transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <Plus size={14} /> Thêm thiết bị
+                            </button>
+                        </div>
+
+                        {/* Danh sách thiết bị đo */}
+                        <div className="space-y-3">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-left">Danh sách thiết bị hiện có ({deviceList.length})</div>
+                            {loadingDevices ? (
+                                <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2 justify-center">
+                                    <Loader2 className="animate-spin text-teal-600" size={24} />
+                                    <span className="text-xs font-semibold">Đang tải danh sách thiết bị...</span>
+                                </div>
+                            ) : deviceList.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {deviceList.map((name, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            className="bg-white border border-slate-150 hover:border-teal-400 rounded-xl p-3.5 flex items-center justify-between transition-all duration-200 shadow-sm"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0 pr-3">
+                                                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 font-bold text-xs border border-teal-100">
+                                                    {idx + 1}
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-800 truncate">{name}</span>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleDeleteDevice(name)}
+                                                className="text-red-400 hover:text-red-600 hover:bg-rose-50 p-2 rounded-lg transition-colors shrink-0"
+                                                title="Xóa thiết bị"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-8 text-center text-slate-400 italic font-medium bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl">
+                                    Chưa cấu hình thiết bị đo nào. Nhập tên thiết bị ở trên để thêm vào danh sách.
+                                </div>
                             )}
                         </div>
                     </div>

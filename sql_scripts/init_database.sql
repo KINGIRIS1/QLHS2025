@@ -169,10 +169,14 @@ CREATE TABLE IF NOT EXISTS device_schedules (
     date DATE NOT NULL,
     session VARCHAR(20) NOT NULL, -- Sáng hoặc Chiều
     executors TEXT NOT NULL,       -- Nhân viên sử dụng máy
+    device_name TEXT,             -- Tên thiết bị đo được sử dụng
     note TEXT,                    -- Ghi chú công tác / Loại máy
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50) NOT NULL
 );
+
+-- Bổ sung cột device_name nếu bảng đã tồn tại trước đó
+ALTER TABLE IF EXISTS public.device_schedules ADD COLUMN IF NOT EXISTS device_name TEXT;
 
 -- Kích hoạt RLS cho bảng device_schedules
 ALTER TABLE IF EXISTS public.device_schedules ENABLE ROW LEVEL SECURITY;

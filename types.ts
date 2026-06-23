@@ -218,6 +218,7 @@ export interface DeviceSchedule {
   date: string;       // Ngày sử dụng (YYYY-MM-DD)
   session: 'Sáng' | 'Chiều'; // Buổi đăng ký
   executors: string;  // Nhân viên sử dụng máy
+  device_name?: string | null; // Tên thiết bị đo được sử dụng
   note?: string | null;      // Ghi chú công tác / Loại máy sử dụng
   created_at?: string;
   created_by: string; // Người đăng ký (username)

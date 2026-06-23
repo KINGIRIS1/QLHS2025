@@ -1,12 +1,51 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { DeviceSchedule } from '../types';
 import { logError, getFromCache, saveToCache } from './apiCore';
+import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 // Cache key cho lịch máy đo
 const DEVICE_SCHEDULE_CACHE_KEY = 'offline_device_schedules';
+const DEVICE_LIST_CACHE_KEY = 'offline_device_list';
 
 // Mock data store cho offline
 let MOCK_DEVICE_SCHEDULES: DeviceSchedule[] = [];
+let MOCK_DEVICE_LIST: string[] = ["Máy GNSS RTK Pentax", "Máy Toàn Đạc Pentax", "Máy GNSS RTK Stonex", "Máy Thủy Bình"];
+
+// Lấy danh sách thiết bị đo hiện có
+export const fetchDeviceNames = async (): Promise<string[]> => {
+    if (!isConfigured) return getFromCache(DEVICE_LIST_CACHE_KEY, MOCK_DEVICE_LIST);
+    try {
+        const value = await getSystemSetting('device_list_settings');
+        if (value) {
+            const parsed = JSON.parse(value) as string[];
+            saveToCache(DEVICE_LIST_CACHE_KEY, parsed);
+            return parsed;
+        }
+    } catch (error) {
+        logError("fetchDeviceNames", error);
+    }
+    // Mặc định trả về danh sách thiết bị mẫu nếu trắng
+    return getFromCache(DEVICE_LIST_CACHE_KEY, MOCK_DEVICE_LIST);
+};
+
+// Lưu danh sách thiết bị đo
+export const saveDeviceNames = async (devices: string[]): Promise<boolean> => {
+    if (!isConfigured) {
+        MOCK_DEVICE_LIST = devices;
+        saveToCache(DEVICE_LIST_CACHE_KEY, devices);
+        return true;
+    }
+    try {
+        const success = await saveSystemSetting('device_list_settings', JSON.stringify(devices));
+        if (success) {
+            saveToCache(DEVICE_LIST_CACHE_KEY, devices);
+        }
+        return success;
+    } catch (error) {
+        logError("saveDeviceNames", error);
+        return false;
+    }
+};
 
 export const fetchDeviceSchedules = async (): Promise<DeviceSchedule[]> => {
     if (!isConfigured) return getFromCache(DEVICE_SCHEDULE_CACHE_KEY, MOCK_DEVICE_SCHEDULES);

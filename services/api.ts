@@ -9,3 +9,4 @@ export * from './apiExcerpts';
 export * from './apiChat';
 export * from './apiWorkSchedule';
 export * from './apiArchive';
+export * from './apiDeviceSchedule';

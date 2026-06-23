@@ -3,17 +3,28 @@ import { logError } from './apiCore';
 
 export interface IGateRecord {
     id: string;
-    soHieu: string;        // Số hồ sơ
-    tenThuTuc: string;      // Tên thủ tục hành chính
+    soHieu: string;        // Mã hồ sơ (thay Số hồ sơ)
+    tenThuTuc: string;      // Loại biến động (thay Tên thủ tục)
     tenLinhVuc: string;     // Tên lĩnh vực
-    ngayTiepNhan: string;   // Ngày tiếp nhận
-    ngayHenTra: string;     // Ngày hẹn trả
+    ngayTiepNhan: string;   // Ngày nhận hồ sơ (thay Ngày tiếp nhận)
+    ngayHenTra: string;     // Ngày trả kết quả (thay Ngày hẹn trả)
     ngayKetThuc: string;    // Ngày kết thúc xử lý
     donVi: string;          // Cơ quan/đơn vị
-    chuHoSo: string;        // Chủ hồ sơ
+    chuHoSo: string;        // CHỦ SỬ DỤNG (thay Chủ hồ sơ)
     soDienThoai: string;    // Số điện thoại
     canBoXuLy: string;      // Cán bộ xử lý hiện tại
     trangThai: string;      // Trạng thái hồ sơ
+    chuyenQuyen?: string;   // CHUYỂN QUYỀN (bổ sung)
+    soTo?: string;          // Số tờ (bổ sung)
+    soThua?: string;        // Số thửa (bổ sung)
+    tongDienTich?: number | null; // Tổng diện tích (bổ sung)
+    dienTichDatO?: number | null; // Diện tích Đất ở (bổ sung)
+    dienTichDatNongNghiep?: number | null; // Diện tích đất nông nghiệp (bổ sung tự động)
+    diaDanh?: string;       // Địa danh (bổ sung)
+    soPhatHanh?: string;    // Số phát hành (bổ sung)
+    thoiHanSuDung?: string; // Thời hạn sử dụng (bổ sung)
+    cccd?: string;          // CCCD (bổ sung)
+    ghiChu?: string;        // GHI CHÚ (bổ sung)
 }
 
 function parseSafeDate(dateStr: string | null | undefined): string | null {
@@ -71,22 +82,44 @@ export const mapIGateToDb = (r: IGateRecord) => ({
     chu_ho_so: r.chuHoSo,
     so_dien_thoai: r.soDienThoai,
     can_bo_xu_ly: r.canBoXuLy,
-    trang_thai: r.trangThai
+    trang_thai: r.trangThai,
+    chuyen_quyen: r.chuyenQuyen || '',
+    so_to: r.soTo || '',
+    so_thua: r.soThua || '',
+    tong_dien_tich: r.tongDienTich !== undefined && r.tongDienTich !== null ? r.tongDienTich : null,
+    dien_tich_dat_o: r.dienTichDatO !== undefined && r.dienTichDatO !== null ? r.dienTichDatO : null,
+    dien_tich_dat_nong_nghiep: r.dienTichDatNongNghiep !== undefined && r.dienTichDatNongNghiep !== null ? r.dienTichDatNongNghiep : null,
+    dia_danh: r.diaDanh || '',
+    so_phat_hanh: r.soPhatHanh || '',
+    thoi_han_su_dung: r.thoiHanSuDung || '',
+    cccd: r.cccd || '',
+    ghi_chu: r.ghiChu || ''
 });
 
 export const mapIGateFromDb = (r: any): IGateRecord => ({
     id: r.id,
-    soHieu: r.so_hieu || r.soHieu,
-    tenThuTuc: r.ten_thu_tuc || r.tenThuTuc,
-    tenLinhVuc: r.ten_linh_vuc || r.tenLinhVuc,
+    soHieu: r.so_hieu || r.soHieu || '',
+    tenThuTuc: r.ten_thu_tuc || r.tenThuTuc || '',
+    tenLinhVuc: r.ten_linh_vuc || r.tenLinhVuc || '',
     ngayTiepNhan: r.ngay_tiep_nhan || r.ngayTiepNhan || '',
     ngayHenTra: r.ngay_hen_tra || r.ngayHenTra || '',
     ngayKetThuc: r.ngay_ket_thuc || r.ngayKetThuc || '',
     donVi: r.don_vi || r.donVi || '',
-    chuHoSo: r.chu_ho_so || r.chuHoSo,
+    chuHoSo: r.chu_ho_so || r.chuHoSo || '',
     soDienThoai: r.so_dien_thoai || r.soDienThoai || '',
     canBoXuLy: r.can_bo_xu_ly || r.canBoXuLy || '',
-    trangThai: r.trang_thai || r.trangThai || ''
+    trangThai: r.trang_thai || r.trangThai || '',
+    chuyenQuyen: r.chuyen_quyen || r.chuyenQuyen || '',
+    soTo: r.so_to || r.soTo || '',
+    soThua: r.so_thua || r.soThua || '',
+    tongDienTich: r.tong_dien_tich !== undefined && r.tong_dien_tich !== null ? Number(r.tong_dien_tich) : null,
+    dienTichDatO: r.dien_tich_dat_o !== undefined && r.dien_tich_dat_o !== null ? Number(r.dien_tich_dat_o) : null,
+    dienTichDatNongNghiep: r.dien_tich_dat_nong_nghiep !== undefined && r.dien_tich_dat_nong_nghiep !== null ? Number(r.dien_tich_dat_nong_nghiep) : null,
+    diaDanh: r.dia_danh || r.diaDanh || '',
+    soPhatHanh: r.so_phat_hanh || r.soPhatHanh || '',
+    thoiHanSuDung: r.thoi_han_su_dung || r.thoiHanSuDung || '',
+    cccd: r.cccd || '',
+    ghiChu: r.ghi_chu || r.ghiChu || ''
 });
 
 const LOCAL_STORAGE_KEY = 'IGATE_RECORDS';

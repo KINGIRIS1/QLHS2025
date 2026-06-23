@@ -249,12 +249,13 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
     const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
         try {
-            const saved = localStorage.getItem('igate_visible_columns');
+            const saved = localStorage.getItem('igate_visible_columns_v4');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 return {
                     stt: parsed.stt !== undefined ? parsed.stt : true,
                     thongTinHoSo: parsed.thongTinHoSo !== undefined ? parsed.thongTinHoSo : true,
+                    cccd: parsed.cccd !== undefined ? parsed.cccd : true,
                     tenThuTuc: parsed.tenThuTuc !== undefined ? parsed.tenThuTuc : true,
                     tenLinhVuc: parsed.tenLinhVuc !== undefined ? parsed.tenLinhVuc : false,
                     thoiHanXuLy: parsed.thoiHanXuLy !== undefined ? parsed.thoiHanXuLy : true,
@@ -265,22 +266,22 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     chuyenQuyen: parsed.chuyenQuyen !== undefined ? parsed.chuyenQuyen : true,
                     soTo: parsed.soTo !== undefined ? parsed.soTo : true,
                     soThua: parsed.soThua !== undefined ? parsed.soThua : true,
-                    tongDienTich: parsed.tongDienTich !== undefined ? parsed.tongDienTich : true,
-                    dienTichDatO: parsed.dienTichDatO !== undefined ? parsed.dienTichDatO : true,
-                    dienTichDatNongNghiep: parsed.dienTichDatNongNghiep !== undefined ? parsed.dienTichDatNongNghiep : true,
+                    tongDienTich: parsed.tongDienTich !== undefined ? parsed.tongDienTich : false,
+                    dienTichDatO: parsed.dienTichDatO !== undefined ? parsed.dienTichDatO : false,
+                    dienTichDatNongNghiep: parsed.dienTichDatNongNghiep !== undefined ? parsed.dienTichDatNongNghiep : false,
                     diaDanh: parsed.diaDanh !== undefined ? parsed.diaDanh : true,
-                    soPhatHanh: parsed.soPhatHanh !== undefined ? parsed.soPhatHanh : true,
-                    thoiHanSuDung: parsed.thoiHanSuDung !== undefined ? parsed.thoiHanSuDung : true,
-                    cccd: parsed.cccd !== undefined ? parsed.cccd : true,
+                    soPhatHanh: parsed.soPhatHanh !== undefined ? parsed.soPhatHanh : false,
+                    thoiHanSuDung: parsed.thoiHanSuDung !== undefined ? parsed.thoiHanSuDung : false,
                     ghiChu: parsed.ghiChu !== undefined ? parsed.ghiChu : true,
                 };
             }
         } catch (e) {
-            console.error('Lỗi khi đọc visibleColumns từ localStorage', e);
+            console.error('Lỗi khi đọc visibleColumns từ localStorage v4', e);
         }
         return {
             stt: true,
             thongTinHoSo: true,
+            cccd: true,
             tenThuTuc: true,
             tenLinhVuc: false,
             thoiHanXuLy: true,
@@ -291,22 +292,21 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             chuyenQuyen: true,
             soTo: true,
             soThua: true,
-            tongDienTich: true,
-            dienTichDatO: true,
-            dienTichDatNongNghiep: true,
+            tongDienTich: false,
+            dienTichDatO: false,
+            dienTichDatNongNghiep: false,
             diaDanh: true,
-            soPhatHanh: true,
-            thoiHanSuDung: true,
-            cccd: true,
+            soPhatHanh: false,
+            thoiHanSuDung: false,
             ghiChu: true,
         };
     });
 
     useEffect(() => {
         try {
-            localStorage.setItem('igate_visible_columns', JSON.stringify(visibleColumns));
+            localStorage.setItem('igate_visible_columns_v4', JSON.stringify(visibleColumns));
         } catch (e) {
-            console.error('Lỗi khi lưu visibleColumns vào localStorage', e);
+            console.error('Lỗi khi lưu visibleColumns vào localStorage v4', e);
         }
     }, [visibleColumns]);
     const columnDropdownRef = useRef<HTMLDivElement>(null);
@@ -314,6 +314,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const columnsList = [
         { key: 'stt', label: 'STT' },
         { key: 'thongTinHoSo', label: 'Thông tin hồ sơ (Mã HS, Chủ sử dụng...)' },
+        { key: 'cccd', label: 'CCCD' },
         { key: 'tenThuTuc', label: 'Loại biến động' },
         { key: 'chuyenQuyen', label: 'CHUYỂN QUYỀN' },
         { key: 'soTo', label: 'Số tờ' },
@@ -324,7 +325,6 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         { key: 'diaDanh', label: 'Địa danh' },
         { key: 'soPhatHanh', label: 'Số phát hành' },
         { key: 'thoiHanSuDung', label: 'Thời hạn sử dụng' },
-        { key: 'cccd', label: 'CCCD' },
         { key: 'tenLinhVuc', label: 'Tên lĩnh vực' },
         { key: 'thoiHanXuLy', label: 'Thời hạn nhận & trả' },
         { key: 'ngayKetThuc', label: 'Ngày kết thúc' },
@@ -1873,7 +1873,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             {/* --- PRIMARY DATA TABLE --- */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left table-fixed min-w-[2800px]">
+                    <table className="w-full text-left table-fixed min-w-[1850px]">
                         <thead className="bg-[#1E293B] text-slate-300 text-xs font-semibold uppercase sticky top-0 z-10">
                             <tr>
                                 <th className="px-3 py-3.5 w-11 text-center">
@@ -1891,26 +1891,26 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     />
                                 </th>
                                 {visibleColumns.stt && <th className="px-3 py-3.5 w-12 text-center text-slate-400">STT</th>}
-                                {visibleColumns.thongTinHoSo && <th className="px-3 py-3.5 w-[240px]">Thông tin hồ sơ</th>}
-                                {visibleColumns.tenThuTuc && <th className="px-3 py-3.5 w-[280px]">Loại biến động</th>}
-                                {visibleColumns.chuyenQuyen && <th className="px-3 py-3.5 w-[140px]">CHUYỂN QUYỀN</th>}
-                                {visibleColumns.soTo && <th className="px-3 py-3.5 w-[80px] text-center">Số tờ</th>}
-                                {visibleColumns.soThua && <th className="px-3 py-3.5 w-[80px] text-center">Số thửa</th>}
+                                {visibleColumns.thongTinHoSo && <th className="px-3 py-3.5 w-[230px]">Thông tin hồ sơ</th>}
+                                {visibleColumns.cccd && <th className="px-3 py-3.5 w-[110px] text-center font-mono">CCCD</th>}
+                                {visibleColumns.tenThuTuc && <th className="px-3 py-3.5 w-[240px]">Loại biến động</th>}
+                                {visibleColumns.chuyenQuyen && <th className="px-3 py-3.5 w-[130px]">CHUYỂN QUYỀN</th>}
+                                {visibleColumns.soTo && <th className="px-3 py-3.5 w-[65px] text-center">Số tờ</th>}
+                                {visibleColumns.soThua && <th className="px-3 py-3.5 w-[65px] text-center">Số thửa</th>}
                                 {visibleColumns.tongDienTich && <th className="px-3 py-3.5 w-[120px] text-center">Tổng diện tích</th>}
                                 {visibleColumns.dienTichDatO && <th className="px-3 py-3.5 w-[100px] text-center">Đất ở</th>}
-                                {visibleColumns.dienTichDatNongNghiep && <th className="px-3 py-3.5 w-[140px] text-center">Đất nông nghiệp</th>}
-                                {visibleColumns.diaDanh && <th className="px-3 py-3.5 w-[180px]">Địa danh</th>}
-                                {visibleColumns.soPhatHanh && <th className="px-3 py-3.5 w-[140px]">Số phát hành</th>}
-                                {visibleColumns.thoiHanSuDung && <th className="px-3 py-3.5 w-[180px]">Thời hạn sử dụng</th>}
-                                {visibleColumns.cccd && <th className="px-3 py-3.5 w-[130px] font-mono">CCCD</th>}
-                                {visibleColumns.tenLinhVuc && <th className="px-3 py-3.5 w-[160px]">Tên lĩnh vực</th>}
-                                {visibleColumns.thoiHanXuLy && <th className="px-3 py-3.5 w-[200px] text-center">Thời hạn nhận & trả</th>}
-                                {visibleColumns.ngayKetThuc && <th className="px-3 py-3.5 w-[120px] text-center">Kết thúc</th>}
-                                {visibleColumns.donVi && <th className="px-3 py-3.5 w-[180px]">Cơ quan/đơn vị</th>}
-                                {visibleColumns.canBoXuLy && <th className="px-3 py-3.5 w-[160px]">Cán bộ xử lý</th>}
-                                {visibleColumns.trangThai && <th className="px-3 py-3.5 w-[170px] text-center">Trạng thái hồ sơ</th>}
-                                {visibleColumns.ghiChu && <th className="px-3 py-3.5 w-[180px]">GHI CHÚ</th>}
-                                <th className="px-3 py-3.5 w-[140px] text-center sticky right-0 bg-[#1E293B] shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">Hành động</th>
+                                {visibleColumns.dienTichDatNongNghiep && <th className="px-3 py-3.5 w-[130px] text-center">Đất nông nghiệp</th>}
+                                {visibleColumns.diaDanh && <th className="px-3 py-3.5 w-[150px]">Địa danh</th>}
+                                {visibleColumns.soPhatHanh && <th className="px-3 py-3.5 w-[130px]">Số phát hành</th>}
+                                {visibleColumns.thoiHanSuDung && <th className="px-3 py-3.5 w-[140px]">Thời hạn sử dụng</th>}
+                                {visibleColumns.tenLinhVuc && <th className="px-3 py-3.5 w-[150px]">Tên lĩnh vực</th>}
+                                {visibleColumns.thoiHanXuLy && <th className="px-3 py-3.5 w-[170px] text-center">Thời hạn nhận & trả</th>}
+                                {visibleColumns.ngayKetThuc && <th className="px-3 py-3.5 w-[100px] text-center">Kết thúc</th>}
+                                {visibleColumns.donVi && <th className="px-3 py-3.5 w-[160px]">Cơ quan/đơn vị</th>}
+                                {visibleColumns.canBoXuLy && <th className="px-3 py-3.5 w-[140px]">Cán bộ xử lý</th>}
+                                {visibleColumns.trangThai && <th className="px-3 py-3.5 w-[155px] text-center">Trạng thái hồ sơ</th>}
+                                {visibleColumns.ghiChu && <th className="px-3 py-3.5 w-[160px]">GHI CHÚ</th>}
+                                <th className="px-3 py-3.5 w-[125px] text-center sticky right-0 bg-[#1E293B] shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
@@ -1966,7 +1966,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                     {/* Số hồ sơ */}
                                                     <div className="flex items-center gap-1.5 mb-0.5 bg-indigo-50/60 border border-indigo-100 px-2 py-0.5 rounded-lg w-fit">
                                                         <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Mã số:</span>
-                                                        <span className="font-mono font-extrabold text-[#1E293B] text-[14px]">{r.soHieu}</span>
+                                                        <span className="font-mono font-extrabold text-[#1E293B] text-[13px]">{r.soHieu}</span>
                                                     </div>
                                                     {/* Chủ hồ sơ */}
                                                     <div className="flex items-center gap-2 mt-0.5">
@@ -1974,7 +1974,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                             {r.chuHoSo ? r.chuHoSo.charAt(0).toUpperCase() : '?'}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <span className="font-bold text-slate-800 block truncate max-w-[180px] text-[14px]" title={r.chuHoSo}>{r.chuHoSo}</span>
+                                                            <span className="font-bold text-slate-800 block truncate max-w-[200px] text-[13px]" title={r.chuHoSo}>{r.chuHoSo}</span>
                                                         </div>
                                                     </div>
                                                     {/* Số điện thoại */}
@@ -1987,6 +1987,11 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                         <span className="text-slate-400 italic text-[11px] mt-0.5">- Không SĐT -</span>
                                                     )}
                                                 </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.cccd && (
+                                            <td className="px-3 py-3 text-center text-xs align-middle font-mono text-slate-700 font-medium">
+                                                {r.cccd || '-'}
                                             </td>
                                         )}
                                         {visibleColumns.tenThuTuc && (
@@ -2049,11 +2054,6 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                     )}
                                                     <span className="text-slate-500 font-semibold" title={r.thoiHanSuDung}>Đất NN: {r.thoiHanSuDung || '-'}</span>
                                                 </div>
-                                            </td>
-                                        )}
-                                        {visibleColumns.cccd && (
-                                            <td className="px-3 py-3 text-xs align-middle font-mono text-slate-700 font-medium">
-                                                {r.cccd || '-'}
                                             </td>
                                         )}
                                         {visibleColumns.tenLinhVuc && (

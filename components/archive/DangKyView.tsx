@@ -37,7 +37,7 @@ interface DangKyFormData {
 }
 
 const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
-    const [subView, setSubView] = useState<'record_dangky' | 'igate'>('record_dangky');
+    const [subView, setSubView] = useState<'record_dangky' | 'igate'>('igate');
     const [activeTab, setActiveTab] = useState<'all' | 'xu_ly' | 'thue' | 'gcn'>('all');
     const [thueSubTab, setThueSubTab] = useState<'tham_tra_thue' | 'chuyen_thue' | 'dong_thue'>('tham_tra_thue');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
@@ -704,16 +704,6 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         <div className="flex flex-col h-full bg-white">
             {/* Top Sub-tabs navigation */}
             <div className="px-4 pt-3 pb-0 border-b border-gray-200 flex gap-4 bg-gray-50 flex-shrink-0">
-                <button
-                    onClick={() => { setSubView('record_dangky'); }}
-                    className={`pb-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
-                        subView === 'record_dangky' 
-                            ? 'border-blue-600 text-blue-700' 
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-                    }`}
-                >
-                    <ClipboardList size={16} /> Hồ sơ Đăng ký
-                </button>
                 <button
                     onClick={() => { setSubView('igate'); }}
                     className={`pb-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${

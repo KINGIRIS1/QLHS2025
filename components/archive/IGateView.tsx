@@ -236,6 +236,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         soThua: '',
         tongDienTich: null,
         dienTichDatO: null,
+        dienTichDatNongNghiep: null,
         diaDanh: '',
         soPhatHanh: '',
         thoiHanSuDung: '',
@@ -441,10 +442,19 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             return;
         }
 
+        const tot = Number(formData.tongDienTich || 0);
+        const o = Number(formData.dienTichDatO || 0);
+        const calculatedNongNghiep = tot > 0 ? (tot - o) : null;
+
+        const dataToSave = {
+            ...formData,
+            dienTichDatNongNghiep: calculatedNongNghiep
+        };
+
         let isSuccess = false;
         if (editingRecord) {
             // Chỉnh sửa
-            const updatedRecord = { ...editingRecord, ...formData };
+            const updatedRecord = { ...editingRecord, ...dataToSave };
             const updated = records.map(r => r.id === editingRecord.id ? updatedRecord : r);
             setRecords(updated);
             isSuccess = await saveIGateRecordApi(updatedRecord, true, DEFAULT_IGATE_RECORDS);
@@ -452,7 +462,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             // Thêm mới
             const newRecord: IGateRecord = {
                 id: 'ig-' + Math.random().toString(36).substr(2, 9),
-                ...formData
+                ...dataToSave
             };
             setRecords([newRecord, ...records]);
             isSuccess = await saveIGateRecordApi(newRecord, false, DEFAULT_IGATE_RECORDS);
@@ -730,9 +740,20 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             ngayKetThuc: record.ngayKetThuc ? formatDisplayDateInClient(record.ngayKetThuc) : '',
             donVi: record.donVi,
             chuHoSo: record.chuHoSo,
-            soDienThoai: record.soDienThoai,
-            canBoXuLy: record.canBoXuLy,
-            trangThai: record.trangThai
+            soDienThoai: record.soDienThoai || '',
+            canBoXuLy: record.canBoXuLy || '',
+            trangThai: record.trangThai,
+            chuyenQuyen: record.chuyenQuyen || '',
+            soTo: record.soTo || '',
+            soThua: record.soThua || '',
+            tongDienTich: record.tongDienTich !== undefined ? record.tongDienTich : null,
+            dienTichDatO: record.dienTichDatO !== undefined ? record.dienTichDatO : null,
+            dienTichDatNongNghiep: record.dienTichDatNongNghiep !== undefined ? record.dienTichDatNongNghiep : null,
+            diaDanh: record.diaDanh || '',
+            soPhatHanh: record.soPhatHanh || '',
+            thoiHanSuDung: record.thoiHanSuDung || '',
+            cccd: record.cccd || '',
+            ghiChu: record.ghiChu || ''
         });
         setIsFormOpen(true);
     };
@@ -2991,6 +3012,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                             value={formData.canBoXuLy}
                                             onChange={(e) => setFormData(prev => ({ ...prev, canBoXuLy: e.target.value }))}
                                         >
+                                            <option value="">Chưa giao cán bộ xử lý</option>
                                             {canBoList.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
@@ -3063,7 +3085,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Cán bộ phụ trách</span>
                                     <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 font-sans">
                                         <UserIcon size={14} className="text-slate-400" />
-                                        {viewingRecord.canBoXuLy || 'Chưa gán cán bộ'}
+                                        {viewingRecord.canBoXuLy || 'Chưa giao cán bộ xử lý'}
                                     </span>
                                 </div>
                                 {(() => {

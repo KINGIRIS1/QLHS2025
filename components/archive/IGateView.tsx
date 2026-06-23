@@ -960,7 +960,12 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 const idxTenLinhVuc = findColIndex(['tên lĩnh vực', 'lĩnh vực', 'linh vuc']);
                 const idxNgayTiepNhan = findColIndex(['ngày tiếp nhận', 'tiếp nhận', 'ngay tiep nhan', 'ngày nhận', 'ngay nhan']);
                 const idxNgayHenTra = findColIndex(['ngày hẹn trả', 'hẹn trả', 'ngay hen tra', 'ngày trả', 'ngay tra']);
-                const idxNgayKetThuc = findColIndex(['kết thúc xử lý', 'ngày kết thúc', 'hoàn thành', 'ngay ket thuc', 'ngày trả kết quả', 'ngay tra ket qua']);
+                let idxNgayKetThuc = findColIndex(['kết thúc xử lý', 'ngày kết thúc', 'hoàn thành', 'ngay ket thuc', 'ngày trả kết quả', 'ngay tra ket qua']);
+                
+                // Nếu cột ngày kết thúc/ ngày trả thực tế trùng khớp với ngày hẹn trả hoặc ngày tiếp nhận, nghĩa là không thực sự có cột ngày trả thực tế riêng biệt
+                if (idxNgayKetThuc !== -1 && (idxNgayKetThuc === idxNgayHenTra || idxNgayKetThuc === idxNgayTiepNhan)) {
+                    idxNgayKetThuc = -1;
+                }
                 const idxDonVi = findColIndex(['cơ quan', 'đơn vị', 'co quan', 'don vi']);
                 const idxChuHoSo = findColIndex(['chủ hồ sơ', 'chủ sử dụng', 'khách hàng', 'chu ho so', 'chu su dung', 'tên chủ']);
                 const idxSoDienThoai = findColIndex(['số điện thoại', 'sđt', 'điện thoại', 'so dien thoai', 'sdt']);

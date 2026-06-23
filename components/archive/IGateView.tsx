@@ -1064,7 +1064,20 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     }
 
                     // Tự động gán thời hạn sử dụng theo yêu cầu đề bài
-                    let thoiHanSuDung = idxThoiHanSuDung !== -1 && row[idxThoiHanSuDung] ? String(row[idxThoiHanSuDung]).trim() : '';
+                    let thoiHanSuDung = '';
+                    if (idxThoiHanSuDung !== -1 && row[idxThoiHanSuDung] !== undefined && row[idxThoiHanSuDung] !== null) {
+                        const rawVal = row[idxThoiHanSuDung];
+                        if (typeof rawVal === 'number') {
+                            thoiHanSuDung = parseExcelDate(rawVal);
+                        } else {
+                            const strVal = String(rawVal).trim();
+                            if (/^\d{5,6}$/.test(strVal)) {
+                                thoiHanSuDung = parseExcelDate(Number(strVal));
+                            } else {
+                                thoiHanSuDung = strVal;
+                            }
+                        }
+                    }
 
                     newRecords.push({
                         id: 'ig-' + Math.random().toString(36).substr(2, 9),
@@ -1073,10 +1086,18 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         tenLinhVuc: idxTenLinhVuc !== -1 && row[idxTenLinhVuc] ? String(row[idxTenLinhVuc]).trim() : 'Đất đai',
                         ngayTiepNhan: idxNgayTiepNhan !== -1 ? parseExcelDate(row[idxNgayTiepNhan]) : new Date().toISOString().split('T')[0],
                         ngayHenTra: idxNgayHenTra !== -1 ? parseExcelDate(row[idxNgayHenTra]) : '',
-                        ngayKetThuc: idxNgayKetThuc !== -1 ? parseExcelDate(row[idxNgayKetThuc]) : '',
+                        ngayKetThuc: (idxNgayKetThuc !== -1 && row[idxNgayKetThuc]) ? parseExcelDate(row[idxNgayKetThuc]) : '',
                         donVi: idxDonVi !== -1 && row[idxDonVi] ? String(row[idxDonVi]).trim() : 'Chi nhánh Văn phòng Đăng ký Đất đai',
                         chuHoSo: chuHoSo || 'Chưa xác định',
-                        soDienThoai: idxSoDienThoai !== -1 ? String(row[idxSoDienThoai] || '').trim() : '',
+                        soDienThoai: (() => {
+                            if (idxSoDienThoai === -1 || row[idxSoDienThoai] === undefined || row[idxSoDienThoai] === null) return '';
+                            let valStr = String(row[idxSoDienThoai]).trim();
+                            const digits = valStr.replace(/[^\d]/g, '');
+                            if (digits.length > 0 && !valStr.startsWith('0') && !valStr.startsWith('+')) {
+                                return '0' + valStr;
+                            }
+                            return valStr;
+                        })(),
                         canBoXuLy: idxCanBo !== -1 && row[idxCanBo] ? String(row[idxCanBo]).trim() : '',
                         trangThai: normalizedTrangThai,
                         
@@ -1090,7 +1111,14 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         diaDanh: idxDiaDanh !== -1 && row[idxDiaDanh] ? String(row[idxDiaDanh]).trim() : '',
                         soPhatHanh: idxSoPhatHanh !== -1 && row[idxSoPhatHanh] ? String(row[idxSoPhatHanh]).trim() : '',
                         thoiHanSuDung: thoiHanSuDung,
-                        cccd: idxCCCD !== -1 && row[idxCCCD] ? String(row[idxCCCD]).trim() : '',
+                        cccd: (() => {
+                            if (idxCCCD === -1 || row[idxCCCD] === undefined || row[idxCCCD] === null) return '';
+                            let valStr = String(row[idxCCCD]).trim().replace(/\s+/g, '');
+                            if (/^\d{11}$/.test(valStr)) {
+                                return '0' + valStr;
+                            }
+                            return valStr;
+                        })(),
                         ghiChu: idxGhiChu !== -1 && row[idxGhiChu] ? String(row[idxGhiChu]).trim() : ''
                     });
                 }
@@ -1151,9 +1179,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             
             let thoiHanShow = '';
             if (o > 0) {
-                thoiHanShow = `Đất ở: Lâu dài. Đất NN: ${r.thoiHanSuDung || '-'}`;
+                thoiHanShow = `Đất ở: Lâu dài. Đất NN: ${formatDisplayDateInClient(r.thoiHanSuDung)}`;
             } else {
-                thoiHanShow = r.thoiHanSuDung ? `Đất NN: ${r.thoiHanSuDung}` : '-';
+                thoiHanShow = r.thoiHanSuDung ? `Đất NN: ${formatDisplayDateInClient(r.thoiHanSuDung)}` : '-';
             }
 
             return [
@@ -2049,7 +2077,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                     {Number(r.dienTichDatO || 0) > 0 && (
                                                         <span className="text-indigo-700 font-bold">Đất ở: Lâu dài</span>
                                                     )}
-                                                    <span className="text-slate-500 font-semibold" title={r.thoiHanSuDung}>Đất NN: {r.thoiHanSuDung || '-'}</span>
+                                                    <span className="text-slate-500 font-semibold" title={r.thoiHanSuDung}>Đất NN: {formatDisplayDateInClient(r.thoiHanSuDung)}</span>
                                                 </div>
                                             </td>
                                         )}
@@ -3128,7 +3156,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                             {Number(viewingRecord.dienTichDatO || 0) > 0 && (
                                                 <span className="text-indigo-800 font-bold">Đất ở: Lâu dài</span>
                                             )}
-                                            <span className="text-slate-500 font-semibold">Đất NN: {viewingRecord.thoiHanSuDung || '-'}</span>
+                                            <span className="text-slate-500 font-semibold">Đất NN: {formatDisplayDateInClient(viewingRecord.thoiHanSuDung)}</span>
                                         </div>
                                     </div>
                                 </div>

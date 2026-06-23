@@ -1065,9 +1065,6 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                     // Tự động gán thời hạn sử dụng theo yêu cầu đề bài
                     let thoiHanSuDung = idxThoiHanSuDung !== -1 && row[idxThoiHanSuDung] ? String(row[idxThoiHanSuDung]).trim() : '';
-                    if (!thoiHanSuDung && dienTichDatO && dienTichDatO > 0) {
-                        thoiHanSuDung = '50 năm'; // default cho đất nông nghiệp khi có đất thổ cư
-                    }
 
                     newRecords.push({
                         id: 'ig-' + Math.random().toString(36).substr(2, 9),
@@ -1080,7 +1077,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         donVi: idxDonVi !== -1 && row[idxDonVi] ? String(row[idxDonVi]).trim() : 'Chi nhánh Văn phòng Đăng ký Đất đai',
                         chuHoSo: chuHoSo || 'Chưa xác định',
                         soDienThoai: idxSoDienThoai !== -1 ? String(row[idxSoDienThoai] || '').trim() : '',
-                        canBoXuLy: idxCanBo !== -1 && row[idxCanBo] ? String(row[idxCanBo]).trim() : (canBoList[0] || 'Chưa phân công'),
+                        canBoXuLy: idxCanBo !== -1 && row[idxCanBo] ? String(row[idxCanBo]).trim() : '',
                         trangThai: normalizedTrangThai,
                         
                         // Ánh xạ các trường mới

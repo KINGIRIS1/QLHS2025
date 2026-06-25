@@ -47,6 +47,7 @@ interface AppRoutesProps {
     // Handlers
     handleViewRecord: (r: RecordFile) => void;
     handleMapCorrectionRequest: (r: RecordFile) => void;
+    handleUpdateReturnResult?: (record: RecordFile, receiptNumber: string, resultReturnedDate: string, receiverName: string) => Promise<boolean>;
     handleAddOrUpdateRecord: (r: RecordFile) => Promise<boolean>;
     handleDeleteRecord: (id: string) => Promise<boolean>;
     handleUpdateUser: (u: User, isUpdate: boolean) => void;
@@ -521,6 +522,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     records={records}
                     holidays={holidays}
                     onReturnResult={props.handleOpenReturnModal}
+                    onUpdateReturnResult={props.handleUpdateReturnResult}
                 />
             );
         case 'receive_contract':

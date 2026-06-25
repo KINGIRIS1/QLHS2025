@@ -4,7 +4,7 @@ import {
     Search, Plus, Trash2, Edit, Save, X, Calendar, Phone, FileSpreadsheet, 
     Download, LayoutGrid, FileText, ClipboardList, BookOpen, User as UserIcon, 
     Building, CheckCircle2, AlertTriangle, FilePieChart, TrendingUp, BarChart3,
-    ArrowUpRight, AlertCircle, RefreshCw, Printer, Filter, Upload, Tag
+    ArrowUpRight, AlertCircle, RefreshCw, Printer, Filter, Upload, Tag, Info
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx-js-style';
@@ -215,6 +215,25 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [excelDuplicateCodes, setExcelDuplicateCodes] = useState<{ code: string; count: number; rows: number[]; chuHoSo: string }[]>([]);
     const [excelMatchedRowsCount, setExcelMatchedRowsCount] = useState<number>(0);
     const excelFileInputRef = useRef<HTMLInputElement>(null);
+
+    // State cho việc hiển thị báo cáo & kiểm tra trùng tệp Excel iGate trước khi lưu
+    const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
+    const [tempImportedRecords, setTempImportedRecords] = useState<IGateRecord[]>([]);
+    const [importReport, setImportReport] = useState<{
+        totalCount: number;
+        validCount: number;
+        duplicateInFileCount: number;
+        duplicateWithDbCount: number;
+        duplicateInFileCodes: string[];
+        duplicateWithDbCodes: string[];
+    }>({
+        totalCount: 0,
+        validCount: 0,
+        duplicateInFileCount: 0,
+        duplicateWithDbCount: 0,
+        duplicateInFileCodes: [],
+        duplicateWithDbCodes: []
+    });
 
     // Modal Form States
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -1150,8 +1169,48 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 }
 
                 if (newRecords.length > 0) {
-                    saveRecords([...newRecords, ...records]);
-                    alert(`Đã nhập thành công ${newRecords.length} hồ sơ iGate từ tệp Excel!`);
+                    const seenInFile = new Map<string, number>();
+                    const duplicateInFileCodesSet = new Set<string>();
+                    const duplicateWithDbCodesSet = new Set<string>();
+
+                    const existingCodes = new Set(records.map(r => r.soHieu));
+
+                    newRecords.forEach(r => {
+                        const code = r.soHieu;
+                        if (!code) return;
+                        
+                        // Kiểm tra trùng nội bộ tệp
+                        if (seenInFile.has(code)) {
+                            duplicateInFileCodesSet.add(code);
+                            seenInFile.set(code, seenInFile.get(code)! + 1);
+                        } else {
+                            seenInFile.set(code, 1);
+                        }
+
+                        // Kiểm tra trùng với DB
+                        if (existingCodes.has(code)) {
+                            duplicateWithDbCodesSet.add(code);
+                        }
+                    });
+
+                    const duplicateInFileCodes = Array.from(duplicateInFileCodesSet);
+                    const duplicateWithDbCodes = Array.from(duplicateWithDbCodesSet);
+                    const totalCount = newRecords.length;
+                    
+                    // Các hồ sơ hợp lệ (không trùng nội bộ, không trùng DB)
+                    const validRecords = newRecords.filter(r => !duplicateInFileCodesSet.has(r.soHieu) && !duplicateWithDbCodesSet.has(r.soHieu));
+                    const validCount = validRecords.length;
+
+                    setTempImportedRecords(newRecords);
+                    setImportReport({
+                        totalCount,
+                        validCount,
+                        duplicateInFileCount: duplicateInFileCodes.length,
+                        duplicateWithDbCount: duplicateWithDbCodes.length,
+                        duplicateInFileCodes,
+                        duplicateWithDbCodes
+                    });
+                    setShowImportConfirmModal(true);
                 } else {
                     alert('Không tìm thấy dòng hợp lệ để nhập vào!');
                 }
@@ -1163,6 +1222,40 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         };
         reader.readAsBinaryString(file);
         e.target.value = ''; // Reset input
+    };
+
+    const handleConfirmImportWithSkip = async () => {
+        const dupInFileSet = new Set(importReport.duplicateInFileCodes);
+        const dupWithDbSet = new Set(importReport.duplicateWithDbCodes);
+        
+        const recordsToInsert = tempImportedRecords.filter(r => !dupInFileSet.has(r.soHieu) && !dupWithDbSet.has(r.soHieu));
+        
+        if (recordsToInsert.length === 0) {
+            alert("Không có hồ sơ hợp lệ nào để nhập!");
+            setShowImportConfirmModal(false);
+            return;
+        }
+
+        await saveRecords([...recordsToInsert, ...records]);
+        alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ iGate hợp lệ (đã tự động bỏ qua các hồ sơ trùng lặp)!`);
+        setShowImportConfirmModal(false);
+        setTempImportedRecords([]);
+    };
+
+    const handleConfirmImportWithOverwrite = async () => {
+        const uniqueFileRecordsMap = new Map<string, IGateRecord>();
+        tempImportedRecords.forEach(r => {
+            uniqueFileRecordsMap.set(r.soHieu, r);
+        });
+        const fileRecordsToImport = Array.from(uniqueFileRecordsMap.values());
+
+        const fileCodesSet = new Set(fileRecordsToImport.map(r => r.soHieu));
+        const keptDbRecords = records.filter(r => !fileCodesSet.has(r.soHieu));
+
+        await saveRecords([...fileRecordsToImport, ...keptDbRecords]);
+        alert(`Đã ghi đè/cập nhật và nhập thành công tổng cộng ${fileRecordsToImport.length} hồ sơ iGate vào Supabase!`);
+        setShowImportConfirmModal(false);
+        setTempImportedRecords([]);
     };
 
     // --- CHỨC NĂNG LẬP BÁO CÁO EXCEL CHUYÊN NGHIỆP ---
@@ -2251,7 +2344,130 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 </div>
             </div>
 
-                {/* --- MODAL CÔNG CỤ PHÂN LOẠI HỒ SƠ QUA EXCEL --- */}
+            {/* --- MODAL KIỂM SOÁT TRÙNG & BÁO CÁO NHẬP EXCEL IGATE --- */}
+            {showImportConfirmModal && (
+                <div id="igate-import-confirm-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-up border border-slate-100">
+                        <div className="bg-gradient-to-r from-blue-950 to-[#1E293B] p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base text-left">
+                                <FileSpreadsheet size={18} className="text-blue-400" />
+                                Kiểm soát Trùng & Báo cáo Số lượng Nhập Excel
+                            </h3>
+                            <button 
+                                onClick={() => {
+                                    setShowImportConfirmModal(false);
+                                    setTempImportedRecords([]);
+                                }} 
+                                className="rounded-lg p-1 hover:bg-white/10 text-white transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-4 flex-1 text-left">
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Hệ thống đã kiểm tra mã hồ sơ (<strong className="text-slate-700">Số hiệu</strong>) của tệp Excel so với dữ liệu hiện có trên Supabase và nội bộ tệp. Vui lòng xem báo cáo số lượng dưới đây:
+                            </p>
+
+                            {/* BẢNG BÁO CÁO SỐ LƯỢNG */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex flex-col justify-between">
+                                    <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Tổng số hồ sơ trong file</span>
+                                    <span className="text-2xl font-black text-blue-900 mt-1">{importReport.totalCount}</span>
+                                </div>
+                                <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex flex-col justify-between">
+                                    <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Hợp lệ (Sẵn sàng nhập)</span>
+                                    <span className="text-2xl font-black text-emerald-900 mt-1">{importReport.validCount}</span>
+                                </div>
+                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 flex flex-col justify-between">
+                                    <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Trùng nội bộ tệp Excel</span>
+                                    <span className="text-2xl font-black text-amber-900 mt-1">{importReport.duplicateInFileCount}</span>
+                                </div>
+                                <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 flex flex-col justify-between">
+                                    <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Trùng mã trên Supabase</span>
+                                    <span className="text-2xl font-black text-rose-900 mt-1">{importReport.duplicateWithDbCount}</span>
+                                </div>
+                            </div>
+
+                            {/* CHI TIẾT CÁC MÃ TRÙNG LẶP */}
+                            {(importReport.duplicateInFileCount > 0 || importReport.duplicateWithDbCount > 0) && (
+                                <div className="space-y-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+                                    <span className="text-[11px] font-bold text-slate-600 block">DANH SÁCH MÃ BỊ TRÙNG LẶP:</span>
+                                    
+                                    {importReport.duplicateInFileCount > 0 && (
+                                        <div className="space-y-1">
+                                            <div className="text-[10px] font-semibold text-amber-700 flex items-center gap-1">
+                                                <AlertTriangle size={12} />
+                                                Trùng nội bộ tệp ({importReport.duplicateInFileCount} mã):
+                                            </div>
+                                            <div className="max-h-[80px] overflow-y-auto bg-white p-2 rounded-lg border border-amber-100 text-xs font-mono text-slate-700 select-all flex flex-wrap gap-1">
+                                                {importReport.duplicateInFileCodes.map(code => (
+                                                    <span key={code} className="bg-amber-50 text-amber-805 px-1.5 py-0.5 rounded border border-amber-200">{code}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {importReport.duplicateWithDbCount > 0 && (
+                                        <div className="space-y-1 mt-2">
+                                            <div className="text-[10px] font-semibold text-rose-700 flex items-center gap-1">
+                                                <AlertCircle size={12} />
+                                                Trùng với Supabase ({importReport.duplicateWithDbCount} mã):
+                                            </div>
+                                            <div className="max-h-[80px] overflow-y-auto bg-white p-2 rounded-lg border border-rose-100 text-xs font-mono text-slate-700 select-all flex flex-wrap gap-1">
+                                                {importReport.duplicateWithDbCodes.map(code => (
+                                                    <span key={code} className="bg-rose-50 text-rose-800 px-1.5 py-0.5 rounded border border-rose-200">{code}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* KHUYẾN NGHỊ */}
+                            <div className="flex gap-2.5 bg-blue-50/50 p-3 rounded-xl border border-blue-100/50 text-slate-600">
+                                <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                                <div className="text-xs space-y-1 leading-relaxed">
+                                    <p className="font-semibold text-blue-900">Vui lòng chọn phương án nhập dữ liệu:</p>
+                                    <ul className="list-disc list-inside space-y-0.5 pl-1">
+                                        <li><strong>Bỏ qua trùng</strong>: Hệ thống sẽ chỉ lấy các hồ sơ hợp lệ (<strong className="text-emerald-700">{importReport.validCount}</strong> hồ sơ) để nhập.</li>
+                                        <li><strong>Ghi đè & Nhập tất cả</strong>: Tự động cập nhật các hồ sơ trùng lặp theo dữ liệu Excel mới nhất của bạn.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-5 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowImportConfirmModal(false);
+                                    setTempImportedRecords([]);
+                                }}
+                                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-100 font-bold text-sm transition-all text-center cursor-pointer"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmImportWithSkip}
+                                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                Bỏ qua hồ sơ trùng
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmImportWithOverwrite}
+                                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                Ghi đè & Nhập tất cả
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL CÔNG CỤ PHÂN LOẠI HỒ SƠ QUA EXCEL --- */}
             {showExcelClassifyModal && (
                 <div id="igate-excel-classify-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-up">

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock, ClipboardCheck } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
@@ -50,7 +50,12 @@ const mapArchiveToRecordFile = (ar: any): RecordFile => {
         assignedTo: d.assigned_to || null,
         exportBatch: d.danh_sach || d.exportBatch || null,
         exportDate: d.ngay_hoan_thanh || d.exportDate || null,
-        extendedDeadline: d.extendedDeadline || null
+        extendedDeadline: d.extendedDeadline || null,
+        _isArchive: true,
+        _archiveType: ar.type,
+        receiptNumber: d.so_bien_lai || null,
+        resultReturnedDate: d.ngay_tra_ket_qua || null,
+        receiverName: d.nguoi_nhan_kq || null
     };
 };
 
@@ -60,6 +65,7 @@ import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
 import { RecordSearchView } from './receive-record/RecordSearchView';
 import { ExtendedList } from './receive-record/ExtendedList';
+import { ReturnedList } from './receive-record/ReturnedList';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
@@ -74,6 +80,7 @@ interface ReceiveRecordProps {
   records?: RecordFile[];
   holidays: Holiday[]; // New prop
   onReturnResult?: (record: RecordFile) => void;
+  onUpdateReturnResult?: (record: RecordFile, receiptNumber: string, resultReturnedDate: string, receiverName: string) => Promise<boolean>;
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -108,8 +115,8 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onReturnResult }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended'>('create');
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onReturnResult, onUpdateReturnResult }) => {
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended' | 'returned_list'>('create');
   const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   
   // State quản lý danh sách hồ sơ Sao lục lấy từ Archive
@@ -523,24 +530,27 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
-        <div className="flex bg-white p-1 rounded-lg border border-gray-200">
+        <div className="flex bg-white p-1 rounded-lg border border-gray-200 overflow-x-auto">
             <button 
                 onClick={() => { setViewMode('create'); setEditingRecord(null); }} 
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
             >
                 <PlusCircle size={16} /> Nhập mới
             </button>
-            <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+            <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
             </button>
-            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <LayoutList size={16} /> Danh sách hôm nay
             </button>
-            <button onClick={() => setViewMode('search')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+            <button onClick={() => setViewMode('search')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <Search size={16} /> Tra cứu hồ sơ
             </button>
-            <button onClick={() => setViewMode('extended')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'extended' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+            <button onClick={() => setViewMode('extended')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'extended' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <Clock size={16} /> Hồ sơ gia hạn
+            </button>
+            <button onClick={() => setViewMode('returned_list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'returned_list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <ClipboardCheck size={16} /> Danh sách đã trả kết quả
             </button>
         </div>
         
@@ -609,6 +619,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 employees={employees}
                 onReturnResult={onReturnResult || (() => {})}
                 onExtendRecord={handleExtendRecord}
+                onUpdateReturnResult={onUpdateReturnResult}
             />
         )}
 
@@ -622,6 +633,21 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 wards={wards}
                 currentUser={currentUser}
                 employees={employees}
+                onPrint={handlePreviewDocx}
+            />
+        )}
+
+        {viewMode === 'returned_list' && (
+            <ReturnedList 
+                records={records}
+                archiveSaoLucRecords={archiveSaoLucRecords}
+                archiveVaoSoRecords={archiveVaoSoRecords}
+                archiveDangKyRecords={archiveDangKyRecords}
+                archiveCongVanRecords={archiveCongVanRecords}
+                wards={wards}
+                currentUser={currentUser}
+                employees={employees}
+                onPreviewExcel={handlePreviewExcel}
                 onPrint={handlePreviewDocx}
             />
         )}

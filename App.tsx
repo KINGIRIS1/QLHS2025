@@ -499,6 +499,53 @@ function App() {
       setReturnRecord(null);
   }, [returnRecord, currentUser]);
 
+  const handleUpdateReturnResult = useCallback(async (record: RecordFile, receiptNumber: string, resultReturnedDate: string, receiverName: string) => {
+      if (record._isArchive) {
+          try {
+              const origArchive = await fetchArchiveRecordById(record.id);
+              if (origArchive) {
+                  const updatedArchive = {
+                      ...origArchive,
+                      data: {
+                          ...origArchive.data,
+                          so_bien_lai: receiptNumber,
+                          nguoi_nhan_kq: receiverName,
+                          ngay_tra_ket_qua: resultReturnedDate
+                      }
+                  };
+                  await saveArchiveRecord(updatedArchive);
+                  window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: record._archiveType || 'saoluc' } }));
+                  setToast({ type: 'success', message: `Đã cập nhật thông tin trả kết quả hồ sơ ${record.code}.` });
+                  return true;
+              }
+          } catch (e) {
+              console.error("Lỗi cập nhật kết quả trả của archive_record:", e);
+              setToast({ type: 'error', message: 'Lỗi cập nhật thông tin trả kết quả lưu trữ!' });
+              return false;
+          }
+      } else {
+          try {
+              const updates = { 
+                  receiptNumber, 
+                  resultReturnedDate, 
+                  receiverName 
+              };
+              const updatedRecord = { ...record, ...updates };
+              setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+              const success = await updateRecordApi(updatedRecord);
+              if (success) {
+                  setToast({ type: 'success', message: `Đã cập nhật thông tin trả kết quả hồ sơ ${record.code}.` });
+                  return true;
+              }
+          } catch (e) {
+              console.error("Lỗi cập nhật kết quả trả của record:", e);
+              setToast({ type: 'error', message: 'Lỗi cập nhật thông tin trả kết quả!' });
+              return false;
+          }
+      }
+      return false;
+  }, [setRecords]);
+
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
       const newValue = !record.needsMapCorrection;
       const updatedRecord = { ...record, needsMapCorrection: newValue };
@@ -766,6 +813,7 @@ function App() {
             
             handleViewRecord={(r) => setViewingRecord(r)}
             handleMapCorrectionRequest={handleMapCorrectionRequest}
+            handleUpdateReturnResult={handleUpdateReturnResult}
             handleAddOrUpdateRecord={handleAddOrUpdateRecord}
             handleDeleteRecord={handleDeleteRecord}
             handleUpdateUser={handleUpdateUser}

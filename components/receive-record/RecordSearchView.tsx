@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, Employee } from '../../types';
 import { RecordStatus } from '../../types';
-import { Search, MapPin, CheckCircle, ShieldCheck, HelpCircle, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, CalendarClock } from 'lucide-react';
+import { Search, MapPin, CheckCircle, ShieldCheck, HelpCircle, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, CalendarClock, Edit2 } from 'lucide-react';
 import { getShortRecordType } from '../../constants';
 
 interface RecordSearchViewProps {
@@ -11,6 +11,7 @@ interface RecordSearchViewProps {
   employees: Employee[];
   onReturnResult: (record: RecordFile) => void;
   onExtendRecord?: (record: RecordFile, extDate: string) => Promise<boolean>;
+  onUpdateReturnResult?: (record: RecordFile, receiptNumber: string, resultReturnedDate: string, receiverName: string) => Promise<boolean>;
 }
 
 const SEARCHABLE_RECORD_TYPES = [
@@ -35,7 +36,8 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
   currentUser,
   employees,
   onReturnResult,
-  onExtendRecord
+  onExtendRecord,
+  onUpdateReturnResult
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterWard, setFilterWard] = useState<string>('all');
@@ -47,6 +49,43 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
   const [selectedRecordForExtend, setSelectedRecordForExtend] = useState<RecordFile | null>(null);
   const [extendDateInput, setExtendDateInput] = useState('');
   const [isSubmittingExtend, setIsSubmittingExtend] = useState(false);
+
+  // Trạng thái modal cập nhật trả kết quả
+  const [showUpdateReturnModal, setShowUpdateReturnModal] = useState(false);
+  const [selectedRecordForUpdateReturn, setSelectedRecordForUpdateReturn] = useState<RecordFile | null>(null);
+  const [editReceiptNumber, setEditReceiptNumber] = useState('');
+  const [editResultReturnedDate, setEditResultReturnedDate] = useState('');
+  const [editReceiverName, setEditReceiverName] = useState('');
+  const [isSubmittingUpdateReturn, setIsSubmittingUpdateReturn] = useState(false);
+
+  const handleConfirmUpdateReturn = async () => {
+    if (!selectedRecordForUpdateReturn) return;
+    setIsSubmittingUpdateReturn(true);
+    try {
+      if (onUpdateReturnResult) {
+        const success = await onUpdateReturnResult(
+          selectedRecordForUpdateReturn,
+          editReceiptNumber,
+          editResultReturnedDate,
+          editReceiverName
+        );
+        if (success) {
+          setShowUpdateReturnModal(false);
+          setSelectedRecordForUpdateReturn(null);
+          alert("Cập nhật thông tin trả kết quả thành công!");
+        } else {
+          alert("Lỗi cập nhật dữ liệu. Vui lòng thử lại!");
+        }
+      } else {
+        alert("Hệ thống chưa hỗ trợ chức năng cập nhật tại đây!");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Đã xảy ra lỗi khi cập nhật!");
+    } finally {
+      setIsSubmittingUpdateReturn(false);
+    }
+  };
 
   const handleConfirmExtend = async () => {
     if (!selectedRecordForExtend || !extendDateInput) return;
@@ -464,13 +503,34 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
 
                     <td className="p-3 align-middle text-center">
                       {isReturned ? (
-                        <div className="flex flex-col items-center justify-center space-y-0.5 text-emerald-600" id={`returned-label-${r.id}`}>
-                          <ShieldCheck size={18} className="text-emerald-500" />
+                        <div className="flex flex-col items-center justify-center space-y-1 text-emerald-600" id={`returned-label-${r.id}`}>
+                          <ShieldCheck size={18} className="text-emerald-500 flex-shrink-0" />
                           <span className="text-[10px] font-bold text-emerald-650">Người nhận:</span>
                           <span className="text-[10px] font-medium bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[125px] text-emerald-700" title={r.receiverName || ''}>
                             {r.receiverName || 'Chủ hồ sơ'}
                           </span>
+                          {r.receiptNumber && (
+                            <span className="text-[10px] font-mono text-gray-500 whitespace-nowrap">
+                              BL: <strong className="text-gray-700">{r.receiptNumber}</strong>
+                            </span>
+                          )}
                           <span className="text-[9px] text-gray-450 font-mono">{formatDate(r.resultReturnedDate)}</span>
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRecordForUpdateReturn(r);
+                              setEditReceiptNumber(r.receiptNumber || '');
+                              setEditResultReturnedDate(r.resultReturnedDate || '');
+                              setEditReceiverName(r.receiverName || '');
+                              setShowUpdateReturnModal(true);
+                            }}
+                            className="mt-1 flex items-center gap-1 text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded transition-colors font-semibold border border-blue-200"
+                            title="Sửa thông tin trả kết quả"
+                          >
+                            <Edit2 size={10} />
+                            Cập nhật trả KQ
+                          </button>
                         </div>
                       ) : isWithdrawn ? (
                         <span className="text-xs text-rose-500 font-bold bg-rose-50 px-2 py-1 rounded border border-rose-100" id={`withdrawn-label-${r.id}`}>
@@ -684,6 +744,94 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
                 className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-amber-500/20 active:scale-95"
               >
                 {isSubmittingExtend ? 'Đang cập nhật...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CẬP NHẬT TRẢ KẾT QUẢ */}
+      {showUpdateReturnModal && selectedRecordForUpdateReturn && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-scale-up border border-gray-100 flex flex-col gap-4">
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+              <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
+                <Edit2 size={22} className="animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Cập nhật trả kết quả</h3>
+                <p className="text-xs text-gray-500">Sửa thông tin biên lai, ngày trả và người nhận kết quả</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-650 space-y-2">
+              <div className="flex justify-between">
+                <span>Mã hồ sơ:</span>
+                <strong className="text-gray-800">{selectedRecordForUpdateReturn.code}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Khách hàng:</span>
+                <strong className="text-gray-800">{selectedRecordForUpdateReturn.customerName}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Loại hồ sơ:</span>
+                <strong className="text-gray-800">{selectedRecordForUpdateReturn.recordType}</strong>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Số biên lai</label>
+                <input
+                  type="text"
+                  placeholder="Nhập số biên lai..."
+                  className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium shadow-inner"
+                  value={editReceiptNumber}
+                  onChange={(e) => setEditReceiptNumber(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Người nhận kết quả</label>
+                <input
+                  type="text"
+                  placeholder="Nhập họ tên người nhận..."
+                  className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium shadow-inner"
+                  value={editReceiverName}
+                  onChange={(e) => setEditReceiverName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Ngày trả kết quả</label>
+                <input
+                  type="date"
+                  required
+                  className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium shadow-inner"
+                  value={editResultReturnedDate}
+                  onChange={(e) => setEditResultReturnedDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUpdateReturnModal(false);
+                  setSelectedRecordForUpdateReturn(null);
+                }}
+                className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 text-sm font-bold transition-all"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUpdateReturn}
+                disabled={isSubmittingUpdateReturn}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-500/20 active:scale-95"
+              >
+                {isSubmittingUpdateReturn ? 'Đang cập nhật...' : 'Xác nhận'}
               </button>
             </div>
           </div>

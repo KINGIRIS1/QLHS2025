@@ -563,3 +563,39 @@ export const syncLegacyCompletedDatesApi = async (): Promise<{ success: boolean;
     }
 };
 
+export const updateBulkRecordTypeApi = async (ids: string[], targetRecordType: string): Promise<boolean> => {
+    if (!isConfigured) {
+        if (IS_CACHED_RECORDS_LOADED) {
+            CACHED_RECORDS = CACHED_RECORDS.map(r => {
+                if (ids.includes(r.id)) {
+                    return { ...r, recordType: targetRecordType };
+                }
+                return r;
+            });
+        }
+        return true;
+    }
+    try {
+        const { error, data } = await supabase
+            .from('records')
+            .update({ recordType: targetRecordType })
+            .in('id', ids)
+            .select();
+        
+        if (error) throw error;
+        
+        if (data && IS_CACHED_RECORDS_LOADED) {
+            data.forEach((r: any) => {
+                const unpacked = unpackRecord(r as RecordFile);
+                const idx = CACHED_RECORDS.findIndex(c => c.id === unpacked.id);
+                if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
+            });
+        }
+        return true;
+    } catch (error) {
+        logError("updateBulkRecordTypeApi", error);
+        return false;
+    }
+};
+
+

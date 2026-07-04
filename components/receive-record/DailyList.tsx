@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
-import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX } from 'lucide-react';
 
 interface DailyListProps {
   records: RecordFile[];
@@ -65,7 +65,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   // - 'outside': Hồ sơ đo đạc phi địa giới
   // - 'archive': Hồ sơ lưu trữ (Sao lục)
   // - 'tax': Hồ sơ thuế chính quy
-  const [subTab, setSubTab] = useState<'inside' | 'outside' | 'archive' | 'tax'>('inside');
+  const [subTab, setSubTab] = useState<'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw'>('inside');
 
   // Lấy địa bàn quản lý của cán bộ hiện tại
   const normalizedMyWards = useMemo(() => {
@@ -84,10 +84,13 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const dailyMeasureRecords = useMemo(() => {
       if (!records) return [];
       return records.filter(r => {
-          const isSaoLuc = (r.recordType || '').toLowerCase().includes('sao lục');
-          const isTax = (r.recordType || '').toLowerCase().includes('thuế chính quy');
-          if (isSaoLuc || isTax) return false;
-          if (['Cung cấp thông tin', 'CMD', 'Tòa án', 'Thi hành án'].includes(r.recordType || '')) return false;
+          const typeLower = (r.recordType || '').toLowerCase();
+          const isSaoLuc = typeLower.includes('sao lục');
+          const isTax = typeLower.includes('thuế chính quy');
+          const isInfo = typeLower.includes('cung cấp thông tin');
+          const isWithdraw = typeLower.includes('thu hồi giấy chứng nhận') || typeLower.includes('thu hồi gcn');
+          if (isSaoLuc || isTax || isInfo || isWithdraw) return false;
+          if (typeLower.includes('cmd') || typeLower.includes('tòa án') || typeLower.includes('thi hành án')) return false;
           return r.receivedDate === filterDate;
       });
   }, [records, filterDate]);
@@ -226,19 +229,92 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       });
   }, [records, filterDate, filterWard, searchTerm]);
 
+  // Bộ lọc hồ sơ Cung cấp thông tin quy hoạch lấy từ bảng records
+  const filteredInfoRecords = useMemo(() => {
+      const searchLower = searchTerm.toLowerCase();
+      const list = records.filter(r => {
+          // 1. Lọc theo loại hồ sơ
+          const isInfo = (r.recordType || '').toLowerCase().includes('cung cấp thông tin');
+          if (!isInfo) return false;
+
+          // 2. Lọc theo ngày nhận
+          if (r.receivedDate !== filterDate) return false;
+          
+          // 3. Lọc theo Đơn vị (đối với cung cấp thông tin sẽ gom theo mã hồ sơ để không bị tách phi địa giới, giống sao lục và thuế)
+          if (filterWard !== 'all') {
+              const targetSuffix = getShortCode(filterWard);
+              const recordSuffix = getRecordSuffix(r.code || '');
+              if (recordSuffix !== targetSuffix) return false;
+          }
+
+          // 4. Tìm kiếm từ khóa
+          if (searchTerm) {
+              const nameMatch = r.customerName?.toLowerCase().includes(searchLower);
+              const codeMatch = r.code?.toLowerCase().includes(searchLower);
+              if (!nameMatch && !codeMatch) return false;
+          }
+          return true;
+      });
+
+      return list.sort((a, b) => {
+          const codeA = (a.code || '').toUpperCase();
+          const codeB = (b.code || '').toUpperCase();
+          return codeA.localeCompare(codeB, undefined, { numeric: true });
+      });
+  }, [records, filterDate, filterWard, searchTerm]);
+
+  // Bộ lọc hồ sơ Thu hồi Giấy chứng nhận lấy từ bảng records
+  const filteredWithdrawRecords = useMemo(() => {
+      const searchLower = searchTerm.toLowerCase();
+      const list = records.filter(r => {
+          // 1. Lọc theo loại hồ sơ
+          const typeLower = (r.recordType || '').toLowerCase();
+          const isWithdraw = typeLower.includes('thu hồi giấy chứng nhận') || typeLower.includes('thu hồi gcn');
+          if (!isWithdraw) return false;
+
+          // 2. Lọc theo ngày nhận
+          if (r.receivedDate !== filterDate) return false;
+          
+          // 3. Lọc theo Đơn vị (đối với thu hồi GCN sẽ gom theo mã hồ sơ để không bị tách phi địa giới, giống sao lục và thuế)
+          if (filterWard !== 'all') {
+              const targetSuffix = getShortCode(filterWard);
+              const recordSuffix = getRecordSuffix(r.code || '');
+              if (recordSuffix !== targetSuffix) return false;
+          }
+
+          // 4. Tìm kiếm từ khóa
+          if (searchTerm) {
+              const nameMatch = r.customerName?.toLowerCase().includes(searchLower);
+              const codeMatch = r.code?.toLowerCase().includes(searchLower);
+              if (!nameMatch && !codeMatch) return false;
+          }
+          return true;
+      });
+
+      return list.sort((a, b) => {
+          const codeA = (a.code || '').toUpperCase();
+          const codeB = (b.code || '').toUpperCase();
+          return codeA.localeCompare(codeB, undefined, { numeric: true });
+      });
+  }, [records, filterDate, filterWard, searchTerm]);
+
   // Danh sách hiển thị theo Tab hiện tại ở ngoài giao diện
   const currentTabRecords = useMemo(() => {
       if (subTab === 'inside') return filteredInsideRecords;
       if (subTab === 'outside') return filteredOutsideRecords;
       if (subTab === 'tax') return filteredTaxRecords;
+      if (subTab === 'info') return filteredInfoRecords;
+      if (subTab === 'withdraw') return filteredWithdrawRecords;
       return filteredArchiveRecords;
-  }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredTaxRecords, filteredArchiveRecords]);
+  }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredTaxRecords, filteredInfoRecords, filteredWithdrawRecords, filteredArchiveRecords]);
 
   // Hàm hỗ trợ in Excel: Trả về tiêu đề hiển thị tương ứng với Tab hiện tại
-  const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive' | 'tax') => {
+  const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw') => {
       if (tab === 'inside') return 'Hồ sơ đo đạc trong địa giới';
       if (tab === 'outside') return 'Hồ sơ đo đạc phi địa giới';
       if (tab === 'tax') return 'Hồ sơ thuế chính quy';
+      if (tab === 'info') return 'Hồ sơ cung cấp thông tin';
+      if (tab === 'withdraw') return 'Hồ sơ thu hồi GCN';
       return 'Hồ sơ lưu trữ (Sao lục)';
   };
 
@@ -446,7 +522,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                 onClick={() => setSubTab('tax')}
                 className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
                     subTab === 'tax'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/30 rounded-tr-xl'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/30'
                         : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
                 }`}
             >
@@ -456,6 +532,40 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                     subTab === 'tax' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
                 }`}>
                     {filteredTaxRecords.length}
+                </span>
+            </button>
+
+            <button
+                onClick={() => setSubTab('info')}
+                className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
+                    subTab === 'info'
+                        ? 'border-sky-600 text-sky-700 bg-sky-50/30'
+                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
+                }`}
+            >
+                <Search size={16} className={subTab === 'info' ? 'text-sky-600' : 'text-gray-400'} />
+                <span>Hồ sơ Cung cấp thông tin</span>
+                <span className={`ml-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full ${
+                    subTab === 'info' ? 'bg-sky-100 text-sky-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                    {filteredInfoRecords.length}
+                </span>
+            </button>
+
+            <button
+                onClick={() => setSubTab('withdraw')}
+                className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
+                    subTab === 'withdraw'
+                        ? 'border-rose-600 text-rose-700 bg-rose-50/30 rounded-tr-xl'
+                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
+                }`}
+            >
+                <FileX size={16} className={subTab === 'withdraw' ? 'text-rose-600' : 'text-gray-400'} />
+                <span>Thu hồi GCN</span>
+                <span className={`ml-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full ${
+                    subTab === 'withdraw' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                    {filteredWithdrawRecords.length}
                 </span>
             </button>
         </div>
@@ -500,6 +610,10 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                                             ? 'bg-purple-100 text-purple-700' 
                                             : (r.recordType || '').toLowerCase().includes('thuế chính quy')
                                             ? 'bg-emerald-100 text-emerald-700'
+                                            : (r.recordType || '').toLowerCase().includes('cung cấp thông tin')
+                                            ? 'bg-sky-100 text-sky-700'
+                                            : (r.recordType || '').toLowerCase().includes('thu hồi')
+                                            ? 'bg-rose-100 text-rose-700'
                                             : 'bg-blue-100 text-blue-700'
                                         }`}>
                                             {getShortRecordType(r.recordType)}

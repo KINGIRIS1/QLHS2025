@@ -117,6 +117,7 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
             newCommune: row['Phường - Xã mới']?.toString() || '',
             blockingDocuments,
             unblockDoc: row['Văn bản giải ngăn chặn']?.toString() || '',
+            unblockDate: parseExcelDate(row['Ngày văn bản giải ngăn chặn']) || parseExcelDate(row['Ngày giải ngăn chặn']) || '',
             notes: row['Ghi chú']?.toString() || '',
             isUnblocked,
             createdBy: currentUser?.name || currentUser?.username || 'Hệ thống',
@@ -526,8 +527,11 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
                               <div className="font-bold text-green-700 mb-1 uppercase flex items-center gap-1">
                                 <CheckCircle size={14} className="shrink-0"/> VĂN BẢN GIẢI NGĂN CHẶN
                               </div>
-                              <div className="text-gray-800 pl-5">
-                                 {record.unblockDoc}
+                              <div className="text-gray-800 pl-5 space-y-1">
+                                <div><span className="font-semibold text-gray-600">Số văn bản:</span> {record.unblockDoc}</div>
+                                {record.unblockDate && (
+                                  <div><span className="font-semibold text-gray-600">Ngày văn bản:</span> {record.unblockDate.includes('-') ? record.unblockDate.split('-').reverse().join('/') : record.unblockDate}</div>
+                                )}
                               </div>
                             </div>
                             {(record.unblock_attached_files && record.unblock_attached_files.length > 0) && (

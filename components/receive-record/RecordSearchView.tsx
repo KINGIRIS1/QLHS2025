@@ -3,6 +3,7 @@ import { RecordFile, Employee } from '../../types';
 import { RecordStatus } from '../../types';
 import { Search, MapPin, CheckCircle, ShieldCheck, HelpCircle, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, CalendarClock, Edit2 } from 'lucide-react';
 import { getShortRecordType } from '../../constants';
+import { showToast } from '../../utils/appHelpers';
 
 interface RecordSearchViewProps {
   records: RecordFile[];
@@ -27,7 +28,8 @@ const SEARCHABLE_RECORD_TYPES = [
   'Thuế chính quy',
   'Cung cấp thông tin',
   'Thi hành án',
-  'Tòa án'
+  'Tòa án',
+  'Thu hồi Giấy chứng nhận'
 ];
 
 export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
@@ -72,16 +74,16 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
         if (success) {
           setShowUpdateReturnModal(false);
           setSelectedRecordForUpdateReturn(null);
-          alert("Cập nhật thông tin trả kết quả thành công!");
+          showToast("Cập nhật thông tin trả kết quả thành công!", "success");
         } else {
-          alert("Lỗi cập nhật dữ liệu. Vui lòng thử lại!");
+          showToast("Lỗi cập nhật dữ liệu. Vui lòng thử lại!", "error");
         }
       } else {
-        alert("Hệ thống chưa hỗ trợ chức năng cập nhật tại đây!");
+        showToast("Hệ thống chưa hỗ trợ chức năng cập nhật tại đây!", "error");
       }
     } catch (e) {
       console.error(e);
-      alert("Đã xảy ra lỗi khi cập nhật!");
+      showToast("Đã xảy ra lỗi khi cập nhật!", "error");
     } finally {
       setIsSubmittingUpdateReturn(false);
     }
@@ -96,16 +98,16 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
         if (success) {
           setShowExtendModal(false);
           setSelectedRecordForExtend(null);
-          alert("Gia hạn thời gian nhận kết quả thành công!");
+          showToast("Gia hạn thời gian nhận kết quả thành công!", "success");
         } else {
-          alert("Xảy ra lỗi trong quá trình gia hạn hồ sơ. Vui lòng thử lại!");
+          showToast("Xảy ra lỗi trong quá trình gia hạn hồ sơ. Vui lòng thử lại!", "error");
         }
       } else {
-         alert("Hệ thống chưa hỗ trợ chức năng gia hạn tại view này!");
+         showToast("Hệ thống chưa hỗ trợ chức năng gia hạn tại view này!", "error");
       }
     } catch (e) {
       console.error(e);
-      alert("Đã xảy ra lỗi hệ thống khi gia hạn!");
+      showToast("Đã xảy ra lỗi hệ thống khi gia hạn!", "error");
     } finally {
       setIsSubmittingExtend(false);
     }

@@ -66,7 +66,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         if (field === 'recordType' || field === 'receivedDate') {
             const rType = field === 'recordType' ? value : prev.recordType;
             const rDate = field === 'receivedDate' ? value : prev.receivedDate;
-            if (rType && rDate) newData.deadline = calculateDeadline(rType, rDate);
+            if (rType && rDate) {
+                newData.deadline = calculateDeadline(rType, rDate);
+            }
         }
         return newData;
     });

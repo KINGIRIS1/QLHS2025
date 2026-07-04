@@ -25,6 +25,14 @@ export interface IGateRecord {
     thoiHanSuDung?: string; // Thời hạn sử dụng (bổ sung)
     cccd?: string;          // CCCD (bổ sung)
     ghiChu?: string;        // GHI CHÚ (bổ sung)
+    ngayTra?: string;       // Ngày trả hồ sơ (bổ sung)
+    lyDoTra?: string;       // Lý do trả hồ sơ (bổ sung)
+    daThucHienNvtc?: boolean; // Đã thực hiện nghĩa vụ tài chính (mới)
+    ngayThucHienNvtc?: string; // Ngày thực hiện nghĩa vụ tài chính (mới)
+    soVaoSo?: string;       // Số vào sổ (mới)
+    ngayGiao1Cua?: string;  // Ngày bàn giao 1 cửa (mới)
+    dotGiao1Cua?: string;   // Đợt bàn giao 1 cửa (mới)
+    ngayKyGcn?: string;     // Ngày ký GCN (mới)
 }
 
 function parseSafeDate(dateStr: string | null | undefined): string | null {
@@ -92,7 +100,15 @@ export const mapIGateToDb = (r: IGateRecord) => ({
     so_phat_hanh: r.soPhatHanh || '',
     thoi_han_su_dung: r.thoiHanSuDung || '',
     cccd: r.cccd || '',
-    ghi_chu: r.ghiChu || ''
+    ghi_chu: r.ghiChu || '',
+    ngay_tra: parseSafeDate(r.ngayTra),
+    ly_do_tra: r.lyDoTra || '',
+    da_thuc_hien_nvtc: r.daThucHienNvtc ?? false,
+    ngay_thuc_hien_nvtc: parseSafeDate(r.ngayThucHienNvtc),
+    so_vao_so: r.soVaoSo || '',
+    ngay_ky_gcn: parseSafeDate(r.ngayKyGcn),
+    ngay_giao_1_cua: parseSafeDate(r.ngayGiao1Cua),
+    dot_giao_1_cua: r.dotGiao1Cua || ''
 });
 
 export const mapIGateFromDb = (r: any): IGateRecord => {
@@ -123,7 +139,15 @@ export const mapIGateFromDb = (r: any): IGateRecord => {
         soPhatHanh: r.so_phat_hanh || r.soPhatHanh || '',
         thoiHanSuDung: r.thoi_han_su_dung || r.thoiHanSuDung || '',
         cccd: r.cccd || '',
-        ghiChu: r.ghi_chu || r.ghiChu || ''
+        ghiChu: r.ghi_chu || r.ghiChu || '',
+        ngayTra: r.ngay_tra || r.ngayTra || '',
+        lyDoTra: r.ly_do_tra || r.lyDoTra || '',
+        daThucHienNvtc: r.da_thuc_hien_nvtc ?? r.daThucHienNvtc ?? false,
+        ngayThucHienNvtc: r.ngay_thuc_hien_nvtc || r.ngayThucHienNvtc || '',
+        soVaoSo: r.so_vao_so || '',
+        ngayKyGcn: r.ngay_ky_gcn || r.ngayKyGcn || '',
+        ngayGiao1Cua: r.ngay_giao_1_cua || r.ngayGiao1Cua || '',
+        dotGiao1Cua: r.dot_giao_1_cua || r.dotGiao1Cua || ''
     };
 };
 

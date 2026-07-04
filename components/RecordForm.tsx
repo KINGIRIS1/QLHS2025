@@ -3,6 +3,7 @@ import { LandRecord, LandRecordFormData, BlockingDocument, User, PlotData, UserR
 import { supabase, isConfigured } from '../services/supabaseClient';
 import { Plus, Trash2, X, Save, AlertCircle, FileText, Paperclip, Loader2, Download } from 'lucide-react';
 import JSZip from 'jszip';
+import { showToast } from '../utils/appHelpers';
 
 interface RecordFormProps {
   initialData?: LandRecord;
@@ -49,6 +50,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     newCommune: '',
     blockingDocuments: [{ docNumber: '', date: new Date().toISOString().split('T')[0], agency: '', note: '' }],
     unblockDoc: '',
+    unblockDate: '',
     notes: '',
     isUnblocked: false,
     createdBy: currentUser.name, // Mặc định lấy tên người đăng nhập
@@ -79,6 +81,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
             ...d,
             date: d.date || ''
         })),
+        unblockDate: initialData.unblockDate || '',
         createdBy: initialData.createdBy || currentUser.name // Giữ nguyên người tạo cũ hoặc lấy user hiện tại nếu chưa có
       });
     }
@@ -215,7 +218,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
   const removeUnblockFile = async (indexToRemove: number) => {
     if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUBADMIN) {
-      alert('Chỉ quản trị viên hoặc quản lý viên mới có quyền xóa tệp đính kèm đã lưu!');
+      showToast('Chỉ quản trị viên hoặc quản lý viên mới có quyền xóa tệp đính kèm đã lưu!', 'error');
       return;
     }
 
@@ -249,7 +252,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
   const removeFile = async (index: number) => {
     if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUBADMIN) {
-      alert('Chỉ quản trị viên hoặc quản lý viên mới có quyền xóa tệp đính kèm đã lưu!');
+      showToast('Chỉ quản trị viên hoặc quản lý viên mới có quyền xóa tệp đính kèm đã lưu!', 'error');
       return;
     }
 
@@ -296,7 +299,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
           
           if (error) {
               console.error("Storage upload error:", error);
-              alert(`Không thể upload file ${file.name}. Lỗi: ${error.message}`);
+              showToast(`Không thể upload file ${file.name}. Lỗi: ${error.message}`, 'error');
               continue;
           } else {
               const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
@@ -322,7 +325,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
           if (error) {
               console.error("Storage upload error:", error);
-              alert(`Không thể upload file ${file.name}. Lỗi: ${error.message}`);
+              showToast(`Không thể upload file ${file.name}. Lỗi: ${error.message}`, 'error');
               continue;
           } else {
               const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(filePath);
@@ -349,7 +352,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       }
     } catch (error: any) {
       console.error("Lỗi khi tải file hoặc lưu dữ liệu:", error);
-      alert('Có lỗi xảy ra: ' + error.message);
+      showToast('Có lỗi xảy ra: ' + error.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -770,17 +773,30 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                 
                 {formData.isUnblocked && (
                     <div className="p-4 border-t border-green-200 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="mb-3">
-                            <label className="block text-xs font-bold text-green-800 mb-1 uppercase">Số văn bản hủy bỏ / Giải tỏa</label>
-                            <input
-                                type="text"
-                                name="unblockDoc"
-                                value={formData.unblockDoc}
-                                onChange={handleChange}
-                                className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
-                                placeholder="Nhập số văn bản..."
-                                required={formData.isUnblocked}
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                            <div>
+                                <label className="block text-xs font-bold text-green-800 mb-1 uppercase">Số văn bản hủy bỏ / Giải tỏa</label>
+                                <input
+                                    type="text"
+                                    name="unblockDoc"
+                                    value={formData.unblockDoc}
+                                    onChange={handleChange}
+                                    className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
+                                    placeholder="Nhập số văn bản..."
+                                    required={formData.isUnblocked}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-green-800 mb-1 uppercase">Ngày văn bản hủy bỏ / Giải tỏa</label>
+                                <input
+                                    type="date"
+                                    name="unblockDate"
+                                    max="9999-12-31"
+                                    value={formData.unblockDate || ''}
+                                    onChange={handleChange}
+                                    className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
+                                />
+                            </div>
                         </div>
 
                         <div className="mb-3">

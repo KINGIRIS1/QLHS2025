@@ -936,10 +936,10 @@ export const fetchWarehouseRecordsPaginated = async (
             list = list.filter(r => (r.data?.socccd || '').toLowerCase().includes(term) || (r.data?.socccd2 || '').toLowerCase().includes(term));
         }
         if (filters.advToBando) {
-            list = list.filter(r => (r.data?.tobando || '').toString().toLowerCase().includes(filters.advToBando!.toLowerCase()));
+            list = list.filter(r => (r.data?.tobando || '').toString().trim() === filters.advToBando!.trim());
         }
         if (filters.advSoThua) {
-            list = list.filter(r => (r.data?.sothua || '').toString().toLowerCase().includes(filters.advSoThua!.toLowerCase()));
+            list = list.filter(r => (r.data?.sothua || '').toString().trim() === filters.advSoThua!.trim());
         }
         if (filters.advKeTang) {
             list = list.filter(r => (r.data?.soke_tang || '').toLowerCase().includes(filters.advKeTang!.toLowerCase()));
@@ -1007,10 +1007,10 @@ export const fetchWarehouseRecordsPaginated = async (
                 q = q.ilike('socccd', `%${filters.advCccd.trim()}%`);
             }
             if (filters.advToBando && filters.advToBando.trim() !== '') {
-                q = q.ilike('tobando', `%${filters.advToBando.trim()}%`);
+                q = q.eq('tobando', filters.advToBando.trim());
             }
             if (filters.advSoThua && filters.advSoThua.trim() !== '') {
-                q = q.ilike('sothua', `%${filters.advSoThua.trim()}%`);
+                q = q.eq('sothua', filters.advSoThua.trim());
             }
             if (filters.advKeTang && filters.advKeTang.trim() !== '') {
                 q = q.ilike('soke_tang', `%${filters.advKeTang.trim()}%`);
@@ -1110,10 +1110,10 @@ export const fetchWarehouseRecordsPaginated = async (
                     query = query.or(`data->>socccd.ilike.${term},data->>socccd2.ilike.${term}`);
                 }
                 if (filters.advToBando && filters.advToBando.trim() !== '') {
-                    query = query.ilike('data->>tobando', `%${filters.advToBando.trim()}%`);
+                    query = query.eq('data->>tobando', filters.advToBando.trim());
                 }
                 if (filters.advSoThua && filters.advSoThua.trim() !== '') {
-                    query = query.ilike('data->>sothua', `%${filters.advSoThua.trim()}%`);
+                    query = query.eq('data->>sothua', filters.advSoThua.trim());
                 }
                 if (filters.advKeTang && filters.advKeTang.trim() !== '') {
                     query = query.ilike('data->>soke_tang', `%${filters.advKeTang.trim()}%`);

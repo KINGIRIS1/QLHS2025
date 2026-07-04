@@ -11,6 +11,7 @@ interface AssignModalProps {
   selectedRecords: RecordFile[];
   filterDepartment?: string; // MỚI: Lọc theo phòng ban (VD: "Thông tin lưu trữ")
   forceAllRecommended?: boolean;
+  currentView?: string; // MỚI: Nhận diện view hiện tại
 }
 
 interface EmployeeItemProps {
@@ -74,7 +75,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isRecommended, isSelec
     </div>
 );
 
-const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment, forceAllRecommended }) => {
+const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment, forceAllRecommended, currentView }) => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -104,6 +105,20 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         e.department.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const isMeasurementTab = currentView && ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
+
+    // Nếu ở tab Đo đạc, lọc cứng toàn bộ danh sách chỉ giữ lại nhân viên thuộc tổ đo đạc
+    if (isMeasurementTab) {
+        filteredEmployees = filteredEmployees.filter(emp => {
+            const dept = (emp.department || '').toLowerCase();
+            const pos = (emp.position || '').toLowerCase();
+            const surveyKeywords = ['đo đạc', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp'];
+            const excludeKeywords = ['văn thư', 'kế toán', 'một cửa', 'tiếp nhận', 'hành chính', 'bảo vệ', 'tạp vụ'];
+            if (excludeKeywords.some(k => dept.includes(k) || pos.includes(k))) return false;
+            return surveyKeywords.some(k => dept.includes(k) || pos.includes(k));
+        });
+    }
+
     // 2. Nếu có filterDepartment, lọc cứng theo phòng ban và trả về hết vào recommended
     if (filterDepartment && !forceAllRecommended) {
         const deptKeyword = removeVietnameseTones(filterDepartment).toLowerCase();
@@ -126,7 +141,17 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
         const dept = (emp.department || '').toLowerCase();
         const pos = (emp.position || '').toLowerCase();
         
-        // Các từ khóa nhận diện chuyên môn kỹ thuật/đo đạc
+        const isMeasurementTab = currentView && ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
+
+        if (isMeasurementTab) {
+            // Trong tab Đo đạc, chỉ đề xuất nhân viên thuộc tổ đo đạc (đo đạc, tổ đo, nội nghiệp, ngoại nghiệp)
+            const surveyKeywords = ['đo đạc', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp'];
+            const excludeKeywords = ['văn thư', 'kế toán', 'một cửa', 'tiếp nhận', 'hành chính', 'bảo vệ', 'tạp vụ'];
+            if (excludeKeywords.some(k => dept.includes(k) || pos.includes(k))) return false;
+            return surveyKeywords.some(k => dept.includes(k) || pos.includes(k));
+        }
+
+        // Các từ khóa nhận diện chuyên môn kỹ thuật/đo đạc chung
         const keywords = [
             'kỹ thuật', 'đo đạc', 'tổ đo', 'địa chính', 
             'nội nghiệp', 'ngoại nghiệp', 'biên tập', 'bản đồ',
@@ -173,7 +198,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
     });
 
     return { recommended: rec, others: oth };
-  }, [employees, targetWardName, searchTerm, filterDepartment]);
+  }, [employees, targetWardName, searchTerm, filterDepartment, currentView]);
 
   // Helper check lại để truyền prop vào UI component con (hiển thị icon briefcase)
   const isSurveyTeamMember = (emp: Employee) => {

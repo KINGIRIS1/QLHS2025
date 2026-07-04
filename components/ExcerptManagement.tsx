@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, PlusCircle, History, AlertCircle, CheckCircle, MapPin, Hash, BookOpen, Loader2, Settings, X, Save, Trash2, Plus, RotateCcw, LayoutGrid, CalendarRange, Copy, Check } from 'lucide-react';
 import { User, UserRole, RecordFile } from '../types';
 import { fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters, fetchTrichDoHistory, saveTrichDoRecord, fetchTrichDoCounters, saveTrichDoCounters } from '../services/api';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 
 interface ExcerptRecord {
   id: string;
@@ -115,7 +115,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
         setResultNumber(null);
         setIsCopied(false);
     } else {
-        alert('Không tìm thấy hồ sơ với mã này.');
+        showToast('Không tìm thấy hồ sơ với mã này.', 'error');
         setLinkedRecord(null);
     }
   };
@@ -143,7 +143,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
 
   const handleGetNumber = async () => {
     if (!selectedWard || !mapSheet || !landPlot) {
-      alert("Vui lòng nhập đầy đủ thông tin!");
+      showToast("Vui lòng nhập đầy đủ thông tin!", 'error');
       return;
     }
 
@@ -204,7 +204,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
         setLandPlot('');
     } catch (error) {
         console.error(error);
-        alert("Lỗi kết nối. Vui lòng thử lại.");
+        showToast("Lỗi kết nối. Vui lòng thử lại.", 'error');
     } finally {
         setLoading(false);
     }
@@ -241,7 +241,7 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
       const name = newWardName.trim();
       if(name) {
           if (wards.includes(name)) {
-              alert(`Xã/Phường "${name}" đã tồn tại!`);
+              showToast(`Xã/Phường "${name}" đã tồn tại!`, 'error');
               return;
           }
           onAddWard(name);

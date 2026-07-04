@@ -175,7 +175,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd = 10; 
     } else if (lowerType.includes('trích đo chỉnh lý')) {
         daysToAdd = 15; 
-    } else if (lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc')) {
+    } else if (lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc') || lowerType.includes('thu hồi giấy chứng nhận')) {
         daysToAdd = 30; 
     }
     
@@ -220,3 +220,41 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     
     return formatDateKey(currentDate);
 };
+
+// --- HÀM TOAST NOTIFICATION TOÀN CỤC ---
+export function showToast(message: string, type: 'success' | 'error' = 'success') {
+    window.dispatchEvent(new CustomEvent('app_toast', {
+        detail: { type, message }
+    }));
+}
+
+// --- HÀM TRÍCH XUẤT SUFFIX VÀ PHƯỜNG TIẾP NHẬN HỒ SƠ ---
+export function getRecordSuffix(code: string): string {
+    if (!code) return '';
+    const clean = code.trim().toUpperCase();
+    const parts = clean.split('-');
+    if (parts.length > 0) {
+        return parts[parts.length - 1];
+    }
+    return '';
+}
+
+export function getReceivingWardBySuffix(suffix: string, defaultWard: string = ''): string {
+    const s = (suffix || '').trim().toUpperCase();
+    if (s === 'MH') return 'Minh Hưng';
+    if (s === 'CT') return 'Chơn Thành';
+    if (s === 'NB') return 'Nha Bích';
+    if (s === 'ML') return 'Minh Lập';
+    if (s === 'MT') return 'Minh Thắng';
+    if (s === 'QM') return 'Quang Minh';
+    if (s === 'TT') return 'Thành Tâm';
+    if (s === 'MLO') return 'Minh Long';
+    return defaultWard;
+}
+
+export function getReceivingWard(record: RecordFile): string {
+    if (!record || !record.code) return record?.ward || '';
+    const suffix = getRecordSuffix(record.code);
+    return getReceivingWardBySuffix(suffix, record.ward || '');
+}
+

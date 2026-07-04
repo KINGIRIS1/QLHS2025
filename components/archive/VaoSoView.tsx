@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
+import { supabase } from '../../services/supabaseClient';
 import { User } from '../../types';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Download, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
@@ -38,11 +39,34 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned' | 'cong-cu-vao-so'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const tempFileInputRef = useRef<HTMLInputElement>(null);
+
+    // States cho công cụ Vào số GCN (Nhận diện mã HS từ Excel)
+    const [tempRecords, setTempRecords] = useState<any[]>([]);
+    const [tempRecordsLoading, setTempRecordsLoading] = useState(false);
+    const [selectedTempIds, setSelectedTempIds] = useState<Set<string>>(new Set());
+    const [tempExcelFileName, setTempExcelFileName] = useState('');
+    
+    // Modal xác nhận bàn giao 1 cửa
+    const [showConfirmHandoverModal, setShowConfirmHandoverModal] = useState(false);
+    const [handoverBatchMode, setHandoverBatchMode] = useState<'new' | 'existing'>('new');
+    const [selectedExistingHandoverBatch, setSelectedExistingHandoverBatch] = useState<string>('');
+    const [isSubmittingHandover, setIsSubmittingHandover] = useState(false);
+    const suggestedHandoverBatch = "1";
+    const existingHandoverBatches: string[] = [];
+
+    // Modal xuất danh sách bàn giao 1 cửa
+    const [showExportHandover1CuaModal, setShowExportHandover1CuaModal] = useState(false);
+    const [exportHandover1CuaParams, setExportHandover1CuaParams] = useState({
+        date: new Date().toISOString().split('T')[0],
+        batch: '',
+        ward: 'all'
+    });
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -284,6 +308,531 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         setSavingId(record.id);
         await saveArchiveRecord(updatedRecord);
         setSavingId(null);
+    };
+
+    // --- CÁC HÀM XỬ LÝ CHO CÔNG CỤ VÀO SỐ GCN MỚI ---
+    const handleTempImportClick = () => {
+        tempFileInputRef.current?.click();
+    };
+
+    const handleTempCellChange = (index: number, key: string, value: any) => {
+        setTempRecords(prev => prev.map((r, i) => {
+            if (i === index) {
+                return { ...r, [key]: value };
+            }
+            return r;
+        }));
+    };
+
+    const handleDeleteTempRow = (index: number) => {
+        setTempRecords(prev => prev.filter((_, i) => i !== index));
+        const updatedSelected = new Set(selectedTempIds);
+        updatedSelected.delete(String(index));
+        setSelectedTempIds(updatedSelected);
+    };
+
+    const handleSelectTempRow = (index: number) => {
+        const newSet = new Set(selectedTempIds);
+        const strIdx = String(index);
+        if (newSet.has(strIdx)) newSet.delete(strIdx);
+        else newSet.add(strIdx);
+        setSelectedTempIds(newSet);
+    };
+
+    const handleSelectAllTempRows = () => {
+        if (selectedTempIds.size === tempRecords.length) {
+            setSelectedTempIds(new Set());
+        } else {
+            setSelectedTempIds(new Set(tempRecords.map((_, i) => String(i))));
+        }
+    };
+
+    const handleGetTempBookNumber = async (index: number) => {
+        const latestStored = await getSystemSetting('vaoso_current_book_number');
+        const baseNum = latestStored || currentBookNumber;
+        const nextNumStr = incrementString(baseNum);
+        const formattedNum = `CN ${nextNumStr}`;
+
+        setTempRecords(prev => prev.map((r, i) => {
+            if (i === index) {
+                return { ...r, soVaoSo: formattedNum };
+            }
+            return r;
+        }));
+
+        setCurrentBookNumber(nextNumStr);
+        await saveSystemSetting('vaoso_current_book_number', nextNumStr);
+    };
+
+    const handleAutoAssignAllTempBookNumbers = async () => {
+        const latestStored = await getSystemSetting('vaoso_current_book_number');
+        let currentNumStr = latestStored || currentBookNumber;
+        
+        const updated = tempRecords.map(r => {
+            if (!r.soVaoSo) {
+                currentNumStr = incrementString(currentNumStr);
+                return { ...r, soVaoSo: `CN ${currentNumStr}` };
+            }
+            return r;
+        });
+
+        setTempRecords(updated);
+        setCurrentBookNumber(currentNumStr);
+        await saveSystemSetting('vaoso_current_book_number', currentNumStr);
+    };
+
+    const handleTempExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setTempExcelFileName(file.name);
+        setTempRecordsLoading(true);
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+                // Tìm dòng tiêu đề
+                let headerRowIdx = -1;
+                for (let i = 0; i < Math.min(data.length, 15); i++) {
+                    const rowStr = JSON.stringify(data[i]).toLowerCase();
+                    if (rowStr.includes('mã hồ sơ') || rowStr.includes('mã hs') || rowStr.includes('số hồ sơ') || rowStr.includes('mã nhận diện') || rowStr.includes('code')) {
+                        headerRowIdx = i;
+                        break;
+                    }
+                }
+
+                if (headerRowIdx === -1) {
+                    headerRowIdx = 0;
+                }
+
+                const rawHeaderRow = data[headerRowIdx] || [];
+                const headers = Array.from(rawHeaderRow).map((h: any) => String(h || '').trim().toLowerCase());
+                const rows = data.slice(headerRowIdx + 1);
+
+                const findCol = (keywords: string[], excludes: string[] = []) => 
+                    headers.findIndex(h => h && keywords.some(k => h.includes(k)) && !excludes.some(e => h.includes(e)));
+
+                const colMap = {
+                    ma_ho_so: findCol(['mã hồ sơ', 'mã hs', 'số hồ sơ', 'mã nhận diện', 'code']),
+                    so_to: findCol(['tờ', 'số tờ', 'bản đồ', 'tờ bản đồ']),
+                    so_thua: findCol(['thửa', 'số thửa', 'thửa đất']),
+                    tong_dien_tich: findCol(['tổng diện tích', 'diện tích', 'dt', 'area']),
+                    dat_o: findCol(['đất ở', 'thổ cư', 'ont', 'odt', 'đất ở đô thị', 'đất ở nông thôn']),
+                    dat_nn: findCol(['đất nông nghiệp', 'đất nn', 'nông nghiệp', 'cln', 'hnc', 'đất trồng cây']),
+                    so_phat_hanh: findCol(['phát hành', 'seri', 'seri gcn', 'số phát hành', 'số seri']),
+                    so_vao_so: findCol(['số vào sổ', 'svs', 'số vào']),
+                    ngay_ky_gcn: findCol(['ngày ký', 'ngày ký gcn', 'ngày cấp', 'ngày cấp gcn']),
+                    ten_chu_su_dung: findCol(['chủ sử dụng', 'tên chủ', 'họ tên', 'bên nhận', 'người sử dụng', 'khách hàng', 'customer'])
+                };
+
+                if (colMap.ma_ho_so === -1) {
+                    alert("Không tìm thấy cột chứa Mã hồ sơ trong file Excel. Vui lòng kiểm tra lại cấu trúc file.");
+                    setTempRecordsLoading(false);
+                    return;
+                }
+
+                const getValue = (row: any[], idx: number) => {
+                    if (idx === -1 || !row) return '';
+                    let val = row[idx];
+                    if (val === undefined || val === null) return '';
+                    
+                    if (typeof val === 'number' && val > 20000 && val < 60000) {
+                         const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                         return date.toISOString().split('T')[0];
+                    }
+                    
+                    const str = String(val).trim();
+                    if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(str)) {
+                        const parts = str.split(/[-/]/);
+                        if (parts.length === 3) {
+                            if (parts[0].length === 4) {
+                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                            } else {
+                                const day = parts[0].padStart(2, '0');
+                                const month = parts[1].padStart(2, '0');
+                                const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                                return `${year}-${month}-${day}`;
+                            }
+                        }
+                    }
+                    return str;
+                };
+
+                const excelRowsData: any[] = [];
+                const codesToQuery: string[] = [];
+
+                rows.forEach(row => {
+                    if (!row || row.length === 0) return;
+                    const code = getValue(row, colMap.ma_ho_so);
+                    if (!code) return;
+
+                    codesToQuery.push(code);
+
+                    excelRowsData.push({
+                        code: code,
+                        so_to: getValue(row, colMap.so_to),
+                        so_thua: getValue(row, colMap.so_thua),
+                        tong_dien_tich: getValue(row, colMap.tong_dien_tich),
+                        dat_o: getValue(row, colMap.dat_o),
+                        dat_nn: getValue(row, colMap.dat_nn),
+                        so_phat_hanh: getValue(row, colMap.so_phat_hanh),
+                        so_vao_so: getValue(row, colMap.so_vao_so),
+                        ngay_ky_gcn: getValue(row, colMap.ngay_ky_gcn) || new Date().toISOString().split('T')[0],
+                        ten_chu_su_dung: getValue(row, colMap.ten_chu_su_dung)
+                    });
+                });
+
+                if (codesToQuery.length === 0) {
+                    alert("Không tìm thấy mã hồ sơ nào trong tệp Excel.");
+                    setTempRecordsLoading(false);
+                    return;
+                }
+
+                // Chuẩn hóa và mở rộng mã để tăng tỷ lệ khớp (chữ hoa, chữ thường, loại bỏ khoảng trắng)
+                const expandedCodes = new Set<string>();
+                codesToQuery.forEach(c => {
+                    expandedCodes.add(c);
+                    expandedCodes.add(c.toLowerCase());
+                    expandedCodes.add(c.toUpperCase());
+                    const normalized = c.trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '');
+                    expandedCodes.add(normalized);
+                    expandedCodes.add(normalized.toUpperCase());
+                });
+                const expandedCodesArray = Array.from(expandedCodes);
+
+                // Truy vấn bảng igate_records (hồ sơ iGate gốc)
+                const { data: dbRecords, error: dbError } = await supabase
+                    .from('igate_records')
+                    .select('*')
+                    .in('so_hieu', expandedCodesArray);
+
+                if (dbError) {
+                    console.error("Lỗi truy vấn hồ sơ hệ thống: ", dbError);
+                }
+
+                const finalTempRecords = excelRowsData.map(excelRow => {
+                    // So sánh không phân biệt chữ hoa/thường và khoảng trắng thừa/ký tự ẩn
+                    const matchedDb = dbRecords?.find(dbRec => {
+                        const dbCodeNorm = String(dbRec.so_hieu || '').trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '');
+                        const excelCodeNorm = String(excelRow.code || '').trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '');
+                        return dbCodeNorm === excelCodeNorm;
+                    });
+                    
+                    return {
+                       id: matchedDb?.id,
+                       code: excelRow.code,
+                       customerName: excelRow.ten_chu_su_dung || matchedDb?.chu_ho_so || '',
+                       mapSheet: excelRow.so_to || matchedDb?.so_to || '',
+                       landPlot: excelRow.so_thua || matchedDb?.so_thua || '',
+                       area: excelRow.tong_dien_tich || matchedDb?.tong_dien_tich || '',
+                       datO: excelRow.dat_o || matchedDb?.dien_tich_dat_o || '',
+                       datNongNghiep: excelRow.dat_nn || '',
+                       soPhatHanh: excelRow.so_phat_hanh || matchedDb?.so_phat_hanh || '',
+                       soVaoSo: excelRow.so_vao_so || '',
+                       ngayKyGcn: excelRow.ngay_ky_gcn || new Date().toISOString().split('T')[0],
+                       diaDanh: matchedDb?.dia_danh || '',
+                       existsInSystem: !!matchedDb,
+                       db_customerName: matchedDb?.chu_ho_so || '',
+                       db_mapSheet: matchedDb?.so_to || '',
+                       db_landPlot: matchedDb?.so_thua || '',
+                       db_area: matchedDb?.tong_dien_tich || ''
+                    };
+                });
+
+                setTempRecords(finalTempRecords);
+
+            } catch (error) {
+                console.error("Lỗi xử lý Excel:", error);
+                alert("Đã xảy ra lỗi khi xử lý tệp Excel.");
+            } finally {
+                setTempRecordsLoading(false);
+                if (e.target) e.target.value = '';
+            }
+        };
+
+        reader.readAsBinaryString(file);
+    };
+
+    const handleConfirmHandover = async (batchNum: string, dateStr: string) => {
+        if (tempRecords.length === 0) return;
+        setIsSubmittingHandover(true);
+
+        try {
+            const todayStr = dateStr || new Date().toISOString().split('T')[0];
+            const batchId = batchNum || '1';
+
+            const archivePromises = tempRecords.map(async (r) => {
+                if (r.existsInSystem && r.id) {
+                    const hasChanged = r.customerName !== r.db_customerName ||
+                                      String(r.mapSheet) !== String(r.db_mapSheet) ||
+                                      String(r.landPlot) !== String(r.db_landPlot) ||
+                                      String(r.area) !== String(r.db_area);
+                    
+                    if (hasChanged) {
+                        const { error: updateError } = await supabase
+                            .from('igate_records')
+                            .update({
+                                chu_ho_so: r.customerName,
+                                so_to: r.mapSheet,
+                                so_thua: r.landPlot,
+                                tong_dien_tich: parseFloat(r.area) || null,
+                                dien_tich_dat_o: parseFloat(r.datO) || null
+                            })
+                            .eq('id', r.id);
+                        
+                        if (updateError) {
+                            console.error(`Lỗi cập nhật hồ sơ gốc ${r.code}:`, updateError);
+                        }
+                    }
+
+                    // Đồng thời, cập nhật trạng thái hồ sơ iGate thành "Đã ký Giấy chứng nhận", lưu Số vào sổ và Ngày ký GCN vào iGate (igate_records)
+                    const { error: statusError } = await supabase
+                        .from('igate_records')
+                        .update({
+                            trang_thai: 'Đã ký Giấy chứng nhận',
+                            so_vao_so: r.soVaoSo,
+                            so_phat_hanh: r.soPhatHanh,
+                            ngay_ket_thuc: r.ngayKyGcn // Ngày ký GCN chính là ngày đạt trạng thái này
+                        })
+                        .eq('id', r.id);
+                    
+                    if (statusError) {
+                        console.error(`Lỗi cập nhật trạng thái hồ sơ iGate ${r.code}:`, statusError);
+                    }
+                } else {
+                    // Nếu hồ sơ chưa tồn tại trên hệ thống iGate (r.existsInSystem === false)
+                    // Ta sẽ tự động insert mới một hồ sơ iGate vào bảng 'igate_records'
+                    const { error: insertError } = await supabase
+                        .from('igate_records')
+                        .insert([{
+                            so_hieu: r.code,
+                            chu_ho_so: r.customerName,
+                            so_to: r.mapSheet,
+                            so_thua: r.landPlot,
+                            tong_dien_tich: parseFloat(r.area) || null,
+                            dien_tich_dat_o: parseFloat(r.datO) || null,
+                            dia_danh: r.diaDanh || '',
+                            so_phat_hanh: r.soPhatHanh || '',
+                            so_vao_so: r.soVaoSo || '',
+                            ngay_ket_thuc: r.ngayKyGcn || todayStr,
+                            trang_thai: 'Đã ký Giấy chứng nhận',
+                            don_vi: 'Chi nhánh VPĐKĐĐ',
+                            ten_linh_vuc: 'Đất đai',
+                            ten_thu_tuc: 'Đăng ký đất đai lần đầu',
+                            ngay_tiep_nhan: todayStr
+                        }]);
+                    
+                    if (insertError) {
+                        console.error(`Lỗi tự động thêm mới hồ sơ iGate ${r.code}:`, insertError);
+                    }
+                }
+
+                const archiveData = {
+                    so_vao_so: r.soVaoSo,
+                    ma_ho_so: r.code,
+                    ten_chuyen_quyen: '',
+                    ten_chu_su_dung: r.customerName,
+                    loai_bien_dong: 'Vào số GCN',
+                    loai_gcn: 'GCN mới',
+                    ngay_nhan: todayStr,
+                    so_to: r.mapSheet,
+                    so_thua: r.landPlot,
+                    tong_dien_tich: r.area,
+                    dien_tich_tho_cu: r.datO,
+                    dien_tich_nong_nghiep: r.datNongNghiep,
+                    dia_danh: r.diaDanh,
+                    so_phat_hanh: r.soPhatHanh,
+                    ngay_ky_gcn: r.ngayKyGcn,
+                    ngay_ky_phieu_tk: '',
+                    ghi_chu: r.existsInSystem ? '' : 'Mã hồ sơ không tồn tại trên iGate',
+                    is_pending_scan: false,
+                    is_scanned: true,
+                    scan_batch_id: String(batchId),
+                    scan_date: todayStr
+                };
+
+                const newArchiveRecord: Partial<ArchiveRecord> = {
+                    type: 'vaoso',
+                    status: 'completed',
+                    so_hieu: r.code,
+                    trich_yeu: `Vào số GCN - ${r.customerName}`,
+                    ngay_thang: r.ngayKyGcn,
+                    noi_nhan_gui: r.diaDanh,
+                    created_by: currentUser.username,
+                    data: archiveData
+                };
+
+                return saveArchiveRecord(newArchiveRecord);
+            });
+
+            await Promise.all(archivePromises);
+
+            alert(`Đã hoàn thành cập nhật hệ thống và bàn giao ${tempRecords.length} hồ sơ vào Danh sách số ${batchId}!`);
+            
+            await loadData();
+            
+            setTempRecords([]);
+            setTempExcelFileName('');
+            setSelectedTempIds(new Set());
+            setShowConfirmHandoverModal(false);
+
+        } catch (error) {
+            console.error("Lỗi xác nhận bàn giao:", error);
+            alert("Đã xảy ra lỗi khi thực hiện bàn giao hồ sơ.");
+        } finally {
+            setIsSubmittingHandover(false);
+        }
+    };
+
+    const exportHandover1CuaExcel = (recordsToExport: ArchiveRecord[], dateVal: string, batchVal: string, wardVal: string) => {
+        if (recordsToExport.length === 0) {
+            alert('Không tìm thấy hồ sơ bàn giao nào thỏa mãn điều kiện lọc.');
+            return;
+        }
+
+        const wb = XLSX.utils.book_new();
+        const wsData: any[] = [];
+
+        wsData.push(['ỦY BAN NHÂN DÂN HUYỆN']);
+        wsData.push(['BỘ PHẬN TIẾP NHẬN & TRẢ KẾT QUẢ']);
+        wsData.push(['']); 
+
+        const title = `DANH SÁCH BÀN GIAO GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT SANG MỘT CỬA`;
+        wsData.push([title]);
+        
+        const dateParts = dateVal.split('-');
+        const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateVal;
+        wsData.push([`Ngày bàn giao: ${formattedDate} - Đợt giao: Danh sách số ${batchVal}`]);
+        
+        let subTitle = `Tổng số hồ sơ: ${recordsToExport.length}`;
+        if (wardVal !== 'all') {
+            subTitle = `Xã/Phường: ${wardVal} - ${subTitle}`;
+        }
+        wsData.push([subTitle]);
+        wsData.push(['']); 
+
+        const headers = [
+            'STT', 
+            'Số vào sổ', 
+            'Mã hồ sơ', 
+            'Chủ sử dụng đất', 
+            'Số tờ', 
+            'Số thửa', 
+            'Tổng diện tích (m2)', 
+            'Đất ở (m2)', 
+            'Đất nông nghiệp (m2)', 
+            'Số phát hành GCN', 
+            'Ngày ký GCN', 
+            'Địa danh (Xã)', 
+            'Ký nhận',
+            'Ghi chú'
+        ];
+        wsData.push(headers);
+
+        recordsToExport.forEach((r, idx) => {
+            wsData.push([
+                idx + 1,
+                r.data?.so_vao_so || '',
+                r.data?.ma_ho_so || '',
+                r.data?.ten_chu_su_dung || '',
+                r.data?.so_to || '',
+                r.data?.so_thua || '',
+                r.data?.tong_dien_tich || '',
+                r.data?.dien_tich_tho_cu || '',
+                r.data?.dien_tich_nong_nghiep || '',
+                r.data?.so_phat_hanh || '',
+                r.data?.ngay_ky_gcn ? new Date(r.data.ngay_ky_gcn).toLocaleDateString('vi-VN') : '',
+                r.data?.dia_danh || '',
+                '', 
+                r.data?.ghi_chu || ''
+            ]);
+        });
+
+        wsData.push(['']);
+        wsData.push(['']);
+        wsData.push(['BÊN GIAO (VPĐKĐĐ)', '', '', '', '', '', '', 'BÊN NHẬN (MỘT CỬA)']);
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        const lastCol = headers.length - 1;
+        const merges = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+            { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
+            { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } },
+            { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } },
+            { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 3 } },
+            { s: { r: wsData.length - 1, c: 7 }, e: { r: wsData.length - 1, c: lastCol } },
+        ];
+        ws['!merges'] = merges;
+
+        ws['!cols'] = [
+            { wch: 5 },  
+            { wch: 15 }, 
+            { wch: 15 }, 
+            { wch: 25 }, 
+            { wch: 8 },  
+            { wch: 8 },  
+            { wch: 18 }, 
+            { wch: 12 }, 
+            { wch: 18 }, 
+            { wch: 18 }, 
+            { wch: 15 }, 
+            { wch: 15 }, 
+            { wch: 12 }, 
+            { wch: 15 }  
+        ];
+
+        const styleTitle = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center', vertical: 'center' } };
+        const styleSub = { font: { italic: true, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' } };
+        const styleLeftBold = { font: { bold: true, sz: 11 }, alignment: { horizontal: 'center' } };
+        const styleHeader = { 
+            font: { bold: true }, 
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } },
+            fill: { fgColor: { rgb: "E8F5E9" } } 
+        };
+        const styleCell = { 
+            border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } },
+            alignment: { vertical: 'center' }
+        };
+        const styleCellCenter = { ...styleCell, alignment: { horizontal: 'center', vertical: 'center' } };
+
+        ws['A1'].s = styleLeftBold;
+        ws['A2'].s = { font: { bold: true, sz: 10, underline: true }, alignment: { horizontal: 'center' } };
+        ws[XLSX.utils.encode_cell({ r: 3, c: 0 })].s = styleTitle;
+        ws[XLSX.utils.encode_cell({ r: 4, c: 0 })].s = styleSub;
+        ws[XLSX.utils.encode_cell({ r: 5, c: 0 })].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
+        const headerRowIdx = 7;
+        for (let c = 0; c <= lastCol; c++) {
+            const cellRef = XLSX.utils.encode_cell({ r: headerRowIdx, c: c });
+            if (ws[cellRef]) ws[cellRef].s = styleHeader;
+        }
+
+        for (let r = headerRowIdx + 1; r < wsData.length - 3; r++) {
+            for (let c = 0; c <= lastCol; c++) {
+                const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
+                if (!ws[cellRef]) ws[cellRef] = { v: '', t: 's' };
+                ws[cellRef].s = styleCell;
+                if ([0, 1, 2, 4, 5, 10, 11].includes(c)) {
+                    ws[cellRef].s = styleCellCenter;
+                }
+            }
+        }
+
+        const sigIdx = wsData.length - 1;
+        ws[XLSX.utils.encode_cell({ r: sigIdx, c: 0 })].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+        ws[XLSX.utils.encode_cell({ r: sigIdx, c: 7 })].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
+        XLSX.utils.book_append_sheet(wb, ws, "DanhSach1Cua");
+        XLSX.writeFile(wb, `DanhSachBanGiao_1Cua_Dot${batchVal}_Ngay${dateVal}.xlsx`);
+        setShowExportHandover1CuaModal(false);
     };
 
     const handleImportClick = () => {
@@ -569,6 +1118,254 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         XLSX.writeFile(wb, `VaoSo_${activeTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const renderVaoSoToolUI = () => {
+        if (tempRecords.length === 0) {
+            return (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50">
+                    <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-10 max-w-lg w-full text-center shadow-md flex flex-col items-center gap-4 hover:border-purple-500 transition-colors">
+                        <div className="p-4 bg-purple-50 text-purple-600 rounded-full">
+                            <FileSpreadsheet size={48} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-bold text-gray-800">Nhập dữ liệu từ Excel</h3>
+                            <p className="text-sm text-gray-500">
+                                Kéo thả file Excel chứa danh sách Mã hồ sơ cần vào số hoặc click nút bên dưới để tải lên. Hệ thống sẽ tự động đối chiếu thông tin với cơ sở dữ liệu iGate chính thức.
+                            </p>
+                        </div>
+                        <input 
+                            type="file" 
+                            ref={tempFileInputRef} 
+                            onChange={handleTempExcelUpload} 
+                            accept=".xlsx, .xls" 
+                            className="hidden" 
+                        />
+                        <div className="flex gap-3 mt-2">
+                            <button 
+                                onClick={handleTempImportClick} 
+                                className="flex items-center gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-purple-700 shadow transition-all hover:scale-105"
+                            >
+                                <Upload size={16}/> Chọn tệp Excel
+                            </button>
+                            <button 
+                                onClick={handleDownloadTemplate} 
+                                className="flex items-center gap-2 bg-gray-100 text-gray-700 border border-gray-300 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-200 shadow-sm"
+                            >
+                                <Download size={16}/> Mẫu nhập liệu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                {/* Temp Table Tool bar */}
+                <div className="p-3 bg-purple-50/50 border-b border-purple-100 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                            <FileSpreadsheet size={14} /> Tệp: {tempExcelFileName}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                            Nhận diện: <strong className="text-gray-800">{tempRecords.length}</strong> hồ sơ | Đã chọn: <strong className="text-purple-700">{selectedTempIds.size}</strong>
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input 
+                            type="file" 
+                            ref={tempFileInputRef} 
+                            onChange={handleTempExcelUpload} 
+                            accept=".xlsx, .xls" 
+                            className="hidden" 
+                        />
+                        <button 
+                            onClick={handleTempImportClick}
+                            className="flex items-center gap-1.5 text-xs bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-lg shadow-sm font-semibold transition-colors"
+                        >
+                            Chọn tệp khác
+                        </button>
+                        <button 
+                            onClick={handleAutoAssignAllTempBookNumbers}
+                            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg shadow-sm font-bold transition-colors"
+                            title="Tự động điền Số vào sổ tiếp theo từ hệ thống cho các dòng còn trống"
+                        >
+                            <Hash size={14}/> Tự động đánh số vào sổ
+                        </button>
+                        <button 
+                            onClick={() => setShowConfirmHandoverModal(true)}
+                            className="flex items-center gap-1.5 text-xs bg-purple-600 text-white hover:bg-purple-700 px-4 py-1.5 rounded-lg shadow-md font-bold transition-colors animate-pulse"
+                            title="Xác nhận dữ liệu và bàn giao sang 1 cửa"
+                        >
+                            <CheckCircle2 size={14}/> Xác nhận cập nhật & Bàn giao
+                        </button>
+                    </div>
+                </div>
+
+                {/* Temp Table */}
+                <div className="flex-1 overflow-auto">
+                    <table className="min-w-full table-fixed border-collapse">
+                        <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm border-b">
+                            <tr>
+                                <th className="p-2 border-b border-r border-gray-200 w-10 text-center bg-gray-50 sticky left-0 z-20">
+                                    <input 
+                                        type="checkbox" 
+                                        onChange={handleSelectAllTempRows} 
+                                        checked={tempRecords.length > 0 && selectedTempIds.size === tempRecords.length} 
+                                    />
+                                </th>
+                                <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-50 sticky left-10 z-20">#</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-40 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Mã hồ sơ</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-40 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Địa danh (Xã)</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-56 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Chủ sử dụng đất</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-24 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Số tờ</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-24 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Số thửa</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Tổng DT (m2)</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Đất ở (m2)</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Đất NN (m2)</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-40 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Số phát hành GCN</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-48 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Số vào sổ</th>
+                                <th className="p-2 border-b border-r border-gray-200 w-40 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap">Ngày ký GCN</th>
+                                <th className="p-2 border-b border-gray-200 w-20 text-center bg-gray-50 sticky right-0 z-20">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {tempRecords.map((r, idx) => (
+                                <tr key={idx} className={`hover:bg-purple-50/20 group ${selectedTempIds.has(String(idx)) ? 'bg-purple-50/40' : ''}`}>
+                                    <td className="p-2 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-purple-50/20">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedTempIds.has(String(idx))} 
+                                            onChange={() => handleSelectTempRow(idx)} 
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-200 text-center text-gray-500 text-xs bg-white sticky left-10 z-10 group-hover:bg-purple-50/20">
+                                        {idx + 1}
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs">
+                                        <div className="flex items-center gap-1.5 font-mono font-medium">
+                                            {r.existsInSystem ? (
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Tìm thấy trong hệ thống" />
+                                            ) : (
+                                                <span title="Không tìm thấy mã hồ sơ trong hệ thống iGate">
+                                                    <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+                                                </span>
+                                            )}
+                                            {r.code}
+                                        </div>
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent"
+                                            value={r.diaDanh || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'diaDanh', e.target.value)}
+                                            placeholder="Địa danh..."
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs font-semibold">
+                                        <input 
+                                            type="text"
+                                            className="w-full font-bold text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-gray-800"
+                                            value={r.customerName || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'customerName', e.target.value)}
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs text-center">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-center text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent"
+                                            value={r.mapSheet || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'mapSheet', e.target.value)}
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs text-center">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-center text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent"
+                                            value={r.landPlot || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'landPlot', e.target.value)}
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs text-center">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-center text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent"
+                                            value={r.area || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'area', e.target.value)}
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs text-center bg-orange-50/10">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-center text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-orange-700 font-semibold"
+                                            value={r.datO || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'datO', e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs text-center bg-green-50/10">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-center text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-green-700 font-semibold"
+                                            value={r.datNongNghiep || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'datNongNghiep', e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs">
+                                        <input 
+                                            type="text"
+                                            className="w-full text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono"
+                                            value={r.soPhatHanh || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'soPhatHanh', e.target.value)}
+                                            placeholder="CQ..."
+                                        />
+                                    </td>
+                                    <td className="p-1 border-r border-gray-100 text-xs">
+                                        <div className="flex items-center gap-1">
+                                            <input 
+                                                type="text"
+                                                className="flex-1 min-w-0 text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono font-bold text-blue-700 animate-pulse"
+                                                value={r.soVaoSo || ''}
+                                                onChange={(e) => handleTempCellChange(idx, 'soVaoSo', e.target.value)}
+                                                placeholder="CN..."
+                                            />
+                                            <button 
+                                                onClick={() => handleGetTempBookNumber(idx)}
+                                                className="p-1 bg-purple-50 hover:bg-purple-100 rounded text-purple-600 transition-colors"
+                                                title="Lấy số tự động từ hệ thống"
+                                                tabIndex={-1}
+                                            >
+                                                <Hash size={13} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td className="p-2 border-r border-gray-100 text-xs">
+                                        <input 
+                                            type="date"
+                                            className="w-full text-xs px-1.5 py-1 border border-transparent rounded hover:border-gray-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-gray-700"
+                                            value={r.ngayKyGcn || ''}
+                                            onChange={(e) => handleTempCellChange(idx, 'ngayKyGcn', e.target.value)}
+                                        />
+                                    </td>
+                                    <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-purple-50/20 z-10 border-l">
+                                        <button 
+                                            onClick={() => handleDeleteTempRow(idx)}
+                                            className="text-gray-400 hover:text-red-500 p-1"
+                                            title="Xóa dòng này"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
@@ -592,22 +1389,40 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
                     <div className="flex bg-white rounded-md border border-gray-200 p-1 shadow-sm">
                         <button 
-                            onClick={() => setActiveTab('all')}
+                            onClick={() => {
+                                setActiveTab('all');
+                                setSelectedIds(new Set());
+                            }}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             Danh sách
                         </button>
                         <button 
-                            onClick={() => setActiveTab('pending')}
+                            onClick={() => {
+                                setActiveTab('pending');
+                                setSelectedIds(new Set());
+                            }}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             Chờ chuyển Scan/1 Cửa
                         </button>
                         <button 
-                            onClick={() => setActiveTab('scanned')}
+                            onClick={() => {
+                                setActiveTab('scanned');
+                                setSelectedIds(new Set());
+                            }}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             Đã chuyển Scan/1 Cửa
+                        </button>
+                        <button 
+                            onClick={() => {
+                                setActiveTab('cong-cu-vao-so');
+                                setSelectedIds(new Set());
+                            }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'cong-cu-vao-so' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Công cụ Vào số GCN
                         </button>
                     </div>
 
@@ -671,6 +1486,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             </button>
                         )}
 
+                        {activeTab !== 'pending' && (
+                            <button onClick={() => setShowExportHandover1CuaModal(true)} className="flex items-center gap-2 bg-pink-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-pink-700 shadow-sm" title="Xuất danh sách bàn giao 1 cửa chọn theo Ngày, Đợt và Xã">
+                                <FileOutput size={16}/> Xuất DS bàn giao 1 cửa
+                            </button>
+                        )}
+
                         <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
                             <FileSpreadsheet size={16}/> Xuất Excel
                         </button>
@@ -714,10 +1535,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
             {/* Table Container */}
             <div className="flex-1 overflow-auto relative flex flex-col">
-                {loading ? (
+                {loading || tempRecordsLoading ? (
                     <div className="flex items-center justify-center h-full text-gray-500 gap-2">
                         <Loader2 className="animate-spin" /> Đang xử lý...
                     </div>
+                ) : activeTab === 'cong-cu-vao-so' ? (
+                    renderVaoSoToolUI()
                 ) : (
                     <>
                     <div className="inline-block min-w-full align-middle flex-1 overflow-auto">
@@ -1405,6 +2228,180 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                     }
                 }}
             />
+
+            {/* Modal Xác nhận cập nhật và bàn giao sang 1 cửa */}
+            {showConfirmHandoverModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up flex flex-col overflow-hidden">
+                        <div className="p-4 border-b bg-purple-50 flex justify-between items-center text-purple-800">
+                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                <CheckCircle2 size={20} /> Xác nhận & Bàn giao 1 cửa
+                            </h3>
+                            <button onClick={() => setShowConfirmHandoverModal(false)} className="text-gray-400 hover:text-red-500">
+                                <X size={20}/>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-gray-600">
+                                Bạn chuẩn bị thực hiện cập nhật Số vào sổ & Ngày ký GCN cho <strong className="text-purple-700">{selectedTempIds.size > 0 ? selectedTempIds.size : tempRecords.length}</strong> hồ sơ được chọn, đồng thời đưa thông tin này vào cơ sở dữ liệu lưu trữ để lập danh sách bàn giao 1 cửa.
+                            </p>
+
+                            {/* Batch Options */}
+                            <div className="space-y-3">
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">Đợt bàn giao của ngày</label>
+                                
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                                        <input 
+                                            type="radio" 
+                                            name="handoverBatchMode" 
+                                            value="new" 
+                                            checked={handoverBatchMode === 'new'} 
+                                            onChange={() => setHandoverBatchMode('new')}
+                                            className="text-purple-600 focus:ring-purple-500"
+                                        />
+                                        <span>Tạo đợt mới (Đợt {suggestedHandoverBatch})</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                                        <input 
+                                            type="radio" 
+                                            name="handoverBatchMode" 
+                                            value="existing" 
+                                            checked={handoverBatchMode === 'existing'} 
+                                            onChange={() => setHandoverBatchMode('existing')}
+                                            className="text-purple-600 focus:ring-purple-500"
+                                        />
+                                        <span>Bổ sung vào đợt cũ</span>
+                                    </label>
+                                </div>
+
+                                {handoverBatchMode === 'existing' && (
+                                    <div className="mt-2">
+                                        <select 
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                            value={selectedExistingHandoverBatch}
+                                            onChange={(e) => setSelectedExistingHandoverBatch(e.target.value)}
+                                        >
+                                            {existingHandoverBatches.length > 0 ? (
+                                                existingHandoverBatches.map(b => (
+                                                    <option key={b} value={b}>Đợt {b} (Đã có hồ sơ bàn giao)</option>
+                                                ))
+                                            ) : (
+                                                <option value="">Chưa có đợt bàn giao cũ trong ngày</option>
+                                            )}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex gap-2">
+                                <AlertTriangle size={16} className="shrink-0 text-amber-600 mt-0.5" />
+                                <div>
+                                    Nếu có thay đổi so với thông tin GCN gốc đang lưu hành trên hệ thống iGate (như Số tờ, Số thửa, Diện tích, Chủ sử dụng), hệ thống sẽ tự động điều chỉnh dữ liệu iGate của các hồ sơ tương ứng theo dữ liệu mới này.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowConfirmHandoverModal(false)} 
+                                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium text-sm"
+                                disabled={isSubmittingHandover}
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                onClick={() => handleConfirmHandover('', '')} 
+                                className="flex items-center gap-2 px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-bold text-sm shadow transition-colors disabled:opacity-50"
+                                disabled={isSubmittingHandover}
+                            >
+                                {isSubmittingHandover ? (
+                                    <>
+                                        <Loader2 className="animate-spin" size={16} /> Đang xử lý...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 size={16} /> Đồng ý & Cập nhật
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Xuất danh sách bàn giao 1 cửa theo yêu cầu chọn ngày, đợt, xã */}
+            {showExportHandover1CuaModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in-up flex flex-col overflow-hidden">
+                        <div className="p-4 border-b bg-pink-50 text-pink-800 flex justify-between items-center">
+                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                <FileOutput size={20} /> Xuất DS bàn giao 1 cửa
+                            </h3>
+                            <button onClick={() => setShowExportHandover1CuaModal(false)} className="text-gray-400 hover:text-red-500">
+                                <X size={20}/>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <p className="text-xs text-gray-500 mb-2">
+                                Lọc và xuất file Excel bàn giao 1 cửa từ cơ sở dữ liệu đã lưu trữ.
+                            </p>
+
+                            {/* Ngày bàn giao */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày bàn giao</label>
+                                <input 
+                                    type="date"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-pink-500"
+                                    value={exportHandover1CuaParams.date}
+                                    onChange={(e) => setExportHandover1CuaParams(p => ({ ...p, date: e.target.value }))}
+                                />
+                            </div>
+
+                            {/* Đợt bàn giao */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Đợt bàn giao</label>
+                                <input 
+                                    type="text"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-pink-500"
+                                    value={exportHandover1CuaParams.batch}
+                                    onChange={(e) => setExportHandover1CuaParams(p => ({ ...p, batch: e.target.value }))}
+                                    placeholder="Ví dụ: 1, 2, 3..."
+                                />
+                            </div>
+
+                            {/* Xã/Phường */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Xã / Phường địa danh</label>
+                                <select 
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-pink-500"
+                                    value={exportHandover1CuaParams.ward}
+                                    onChange={(e) => setExportHandover1CuaParams(p => ({ ...p, ward: e.target.value }))}
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {wards.map(w => (
+                                        <option key={w} value={w}>{w}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                            <button onClick={() => setShowExportHandover1CuaModal(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium text-sm">
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                onClick={() => exportHandover1CuaExcel(records.filter(r => r.type === 'vaoso' && r.data?.scan_date === exportHandover1CuaParams.date && String(r.data?.scan_batch_id) === exportHandover1CuaParams.batch), exportHandover1CuaParams.date, exportHandover1CuaParams.batch, exportHandover1CuaParams.ward)} 
+                                className="flex items-center gap-2 px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-md font-bold text-sm shadow-sm transition-transform active:scale-95"
+                            >
+                                <FileOutput size={16} /> Xuất Excel bàn giao
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <DeleteAllModal
                 isOpen={showDeleteAllModal}

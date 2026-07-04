@@ -197,14 +197,28 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div>Địa chỉ thửa đất: {data.address ? data.address + ' - ' : ''}{getFullWard(data.ward || '')}</div>
                             <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{data.recordType ? `${data.recordType} - ` : ''}{data.content}</span></div>
                             
-                            <div>1. {tp1Value}</div>
-                            <div>2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)</div>
-                            {data.authorizedBy ? (
-                                <div>3. Hợp đồng ủy quyền, giấy ủy quyền: {data.authorizedBy?.toUpperCase()}{data.authDocType ? ` (${data.authDocType})` : ''}</div>
-                            ) : null}
-                            {data.otherDocs ? (
-                                <div>{data.authorizedBy ? '4' : '3'}. Giấy tờ khác: {data.otherDocs}</div>
-                            ) : null}
+                            {(type.includes('thu hồi giấy chứng nhận') || type.includes('thu hồi gcn')) ? (
+                                <>
+                                    <div>1. Giấy chứng nhận bản gốc</div>
+                                    {data.authorizedBy ? (
+                                        <div>2. Hợp đồng ủy quyền (Giấy ủy quyền): {data.authorizedBy?.toUpperCase()}{data.authDocType ? ` (${data.authDocType})` : ''}</div>
+                                    ) : null}
+                                    {data.otherDocs ? (
+                                        <div>{data.authorizedBy ? '3' : '2'}. Giấy tờ kèm theo: {data.otherDocs}</div>
+                                    ) : null}
+                                </>
+                            ) : (
+                                <>
+                                    <div>1. {tp1Value}</div>
+                                    <div>2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)</div>
+                                    {data.authorizedBy ? (
+                                        <div>3. Hợp đồng ủy quyền, giấy ủy quyền: {data.authorizedBy?.toUpperCase()}{data.authDocType ? ` (${data.authDocType})` : ''}</div>
+                                    ) : null}
+                                    {data.otherDocs ? (
+                                        <div>{data.authorizedBy ? '4' : '3'}. Giấy tờ khác: {data.otherDocs}</div>
+                                    ) : null}
+                                </>
+                            )}
                             <div>Số lượng hồ sơ:.......1....(bộ)</div>
                             <div>Thời gian giải quyết hồ sơ theo quy định là: <span className="font-bold">{standardDays}</span> ngày làm việc</div>
                             <div>Thời gian nhận hồ sơ: ngày <span className="font-bold">{formatDateShort(rDate)}</span></div>

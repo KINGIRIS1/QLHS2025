@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, isRecordApproaching } from '../utils/appHelpers';
+import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, showToast } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
@@ -170,7 +170,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleSaveKey = () => {
         saveGeminiKey(apiKey);
         setIsKeyModalOpen(false);
-        alert("Đã lưu API Key thành công!");
+        showToast("Đã lưu API Key thành công!", "success");
     };
 
     // --- LOGIC TÍNH TOÁN DỮ LIỆU CHUNG (Theo ngày & xã) ---
@@ -280,7 +280,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     };
 
     const handleGenerateClick = () => {
-        if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
+        if (!fromDate || !toDate) { showToast("Vui lòng chọn đầy đủ thời gian.", "error"); return; }
         
         const currentKey = getGeminiKey();
         if (!currentKey && !process.env.API_KEY) {
@@ -299,7 +299,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     };
 
     const handleExportExcelClick = () => {
-        if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
+        if (!fromDate || !toDate) { showToast("Vui lòng chọn đầy đủ thời gian.", "error"); return; }
         onExportExcel(fromDate, toDate, selectedWard);
     };
 

@@ -4,7 +4,7 @@ import { X, Upload, FileText, CheckCircle, Trash2, Download, AlertCircle, Save, 
 import { saveTemplate, hasTemplate, removeTemplate, saveTemplateUrl, getTemplateSourceType, STORAGE_KEYS } from '../services/docxService';
 import { saveExcelTemplate, hasExcelTemplate, removeExcelTemplate, EXCEL_STORAGE_KEYS } from '../services/excelTemplateService';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 
 interface TemplateConfigModalProps {
   isOpen: boolean;
@@ -102,7 +102,7 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
     if (e.target.files && e.target.files[0]) {
         const selectedFile = e.target.files[0];
         if (!selectedFile.name.endsWith(acceptExt)) {
-            alert(`Vui lòng chỉ chọn file ${acceptExt}`);
+            showToast(`Vui lòng chỉ chọn file ${acceptExt}`, "error");
             return;
         }
         setFile(selectedFile);
@@ -115,10 +115,10 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
         // Excel chỉ hỗ trợ Upload file (chưa hỗ trợ link do thư viện xlsx phức tạp hơn)
         if (file) {
             const success = await saveExcelTemplate(storageKey, file, startRow);
-            if (success) { setSavedType('FILE'); alert('Đã lưu mẫu Excel!'); setFile(null); }
+            if (success) { setSavedType('FILE'); showToast('Đã lưu mẫu Excel!', 'success'); setFile(null); }
         } else if (savedType !== 'NONE') {
             localStorage.setItem(storageKey + '_start_row', startRow.toString());
-            alert('Đã cập nhật cấu hình!');
+            showToast('Đã cập nhật cấu hình!', 'success');
         }
         setIsSaving(false);
         return;
@@ -134,11 +134,11 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
 
     if (success) {
         setSavedType(mode === 'upload' ? 'FILE' : 'URL');
-        alert('Đã lưu cấu hình mẫu thành công!');
+        showToast('Đã lưu cấu hình mẫu thành công!', 'success');
         setFile(null);
         setUrl('');
     } else {
-        alert('Lỗi khi lưu mẫu. Vui lòng kiểm tra lại.');
+        showToast('Lỗi khi lưu mẫu. Vui lòng kiểm tra lại.', 'error');
     }
     setIsSaving(false);
   };

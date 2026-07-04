@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Employee, User } from '../types';
 import { Plus, Trash2, Save, User as UserIcon, FileSpreadsheet, Download, List, Edit2, CheckSquare, Search } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 
 interface EmployeeManagementProps {
   employees: Employee[];
@@ -63,12 +63,12 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   const handleSave = () => {
     if (!editingEmployee.name || !editingEmployee.id) {
-        alert('Vui lòng nhập tên và mã nhân viên');
+        showToast('Vui lòng nhập tên và mã nhân viên', 'error');
         return;
     }
     const newEmp = editingEmployee as Employee;
     onSaveEmployee(newEmp);
-    alert(isNew ? 'Đã thêm nhân viên mới!' : 'Đã cập nhật thông tin!');
+    showToast(isNew ? 'Đã thêm nhân viên mới!' : 'Đã cập nhật thông tin!', 'success');
     setActiveTab('list');
   };
 
@@ -130,10 +130,10 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                count++;
            }
         });
-        alert(`Đã nhập thành công ${count} nhân viên.`);
+        showToast(`Đã nhập thành công ${count} nhân viên.`, 'success');
       } catch (error) {
         console.error(error);
-        alert('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng.');
+        showToast('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng.', 'error');
       } finally {
          if (fileInputRef.current) fileInputRef.current.value = '';
       }

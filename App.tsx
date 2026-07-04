@@ -6,6 +6,7 @@ import Login from './components/Login';
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
+import BlockingWarningModal from './components/BlockingWarningModal';
 
 import { DEFAULT_VISIBLE_COLUMNS, confirmAction } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
@@ -69,6 +70,11 @@ function App() {
 
   const [isPlotCountModalOpen, setIsPlotCountModalOpen] = useState(false);
   const [selectedRecordForPlotCount, setSelectedRecordForPlotCount] = useState<RecordFile | null>(null);
+
+  // Trạng thái cho cảnh báo ngăn chặn trình ký duyệt
+  const [isBlockingWarningOpen, setIsBlockingWarningOpen] = useState(false);
+  const [blockingMatches, setBlockingMatches] = useState<{ record: any; source: 'active' | 'archive' }[]>([]);
+  const [pendingAdvanceRecord, setPendingAdvanceRecord] = useState<RecordFile | null>(null);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -206,7 +212,7 @@ function App() {
           } catch (e: any) {
               console.error("Download update failed:", e);
               setUpdateStatus('error');
-              alert("Lỗi khi tải bản cập nhật: " + (e.message || "Không xác định"));
+              setToast({ type: 'error', message: "Lỗi khi tải bản cập nhật: " + (e.message || "Không xác định") });
           }
       } else {
           // Fallback cho web
@@ -560,12 +566,70 @@ function App() {
       }
   }, []);
 
-  const advanceStatus = useCallback(async (record: RecordFile) => {
-      if (record.status === RecordStatus.RECEIVED) { 
-          setAssignTargetRecords([record]); 
-          setIsAssignModalOpen(true); 
-          return; 
-      }
+  const checkBlocking = useCallback((record: RecordFile) => {
+      const activeRaw = localStorage.getItem('offline_blocking_records');
+      const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
+      
+      const activeList = activeRaw ? JSON.parse(activeRaw) : [];
+      const archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
+      
+      const normalize = (str: string | null | undefined) => {
+          if (!str) return '';
+          return str
+              .trim()
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/đ/g, 'd');
+      };
+
+      const wardNorm = normalize(record.ward);
+      const plotNorm = normalize(record.landPlot);
+      const sheetNorm = normalize(record.mapSheet);
+
+      if (!wardNorm || !plotNorm) return [];
+
+      const matches: { record: any; source: 'active' | 'archive' }[] = [];
+
+      const checkList = (list: any[], source: 'active' | 'archive') => {
+          list.forEach(blocking => {
+              const blockOldNorm = normalize(blocking.oldCommune);
+              const blockNewNorm = normalize(blocking.newCommune);
+              
+              const isCommuneMatch = (blockOldNorm && (blockOldNorm.includes(wardNorm) || wardNorm.includes(blockOldNorm))) ||
+                                     (blockNewNorm && (blockNewNorm.includes(wardNorm) || wardNorm.includes(blockNewNorm)));
+              
+              if (!isCommuneMatch) return;
+
+              const plotMatch = blocking.plots?.some((p: any) => {
+                  const oldPlotNorm = normalize(p.oldPlotNumber);
+                  const newPlotNorm = normalize(p.newPlotNumber);
+                  const oldSheetNorm = normalize(p.oldMapSheetNumber);
+                  const newSheetNorm = normalize(p.newMapSheetNumber);
+
+                  const plotMatches = (oldPlotNorm && (plotNorm.includes(oldPlotNorm) || oldPlotNorm.includes(plotNorm))) ||
+                                      (newPlotNorm && (plotNorm.includes(newPlotNorm) || newPlotNorm.includes(plotNorm)));
+
+                  const sheetMatches = !sheetNorm || !oldSheetNorm || 
+                                       (oldSheetNorm && (sheetNorm.includes(oldSheetNorm) || oldSheetNorm.includes(sheetNorm))) ||
+                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || sheetNorm.includes(newSheetNorm)));
+
+                  return plotMatches && sheetMatches;
+              });
+
+              if (plotMatch) {
+                  matches.push({ record: blocking, source });
+              }
+          });
+      };
+
+      checkList(activeList, 'active');
+      checkList(archiveList, 'archive');
+
+      return matches;
+  }, []);
+
+  const proceedAdvanceStatus = useCallback(async (record: RecordFile) => {
       // UPDATE: Thêm COMPLETED_WORK vào luồng
       const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
       const idx = flow.indexOf(record.status);
@@ -582,6 +646,32 @@ function App() {
           await updateRecordApi({ ...record, ...updates });
       }
   }, [getUpdatesForStatusChange]);
+
+  const advanceStatus = useCallback(async (record: RecordFile) => {
+      if (record.status === RecordStatus.RECEIVED) { 
+          setAssignTargetRecords([record]); 
+          setIsAssignModalOpen(true); 
+          return; 
+      }
+
+      // Kiểm tra xem trạng thái tiếp theo có phải trình ký duyệt (PENDING_SIGN) hoặc đã thực hiện (COMPLETED_WORK) hay không
+      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+      const idx = flow.indexOf(record.status);
+      if (idx < flow.length - 1) {
+          const nextStatus = flow[idx + 1];
+          if (nextStatus === RecordStatus.PENDING_SIGN || nextStatus === RecordStatus.COMPLETED_WORK) {
+              const matches = checkBlocking(record);
+              if (matches.length > 0) {
+                  setBlockingMatches(matches);
+                  setPendingAdvanceRecord(record);
+                  setIsBlockingWarningOpen(true);
+                  return;
+              }
+          }
+      }
+
+      await proceedAdvanceStatus(record);
+  }, [checkBlocking, proceedAdvanceStatus]);
 
   const handleConfirmPlotCount = useCallback(async (plotCount: number) => {
       if (selectedRecordForPlotCount) {
@@ -616,7 +706,7 @@ function App() {
   const handleConfirmSignBatch = async () => {
       if (!canPerformAction) return;
       const pendingSign = recordFilterProps.filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
-      if (pendingSign.length === 0) { alert("Không có hồ sơ nào đang chờ ký."); return; }
+      if (pendingSign.length === 0) { setToast({ type: 'error', message: "Không có hồ sơ nào đang chờ ký." }); return; }
       if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ sang "Đã ký"?`)) {
           const todayStr = new Date().toISOString().split('T')[0];
           const updates = { status: RecordStatus.SIGNED, approvalDate: todayStr, completedDate: null };
@@ -920,6 +1010,22 @@ function App() {
             }}
             onConfirm={handleConfirmPlotCount}
             record={selectedRecordForPlotCount}
+        />
+
+        <BlockingWarningModal
+            isOpen={isBlockingWarningOpen}
+            onClose={() => {
+                setIsBlockingWarningOpen(false);
+                setPendingAdvanceRecord(null);
+                setBlockingMatches([]);
+            }}
+            onConfirm={() => {
+                if (pendingAdvanceRecord) {
+                    proceedAdvanceStatus(pendingAdvanceRecord);
+                }
+            }}
+            matches={blockingMatches}
+            recordFile={pendingAdvanceRecord}
         />
     </MainLayout>
   );

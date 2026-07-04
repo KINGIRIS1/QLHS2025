@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye } from 'lucide-react';
+import { showToast, getReceivingWard } from '../utils/appHelpers';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -101,7 +102,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         
         recordsToExport = records.filter(r => {
             const matchBatch = r.exportDate?.startsWith(dateStr) && r.exportBatch === batchNum;
-            const matchWard = selectedWard === 'all' || r.ward === selectedWard;
+            const recWard = getReceivingWard(r);
+            const matchWard = selectedWard === 'all' || recWard === selectedWard;
             return matchBatch && matchWard;
         });
 
@@ -128,7 +130,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     }
 
     if (recordsToExport.length === 0) {
-        alert("Không tìm thấy hồ sơ nào cho lựa chọn này.");
+        showToast("Không tìm thấy hồ sơ nào cho lựa chọn này.", "error");
         return null;
     }
 

@@ -5,7 +5,7 @@ import { fetchMessages, sendMessageApi, uploadChatFile, fetchChatGroups, createC
 import { supabase } from '../services/supabaseClient';
 import { Send, Paperclip, File as FileIcon, X, Loader2, Image as ImageIcon, Download, Hash, MapPin, Plus, Trash2, Users, Monitor, Camera, UserPlus, Shield, Crop, Smile, Reply, ZoomIn, ArrowLeft } from 'lucide-react';
 import ScreenshotCropper from './ScreenshotCropper';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 
 // ... (Giữ nguyên phần định nghĩa interface Window và MessageItem component không thay đổi) ...
 declare global {
@@ -349,7 +349,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
         setReplyingTo(null); 
     } catch (error) {
         console.error(error);
-        alert("Gửi thất bại.");
+        showToast("Gửi thất bại.", "error");
     } finally {
         setSending(false);
     }
@@ -446,10 +446,10 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
                   setScreenshotImg(dataUrl);
                   setIsCropping(true);
               } else {
-                  alert("Không chụp được màn hình.");
+                  showToast("Không chụp được màn hình.", "error");
               }
           } else {
-               alert("Chức năng này yêu cầu App Desktop (Electron).");
+               showToast("Chức năng này yêu cầu App Desktop (Electron).", "error");
           }
       } catch (err: any) {
           console.error(err);

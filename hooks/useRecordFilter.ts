@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
-import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
+import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, getReceivingWard } from '../utils/appHelpers';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -33,6 +33,7 @@ export const useRecordFilter = (
     const [filterWard, setFilterWard] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterEmployee, setFilterEmployee] = useState('all');
+    const [filterRecordType, setFilterRecordType] = useState('all');
     const [warningFilter, setWarningFilter] = useState<'none' | 'overdue' | 'approaching'>('none');
     
     // Cập nhật type cho handoverTab để hỗ trợ 'returned'
@@ -49,7 +50,12 @@ export const useRecordFilter = (
     // Reset pagination when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [currentView, sortConfig, warningFilter, filterWard, filterStatus, filterEmployee, filterSpecificDate, filterFromDate, filterToDate, handoverTab, searchTerm]);
+    }, [currentView, sortConfig, warningFilter, filterWard, filterStatus, filterEmployee, filterRecordType, filterSpecificDate, filterFromDate, filterToDate, handoverTab, searchTerm]);
+
+    // Reset filterRecordType khi đổi view
+    useEffect(() => {
+        setFilterRecordType('all');
+    }, [currentView]);
 
     // --- WARNING CHECK LOGIC ---
     const checkWarningPermission = (r: RecordFile) => {
@@ -125,9 +131,9 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
         
         if (isOtherView) {
-            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(r.recordType || ''));
+            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || ''));
         } else if (isMeasurementView) {
-            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(r.recordType || ''));
+            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || ''));
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)
@@ -145,7 +151,12 @@ export const useRecordFilter = (
         // Ward, Status, Employee Filters
         if (filterWard !== 'all') {
             const wardSearch = removeVietnameseTones(filterWard);
-            result = result.filter(r => removeVietnameseTones(r.ward || '').includes(wardSearch));
+            const isHandoverView = currentView === 'handover_list' || currentView === 'other_handover_list';
+            if (isHandoverView) {
+                result = result.filter(r => removeVietnameseTones(getReceivingWard(r) || '').includes(wardSearch));
+            } else {
+                result = result.filter(r => removeVietnameseTones(r.ward || '').includes(wardSearch));
+            }
         }
         if (filterStatus !== 'all' && currentView !== 'handover_list') {
             result = result.filter(r => r.status === filterStatus);
@@ -153,6 +164,9 @@ export const useRecordFilter = (
         if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
             if (filterEmployee === 'unassigned') result = result.filter(r => !r.assignedTo);
             else result = result.filter(r => r.assignedTo === filterEmployee);
+        }
+        if (filterRecordType !== 'all') {
+            result = result.filter(r => r.recordType === filterRecordType);
         }
 
         // Restrict EMPLOYEE to their own records, UNLESS they are in 'Tổ đo đạc'
@@ -201,7 +215,7 @@ export const useRecordFilter = (
         });
 
         return result;
-    }, [records, searchTerm, filterWard, filterStatus, filterEmployee, filterDate, filterSpecificDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
+    }, [records, searchTerm, filterWard, filterStatus, filterEmployee, filterRecordType, filterDate, filterSpecificDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
 
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -223,8 +237,8 @@ export const useRecordFilter = (
                 if (!checkWarningPermission(r)) return; 
                 
                 // Filter by recordType based on view group
-                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(r.recordType || '')) return;
-                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(r.recordType || '')) return;
+                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || '')) return;
+                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || '')) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;
@@ -244,6 +258,7 @@ export const useRecordFilter = (
         filterWard, setFilterWard,
         filterStatus, setFilterStatus,
         filterEmployee, setFilterEmployee,
+        filterRecordType, setFilterRecordType,
         warningFilter, setWarningFilter,
         handoverTab, setHandoverTab,
         sortConfig, setSortConfig,

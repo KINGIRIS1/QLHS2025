@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx-js-style';
 import { PriceItem } from '../types';
 import { savePriceListBatch } from '../services/api';
 import { X, Save, Upload, FileSpreadsheet, Trash2, AlertCircle, Download } from 'lucide-react';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 
 interface PriceConfigModalProps {
   isOpen: boolean;
@@ -82,13 +82,13 @@ const PriceConfigModal: React.FC<PriceConfigModalProps> = ({ isOpen, onClose, cu
 
         if (newItems.length > 0) {
             setItems(newItems);
-            alert(`Đã đọc được ${newItems.length} dòng từ Excel.`);
+            showToast(`Đã đọc được ${newItems.length} dòng từ Excel.`, "success");
         } else {
-            alert('Không tìm thấy dữ liệu phù hợp. Vui lòng kiểm tra tên cột trong Excel (TenSanPham, GiaSanPham, DTMin, DTMax, VAT_IS_PERCENT...).');
+            showToast('Không tìm thấy dữ liệu phù hợp. Vui lòng kiểm tra tên cột trong Excel (TenSanPham, GiaSanPham, DTMin, DTMax, VAT_IS_PERCENT...).', "error");
         }
       } catch (error) {
         console.error(error);
-        alert('Lỗi đọc file Excel.');
+        showToast('Lỗi đọc file Excel.', "error");
       } finally {
          if (fileInputRef.current) fileInputRef.current.value = '';
       }
@@ -104,11 +104,11 @@ const PriceConfigModal: React.FC<PriceConfigModalProps> = ({ isOpen, onClose, cu
       const success = await savePriceListBatch(items);
       setLoading(false);
       if (success) {
-          alert("Đã cập nhật bảng giá thành công!");
+          showToast("Đã cập nhật bảng giá thành công!", "success");
           onUpdate();
           onClose();
       } else {
-          alert("Lỗi khi lưu bảng giá.");
+          showToast("Lỗi khi lưu bảng giá.", "error");
       }
   };
 

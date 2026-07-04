@@ -117,6 +117,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onConfirm={props.confirmAssign} 
                 employees={props.employees} 
                 selectedRecords={props.assignTargetRecords} 
+                currentView={props.currentView}
             />
             
             {isMobile ? (

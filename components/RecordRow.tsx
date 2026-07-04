@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, getReceivingWard } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -137,6 +137,11 @@ const RecordRow: React.FC<RecordRowProps> = ({
           <td className={`${cellClass} text-center text-gray-700`}>
               <div className="break-words leading-normal text-sm" title={getNormalizedWard(record.ward)}> 
                   {getNormalizedWard(record.ward) || '--'}
+                  {getReceivingWard(record) && getNormalizedWard(getReceivingWard(record)) !== getNormalizedWard(record.ward) && (
+                      <span className="block text-[10px] text-amber-600 font-semibold mt-0.5">
+                          (Nhận tại {getNormalizedWard(getReceivingWard(record))})
+                      </span>
+                  )}
               </div>
           </td>
       )}

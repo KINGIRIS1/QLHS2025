@@ -4,7 +4,8 @@ import {
     Search, Plus, Trash2, Edit, Save, X, Calendar, Phone, FileSpreadsheet, 
     Download, LayoutGrid, FileText, ClipboardList, BookOpen, User as UserIcon, 
     Building, CheckCircle2, AlertTriangle, FilePieChart, TrendingUp, BarChart3,
-    ArrowUpRight, AlertCircle, RefreshCw, Printer, Filter, Upload, Tag, Info
+    ArrowUpRight, AlertCircle, RefreshCw, Printer, Filter, Upload, Tag, Info,
+    FileOutput, Hash, Loader2, Settings
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx-js-style';
@@ -17,6 +18,9 @@ import {
     deleteAllIGateRecordsApi, 
     resetIGateRecordsToDefaultApi 
 } from '../../services/apiIGate';
+import { supabase } from '../../services/supabaseClient';
+import { ArchiveRecord, saveArchiveRecord } from '../../services/apiArchive';
+import { getSystemSetting, saveSystemSetting } from '../../services/apiSystem';
 
 interface IGateRecord {
     id: string;
@@ -42,6 +46,14 @@ interface IGateRecord {
     thoiHanSuDung?: string; // Thời hạn sử dụng
     cccd?: string;          // CCCD
     ghiChu?: string;        // GHI CHÚ
+    ngayTra?: string;       // Ngày trả hồ sơ
+    lyDoTra?: string;       // Lý do trả hồ sơ
+    daThucHienNvtc?: boolean; // Đã thực hiện nghĩa vụ tài chính
+    ngayThucHienNvtc?: string; // Ngày thực hiện nghĩa vụ tài chính
+    soVaoSo?: string;
+    ngayGiao1Cua?: string;
+    dotGiao1Cua?: string;
+    excelRowIndex?: number; // Dòng trong file excel
 }
 
 interface IGateViewProps {
@@ -65,10 +77,12 @@ const TRANG_THAI_LIST = [
     "Mới tiếp nhận",
     "Đã chuyển thông tin thuế",
     "Đã phát hành thông báo thuế",
+    "Đã thực hiện nghĩa vụ tài chính",
     "Chờ thực hiện nghĩa vụ tài chính",
     "Đã ký Giấy chứng nhận",
     "Chưa trả kết quả",
-    "Đã trả kết quả"
+    "Đã trả kết quả",
+    "Hồ sơ trả"
 ];
 
 const LINH_VUC_LIST = [
@@ -171,13 +185,77 @@ const getTodayString = (): string => {
     return `${d}/${m}/${y}`;
 };
 
+const getImportUniqueKey = (soHieu: string, soTo: string, soThua: string): string => {
+    const code = (soHieu || '').trim().toUpperCase();
+    const to = (soTo || '').trim().toUpperCase();
+    const thua = (soThua || '').trim().toUpperCase();
+    return `${code}|${to}|${thua}`;
+};
+
+const cleanThoiHanSuDung = (val: string | null | undefined): string => {
+    if (!val) return '';
+    const trimmed = val.trim();
+    const parsed = parseToDateObject(trimmed);
+    if (!parsed) return trimmed; // Nếu không phải ngày tháng hợp lệ (ví dụ: "Lâu dài", "50 năm"), giữ nguyên bản
+    
+    // Nếu là ngày tháng hợp lệ, ta chỉ trả về chuỗi ngày dạng DD/MM/YYYY
+    const day = parsed.getDate().toString().padStart(2, '0');
+    const month = (parsed.getMonth() + 1).toString().padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
+const formatThoiHanSuDung = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '-';
+    const parsed = parseToDateObject(dateStr);
+    if (!parsed) return dateStr || '-';
+    
+    const day = parsed.getDate().toString().padStart(2, '0');
+    const month = (parsed.getMonth() + 1).toString().padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
 const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<IGateRecord[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTrangThaiFilter, setSelectedTrangThaiFilter] = useState<string>('Tất cả');
     const [selectedLinhVucFilter, setSelectedLinhVucFilter] = useState<string>('Tất cả');
+    const [selectedLoaiHoSoFilter, setSelectedLoaiHoSoFilter] = useState<string>('Tất cả');
     const [showOnlyTon90Days, setShowOnlyTon90Days] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    
+    // States cho Tab Công cụ Vào số GCN (di chuyển từ VaoSoView sang)
+    const [showVaoSoModal, setShowVaoSoModal] = useState(false);
+    const [tempRecords, setTempRecords] = useState<any[]>([]);
+    const [tempRecordsLoading, setTempRecordsLoading] = useState(false);
+    const [selectedTempIds, setSelectedTempIds] = useState<Set<string>>(new Set());
+    const [tempExcelFileName, setTempExcelFileName] = useState('');
+    const [showConfirmHandoverModal, setShowConfirmHandoverModal] = useState(false);
+    const [handoverBatchMode, setHandoverBatchMode] = useState<'new' | 'existing'>('new');
+    const [selectedExistingHandoverBatch, setSelectedExistingHandoverBatch] = useState<string>('');
+    const [isSubmittingHandover, setIsSubmittingHandover] = useState(false);
+    const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showExportReportModal, setShowExportReportModal] = useState(false);
+    const [exportFromDate, setExportFromDate] = useState(() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    });
+    const [exportToDate, setExportToDate] = useState(() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    const [exportWard, setExportWard] = useState('Tất cả');
+    const tempFileInputRef = useRef<HTMLInputElement>(null);
+    const [showExportHandover1CuaModal, setShowExportHandover1CuaModal] = useState(false);
+    const [exportHandover1CuaParams, setExportHandover1CuaParams] = useState({
+        filterType: 'by_date' as 'by_date' | 'by_batch',
+        dateStr: new Date().toISOString().split('T')[0],
+        batchName: '',
+        deliverer: '',
+        receiver: ''
+    });
     
     // State phân trang cho phần hiển thị dữ liệu
     const [currentPage, setCurrentPage] = useState(1);
@@ -193,6 +271,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [batchStatus, setBatchStatus] = useState<string>('');
     const [batchCanBo, setBatchCanBo] = useState<string>('');
     const [batchDate, setBatchDate] = useState<string>('');
+    const [batchLyDoTra, setBatchLyDoTra] = useState<string>('');
 
     // Định nghĩa cấu trúc hồ sơ khớp từ Excel
     interface MatchedExcelRecord {
@@ -210,6 +289,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const [excelSelectedIds, setExcelSelectedIds] = useState<Set<string>>(new Set());
     const [excelActiveToolStatus, setExcelActiveToolStatus] = useState<string>('Đã chuyển thông tin thuế');
     const [excelCanBoUpdate, setExcelCanBoUpdate] = useState<string>('');
+    const [excelLyDoTraUpdate, setExcelLyDoTraUpdate] = useState<string>('');
     const [excelTotalScanned, setExcelTotalScanned] = useState<number>(0);
     const [excelFileName, setExcelFileName] = useState<string>('');
     const [excelDuplicateCodes, setExcelDuplicateCodes] = useState<{ code: string; count: number; rows: number[]; chuHoSo: string }[]>([]);
@@ -226,13 +306,27 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         duplicateWithDbCount: number;
         duplicateInFileCodes: string[];
         duplicateWithDbCodes: string[];
+        dupCodeDiffCount: number;
+        dupCodeDiffInFileCount: number;
+        dupCodeDiffWithDbCount: number;
+        dupCodeDiffInFileCodes: string[];
+        dupCodeDiffWithDbCodes: string[];
+        skippedRecords: IGateRecord[];
+        skippedReasons: string[];
     }>({
         totalCount: 0,
         validCount: 0,
         duplicateInFileCount: 0,
         duplicateWithDbCount: 0,
         duplicateInFileCodes: [],
-        duplicateWithDbCodes: []
+        duplicateWithDbCodes: [],
+        dupCodeDiffCount: 0,
+        dupCodeDiffInFileCount: 0,
+        dupCodeDiffWithDbCount: 0,
+        dupCodeDiffInFileCodes: [],
+        dupCodeDiffWithDbCodes: [],
+        skippedRecords: [],
+        skippedReasons: []
     });
 
     // Modal Form States
@@ -260,7 +354,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         soPhatHanh: '',
         thoiHanSuDung: '',
         cccd: '',
-        ghiChu: ''
+        ghiChu: '',
+        ngayTra: '',
+        lyDoTra: ''
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -376,6 +472,40 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     // Tải dữ liệu từ database / API
     const loadData = async () => {
         const data = await fetchIGateRecords(DEFAULT_IGATE_RECORDS);
+        
+        try {
+            const { data: archives, error } = await supabase
+                .from('archive_records')
+                .select('*')
+                .eq('type', 'vaoso');
+                
+            if (!error && archives) {
+                const archiveMap = new Map<string, any>();
+                archives.forEach(ar => {
+                    if (ar.so_hieu) {
+                        archiveMap.set(ar.so_hieu.trim().toLowerCase(), ar);
+                    }
+                });
+                
+                const updatedData = data.map(record => {
+                    const match = archiveMap.get(record.soHieu.trim().toLowerCase());
+                    if (match) {
+                        return {
+                            ...record,
+                            soVaoSo: record.soVaoSo || match.data?.so_vao_so || '',
+                            ngayGiao1Cua: match.data?.scan_date || match.data?.ngay_nhan || match.ngay_thang || '',
+                            dotGiao1Cua: match.data?.scan_batch_id || match.data?.batch_id || ''
+                        };
+                    }
+                    return record;
+                });
+                setRecords(updatedData);
+                return;
+            }
+        } catch (e) {
+            console.error("Lỗi ghép dữ liệu bàn giao 1 cửa:", e);
+        }
+        
         setRecords(data);
     };
 
@@ -383,10 +513,662 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         loadData();
     }, []);
 
+    const incrementString = (str: string): string => {
+        const num = parseInt(str);
+        if (isNaN(num)) return str;
+        const nextNum = num + 1;
+        if (str.length > nextNum.toString().length) {
+            return nextNum.toString().padStart(str.length, '0');
+        }
+        return nextNum.toString();
+    };
+
+    // Tải thông tin Số vào sổ lớn nhất khi khởi chạy
+    useEffect(() => {
+        const loadBookNumber = async () => {
+            const stored = await getSystemSetting('vaoso_current_book_number');
+            if (stored) {
+                setCurrentBookNumber(stored);
+            } else {
+                try {
+                    const { data, error } = await supabase
+                        .from('archive_records')
+                        .select('data')
+                        .eq('type', 'vaoso');
+                    if (!error && data) {
+                        let maxNum = 0;
+                        data.forEach(r => {
+                            const val = r.data?.so_vao_so || '';
+                            if (val.startsWith('CN ')) {
+                                const numPart = val.replace('CN ', '');
+                                const num = parseInt(numPart);
+                                if (!isNaN(num) && num > maxNum) {
+                                    maxNum = num;
+                                }
+                            } else {
+                                 const num = parseInt(val);
+                                 if (!isNaN(num) && num > maxNum) {
+                                    maxNum = num;
+                                }
+                            }
+                        });
+                        setCurrentBookNumber(maxNum.toString().padStart(6, '0'));
+                    }
+                } catch (e) {
+                    console.error("Lỗi lấy số vào sổ lớn nhất:", e);
+                }
+            }
+        };
+        if (showVaoSoModal) {
+            loadBookNumber();
+        }
+    }, [showVaoSoModal]);
+
+    const handleTempImportClick = () => {
+        tempFileInputRef.current?.click();
+    };
+
+    const handleTempCellChange = (index: number, key: string, value: any) => {
+        setTempRecords(prev => prev.map((r, i) => {
+            if (i === index) {
+                return { ...r, [key]: value };
+            }
+            return r;
+        }));
+    };
+
+    const handleDeleteTempRow = (index: number) => {
+        setTempRecords(prev => prev.filter((_, i) => i !== index));
+        const updatedSelected = new Set(selectedTempIds);
+        updatedSelected.delete(String(index));
+        setSelectedTempIds(updatedSelected);
+    };
+
+    const handleSelectTempRow = (index: number) => {
+        const newSet = new Set(selectedTempIds);
+        const strIdx = String(index);
+        if (newSet.has(strIdx)) newSet.delete(strIdx);
+        else newSet.add(strIdx);
+        setSelectedTempIds(newSet);
+    };
+
+    const handleSelectAllTempRows = () => {
+        if (selectedTempIds.size === tempRecords.length) {
+            setSelectedTempIds(new Set());
+        } else {
+            setSelectedTempIds(new Set(tempRecords.map((_, i) => String(i))));
+        }
+    };
+
+    const handleGetTempBookNumber = async (index: number) => {
+        const latestStored = await getSystemSetting('vaoso_current_book_number');
+        const baseNum = latestStored || currentBookNumber;
+        const nextNumStr = incrementString(baseNum);
+        const formattedNum = `CN ${nextNumStr}`;
+
+        setTempRecords(prev => prev.map((r, i) => {
+            if (i === index) {
+                return { ...r, soVaoSo: formattedNum };
+            }
+            return r;
+        }));
+
+        setCurrentBookNumber(nextNumStr);
+        await saveSystemSetting('vaoso_current_book_number', nextNumStr);
+    };
+
+    const handleAutoAssignAllTempBookNumbers = async () => {
+        const latestStored = await getSystemSetting('vaoso_current_book_number');
+        let currentNumStr = latestStored || currentBookNumber;
+        
+        const updated = tempRecords.map(r => {
+            if (!r.soVaoSo) {
+                currentNumStr = incrementString(currentNumStr);
+                return { ...r, soVaoSo: `CN ${currentNumStr}` };
+            }
+            return r;
+        });
+
+        setTempRecords(updated);
+        setCurrentBookNumber(currentNumStr);
+        await saveSystemSetting('vaoso_current_book_number', currentNumStr);
+    };
+
+    const handleDownloadTemplateVaoSo = () => {
+        const templateData = [
+            {
+                'Số vào sổ': 'CN 00001',
+                'Mã hồ sơ': 'HS001',
+                'Tên chủ sử dụng': 'Trần Thị B',
+                'Số tờ': '12',
+                'Số thửa': '34',
+                'Tổng diện tích': '150.5',
+                'Đất ở': '100',
+                'Đất nông nghiệp': '50.5',
+                'Số phát hành': 'CQ123456',
+                'Ngày ký GCN': '2023-11-01',
+            }
+        ];
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "MauNhapLieuVaoSo");
+        XLSX.writeFile(wb, "Mau_Nhap_Lieu_Vao_So_GCN.xlsx");
+    };
+
+    const handleTempExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setTempExcelFileName(file.name);
+        setTempRecordsLoading(true);
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+                // Tìm dòng tiêu đề
+                let headerRowIdx = -1;
+                for (let i = 0; i < Math.min(data.length, 15); i++) {
+                    const rowStr = JSON.stringify(data[i]).toLowerCase();
+                    if (rowStr.includes('mã hồ sơ') || rowStr.includes('mã hs') || rowStr.includes('số hồ sơ') || rowStr.includes('mã nhận diện') || rowStr.includes('code')) {
+                        headerRowIdx = i;
+                        break;
+                    }
+                }
+
+                if (headerRowIdx === -1) {
+                    headerRowIdx = 0;
+                }
+
+                const rawHeaderRow = data[headerRowIdx] || [];
+                const headers = Array.from(rawHeaderRow).map((h: any) => String(h || '').trim().toLowerCase());
+                const rows = data.slice(headerRowIdx + 1);
+
+                const findCol = (keywords: string[], excludes: string[] = []) => 
+                    headers.findIndex(h => h && keywords.some(k => h.includes(k)) && !excludes.some(e => h.includes(e)));
+
+                const colMap = {
+                    ma_ho_so: findCol(['mã hồ sơ', 'mã hs', 'số hồ sơ', 'mã nhận diện', 'code']),
+                    so_to: findCol(['tờ', 'số tờ', 'bản đồ', 'tờ bản đồ']),
+                    so_thua: findCol(['thửa', 'số thửa', 'thửa đất']),
+                    tong_dien_tich: findCol(['tổng diện tích', 'diện tích', 'dt', 'area']),
+                    dat_o: findCol(['đất ở', 'thổ cư', 'ont', 'odt', 'đất ở đô thị', 'đất ở nông thôn']),
+                    dat_nn: findCol(['đất nông nghiệp', 'đất nn', 'nông nghiệp', 'cln', 'hnc', 'đất trồng cây']),
+                    so_phat_hanh: findCol(['phát hành', 'seri', 'seri gcn', 'số phát hành', 'số seri']),
+                    so_vao_so: findCol(['số vào sổ', 'svs', 'số vào']),
+                    ngay_ky_gcn: findCol(['ngày ký', 'ngày ký gcn', 'ngày cấp', 'ngày cấp gcn']),
+                    ten_chu_su_dung: findCol(['chủ sử dụng', 'tên chủ', 'họ tên', 'bên nhận', 'người sử dụng', 'khách hàng', 'customer'])
+                };
+
+                if (colMap.ma_ho_so === -1) {
+                    alert("Không tìm thấy cột chứa Mã hồ sơ trong file Excel. Vui lòng kiểm tra lại cấu trúc file.");
+                    setTempRecordsLoading(false);
+                    return;
+                }
+
+                const getValue = (rowArr: any[], idx: number) => {
+                    if (idx === -1 || !rowArr) return '';
+                    let val = rowArr[idx];
+                    if (val === undefined || val === null) return '';
+                    
+                    if (typeof val === 'number' && val > 20000 && val < 60000) {
+                         const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                         return date.toISOString().split('T')[0];
+                    }
+                    
+                    const str = String(val).trim();
+                    if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(str)) {
+                        const parts = str.split(/[-/]/);
+                        if (parts.length === 3) {
+                            if (parts[0].length === 4) {
+                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                            } else {
+                                const day = parts[0].padStart(2, '0');
+                                const month = parts[1].padStart(2, '0');
+                                const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                                return `${year}-${month}-${day}`;
+                            }
+                        }
+                    }
+                    return str;
+                };
+
+                const excelRowsData: any[] = [];
+                const codesToQuery: string[] = [];
+
+                rows.forEach(rowArr => {
+                    if (!rowArr || rowArr.length === 0) return;
+                    const code = getValue(rowArr, colMap.ma_ho_so);
+                    if (!code) return;
+
+                    codesToQuery.push(code);
+
+                    excelRowsData.push({
+                        code: code,
+                        so_to: getValue(rowArr, colMap.so_to),
+                        so_thua: getValue(rowArr, colMap.so_thua),
+                        tong_dien_tich: getValue(rowArr, colMap.tong_dien_tich),
+                        dat_o: getValue(rowArr, colMap.dat_o),
+                        dat_nn: getValue(rowArr, colMap.dat_nn),
+                        so_phat_hanh: getValue(rowArr, colMap.so_phat_hanh),
+                        so_vao_so: getValue(rowArr, colMap.so_vao_so),
+                        ngay_ky_gcn: getValue(rowArr, colMap.ngay_ky_gcn) || new Date().toISOString().split('T')[0],
+                        ten_chu_su_dung: getValue(rowArr, colMap.ten_chu_su_dung)
+                    });
+                });
+
+                if (codesToQuery.length === 0) {
+                    alert("Không tìm thấy mã hồ sơ nào trong tệp Excel.");
+                    setTempRecordsLoading(false);
+                    return;
+                }
+
+                // Chuẩn hóa và mở rộng mã để tăng tỷ lệ khớp (chữ hoa, chữ thường, loại bỏ khoảng trắng)
+                const expandedCodes = new Set<string>();
+                codesToQuery.forEach(c => {
+                    expandedCodes.add(c);
+                    expandedCodes.add(c.toLowerCase());
+                    expandedCodes.add(c.toUpperCase());
+                    const normalized = c.trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '');
+                    expandedCodes.add(normalized);
+                    expandedCodes.add(normalized.toUpperCase());
+                });
+                const expandedCodesArray = Array.from(expandedCodes);
+
+                // Truy vấn bảng igate_records (hồ sơ iGate gốc)
+                const { data: dbRecords, error: dbError } = await supabase
+                    .from('igate_records')
+                    .select('*')
+                    .in('so_hieu', expandedCodesArray);
+
+                if (dbError) {
+                    console.error("Lỗi truy vấn hồ sơ hệ thống: ", dbError);
+                }
+
+                const finalTempRecords = excelRowsData.map(excelRow => {
+                    // So sánh không phân biệt chữ hoa/thường và khoảng trắng thừa/ký tự ẩn
+                    const matchedDb = dbRecords?.find(dbRec => {
+                        const dbCodeNorm = String(dbRec.so_hieu || '').trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '');
+                        const excelCodeNorm = String(excelRow.code || '').trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '');
+                        return dbCodeNorm === excelCodeNorm;
+                    });
+                    
+                    return {
+                       id: matchedDb?.id,
+                       code: excelRow.code,
+                       customerName: excelRow.ten_chu_su_dung || matchedDb?.chu_ho_so || '',
+                       mapSheet: excelRow.so_to || matchedDb?.so_to || '',
+                       landPlot: excelRow.so_thua || matchedDb?.so_thua || '',
+                       area: excelRow.tong_dien_tich || matchedDb?.tong_dien_tich || '',
+                       datO: excelRow.dat_o || matchedDb?.dien_tich_dat_o || '',
+                       datNongNghiep: excelRow.dat_nn || '',
+                       soPhatHanh: excelRow.so_phat_hanh || matchedDb?.so_phat_hanh || '',
+                       soVaoSo: excelRow.so_vao_so || '',
+                       ngayKyGcn: excelRow.ngay_ky_gcn || new Date().toISOString().split('T')[0],
+                       diaDanh: matchedDb?.dia_danh || '',
+                       existsInSystem: !!matchedDb,
+                       db_customerName: matchedDb?.chu_ho_so || '',
+                       db_mapSheet: matchedDb?.so_to || '',
+                       db_landPlot: matchedDb?.so_thua || '',
+                       db_area: matchedDb?.tong_dien_tich || ''
+                    };
+                });
+
+                setTempRecords(finalTempRecords);
+
+            } catch (error) {
+                console.error("Lỗi xử lý Excel:", error);
+                alert("Đã xảy ra lỗi khi xử lý tệp Excel.");
+            } finally {
+                setTempRecordsLoading(false);
+                if (e.target) e.target.value = '';
+            }
+        };
+
+        reader.readAsBinaryString(file);
+    };
+
+    const handleConfirmHandover = async () => {
+        if (tempRecords.length === 0) return;
+        setIsSubmittingHandover(true);
+
+        try {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const batchId = handoverBatchMode === 'new' ? currentBookNumber : (selectedExistingHandoverBatch || 'Đợt 1');
+
+            const archivePromises = tempRecords.map(async (r) => {
+                if (r.existsInSystem && r.id) {
+                    // Kiểm tra xem dữ liệu Tờ, Thửa, v.v. có bị thay đổi so với dữ liệu hệ thống (IGate) không
+                    const hasChanged = r.customerName !== r.db_customerName ||
+                                      String(r.mapSheet) !== String(r.db_mapSheet) ||
+                                      String(r.landPlot) !== String(r.db_landPlot) ||
+                                      String(r.area) !== String(r.db_area);
+                    
+                    if (hasChanged) {
+                        // Cập nhật thông tin mới vào bảng iGate records (igate_records)
+                        const { error: updateError } = await supabase
+                            .from('igate_records')
+                            .update({
+                                chu_ho_so: r.customerName,
+                                so_to: r.mapSheet,
+                                so_thua: r.landPlot,
+                                tong_dien_tich: parseFloat(r.area) || null,
+                                dien_tich_dat_o: parseFloat(r.datO) || null
+                            })
+                            .eq('id', r.id);
+                        
+                        if (updateError) {
+                            console.error(`Lỗi cập nhật hồ sơ gốc ${r.code}:`, updateError);
+                        }
+                    }
+
+                    // Đồng thời, cập nhật trạng thái hồ sơ iGate thành "Đã ký Giấy chứng nhận", lưu Số vào sổ và Ngày ký GCN vào iGate (igate_records)
+                    const { error: statusError } = await supabase
+                        .from('igate_records')
+                        .update({
+                            trang_thai: 'Đã ký Giấy chứng nhận',
+                            so_vao_so: r.soVaoSo,
+                            so_phat_hanh: r.soPhatHanh,
+                            ngay_ket_thuc: r.ngayKyGcn // Ngày ký GCN chính là ngày đạt trạng thái này
+                        })
+                        .eq('id', r.id);
+                    
+                    if (statusError) {
+                        console.error(`Lỗi cập nhật trạng thái hồ sơ iGate ${r.code}:`, statusError);
+                    }
+                } else {
+                    // Nếu hồ sơ chưa tồn tại trên hệ thống iGate (r.existsInSystem === false)
+                    // Ta sẽ tự động insert mới một hồ sơ iGate vào bảng 'igate_records'
+                    const { error: insertError } = await supabase
+                        .from('igate_records')
+                        .insert([{
+                            so_hieu: r.code,
+                            chu_ho_so: r.customerName,
+                            so_to: r.mapSheet,
+                            so_thua: r.landPlot,
+                            tong_dien_tich: parseFloat(r.area) || null,
+                            dien_tich_dat_o: parseFloat(r.datO) || null,
+                            dia_danh: r.diaDanh || '',
+                            so_phat_hanh: r.soPhatHanh || '',
+                            so_vao_so: r.soVaoSo || '',
+                            ngay_ket_thuc: r.ngayKyGcn || todayStr,
+                            trang_thai: 'Đã ký Giấy chứng nhận',
+                            don_vi: 'Chi nhánh VPĐKĐĐ',
+                            ten_linh_vuc: 'Đất đai',
+                            ten_thu_tuc: 'Đăng ký đất đai lần đầu',
+                            ngay_tiep_nhan: todayStr
+                        }]);
+                    
+                    if (insertError) {
+                        console.error(`Lỗi tự động thêm mới hồ sơ iGate ${r.code}:`, insertError);
+                    }
+                }
+
+                // Lưu biên bản lưu trữ loại 'vaoso' để bàn giao 1 cửa
+                const archiveData = {
+                    so_vao_so: r.soVaoSo,
+                    ma_ho_so: r.code,
+                    ten_chuyen_quyen: '',
+                    ten_chu_su_dung: r.customerName,
+                    loai_bien_dong: 'Vào số GCN',
+                    loai_gcn: 'GCN mới',
+                    ngay_nhan: todayStr,
+                    so_to: r.mapSheet,
+                    so_thua: r.landPlot,
+                    tong_dien_tich: r.area,
+                    dien_tich_tho_cu: r.datO,
+                    dien_tich_nong_nghiep: r.datNongNghiep,
+                    dia_danh: r.diaDanh,
+                    so_phat_hanh: r.soPhatHanh,
+                    ngay_ky_gcn: r.ngayKyGcn,
+                    ngay_ky_phieu_tk: '',
+                    ghi_chu: r.existsInSystem ? '' : 'Tự động tạo mới trên iGate (Mã hồ sơ chưa có sẵn)',
+                    is_pending_scan: false,
+                    is_scanned: true,
+                    scan_batch_id: String(batchId),
+                    scan_date: todayStr
+                };
+
+                const newArchiveRecord: Partial<ArchiveRecord> = {
+                    type: 'vaoso',
+                    status: 'completed',
+                    so_hieu: r.code,
+                    trich_yeu: `Vào số GCN - ${r.customerName}`,
+                    ngay_thang: r.ngayKyGcn,
+                    noi_nhan_gui: r.diaDanh,
+                    created_by: currentUser?.username || 'user',
+                    data: archiveData
+                };
+
+                return saveArchiveRecord(newArchiveRecord);
+            });
+
+            await Promise.all(archivePromises);
+
+            alert(`Đã hoàn thành cập nhật thông tin Số vào sổ, Ngày ký GCN lên hệ thống iGate và tạo danh sách bàn giao 1 cửa gồm ${tempRecords.length} hồ sơ thành công!`);
+            
+            // Tải lại danh sách iGate records chính thức để cập nhật UI
+            if (typeof loadData === 'function') {
+                await loadData();
+            } else {
+                // Nếu loadData không được truyền từ props, ta có thể tự tải
+                const { data: refreshed, error: err } = await supabase.from('igate_records').select('*').order('created_at', { ascending: false });
+                if (!err && refreshed) setRecords(refreshed);
+            }
+            
+            setTempRecords([]);
+            setTempExcelFileName('');
+            setSelectedTempIds(new Set());
+            setShowConfirmHandoverModal(false);
+
+        } catch (error) {
+            console.error("Lỗi xác nhận bàn giao:", error);
+            alert("Đã xảy ra lỗi khi thực hiện bàn giao hồ sơ.");
+        } finally {
+            setIsSubmittingHandover(false);
+        }
+    };
+
+    const handleTriggerExport = async () => {
+        try {
+            // Tải danh sách lưu trữ loại 'vaoso' từ Supabase
+            const { data, error } = await supabase
+                .from('archive_records')
+                .select('*')
+                .eq('type', 'vaoso');
+            
+            if (error) {
+                console.error("Lỗi fetch dữ liệu bàn giao:", error);
+                alert("Không thể tải danh sách bàn giao.");
+                return;
+            }
+
+            const allArchiveRecords: ArchiveRecord[] = data || [];
+            
+            // Lọc theo điều kiện cấu hình
+            let filtered = allArchiveRecords;
+            if (exportHandover1CuaParams.filterType === 'by_date') {
+                const searchDate = exportHandover1CuaParams.dateStr;
+                filtered = allArchiveRecords.filter(r => {
+                    const scanDate = r.data?.scan_date || '';
+                    const ngayNhan = r.data?.ngay_nhan || '';
+                    return scanDate.includes(searchDate) || ngayNhan.includes(searchDate);
+                });
+            } else {
+                const searchBatch = exportHandover1CuaParams.batchName.toLowerCase().trim();
+                filtered = allArchiveRecords.filter(r => {
+                    const batchId = String(r.data?.scan_batch_id || '').toLowerCase().trim();
+                    return batchId.includes(searchBatch);
+                });
+            }
+
+            // Gọi hàm xuất Excel
+            exportHandover1CuaExcel(
+                filtered,
+                exportHandover1CuaParams.dateStr,
+                exportHandover1CuaParams.batchName || 'Mặc định',
+                'all'
+            );
+        } catch (err) {
+            console.error("Lỗi xuất bàn giao:", err);
+            alert("Đã xảy ra lỗi khi xuất file Excel bàn giao.");
+        }
+    };
+
+    const exportHandover1CuaExcel = (recordsToExport: ArchiveRecord[], dateVal: string, batchVal: string, wardVal: string) => {
+        if (recordsToExport.length === 0) {
+            alert('Không tìm thấy hồ sơ bàn giao nào thỏa mãn điều kiện lọc.');
+            return;
+        }
+
+        const wb = XLSX.utils.book_new();
+        const wsData: any[] = [];
+
+        wsData.push(['ỦY BAN NHÂN DÂN HUYỆN']);
+        wsData.push(['BỘ PHẬN TIẾP NHẬN & TRẢ KẾT QUẢ']);
+        wsData.push(['']); 
+
+        const title = `DANH SÁCH BÀN GIAO GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT SANG MỘT CỬA`;
+        wsData.push([title]);
+        
+        const dateParts = dateVal.split('-');
+        const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateVal;
+        wsData.push([`Ngày bàn giao: ${formattedDate} - Đợt giao: Danh sách số ${batchVal}`]);
+        
+        let subTitle = `Tổng số hồ sơ: ${recordsToExport.length}`;
+        if (wardVal !== 'all') {
+            subTitle = `Xã/Phường: ${wardVal} - ${subTitle}`;
+        }
+        wsData.push([subTitle]);
+        wsData.push(['']); 
+
+        const headers = [
+            'STT', 
+            'Số vào sổ', 
+            'Mã hồ sơ', 
+            'Chủ sử dụng đất', 
+            'Số tờ', 
+            'Số thửa', 
+            'Tổng diện tích (m2)', 
+            'Đất ở (m2)', 
+            'Đất nông nghiệp (m2)', 
+            'Số phát hành GCN', 
+            'Ngày ký GCN', 
+            'Địa danh (Xã)', 
+            'Ký nhận',
+            'Ghi chú'
+        ];
+        wsData.push(headers);
+
+        recordsToExport.forEach((r, idx) => {
+            wsData.push([
+                idx + 1,
+                r.data?.so_vao_so || '',
+                r.data?.ma_ho_so || '',
+                r.data?.ten_chu_su_dung || '',
+                r.data?.so_to || '',
+                r.data?.so_thua || '',
+                r.data?.tong_dien_tich || '',
+                r.data?.dien_tich_tho_cu || '',
+                r.data?.dien_tich_nong_nghiep || '',
+                r.data?.so_phat_hanh || '',
+                r.data?.ngay_ky_gcn ? new Date(r.data.ngay_ky_gcn).toLocaleDateString('vi-VN') : '',
+                r.data?.dia_danh || '',
+                '', 
+                r.data?.ghi_chu || ''
+            ]);
+        });
+
+        wsData.push(['']);
+        wsData.push(['']);
+        wsData.push(['BÊN GIAO (VPĐKĐĐ)', '', '', '', '', '', '', 'BÊN NHẬN (MỘT CỬA)']);
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        const lastCol = headers.length - 1;
+        const merges = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+            { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
+            { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } },
+            { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } },
+            { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 3 } },
+            { s: { r: wsData.length - 1, c: 7 }, e: { r: wsData.length - 1, c: lastCol } },
+        ];
+        ws['!merges'] = merges;
+
+        ws['!cols'] = [
+            { wch: 5 },  
+            { wch: 15 }, 
+            { wch: 15 }, 
+            { wch: 25 }, 
+            { wch: 8 },  
+            { wch: 8 },  
+            { wch: 18 }, 
+            { wch: 12 }, 
+            { wch: 18 }, 
+            { wch: 18 }, 
+            { wch: 15 }, 
+            { wch: 15 }, 
+            { wch: 12 }, 
+            { wch: 15 }  
+        ];
+
+        const styleTitle = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center', vertical: 'center' } };
+        const styleSub = { font: { italic: true, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' } };
+        const styleLeftBold = { font: { bold: true, sz: 11 }, alignment: { horizontal: 'center' } };
+        const styleHeader = { 
+            font: { bold: true }, 
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } },
+            fill: { fgColor: { rgb: "E8F5E9" } } 
+        };
+        const styleCell = { 
+            border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } },
+            alignment: { vertical: 'center' }
+        };
+        const styleCellCenter = { ...styleCell, alignment: { horizontal: 'center', vertical: 'center' } };
+
+        ws['A1'].s = styleLeftBold;
+        ws['A2'].s = { font: { bold: true, sz: 10, underline: true }, alignment: { horizontal: 'center' } };
+        ws[XLSX.utils.encode_cell({ r: 3, c: 0 })].s = styleTitle;
+        ws[XLSX.utils.encode_cell({ r: 4, c: 0 })].s = styleSub;
+        ws[XLSX.utils.encode_cell({ r: 5, c: 0 })].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
+        const headerRowIdx = 7;
+        for (let c = 0; c <= lastCol; c++) {
+            const cellRef = XLSX.utils.encode_cell({ r: headerRowIdx, c: c });
+            if (ws[cellRef]) ws[cellRef].s = styleHeader;
+        }
+
+        for (let r = headerRowIdx + 1; r < wsData.length - 3; r++) {
+            for (let c = 0; c <= lastCol; c++) {
+                const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
+                if (!ws[cellRef]) ws[cellRef] = { v: '', t: 's' };
+                ws[cellRef].s = styleCell;
+                if ([0, 1, 2, 4, 5, 10, 11].includes(c)) {
+                    ws[cellRef].s = styleCellCenter;
+                }
+            }
+        }
+
+        const sigIdx = wsData.length - 1;
+        ws[XLSX.utils.encode_cell({ r: sigIdx, c: 0 })].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+        ws[XLSX.utils.encode_cell({ r: sigIdx, c: 7 })].s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+
+        XLSX.utils.book_append_sheet(wb, ws, "DanhSach1Cua");
+        XLSX.writeFile(wb, `DanhSachBanGiao_1Cua_Dot${batchVal}_Ngay${dateVal}.xlsx`);
+        setShowExportHandover1CuaModal(false);
+    };
+
     // Tự động chuyển về trang 1 khi thay đổi trạng thái tìm kiếm hoặc bộ lọc
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter]);
+    }, [searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter, selectedLoaiHoSoFilter]);
 
     // Tải danh sách cán bộ xử lý động (gồm tổ trưởng, tổ phó, nhân viên thuộc tổ đăng ký và cán bộ Một cửa)
     useEffect(() => {
@@ -467,7 +1249,12 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
         const dataToSave = {
             ...formData,
-            dienTichDatNongNghiep: calculatedNongNghiep
+            thoiHanSuDung: cleanThoiHanSuDung(formData.thoiHanSuDung),
+            dienTichDatNongNghiep: calculatedNongNghiep,
+            ngayTra: formData.trangThai === 'Hồ sơ trả' ? (formData.ngayKetThuc || getNowVietnameseString()) : formData.ngayTra,
+            lyDoTra: formData.trangThai === 'Hồ sơ trả' ? (formData.ghiChu || '') : formData.lyDoTra,
+            daThucHienNvtc: formData.trangThai === 'Đã thực hiện nghĩa vụ tài chính' ? true : formData.daThucHienNvtc,
+            ngayThucHienNvtc: formData.trangThai === 'Đã thực hiện nghĩa vụ tài chính' ? (formData.ngayKetThuc || getNowVietnameseString()) : formData.ngayThucHienNvtc,
         };
 
         let isSuccess = false;
@@ -506,16 +1293,21 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         const statesWithDate = [
             "Đã chuyển thông tin thuế",
             "Đã phát hành thông báo thuế",
+            "Đã thực hiện nghĩa vụ tài chính",
             "Chờ thực hiện nghĩa vụ tài chính",
             "Đã ký Giấy chứng nhận",
             "Chưa trả kết quả",
-            "Đã trả kết quả"
+            "Đã trả kết quả",
+            "Hồ sơ trả"
         ];
 
         let confirmMsg = `Bạn có chắc chắn muốn cập nhật hàng loạt cho ${selectedIds.size} hồ sơ đã chọn không?`;
         if (batchStatus) confirmMsg += `\n- Cập nhật trạng thái mới: ${batchStatus}`;
         if (batchStatus && statesWithDate.includes(batchStatus) && batchDate) {
             confirmMsg += `\n- Gán ngày của trạng thái: ${batchDate}`;
+        }
+        if (batchStatus === 'Hồ sơ trả' && batchLyDoTra) {
+            confirmMsg += `\n- Lý do trả: ${batchLyDoTra}`;
         }
         if (batchCanBo) confirmMsg += `\n- Phân công cán bộ xử lý: ${batchCanBo}`;
 
@@ -527,6 +1319,15 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         updatedRecord.trangThai = batchStatus;
                         if (statesWithDate.includes(batchStatus)) {
                             updatedRecord.ngayKetThuc = batchDate || r.ngayKetThuc || getTodayString();
+                        }
+                        if (batchStatus === 'Hồ sơ trả') {
+                            updatedRecord.ngayTra = batchDate || getNowVietnameseString();
+                            updatedRecord.lyDoTra = batchLyDoTra;
+                            updatedRecord.ghiChu = batchLyDoTra || r.ghiChu;
+                        }
+                        if (batchStatus === 'Đã thực hiện nghĩa vụ tài chính') {
+                            updatedRecord.daThucHienNvtc = true;
+                            updatedRecord.ngayThucHienNvtc = batchDate || getNowVietnameseString();
                         }
                     }
                     if (batchCanBo) {
@@ -706,6 +1507,15 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     if (matchedItem) {
                         clone.ngayKetThuc = matchedItem.excelDate;
                     }
+                    if (excelActiveToolStatus === 'Hồ sơ trả') {
+                        clone.ngayTra = (matchedItem && matchedItem.excelDate) || getNowVietnameseString();
+                        clone.lyDoTra = excelLyDoTraUpdate || 'Trả lại theo phân loại Excel';
+                        clone.ghiChu = excelLyDoTraUpdate || 'Trả lại theo phân loại Excel';
+                    }
+                    if (excelActiveToolStatus === 'Đã thực hiện nghĩa vụ tài chính') {
+                        clone.daThucHienNvtc = true;
+                        clone.ngayThucHienNvtc = (matchedItem && matchedItem.excelDate) || getNowVietnameseString();
+                    }
                     if (excelCanBoUpdate) {
                         clone.canBoXuLy = excelCanBoUpdate;
                     }
@@ -742,7 +1552,20 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             chuHoSo: '',
             soDienThoai: '',
             canBoXuLy: canBoList[0] || '',
-            trangThai: 'Mới tiếp nhận'
+            trangThai: 'Mới tiếp nhận',
+            chuyenQuyen: '',
+            soTo: '',
+            soThua: '',
+            tongDienTich: null,
+            dienTichDatO: null,
+            dienTichDatNongNghiep: null,
+            diaDanh: '',
+            soPhatHanh: '',
+            thoiHanSuDung: '',
+            cccd: '',
+            ghiChu: '',
+            ngayTra: getNowVietnameseString(),
+            lyDoTra: ''
         });
         setIsFormOpen(true);
     };
@@ -772,7 +1595,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             soPhatHanh: record.soPhatHanh || '',
             thoiHanSuDung: record.thoiHanSuDung || '',
             cccd: record.cccd || '',
-            ghiChu: record.ghiChu || ''
+            ghiChu: record.ghiChu || '',
+            ngayTra: record.ngayTra || '',
+            lyDoTra: record.lyDoTra || ''
         });
         setIsFormOpen(true);
     };
@@ -818,11 +1643,12 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         const total = records.length;
         const newReceipt = records.filter(r => r.trangThai === 'Mới tiếp nhận').length;
         
-        // Hồ sơ chờ thuế (Đã chuyển thông tin thuế + Đã phát hành thông báo thuế + Chờ thực hiện nghĩa vụ tài chính)
+        // Hồ sơ chờ thuế (Đã chuyển thông tin thuế + Đã phát hành thông báo thuế + Đã thực hiện nghĩa vụ tài chính + Chờ thực hiện nghĩa vụ tài chính)
         const daChuyenThongTinThue = records.filter(r => r.trangThai === 'Đã chuyển thông tin thuế').length;
         const daPhatHanhThongBaoThue = records.filter(r => r.trangThai === 'Đã phát hành thông báo thuế').length;
-        const choThucHienNghiaVuTaiChinh = records.filter(r => r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính').length;
-        const countChoThue = daChuyenThongTinThue + daPhatHanhThongBaoThue + choThucHienNghiaVuTaiChinh;
+        const daThucHienNghiaVuTaiChinh = records.filter(r => r.trangThai === 'Đã thực hiện nghĩa vụ tài chính').length;
+        const choThucHienNghiaVuTaiChinh = Math.max(0, daPhatHanhThongBaoThue - daThucHienNghiaVuTaiChinh);
+        const countChoThue = daChuyenThongTinThue + daPhatHanhThongBaoThue;
 
         // Hồ sơ chờ trả kết quả
         const daKyGCN = records.filter(r => r.trangThai === 'Đã ký Giấy chứng nhận').length;
@@ -844,6 +1670,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         // Hồ sơ đã trả kết quả
         const daTraKQ = records.filter(r => r.trangThai === 'Đã trả kết quả').length;
 
+        // Hồ sơ bị trả (bị cơ quan chuyên môn trả lại)
+        const hoSoTra = records.filter(r => r.trangThai === 'Hồ sơ trả').length;
+
         return {
             total,
             newReceipt,
@@ -851,6 +1680,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 total: countChoThue,
                 daChuyenThongTinThue,
                 daPhatHanhThongBaoThue,
+                daThucHienNghiaVuTaiChinh,
                 choThucHienNghiaVuTaiChinh
             },
             choTraKQ: {
@@ -859,7 +1689,8 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 chuaTraKQ
             },
             ton90Ngay: countTon90Ngay,
-            daTraKQ
+            daTraKQ,
+            hoSoTra
         };
     }, [records]);
 
@@ -896,6 +1727,11 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         return months;
     }, [records]);
 
+    const loaiHoSoList = useMemo(() => {
+        const list = records.map(r => r.tenThuTuc).filter(Boolean);
+        return Array.from(new Set(list)).sort();
+    }, [records]);
+
     // --- BỘ LỌC DANH SÁCH ---
     const filteredRecords = useMemo(() => {
         const today = new Date();
@@ -915,17 +1751,18 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 if (selectedTrangThaiFilter === 'Hồ sơ chờ thuế') {
                     matchTrangThai = r.trangThai === 'Đã chuyển thông tin thuế' || 
                                      r.trangThai === 'Đã phát hành thông báo thuế' || 
+                                     r.trangThai === 'Đã thực hiện nghĩa vụ tài chính' ||
                                      r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính';
-                } else if (selectedTrangThaiFilter === 'Hồ sơ chờ trả kết quả') {
+                } else if (selectedTrangThaiFilter === 'Chờ trả kết quả') {
                     matchTrangThai = r.trangThai === 'Đã ký Giấy chứng nhận' || 
                                      r.trangThai === 'Chưa trả kết quả';
-                } else if (selectedTrangThaiFilter === 'Hồ sơ đã phát hành thông báo thuế') {
+                } else if (selectedTrangThaiFilter === 'Đã phát hành thông báo thuế') {
                     matchTrangThai = r.trangThai === 'Đã phát hành thông báo thuế';
-                } else if (selectedTrangThaiFilter === 'Hồ sơ chờ thực hiện nghĩa vụ tài chính') {
+                } else if (selectedTrangThaiFilter === 'Chờ thực hiện nghĩa vụ tài chính') {
                     matchTrangThai = r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính';
-                } else if (selectedTrangThaiFilter === 'Hồ sơ đã ký Giấy chứng nhận') {
+                } else if (selectedTrangThaiFilter === 'Đã ký Giấy chứng nhận') {
                     matchTrangThai = r.trangThai === 'Đã ký Giấy chứng nhận';
-                } else if (selectedTrangThaiFilter === 'Hồ sơ chưa trả kết quả') {
+                } else if (selectedTrangThaiFilter === 'Chưa trả kết quả') {
                     matchTrangThai = r.trangThai === 'Chưa trả kết quả';
                 } else {
                     matchTrangThai = r.trangThai === selectedTrangThaiFilter;
@@ -934,6 +1771,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
             // Lọc theo lĩnh vực
             const matchLinhVuc = selectedLinhVucFilter === 'Tất cả' || r.tenLinhVuc === selectedLinhVucFilter;
+
+            // Lọc theo Loại hồ sơ (Thủ tục)
+            const matchLoaiHoSo = selectedLoaiHoSoFilter === 'Tất cả' || r.tenThuTuc === selectedLoaiHoSoFilter;
 
             // Lọc theo tồn trên 90 ngày
             let matchTon90Days = true;
@@ -954,9 +1794,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 }
             }
 
-            return matchSearch && matchTrangThai && matchLinhVuc && matchTon90Days;
+            return matchSearch && matchTrangThai && matchLinhVuc && matchLoaiHoSo && matchTon90Days;
         });
-    }, [records, searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter, showOnlyTon90Days]);
+    }, [records, searchTerm, selectedTrangThaiFilter, selectedLinhVucFilter, selectedLoaiHoSoFilter, showOnlyTon90Days]);
 
     // Các bản ghi iGate sau khi phân trang
     const paginatedRecords = useMemo(() => {
@@ -1081,6 +1921,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         const lowerTT = rawTrangThai.toLowerCase();
                         if (lowerTT.includes('mới') || lowerTT.includes('tiếp nhận')) normalizedTrangThai = 'Mới tiếp nhận';
                         else if (lowerTT.includes('chuyển thông tin thuế') || lowerTT.includes('đã chuyển thuế')) normalizedTrangThai = 'Đã chuyển thông tin thuế';
+                        else if (lowerTT.includes('thực hiện nghĩa vụ tài chính') || lowerTT.includes('đã thực hiện nghĩa vụ') || lowerTT.includes('đã đóng thuế') || lowerTT.includes('đã nộp tiền')) normalizedTrangThai = 'Đã thực hiện nghĩa vụ tài chính';
                         else if (lowerTT.includes('phát hành thông báo thuế') || lowerTT.includes('đã phát hành')) normalizedTrangThai = 'Đã phát hành thông báo thuế';
                         else if (lowerTT.includes('chờ thực hiện nghĩa vụ') || lowerTT.includes('chuẩn bị đóng') || lowerTT.includes('chờ thuế')) normalizedTrangThai = 'Chờ thực hiện nghĩa vụ tài chính';
                         else if (lowerTT.includes('đã ký') || lowerTT.includes('ký gcn')) normalizedTrangThai = 'Đã ký Giấy chứng nhận';
@@ -1127,6 +1968,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     newRecords.push({
                         id: 'ig-' + Math.random().toString(36).substr(2, 9),
                         soHieu: soHieu || `IGATE-${100000 + i}`,
+                        excelRowIndex: i + 1,
                         tenThuTuc: idxTenThuTuc !== -1 && row[idxTenThuTuc] ? String(row[idxTenThuTuc]).trim() : 'Đăng ký đất đai biến động trực tuyến',
                         tenLinhVuc: idxTenLinhVuc !== -1 && row[idxTenLinhVuc] ? String(row[idxTenLinhVuc]).trim() : 'Đất đai',
                         ngayTiepNhan: idxNgayTiepNhan !== -1 ? parseExcelDate(row[idxNgayTiepNhan]) : new Date().toISOString().split('T')[0],
@@ -1155,7 +1997,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         dienTichDatNongNghiep: dienTichDatNongNghiep,
                         diaDanh: idxDiaDanh !== -1 && row[idxDiaDanh] ? String(row[idxDiaDanh]).trim() : '',
                         soPhatHanh: idxSoPhatHanh !== -1 && row[idxSoPhatHanh] ? String(row[idxSoPhatHanh]).trim() : '',
-                        thoiHanSuDung: thoiHanSuDung,
+                        thoiHanSuDung: cleanThoiHanSuDung(thoiHanSuDung),
                         cccd: (() => {
                             if (idxCCCD === -1 || row[idxCCCD] === undefined || row[idxCCCD] === null) return '';
                             let valStr = String(row[idxCCCD]).trim().replace(/\s+/g, '');
@@ -1169,46 +2011,159 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 }
 
                 if (newRecords.length > 0) {
-                    const seenInFile = new Map<string, number>();
-                    const duplicateInFileCodesSet = new Set<string>();
-                    const duplicateWithDbCodesSet = new Set<string>();
+                    const dbRecordsByCode = new Map<string, IGateRecord[]>();
+                    const dbRecordsByKey3 = new Map<string, IGateRecord[]>();
+                    records.forEach(dbRec => {
+                        const code = (dbRec.soHieu || '').trim().toUpperCase();
+                        const to = (dbRec.soTo || '').trim().toUpperCase();
+                        const thua = (dbRec.soThua || '').trim().toUpperCase();
+                        const key3 = getImportUniqueKey(dbRec.soHieu, dbRec.soTo || '', dbRec.soThua || '');
 
-                    const existingCodes = new Set(records.map(r => r.soHieu));
+                        if (!dbRecordsByCode.has(code)) {
+                            dbRecordsByCode.set(code, []);
+                        }
+                        dbRecordsByCode.get(code)!.push(dbRec);
+
+                        if (!dbRecordsByKey3.has(key3)) {
+                            dbRecordsByKey3.set(key3, []);
+                        }
+                        dbRecordsByKey3.get(key3)!.push(dbRec);
+                    });
+
+                    const fileRecordsByCode = new Map<string, IGateRecord[]>();
+                    const fileRecordsByKey3 = new Map<string, IGateRecord[]>();
+                    newRecords.forEach(r => {
+                        const code = (r.soHieu || '').trim().toUpperCase();
+                        const to = (r.soTo || '').trim().toUpperCase();
+                        const thua = (r.soThua || '').trim().toUpperCase();
+                        const key3 = getImportUniqueKey(r.soHieu, r.soTo || '', r.soThua || '');
+
+                        if (!fileRecordsByCode.has(code)) {
+                            fileRecordsByCode.set(code, []);
+                        }
+                        fileRecordsByCode.get(code)!.push(r);
+
+                        if (!fileRecordsByKey3.has(key3)) {
+                            fileRecordsByKey3.set(key3, []);
+                        }
+                        fileRecordsByKey3.get(key3)!.push(r);
+                    });
+
+                    const dup3InFileKeysSet = new Set<string>();
+                    const dup3WithDbKeysSet = new Set<string>();
+                    const dupCodeDiffInFileKeysSet = new Set<string>();
+                    const dupCodeDiffWithDbKeysSet = new Set<string>();
+
+                    const skippedRecords: IGateRecord[] = [];
+                    const skippedReasons: string[] = [];
+                    const validRecords: IGateRecord[] = [];
 
                     newRecords.forEach(r => {
-                        const code = r.soHieu;
-                        if (!code) return;
-                        
-                        // Kiểm tra trùng nội bộ tệp
-                        if (seenInFile.has(code)) {
-                            duplicateInFileCodesSet.add(code);
-                            seenInFile.set(code, seenInFile.get(code)! + 1);
-                        } else {
-                            seenInFile.set(code, 1);
+                        const code = (r.soHieu || '').trim().toUpperCase();
+                        const to = (r.soTo || '').trim().toUpperCase();
+                        const thua = (r.soThua || '').trim().toUpperCase();
+                        const key = getImportUniqueKey(r.soHieu, r.soTo || '', r.soThua || '');
+
+                        let isDup3InFile = false;
+                        let isDup3WithDb = false;
+                        let isDupCodeDiffInFile = false;
+                        let isDupCodeDiffWithDb = false;
+
+                        // 1. Trùng tuyệt đối 3 cột nội bộ tệp (xem có từ 2 dòng trở lên cùng key trong tệp không)
+                        if (fileRecordsByKey3.has(key) && fileRecordsByKey3.get(key)!.length > 1) {
+                            isDup3InFile = true;
                         }
 
-                        // Kiểm tra trùng với DB
-                        if (existingCodes.has(code)) {
-                            duplicateWithDbCodesSet.add(code);
+                        // 2. Trùng tuyệt đối 3 cột với DB
+                        if (dbRecordsByKey3.has(key)) {
+                            isDup3WithDb = true;
+                        }
+
+                        // 3. Trùng mã khác Tờ/Thửa nội bộ tệp
+                        if (fileRecordsByCode.has(code)) {
+                            const fileMatches = fileRecordsByCode.get(code)!;
+                            const hasDiffLand = fileMatches.some(f => 
+                                (f.soTo || '').trim().toUpperCase() !== to || 
+                                (f.soThua || '').trim().toUpperCase() !== thua
+                            );
+                            if (hasDiffLand) {
+                                isDupCodeDiffInFile = true;
+                            }
+                        }
+
+                        // 4. Trùng mã khác Tờ/Thửa so với hệ thống
+                        if (dbRecordsByCode.has(code)) {
+                            const dbMatches = dbRecordsByCode.get(code)!;
+                            const hasDiffLand = dbMatches.some(db => 
+                                (db.soTo || '').trim().toUpperCase() !== to || 
+                                (db.soThua || '').trim().toUpperCase() !== thua
+                            );
+                            if (hasDiffLand) {
+                                isDupCodeDiffWithDb = true;
+                            }
+                        }
+
+                        // Classify
+                        if (isDup3InFile) {
+                            dup3InFileKeysSet.add(key);
+                        }
+                        if (isDup3WithDb) {
+                            dup3WithDbKeysSet.add(key);
+                        }
+                        if (isDupCodeDiffInFile) {
+                            dupCodeDiffInFileKeysSet.add(key);
+                        }
+                        if (isDupCodeDiffWithDb) {
+                            dupCodeDiffWithDbKeysSet.add(key);
+                        }
+
+                        // Kiểm tra xem có thuộc diện trùng lặp/cảnh báo hay không
+                        if (isDup3InFile || isDup3WithDb || isDupCodeDiffInFile || isDupCodeDiffWithDb) {
+                            skippedRecords.push(r);
+                            
+                            // Xác định lý do trùng chi tiết nhất để báo cáo người dùng
+                            let reason = '';
+                            if (isDup3InFile && isDup3WithDb) {
+                                reason = 'Trùng tuyệt đối 3 cột cả nội bộ tệp và trên hệ thống';
+                            } else if (isDup3InFile) {
+                                reason = 'Trùng tuyệt đối 3 cột với dòng khác trong tệp (trùng nội bộ)';
+                            } else if (isDup3WithDb) {
+                                reason = 'Trùng tuyệt đối 3 cột với hồ sơ đã lưu trên hệ thống';
+                            } else if (isDupCodeDiffInFile && isDupCodeDiffWithDb) {
+                                reason = 'Trùng mã hồ sơ với tệp & hệ thống nhưng khác Tờ/Thửa';
+                            } else if (isDupCodeDiffInFile) {
+                                reason = 'Trùng mã hồ sơ với dòng khác trong tệp nhưng khác Tờ/Thửa';
+                            } else if (isDupCodeDiffWithDb) {
+                                reason = 'Trùng mã hồ sơ với hệ thống nhưng khác Tờ/Thửa (Cảnh báo)';
+                            } else {
+                                reason = 'Bị trùng lặp hoặc cảnh báo dữ liệu';
+                            }
+                            skippedReasons.push(reason);
+                        } else {
+                            validRecords.push(r);
                         }
                     });
 
-                    const duplicateInFileCodes = Array.from(duplicateInFileCodesSet);
-                    const duplicateWithDbCodes = Array.from(duplicateWithDbCodesSet);
                     const totalCount = newRecords.length;
-                    
-                    // Các hồ sơ hợp lệ (không trùng nội bộ, không trùng DB)
-                    const validRecords = newRecords.filter(r => !duplicateInFileCodesSet.has(r.soHieu) && !duplicateWithDbCodesSet.has(r.soHieu));
                     const validCount = validRecords.length;
 
                     setTempImportedRecords(newRecords);
                     setImportReport({
                         totalCount,
                         validCount,
-                        duplicateInFileCount: duplicateInFileCodes.length,
-                        duplicateWithDbCount: duplicateWithDbCodes.length,
-                        duplicateInFileCodes,
-                        duplicateWithDbCodes
+                        duplicateInFileCount: dup3InFileKeysSet.size,
+                        duplicateWithDbCount: dup3WithDbKeysSet.size,
+                        duplicateInFileCodes: Array.from(dup3InFileKeysSet),
+                        duplicateWithDbCodes: Array.from(dup3WithDbKeysSet),
+                        
+                        dupCodeDiffCount: dupCodeDiffInFileKeysSet.size + dupCodeDiffWithDbKeysSet.size,
+                        dupCodeDiffInFileCount: dupCodeDiffInFileKeysSet.size,
+                        dupCodeDiffWithDbCount: dupCodeDiffWithDbKeysSet.size,
+                        dupCodeDiffInFileCodes: Array.from(dupCodeDiffInFileKeysSet),
+                        dupCodeDiffWithDbCodes: Array.from(dupCodeDiffWithDbKeysSet),
+                        
+                        skippedRecords,
+                        skippedReasons
                     });
                     setShowImportConfirmModal(true);
                 } else {
@@ -1224,11 +2179,135 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         e.target.value = ''; // Reset input
     };
 
+    const handleExportSkippedDuplicatesExcel = (skippedList: IGateRecord[], reasonsList: string[]) => {
+        if (skippedList.length === 0) return;
+
+        const headerRow = [
+            'STT',
+            'Dòng trong file Excel',
+            'Mã hồ sơ (Số hiệu)',
+            'Chủ sử dụng',
+            'Số tờ',
+            'Số thửa',
+            'Lý do trùng / Cảnh báo',
+            'Loại biến động',
+            'Ngày tiếp nhận',
+            'Cơ quan/đơn vị',
+            'Trạng thái hiện tại'
+        ];
+
+        const bodyRows = skippedList.map((r, idx) => {
+            return [
+                idx + 1,
+                r.excelRowIndex ? `Dòng ${r.excelRowIndex}` : '-',
+                r.soHieu,
+                r.chuHoSo || 'Chưa xác định',
+                r.soTo || '-',
+                r.soThua || '-',
+                reasonsList[idx] || 'Trùng lặp dữ liệu',
+                r.tenThuTuc || '-',
+                r.ngayTiepNhan || '-',
+                r.donVi || '-',
+                r.trangThai || '-'
+            ];
+        });
+
+        const worksheet = XLSX.utils.aoa_to_sheet([
+            ['DANH SÁCH HỒ SƠ BỊ TRÙNG LẶP / BỎ QUA KHI NHẬP EXCEL'],
+            [`Ngày xuất báo cáo: ${new Date().toLocaleDateString('vi-VN')} - Vui lòng kiểm tra lại trước khi nhập`],
+            [''],
+            headerRow,
+            ...bodyRows
+        ]);
+
+        worksheet['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } }
+        ];
+
+        worksheet['!cols'] = [
+            { wch: 6 },   // STT
+            { wch: 20 },  // Dòng trong file Excel
+            { wch: 18 },  // Mã hồ sơ
+            { wch: 22 },  // Chủ sử dụng
+            { wch: 10 },  // Số tờ
+            { wch: 10 },  // Số thửa
+            { wch: 45 },  // Lý do trùng
+            { wch: 30 },  // Loại biến động
+            { wch: 15 },  // Ngày tiếp nhận
+            { wch: 25 },  // Cơ quan
+            { wch: 20 }   // Trạng thái
+        ];
+
+        // Apply styles
+        const cellStyleHeader = {
+            font: { name: 'Arial', size: 10, bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '991B1B' } }, // Dark Red
+            alignment: { vertical: 'center', horizontal: 'center', wrapText: true },
+            border: {
+                top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                bottom: { style: 'medium', color: { rgb: '991B1B' } },
+                left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+            }
+        };
+
+        const cellStyleTitle = {
+            font: { name: 'Arial', size: 14, bold: true, color: { rgb: '991B1B' } },
+            alignment: { vertical: 'center', horizontal: 'left' }
+        };
+
+        const cellStyleSubTitle = {
+            font: { name: 'Arial', size: 10, italic: true, color: { rgb: '555555' } },
+            alignment: { vertical: 'center', horizontal: 'left' }
+        };
+
+        const cellStyleDataNormal = {
+            font: { name: 'Arial', size: 10 },
+            alignment: { vertical: 'center', horizontal: 'left' },
+            border: {
+                top: { style: 'thin', color: { rgb: 'E5E7EB' } },
+                bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+                left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+                right: { style: 'thin', color: { rgb: 'E5E7EB' } }
+            }
+        };
+
+        for (const cellAddress in worksheet) {
+            if (cellAddress.startsWith('!')) continue;
+            const cell = worksheet[cellAddress];
+            const parsedCell = XLSX.utils.decode_cell(cellAddress);
+            const r = parsedCell.r;
+
+            if (r === 0) {
+                cell.s = cellStyleTitle;
+            } else if (r === 1) {
+                cell.s = cellStyleSubTitle;
+            } else if (r === 3) {
+                cell.s = cellStyleHeader;
+            } else if (r > 3) {
+                cell.s = cellStyleDataNormal;
+            }
+        }
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Hồ sơ trùng bị bỏ qua');
+        XLSX.writeFile(workbook, `Danh_Sach_Ho_So_Trung_Bi_Bo_Qua_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     const handleConfirmImportWithSkip = async () => {
         const dupInFileSet = new Set(importReport.duplicateInFileCodes);
         const dupWithDbSet = new Set(importReport.duplicateWithDbCodes);
+        const dupCodeDiffInFileSet = new Set(importReport.dupCodeDiffInFileCodes);
+        const dupCodeDiffWithDbSet = new Set(importReport.dupCodeDiffWithDbCodes);
         
-        const recordsToInsert = tempImportedRecords.filter(r => !dupInFileSet.has(r.soHieu) && !dupWithDbSet.has(r.soHieu));
+        const recordsToInsert = tempImportedRecords.filter(r => {
+            const key = getImportUniqueKey(r.soHieu, r.soTo || '', r.soThua || '');
+            return !dupInFileSet.has(key) && 
+                   !dupWithDbSet.has(key) &&
+                   !dupCodeDiffInFileSet.has(key) &&
+                   !dupCodeDiffWithDbSet.has(key);
+        });
         
         if (recordsToInsert.length === 0) {
             alert("Không có hồ sơ hợp lệ nào để nhập!");
@@ -1237,7 +2316,19 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         }
 
         await saveRecords([...recordsToInsert, ...records]);
-        alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ iGate hợp lệ (đã tự động bỏ qua các hồ sơ trùng lặp)!`);
+
+        if (importReport.skippedRecords.length > 0) {
+            try {
+                handleExportSkippedDuplicatesExcel(importReport.skippedRecords, importReport.skippedReasons);
+                alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ iGate hợp lệ. Hệ thống đã tự động xuất tải file Excel chứa ${importReport.skippedRecords.length} hồ sơ bị trùng lặp để bạn kiểm tra!`);
+            } catch (err) {
+                console.error(err);
+                alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ iGate hợp lệ, nhưng không xuất được danh sách trùng.`);
+            }
+        } else {
+            alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ iGate hợp lệ!`);
+        }
+
         setShowImportConfirmModal(false);
         setTempImportedRecords([]);
     };
@@ -1245,12 +2336,16 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
     const handleConfirmImportWithOverwrite = async () => {
         const uniqueFileRecordsMap = new Map<string, IGateRecord>();
         tempImportedRecords.forEach(r => {
-            uniqueFileRecordsMap.set(r.soHieu, r);
+            const key = getImportUniqueKey(r.soHieu, r.soTo || '', r.soThua || '');
+            uniqueFileRecordsMap.set(key, r);
         });
         const fileRecordsToImport = Array.from(uniqueFileRecordsMap.values());
 
-        const fileCodesSet = new Set(fileRecordsToImport.map(r => r.soHieu));
-        const keptDbRecords = records.filter(r => !fileCodesSet.has(r.soHieu));
+        const fileKeysSet = new Set(fileRecordsToImport.map(r => getImportUniqueKey(r.soHieu, r.soTo || '', r.soThua || '')));
+        const keptDbRecords = records.filter(r => {
+            const dbKey = getImportUniqueKey(r.soHieu, r.soTo || '', r.soThua || '');
+            return !fileKeysSet.has(dbKey);
+        });
 
         await saveRecords([...fileRecordsToImport, ...keptDbRecords]);
         alert(`Đã ghi đè/cập nhật và nhập thành công tổng cộng ${fileRecordsToImport.length} hồ sơ iGate vào Supabase!`);
@@ -1260,8 +2355,28 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
     // --- CHỨC NĂNG LẬP BÁO CÁO EXCEL CHUYÊN NGHIỆP ---
     const handleExportReportExcel = () => {
-        if (filteredRecords.length === 0) {
-            alert('Không có dữ liệu phù hợp bộ lọc để xuất báo cáo!');
+        // Lọc dữ liệu theo các tiêu chí của Popup
+        const fromDateStr = exportFromDate;
+        const toDateStr = exportToDate;
+        const wardStr = exportWard;
+
+        const filtered = records.filter(r => {
+            // Lọc theo ngày tiếp nhận
+            const ngayTiepNhan = r.ngayTiepNhan ? r.ngayTiepNhan.split(' ')[0] : '';
+            const matchFrom = fromDateStr ? ngayTiepNhan >= fromDateStr : true;
+            const matchTo = toDateStr ? ngayTiepNhan <= toDateStr : true;
+
+            // Lọc theo xã phường
+            let matchWard = true;
+            if (wardStr !== 'Tất cả') {
+                matchWard = r.diaDanh ? r.diaDanh.toLowerCase().includes(wardStr.toLowerCase()) : false;
+            }
+
+            return matchFrom && matchTo && matchWard;
+        });
+
+        if (filtered.length === 0) {
+            alert('Không có dữ liệu phù hợp với khoảng thời gian và xã phường đã chọn!');
             return;
         }
 
@@ -1277,6 +2392,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             'Đất nông nghiệp (m²)',
             'Địa danh thửa đất',
             'Số phát hành',
+            'Số vào sổ GCN',
+            'Ngày ký GCN',
+            'Ngày giao 1 cửa',
+            'Đợt giao 1 cửa',
             'Thời hạn sử dụng',
             'CCCD',
             'Tên lĩnh vực',
@@ -1291,16 +2410,16 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             'GHI CHÚ'
         ];
 
-        const bodyRows = filteredRecords.map((r, idx) => {
+        const bodyRows = filtered.map((r, idx) => {
             const tot = Number(r.tongDienTich || 0);
             const o = Number(r.dienTichDatO || 0);
             const nong = tot > 0 ? (tot - o) : 0;
             
             let thoiHanShow = '';
             if (o > 0) {
-                thoiHanShow = `Đất ở: Lâu dài. Đất NN: ${formatDisplayDateInClient(r.thoiHanSuDung)}`;
+                thoiHanShow = `Đất ở: Lâu dài. Đất NN: ${formatThoiHanSuDung(r.thoiHanSuDung)}`;
             } else {
-                thoiHanShow = r.thoiHanSuDung ? `Đất NN: ${formatDisplayDateInClient(r.thoiHanSuDung)}` : '-';
+                thoiHanShow = r.thoiHanSuDung ? `Đất NN: ${formatThoiHanSuDung(r.thoiHanSuDung)}` : '-';
             }
 
             return [
@@ -1315,6 +2434,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 tot > 0 ? nong : '-',
                 r.diaDanh || '-',
                 r.soPhatHanh || '-',
+                r.soVaoSo || '-',
+                (r.trangThai === 'Đã ký Giấy chứng nhận' || r.soVaoSo) ? (r.ngayKetThuc || '-') : '-',
+                r.ngayGiao1Cua ? formatDisplayDateInClient(r.ngayGiao1Cua) : '-',
+                r.dotGiao1Cua || '-',
                 thoiHanShow,
                 r.cccd || '-',
                 r.tenLinhVuc || '-',
@@ -1332,6 +2455,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
         const worksheet = XLSX.utils.aoa_to_sheet([
             ['BÁO CÁO THỐNG KÊ QUẢN LÝ HỒ SƠ IGATE CHI TIẾT'],
+            [`Khoảng thời gian: Từ ${exportFromDate ? formatDisplayDateInClient(exportFromDate) : 'đầu'} đến ${exportToDate ? formatDisplayDateInClient(exportToDate) : 'hiện tại'} - Xã/phường: ${exportWard}`],
             [`Ngày lập báo cáo: ${new Date().toLocaleDateString('vi-VN')} - Người lập: ${currentUser.name}`],
             [''],
             headerRow,
@@ -1340,8 +2464,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
         // Merge cells tiêu đề
         worksheet['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 22 } },
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 22 } }
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 26 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 26 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 26 } }
         ];
 
         // Format Width cho các cột
@@ -1357,6 +2482,10 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             { wch: 18 },  // Đất nông nghiệp
             { wch: 24 },  // Địa danh thửa đất
             { wch: 18 },  // Số phát hành
+            { wch: 18 },  // Số vào sổ GCN
+            { wch: 18 },  // Ngày ký GCN
+            { wch: 18 },  // Ngày giao 1 cửa
+            { wch: 18 },  // Đợt giao 1 cửa
             { wch: 26 },  // Thời hạn sử dụng
             { wch: 16 },  // CCCD
             { wch: 18 },  // Tên lĩnh vực
@@ -1433,19 +2562,19 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
             if (cellAddress.startsWith('!')) continue;
             const cell = worksheet[cellAddress];
             const parsedCell = XLSX.utils.decode_cell(cellAddress);
-            const r = parsedCell.r;
-            const c = parsedCell.c;
+            const rIdx = parsedCell.r;
+            const cIdx = parsedCell.c;
 
-            if (r === 0) {
+            if (rIdx === 0) {
                 cell.s = cellStyleTitle;
-            } else if (r === 1) {
+            } else if (rIdx === 1 || rIdx === 2) {
                 cell.s = cellStyleSubTitle;
-            } else if (r === 3) {
+            } else if (rIdx === 4) {
                 cell.s = cellStyleHeader;
-            } else if (r > 3) {
-                if ([0, 1, 4, 5, 6, 7, 8, 10, 12, 14, 15, 16].includes(c)) {
+            } else if (rIdx > 4) {
+                if ([0, 1, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 19, 20].includes(cIdx)) {
                     cell.s = cellStyleDataCenter;
-                } else if (c === 21) {
+                } else if (cIdx === 25) {
                     cell.s = cellStyleDataStatus;
                     // Đổi màu nền trạng thái dựa trên giá trị
                     const val = String(cell.v || '');
@@ -1462,15 +2591,18 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'IGate Report');
         XLSX.writeFile(workbook, `Bao_Cao_IGate_${new Date().toISOString().split('T')[0]}.xlsx`);
+        setShowExportReportModal(false);
     };
 
     return (
         <div className="space-y-6">
-            {/* --- DASHBOARD METRICS CONTROLS --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {/* Giao diện chính của iGate */}
+            <>
+                    {/* --- DASHBOARD METRICS CONTROLS --- */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
                 {/* 1. Tổng số hồ sơ */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Tất cả'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    onClick={() => { setSelectedTrangThaiFilter('Tất cả'); setSelectedLinhVucFilter('Tất cả'); setSelectedLoaiHoSoFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
                     className={`cursor-pointer bg-gradient-to-br from-indigo-50 to-white hover:from-indigo-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
                         selectedTrangThaiFilter === 'Tất cả' && !showOnlyTon90Days ? 'ring-4 ring-indigo-500/30 border-indigo-300' : 'border-indigo-100'
                     }`}
@@ -1488,7 +2620,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 2. Mới tiếp nhận */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Mới tiếp nhận'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    onClick={() => { setSelectedTrangThaiFilter('Mới tiếp nhận'); setSelectedLinhVucFilter('Tất cả'); setSelectedLoaiHoSoFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
                     className={`cursor-pointer bg-gradient-to-br from-sky-50 to-white hover:from-sky-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
                         selectedTrangThaiFilter === 'Mới tiếp nhận' && !showOnlyTon90Days ? 'ring-4 ring-sky-500/30 border-sky-300' : 'border-sky-100'
                     }`}
@@ -1506,9 +2638,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 3. Chờ thuế */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Hồ sơ chờ thuế'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    onClick={() => { setSelectedTrangThaiFilter('Hồ sơ chờ thuế'); setSelectedLinhVucFilter('Tất cả'); setSelectedLoaiHoSoFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
                     className={`cursor-pointer bg-gradient-to-br from-orange-50 to-white hover:from-orange-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
-                        (selectedTrangThaiFilter === 'Hồ sơ chờ thuế' || selectedTrangThaiFilter === 'Đã chuyển thông tin thuế' || selectedTrangThaiFilter === 'Hồ sơ đã phát hành thông báo thuế' || selectedTrangThaiFilter === 'Hồ sơ chờ thực hiện nghĩa vụ tài chính') && !showOnlyTon90Days ? 'ring-4 ring-orange-500/30 border-orange-300 bg-orange-50/40' : 'border-orange-100'
+                        (selectedTrangThaiFilter === 'Hồ sơ chờ thuế' || selectedTrangThaiFilter === 'Đã chuyển thông tin thuế' || selectedTrangThaiFilter === 'Đã phát hành thông báo thuế' || selectedTrangThaiFilter === 'Đã thực hiện nghĩa vụ tài chính' || selectedTrangThaiFilter === 'Chờ thực hiện nghĩa vụ tài chính') && !showOnlyTon90Days ? 'ring-4 ring-orange-500/30 border-orange-300 bg-orange-50/40' : 'border-orange-100'
                     }`}
                 >
                     <div className="absolute right-0 bottom-0 text-orange-500/10 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform">
@@ -1529,6 +2661,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 e.stopPropagation();
                                 setSelectedTrangThaiFilter('Đã chuyển thông tin thuế');
                                 setSelectedLinhVucFilter('Tất cả');
+                                setSelectedLoaiHoSoFilter('Tất cả');
                                 setSelectedIds(new Set());
                                 setCurrentPage(1);
                                 setShowOnlyTon90Days(false);
@@ -1538,11 +2671,12 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             <span className="font-bold">{stats.choThue.daChuyenThongTinThue}</span>
                         </div>
                         <div 
-                            className={`flex justify-between p-0.5 px-1.5 rounded-lg transition-colors hover:bg-orange-100/40 cursor-pointer ${selectedTrangThaiFilter === 'Hồ sơ đã phát hành thông báo thuế' ? 'bg-orange-100/60 font-bold text-orange-950' : ''}`}
+                            className={`flex justify-between p-0.5 px-1.5 rounded-lg transition-colors hover:bg-orange-100/40 cursor-pointer ${selectedTrangThaiFilter === 'Đã phát hành thông báo thuế' ? 'bg-orange-100/60 font-bold text-orange-950' : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedTrangThaiFilter('Hồ sơ đã phát hành thông báo thuế');
+                                setSelectedTrangThaiFilter('Đã phát hành thông báo thuế');
                                 setSelectedLinhVucFilter('Tất cả');
+                                setSelectedLoaiHoSoFilter('Tất cả');
                                 setSelectedIds(new Set());
                                 setCurrentPage(1);
                                 setShowOnlyTon90Days(false);
@@ -1552,11 +2686,27 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             <span className="font-bold">{stats.choThue.daPhatHanhThongBaoThue}</span>
                         </div>
                         <div 
+                            className={`flex justify-between p-0.5 px-1.5 rounded-lg transition-colors hover:bg-orange-100/40 cursor-pointer ${selectedTrangThaiFilter === 'Đã thực hiện nghĩa vụ tài chính' ? 'bg-orange-100/60 font-bold text-orange-950' : ''}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTrangThaiFilter('Đã thực hiện nghĩa vụ tài chính');
+                                setSelectedLinhVucFilter('Tất cả');
+                                setSelectedLoaiHoSoFilter('Tất cả');
+                                setSelectedIds(new Set());
+                                setCurrentPage(1);
+                                setShowOnlyTon90Days(false);
+                            }}
+                        >
+                            <span>• Đã thực hiện NVTC:</span> 
+                            <span className="font-bold">{stats.choThue.daThucHienNghiaVuTaiChinh}</span>
+                        </div>
+                        <div 
                             className={`flex justify-between p-0.5 px-1.5 rounded-lg transition-colors hover:bg-orange-100/40 cursor-pointer ${selectedTrangThaiFilter === 'Hồ sơ chờ thực hiện nghĩa vụ tài chính' ? 'bg-orange-100/60 font-bold text-orange-950' : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedTrangThaiFilter('Hồ sơ chờ thực hiện nghĩa vụ tài chính');
                                 setSelectedLinhVucFilter('Tất cả');
+                                setSelectedLoaiHoSoFilter('Tất cả');
                                 setSelectedIds(new Set());
                                 setCurrentPage(1);
                                 setShowOnlyTon90Days(false);
@@ -1570,9 +2720,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 4. Chờ trả kết quả */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Hồ sơ chờ trả kết quả'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    onClick={() => { setSelectedTrangThaiFilter('Chờ trả kết quả'); setSelectedLinhVucFilter('Tất cả'); setSelectedLoaiHoSoFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
                     className={`cursor-pointer bg-gradient-to-br from-teal-50 to-white hover:from-teal-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
-                        (selectedTrangThaiFilter === 'Hồ sơ chờ trả kết quả' || selectedTrangThaiFilter === 'Hồ sơ đã ký Giấy chứng nhận' || selectedTrangThaiFilter === 'Hồ sơ chưa trả kết quả') && !showOnlyTon90Days ? 'ring-4 ring-teal-500/30 border-teal-300 bg-teal-50/40' : 'border-teal-100'
+                        (selectedTrangThaiFilter === 'Chờ trả kết quả' || selectedTrangThaiFilter === 'Đã ký Giấy chứng nhận' || selectedTrangThaiFilter === 'Chưa trả kết quả') && !showOnlyTon90Days ? 'ring-4 ring-teal-500/30 border-teal-300 bg-teal-50/40' : 'border-teal-100'
                     }`}
                 >
                     <div className="absolute right-0 bottom-0 text-teal-500/10 translate-x-3 translate-y-3 group-hover:scale-110 transition-transform">
@@ -1588,11 +2738,12 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     <h3 className="text-xs font-bold text-teal-900/60 uppercase tracking-widest mb-1.5">Chờ trả kết quả</h3>
                     <div className="space-y-0.5 text-xs text-teal-900/80 font-medium z-10 relative">
                         <div 
-                            className={`flex justify-between p-0.5 px-1.5 rounded-lg transition-colors hover:bg-teal-100/40 cursor-pointer ${selectedTrangThaiFilter === 'Hồ sơ đã ký Giấy chứng nhận' ? 'bg-teal-100/60 font-bold text-teal-950' : ''}`}
+                            className={`flex justify-between p-0.5 px-1.5 rounded-lg transition-colors hover:bg-teal-100/40 cursor-pointer ${selectedTrangThaiFilter === 'Đã ký Giấy chứng nhận' ? 'bg-teal-100/60 font-bold text-teal-950' : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedTrangThaiFilter('Hồ sơ đã ký Giấy chứng nhận');
+                                setSelectedTrangThaiFilter('Đã ký Giấy chứng nhận');
                                 setSelectedLinhVucFilter('Tất cả');
+                                setSelectedLoaiHoSoFilter('Tất cả');
                                 setSelectedIds(new Set());
                                 setCurrentPage(1);
                                 setShowOnlyTon90Days(false);
@@ -1607,6 +2758,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 e.stopPropagation();
                                 setSelectedTrangThaiFilter('Hồ sơ chưa trả kết quả');
                                 setSelectedLinhVucFilter('Tất cả');
+                                setSelectedLoaiHoSoFilter('Tất cả');
                                 setSelectedIds(new Set());
                                 setCurrentPage(1);
                                 setShowOnlyTon90Days(false);
@@ -1620,7 +2772,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                 {/* 5. Đã trả kết quả */}
                 <div 
-                    onClick={() => { setSelectedTrangThaiFilter('Đã trả kết quả'); setSelectedLinhVucFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    onClick={() => { setSelectedTrangThaiFilter('Đã trả kết quả'); setSelectedLinhVucFilter('Tất cả'); setSelectedLoaiHoSoFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
                     className={`cursor-pointer bg-gradient-to-br from-emerald-50 to-white hover:from-emerald-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
                         selectedTrangThaiFilter === 'Đã trả kết quả' && !showOnlyTon90Days ? 'ring-4 ring-emerald-500/30 border-emerald-300' : 'border-emerald-100'
                     }`}
@@ -1636,10 +2788,29 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     <p className="text-3xl font-bold text-emerald-950 mt-1">{stats.daTraKQ}</p>
                 </div>
 
-                {/* 6. Tồn trên 90 ngày */}
+                {/* 6. Hồ sơ bị trả */}
+                <div 
+                    onClick={() => { setSelectedTrangThaiFilter('Hồ sơ trả'); setSelectedLinhVucFilter('Tất cả'); setSelectedLoaiHoSoFilter('Tất cả'); setSelectedIds(new Set()); setCurrentPage(1); setShowOnlyTon90Days(false); }}
+                    className={`cursor-pointer bg-gradient-to-br from-rose-50 to-white hover:from-rose-100 rounded-2xl border p-5 shadow-sm transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${
+                        selectedTrangThaiFilter === 'Hồ sơ trả' && !showOnlyTon90Days ? 'ring-4 ring-rose-500/30 border-rose-300' : 'border-rose-100'
+                    }`}
+                >
+                    <div className="absolute right-0 bottom-0 text-rose-500/10 translate-x-2 translate-y-2 group-hover:scale-110 transition-transform">
+                        <AlertCircle size={110} />
+                    </div>
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="p-2.5 bg-rose-500 text-white rounded-xl shadow-md shadow-rose-500/20"><AlertCircle size={20} /></span>
+                        <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full">Bị trả lại</span>
+                    </div>
+                    <h3 className="text-xs font-bold text-rose-900/60 uppercase tracking-widest">Hồ sơ bị trả</h3>
+                    <p className="text-3xl font-bold text-rose-950 mt-1">{stats.hoSoTra}</p>
+                </div>
+
+                {/* 7. Tồn trên 90 ngày */}
                 <div 
                     onClick={() => {
                         setShowOnlyTon90Days(!showOnlyTon90Days);
+                        setSelectedLoaiHoSoFilter('Tất cả');
                         setSelectedIds(new Set());
                         setCurrentPage(1);
                     }}
@@ -1714,12 +2885,27 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
                     
                     <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <span className="p-1 px-2.5 bg-indigo-500/30 text-indigo-300 font-bold text-[10px] uppercase tracking-wider rounded-md border border-indigo-500/20">Công cụ</span>
-                            <h3 className="font-bold text-slate-100 flex items-center gap-1.5">
-                                <FileSpreadsheet size={18} className="text-indigo-400" />
-                                Quản lý dữ liệu hệ thống
-                            </h3>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <span className="p-1 px-2.5 bg-indigo-500/30 text-indigo-300 font-bold text-[10px] uppercase tracking-wider rounded-md border border-indigo-500/20">Công cụ</span>
+                                <h3 className="font-bold text-slate-100 flex items-center gap-1.5">
+                                    <FileSpreadsheet size={18} className="text-indigo-400" />
+                                    Quản lý dữ liệu hệ thống
+                                </h3>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    const latestStored = await getSystemSetting('vaoso_current_book_number');
+                                    if (latestStored) {
+                                        setCurrentBookNumber(latestStored);
+                                    }
+                                    setShowSettingsModal(true);
+                                }}
+                                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors cursor-pointer animate-pulse"
+                                title="Cài đặt số vào sổ"
+                            >
+                                <Settings size={14} />
+                            </button>
                         </div>
                         <p className="text-xs text-slate-400 leading-relaxed mb-4">
                             Hệ thống tự động hỗ trợ bạn nhập dữ liệu gốc từ phần mềm một cửa iGate tập trung qua tệp Excel để phân loại, theo dõi nghĩa vụ tài chính và lập báo cáo nhanh chóng.
@@ -1727,13 +2913,23 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     </div>
 
                     <div className="space-y-3">
-                        {/* 1. Nút Thêm mới */}
-                        <button
-                            onClick={handleAddNew}
-                            className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition-all font-sans text-sm active:scale-[0.98]"
-                        >
-                            <Plus size={16} /> Thêm Hồ sơ iGate thủ công
-                        </button>
+                        {/* 1. Nút Thêm mới & Vào số GCN */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={handleAddNew}
+                                className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold py-2.5 px-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all font-sans text-xs active:scale-[0.98]"
+                                title="Thêm Hồ sơ iGate thủ công"
+                            >
+                                <Plus size={14} /> Thêm thủ công
+                            </button>
+                            <button
+                                onClick={() => setShowVaoSoModal(true)}
+                                className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-2.5 px-3 rounded-xl shadow-lg shadow-purple-600/30 transition-all font-sans text-xs active:scale-[0.98]"
+                                title="Mở Công cụ Vào số GCN bằng file Excel và bàn giao 1 cửa"
+                            >
+                                <FileSpreadsheet size={14} /> Vào số GCN
+                            </button>
+                        </div>
 
                         {/* 2. Nhập từ Excel & Công cụ phân loại từ Excel */}
                         <div className="grid grid-cols-2 gap-2">
@@ -1771,7 +2967,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
 
                         {/* 3. Lập báo cáo */}
                         <button
-                            onClick={handleExportReportExcel}
+                            onClick={() => setShowExportReportModal(true)}
                             className="w-full flex items-center justify-center gap-2 bg-indigo-950 text-indigo-200 border border-indigo-800 hover:bg-indigo-900 font-bold py-2.5 px-3 rounded-xl text-xs transition-all active:scale-[0.98]"
                         >
                             <Printer size={14} /> Xuất Báo Cáo Thống Kê
@@ -1832,6 +3028,23 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                             >
                                 <option value="Tất cả">Tất cả lĩnh vực</option>
                                 {LINH_VUC_LIST.map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Chọn Loại hồ sơ */}
+                        <div className="w-full sm:w-auto md:w-auto flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 min-w-[200px] max-w-xs">
+                            <Filter size={16} className="text-slate-500" />
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap">Loại hồ sơ:</span>
+                            <select 
+                                className="text-xs outline-none bg-transparent text-slate-700 font-semibold cursor-pointer border-none flex-1 focus:ring-0 truncate"
+                                value={selectedLoaiHoSoFilter}
+                                onChange={(e) => {
+                                    setSelectedLoaiHoSoFilter(e.target.value);
+                                    setSelectedIds(new Set());
+                                }}
+                            >
+                                <option value="Tất cả">Tất cả loại hồ sơ</option>
+                                {loaiHoSoList.map(v => <option key={v} value={v} title={v}>{v}</option>)}
                             </select>
                         </div>
 
@@ -1902,29 +3115,33 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     {[
                         'Tất cả',
                         'Mới tiếp nhận',
-                        'Hồ sơ đã phát hành thông báo thuế',
-                        'Hồ sơ chờ thực hiện nghĩa vụ tài chính',
-                        'Hồ sơ đã ký Giấy chứng nhận',
-                        'Hồ sơ chưa trả kết quả',
-                        'Đã trả kết quả'
+                        'Đã phát hành thông báo thuế',
+                        'Đã thực hiện nghĩa vụ tài chính',
+                        'Chờ thực hiện nghĩa vụ tài chính',
+                        'Đã ký Giấy chứng nhận',
+                        'Chưa trả kết quả',
+                        'Đã trả kết quả',
+                        'Hồ sơ trả'
                     ].map(tab => {
                         const isSelected = selectedTrangThaiFilter === tab;
                         let count = 0;
                         if (tab === 'Tất cả') count = records.length;
                         else if (tab === 'Mới tiếp nhận') count = records.filter(r => r.trangThai === 'Mới tiếp nhận').length;
-                        else if (tab === 'Hồ sơ đã phát hành thông báo thuế') count = records.filter(r => r.trangThai === 'Đã phát hành thông báo thuế').length;
-                        else if (tab === 'Hồ sơ chờ thực hiện nghĩa vụ tài chính') count = records.filter(r => r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính').length;
-                        else if (tab === 'Hồ sơ đã ký Giấy chứng nhận') count = records.filter(r => r.trangThai === 'Đã ký Giấy chứng nhận').length;
-                        else if (tab === 'Hồ sơ chưa trả kết quả') count = records.filter(r => r.trangThai === 'Chưa trả kết quả').length;
+                        else if (tab === 'Đã phát hành thông báo thuế') count = records.filter(r => r.trangThai === 'Đã phát hành thông báo thuế').length;
+                        else if (tab === 'Đã thực hiện nghĩa vụ tài chính') count = records.filter(r => r.trangThai === 'Đã thực hiện nghĩa vụ tài chính').length;
+                        else if (tab === 'Chờ thực hiện nghĩa vụ tài chính') count = Math.max(0, records.filter(r => r.trangThai === 'Đã phát hành thông báo thuế').length - records.filter(r => r.trangThai === 'Đã thực hiện nghĩa vụ tài chính').length);
+                        else if (tab === 'Đã ký Giấy chứng nhận') count = records.filter(r => r.trangThai === 'Đã ký Giấy chứng nhận').length;
+                        else if (tab === 'Chưa trả kết quả') count = records.filter(r => r.trangThai === 'Chưa trả kết quả').length;
                         else count = records.filter(r => r.trangThai === tab).length;
 
                         // Định dạng màu sắc các tab phân loại
                         let activeStyle = "bg-indigo-600 text-white shadow-md shadow-indigo-600/10";
                         let inactiveStyle = "bg-slate-50 text-slate-600 hover:bg-slate-100";
                         if (isSelected) {
-                            if (tab.includes('thuế')) activeStyle = "bg-orange-500 text-white shadow-md shadow-orange-500/10";
+                            if (tab.includes('thuế') || tab === 'Đã thực hiện nghĩa vụ tài chính') activeStyle = "bg-orange-500 text-white shadow-md shadow-orange-500/10";
                             else if (tab.includes('Giấy chứng nhận')) activeStyle = "bg-teal-600 text-white shadow-md shadow-teal-600/10";
                             else if (tab.includes('trả kết quả')) activeStyle = "bg-green-600 text-white shadow-md shadow-green-600/10";
+                            else if (tab === 'Hồ sơ trả') activeStyle = "bg-rose-650 text-white shadow-md shadow-rose-600/10";
                         }
 
                         return (
@@ -1978,6 +3195,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 setBatchStatus('');
                                 setBatchCanBo('');
                                 setBatchDate(getTodayString());
+                                setBatchLyDoTra('');
                                 setIsBatchModalOpen(true);
                             }}
                             className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
@@ -2068,10 +3286,12 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 if (r.trangThai === 'Mới tiếp nhận') statusBadge = "bg-sky-50 text-sky-700 border-sky-100";
                                 else if (r.trangThai === 'Đã chuyển thông tin thuế') statusBadge = "bg-orange-50 text-orange-600 border-orange-100";
                                 else if (r.trangThai === 'Đã phát hành thông báo thuế') statusBadge = "bg-amber-100 text-amber-800 border-amber-200";
+                                else if (r.trangThai === 'Đã thực hiện nghĩa vụ tài chính') statusBadge = "bg-emerald-100 text-emerald-800 border-emerald-200 font-bold";
                                 else if (r.trangThai === 'Chờ thực hiện nghĩa vụ tài chính') statusBadge = "bg-orange-150 text-orange-850 border-orange-200";
                                 else if (r.trangThai === 'Đã ký Giấy chứng nhận') statusBadge = "bg-teal-50 text-teal-700 border-teal-150";
                                 else if (r.trangThai === 'Chưa trả kết quả') statusBadge = "bg-yellow-50 text-yellow-800 border-yellow-200 font-medium";
                                 else if (r.trangThai === 'Đã trả kết quả') statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-100 font-bold";
+                                else if (r.trangThai === 'Hồ sơ trả') statusBadge = "bg-rose-50 text-rose-700 border-rose-200 font-bold";
  
                                 return (
                                     <tr 
@@ -2083,7 +3303,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                     ? 'bg-red-50/20' 
                                                     : r.trangThai === 'Đã trả kết quả' 
                                                         ? 'bg-emerald-50/5' 
-                                                        : ''
+                                                        : r.trangThai === 'Hồ sơ trả'
+                                                            ? 'bg-rose-50/10'
+                                                            : ''
                                         }`}
                                     >
                                         <td className="px-3 py-3 text-center text-xs align-middle">
@@ -2196,7 +3418,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                                     {Number(r.dienTichDatO || 0) > 0 && (
                                                         <span className="text-indigo-700 font-bold">Đất ở: Lâu dài</span>
                                                     )}
-                                                    <span className="text-slate-500 font-semibold" title={r.thoiHanSuDung}>Đất NN: {formatDisplayDateInClient(r.thoiHanSuDung)}</span>
+                                                    <span className="text-slate-500 font-semibold" title={r.thoiHanSuDung}>Đất NN: {formatThoiHanSuDung(r.thoiHanSuDung)}</span>
                                                 </div>
                                             </td>
                                         )}
@@ -2246,9 +3468,22 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         )}
                                         {visibleColumns.trangThai && (
                                             <td className="px-3 py-3 text-center text-xs align-middle">
-                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadge}`}>
-                                                    {r.trangThai}
-                                                </span>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadge}`}>
+                                                        {r.trangThai}
+                                                    </span>
+                                                    {(() => {
+                                                        const stateDate = r.trangThai === 'Mới tiếp nhận' ? r.ngayTiepNhan : (r.trangThai === 'Hồ sơ trả' ? r.ngayTra : r.ngayKetThuc);
+                                                        if (stateDate) {
+                                                            return (
+                                                                <span className="text-[10px] text-slate-500 font-semibold font-mono whitespace-nowrap block mt-0.5">
+                                                                    {formatDisplayDateInClient(stateDate)}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
                                             </td>
                                         )}
                                         {visibleColumns.ghiChu && (
@@ -2343,11 +3578,292 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                     )}
                 </div>
             </div>
+        </>
+
+        {showVaoSoModal && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in text-left">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-up border border-slate-100">
+                    {/* Header của Modal */}
+                    <div className="bg-gradient-to-r from-purple-800 to-indigo-950 p-5 text-white flex justify-between items-center shrink-0">
+                        <div>
+                            <h3 className="font-bold flex items-center gap-2 text-base text-left">
+                                <FileSpreadsheet size={18} className="text-purple-400" />
+                                Công cụ Vào số GCN (Bàn giao 1 cửa)
+                            </h3>
+                            <p className="text-xs text-purple-200 mt-1 font-medium text-left">
+                                Công cụ đối chiếu thông tin GCN từ tệp Excel và thực hiện cập nhật Số vào sổ, Ngày ký GCN đồng thời bàn giao 1 cửa
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => setShowExportHandover1CuaModal(true)} 
+                                className="flex items-center gap-1.5 bg-pink-600 hover:bg-pink-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all cursor-pointer"
+                            >
+                                <FileOutput size={14}/> Xuất DS bàn giao 1 cửa
+                            </button>
+                            <button 
+                                onClick={() => setShowVaoSoModal(false)}
+                                className="rounded-lg p-1.5 hover:bg-white/10 text-white transition-all cursor-pointer border border-white/10"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Nội dung chính của Modal */}
+                    <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                        {tempRecords.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center p-12 min-h-[350px]">
+                                <div className="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-10 max-w-lg w-full text-center shadow-md flex flex-col items-center gap-4 hover:border-purple-500 transition-colors mx-auto">
+                                    <div className="p-4 bg-purple-50 text-purple-600 rounded-full">
+                                        <FileSpreadsheet size={48} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm font-bold text-slate-850">Nhập dữ liệu GCN từ Excel</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed">
+                                            Chọn file Excel chứa danh sách Mã hồ sơ cần vào số. Hệ thống sẽ tự động đối chiếu thông tin với cơ sở dữ liệu iGate chính thức.
+                                        </p>
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={tempFileInputRef} 
+                                        onChange={handleTempExcelUpload} 
+                                        accept=".xlsx, .xls" 
+                                        className="hidden" 
+                                    />
+                                    <div className="flex gap-3 mt-2 justify-center">
+                                        <button 
+                                            onClick={handleTempImportClick} 
+                                            className="flex items-center gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-purple-700 shadow-md transition-all hover:scale-105 cursor-pointer"
+                                        >
+                                            <Upload size={14}/> Chọn tệp Excel
+                                        </button>
+                                        <button 
+                                            onClick={handleDownloadTemplateVaoSo} 
+                                            className="flex items-center gap-2 bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-slate-200 shadow-sm cursor-pointer"
+                                        >
+                                            <Download size={14}/> Mẫu nhập liệu
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col overflow-hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+                                {/* Toolbar */}
+                                <div className="p-3 bg-purple-50/50 border-b border-purple-100 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-semibold bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                                            <FileSpreadsheet size={12} /> Tệp: {tempExcelFileName}
+                                        </span>
+                                        <span className="text-xs text-slate-500">
+                                            Hệ thống nhận diện: <strong className="text-slate-800">{tempRecords.length}</strong> hồ sơ | Đã chọn: <strong className="text-purple-700">{selectedTempIds.size}</strong>
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="file" 
+                                            ref={tempFileInputRef} 
+                                            onChange={handleTempExcelUpload} 
+                                            accept=".xlsx, .xls" 
+                                            className="hidden" 
+                                        />
+                                        <button 
+                                            onClick={handleTempImportClick}
+                                            className="flex items-center gap-1.5 text-xs bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg shadow-xs font-semibold transition-colors cursor-pointer"
+                                        >
+                                            Chọn tệp khác
+                                        </button>
+                                        <button 
+                                            onClick={handleAutoAssignAllTempBookNumbers}
+                                            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg shadow-xs font-bold transition-colors cursor-pointer"
+                                            title="Tự động điền Số vào sổ tiếp theo từ hệ thống cho các dòng còn trống"
+                                        >
+                                            <Hash size={12}/> Tự động đánh số vào sổ
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowConfirmHandoverModal(true)}
+                                            className="flex items-center gap-1.5 text-xs bg-purple-600 text-white hover:bg-purple-700 px-4 py-1.5 rounded-lg shadow-md font-bold transition-colors animate-pulse cursor-pointer"
+                                            title="Xác nhận dữ liệu và bàn giao sang 1 cửa"
+                                        >
+                                            <CheckCircle2 size={12}/> Xác nhận cập nhật & Bàn giao
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bảng hồ sơ nhận diện */}
+                                <div className="flex-1 overflow-auto max-h-[50vh]">
+                                    <table className="min-w-full table-fixed border-collapse text-left">
+                                        <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b">
+                                            <tr className="text-slate-600 text-xs">
+                                                <th className="p-2 border-b border-r border-slate-200 w-10 text-center bg-slate-50 sticky left-0 z-20">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        onChange={handleSelectAllTempRows} 
+                                                        checked={tempRecords.length > 0 && selectedTempIds.size === tempRecords.length} 
+                                                        className="w-3.5 h-3.5 rounded text-purple-600 cursor-pointer"
+                                                    />
+                                                </th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-12 text-center bg-slate-50 sticky left-10 z-20">#</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-40 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Mã hồ sơ</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-40 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Địa danh (Xã)</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-56 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Chủ sử dụng đất</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-24 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Số tờ</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-24 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Số thửa</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-32 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Tổng DT (m2)</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-32 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Đất ở (m2)</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-32 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Đất NN (m2)</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-40 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Số phát hành GCN</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-48 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Số vào sổ</th>
+                                                <th className="p-2 border-b border-r border-slate-200 w-40 text-[11px] font-bold text-slate-500 uppercase text-center whitespace-nowrap">Ngày ký GCN</th>
+                                                <th className="p-2 border-b border-slate-200 w-20 text-center bg-slate-50 sticky right-0 z-20">Xóa</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 text-xs bg-white text-left">
+                                            {tempRecords.map((r, idx) => (
+                                                <tr key={idx} className={`hover:bg-purple-50/20 group ${selectedTempIds.has(String(idx)) ? 'bg-purple-50/40' : ''}`}>
+                                                    <td className="p-2 border-r border-slate-200 text-center bg-white sticky left-0 z-10 group-hover:bg-purple-50/20">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedTempIds.has(String(idx))} 
+                                                            onChange={() => handleSelectTempRow(idx)} 
+                                                            className="w-3.5 h-3.5 rounded text-purple-600 cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-200 text-center text-slate-400 text-xs bg-white sticky left-10 z-10 group-hover:bg-purple-50/20 font-mono">
+                                                        {idx + 1}
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-left">
+                                                        <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+                                                            {r.existsInSystem ? (
+                                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Tìm thấy hồ sơ trên hệ thống iGate" />
+                                                            ) : (
+                                                                <span title="Mã hồ sơ chưa tồn tại trên iGate">
+                                                                    <AlertTriangle size={14} className="text-amber-500 shrink-0 animate-bounce" />
+                                                                </span>
+                                                            )}
+                                                            {r.code}
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-left">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent"
+                                                            value={r.diaDanh || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'diaDanh', e.target.value)}
+                                                            placeholder="Xã..."
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-left">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full font-bold text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-slate-800"
+                                                            value={r.customerName || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'customerName', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-center">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-center text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono font-semibold"
+                                                            value={r.mapSheet || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'mapSheet', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-center">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-center text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono font-semibold"
+                                                            value={r.landPlot || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'landPlot', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-center">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-center text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono"
+                                                            value={r.area || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'area', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-center bg-orange-50/10">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-center text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-orange-700 font-bold"
+                                                            value={r.datO || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'datO', e.target.value)}
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-center bg-green-50/10">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-center text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent text-green-700 font-bold"
+                                                            value={r.datNongNghiep || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'datNongNghiep', e.target.value)}
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs text-left">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full text-xs px-2 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono"
+                                                            value={r.soPhatHanh || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'soPhatHanh', e.target.value)}
+                                                            placeholder="CQ..."
+                                                        />
+                                                    </td>
+                                                    <td className="p-1 border-r border-slate-100 text-xs">
+                                                        <div className="flex items-center gap-1">
+                                                            <input 
+                                                                type="text"
+                                                                className="flex-1 min-w-0 text-xs px-1.5 py-1.5 border border-transparent rounded-lg hover:border-slate-200 focus:border-purple-500 focus:bg-white outline-none bg-transparent font-mono font-bold text-blue-700 animate-pulse"
+                                                                value={r.soVaoSo || ''}
+                                                                onChange={(e) => handleTempCellChange(idx, 'soVaoSo', e.target.value)}
+                                                                placeholder="CN..."
+                                                            />
+                                                            <button 
+                                                                onClick={() => handleGetTempBookNumber(idx)}
+                                                                className="p-1.5 bg-purple-50 hover:bg-purple-100 rounded-lg text-purple-600 transition-colors cursor-pointer"
+                                                                title="Lấy số tự động từ hệ thống"
+                                                                tabIndex={-1}
+                                                            >
+                                                                <Hash size={13} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-100 text-xs font-mono">
+                                                        <input 
+                                                            type="date"
+                                                            className="w-full text-xs px-1.5 py-1.5 border border-slate-200 rounded-lg focus:border-purple-500 focus:bg-white outline-none text-slate-700 cursor-pointer"
+                                                            value={r.ngayKyGcn || ''}
+                                                            onChange={(e) => handleTempCellChange(idx, 'ngayKyGcn', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-purple-50/20 z-10 border-l">
+                                                        <button 
+                                                            onClick={() => handleDeleteTempRow(idx)}
+                                                            className="text-slate-400 hover:text-red-500 p-1 cursor-pointer transition-colors"
+                                                            title="Xóa dòng này"
+                                                        >
+                                                            <X size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
 
             {/* --- MODAL KIỂM SOÁT TRÙNG & BÁO CÁO NHẬP EXCEL IGATE --- */}
             {showImportConfirmModal && (
                 <div id="igate-import-confirm-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-up border border-slate-100">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-up border border-slate-100">
                         <div className="bg-gradient-to-r from-blue-950 to-[#1E293B] p-5 text-white flex justify-between items-center">
                             <h3 className="font-bold flex items-center gap-2 text-base text-left">
                                 <FileSpreadsheet size={18} className="text-blue-400" />
@@ -2379,48 +3895,77 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Hợp lệ (Sẵn sàng nhập)</span>
                                     <span className="text-2xl font-black text-emerald-900 mt-1">{importReport.validCount}</span>
                                 </div>
-                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 flex flex-col justify-between">
-                                    <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Trùng nội bộ tệp Excel</span>
-                                    <span className="text-2xl font-black text-amber-900 mt-1">{importReport.duplicateInFileCount}</span>
+                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 flex flex-col justify-between col-span-2">
+                                    <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-2">Trùng tuyệt đối cả 3 cột (Mã + Tờ + Thửa)</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-white/60 p-2 rounded-lg border border-amber-150">
+                                            <span className="text-[10px] text-slate-500 block">Nội bộ tệp:</span>
+                                            <span className="text-lg font-bold text-amber-950">{importReport.duplicateInFileCount}</span>
+                                        </div>
+                                        <div className="bg-white/60 p-2 rounded-lg border border-amber-150">
+                                            <span className="text-[10px] text-slate-500 block">Trên hệ thống:</span>
+                                            <span className="text-lg font-bold text-amber-950">{importReport.duplicateWithDbCount}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 flex flex-col justify-between">
-                                    <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Trùng mã trên Supabase</span>
-                                    <span className="text-2xl font-black text-rose-900 mt-1">{importReport.duplicateWithDbCount}</span>
+                                <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex flex-col justify-between col-span-2">
+                                    <div className="text-[11px] font-bold text-orange-700 uppercase tracking-wider mb-2">Trùng mã nhưng khác số Tờ / Thửa (Hệ thống cảnh báo)</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-white/60 p-2 rounded-lg border border-orange-150">
+                                            <span className="text-[10px] text-slate-500 block">Nội bộ tệp:</span>
+                                            <span className="text-lg font-bold text-orange-950">{importReport.dupCodeDiffInFileCount}</span>
+                                        </div>
+                                        <div className="bg-white/60 p-2 rounded-lg border border-orange-150">
+                                            <span className="text-[10px] text-slate-500 block">Trên hệ thống:</span>
+                                            <span className="text-lg font-bold text-orange-950">{importReport.dupCodeDiffWithDbCount}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* CHI TIẾT CÁC MÃ TRÙNG LẶP */}
-                            {(importReport.duplicateInFileCount > 0 || importReport.duplicateWithDbCount > 0) && (
-                                <div className="space-y-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
-                                    <span className="text-[11px] font-bold text-slate-600 block">DANH SÁCH MÃ BỊ TRÙNG LẶP:</span>
-                                    
-                                    {importReport.duplicateInFileCount > 0 && (
-                                        <div className="space-y-1">
-                                            <div className="text-[10px] font-semibold text-amber-700 flex items-center gap-1">
-                                                <AlertTriangle size={12} />
-                                                Trùng nội bộ tệp ({importReport.duplicateInFileCount} mã):
-                                            </div>
-                                            <div className="max-h-[80px] overflow-y-auto bg-white p-2 rounded-lg border border-amber-100 text-xs font-mono text-slate-700 select-all flex flex-wrap gap-1">
-                                                {importReport.duplicateInFileCodes.map(code => (
-                                                    <span key={code} className="bg-amber-50 text-amber-805 px-1.5 py-0.5 rounded border border-amber-200">{code}</span>
-                                                ))}
-                                            </div>
+                            {/* CHI TIẾT CÁC MÃ TRÙNG LẶP / CẢNH BÁO */}
+                            {importReport.skippedRecords && importReport.skippedRecords.length > 0 && (
+                                <div className="space-y-2.5">
+                                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide block flex items-center gap-1.5">
+                                        <AlertTriangle size={14} className="text-red-500" />
+                                        Danh sách dòng trùng lặp / cảnh báo chi tiết ({importReport.skippedRecords.length} dòng):
+                                    </span>
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                                        <div className="max-h-[220px] overflow-y-auto">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider sticky top-0 z-10 border-b border-slate-100">
+                                                    <tr>
+                                                        <th className="py-2 px-3 text-center w-20">Dòng Excel</th>
+                                                        <th className="py-2 px-3 w-36">Mã hồ sơ</th>
+                                                        <th className="py-2 px-3 w-16 text-center">Tờ</th>
+                                                        <th className="py-2 px-3 w-16 text-center">Thửa</th>
+                                                        <th className="py-2 px-3 text-rose-800">Lý do trùng lặp / Cảnh báo</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 text-xs text-slate-750">
+                                                    {importReport.skippedRecords.map((r, idx) => (
+                                                        <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                                                            <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-500 bg-slate-50/30">
+                                                                Dòng {r.excelRowIndex || '-'}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-mono font-bold text-slate-900 select-all">
+                                                                {r.soHieu}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">
+                                                                {r.soTo || '-'}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">
+                                                                {r.soThua || '-'}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-[11px] text-red-700 font-medium leading-normal">
+                                                                {importReport.skippedReasons[idx]}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    )}
-
-                                    {importReport.duplicateWithDbCount > 0 && (
-                                        <div className="space-y-1 mt-2">
-                                            <div className="text-[10px] font-semibold text-rose-700 flex items-center gap-1">
-                                                <AlertCircle size={12} />
-                                                Trùng với Supabase ({importReport.duplicateWithDbCount} mã):
-                                            </div>
-                                            <div className="max-h-[80px] overflow-y-auto bg-white p-2 rounded-lg border border-rose-100 text-xs font-mono text-slate-700 select-all flex flex-wrap gap-1">
-                                                {importReport.duplicateWithDbCodes.map(code => (
-                                                    <span key={code} className="bg-rose-50 text-rose-800 px-1.5 py-0.5 rounded border border-rose-200">{code}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
 
@@ -2429,9 +3974,9 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
                                 <div className="text-xs space-y-1 leading-relaxed">
                                     <p className="font-semibold text-blue-900">Vui lòng chọn phương án nhập dữ liệu:</p>
-                                    <ul className="list-disc list-inside space-y-0.5 pl-1">
-                                        <li><strong>Bỏ qua trùng</strong>: Hệ thống sẽ chỉ lấy các hồ sơ hợp lệ (<strong className="text-emerald-700">{importReport.validCount}</strong> hồ sơ) để nhập.</li>
-                                        <li><strong>Ghi đè & Nhập tất cả</strong>: Tự động cập nhật các hồ sơ trùng lặp theo dữ liệu Excel mới nhất của bạn.</li>
+                                    <ul className="list-disc list-inside space-y-1 pl-1">
+                                        <li><strong>Bỏ qua hồ sơ trùng</strong>: Hệ thống sẽ loại bỏ các hồ sơ bị trùng/cảnh báo, chỉ nhập các hồ sơ hợp lệ hoàn toàn (<strong className="text-emerald-700">{importReport.validCount}</strong> hồ sơ) và <span className="text-rose-600 font-bold">tự động tải xuống file Excel chứa các hồ sơ bị bỏ qua</span> để bạn kiểm tra lại.</li>
+                                        <li><strong>Ghi đè & Nhập tất cả</strong>: Cho phép nhập toàn bộ. Các hồ sơ trùng tuyệt đối (3 cột) sẽ được ghi đè, còn các hồ sơ trùng mã khác Tờ/Thửa vẫn được thêm mới bình thường.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -2467,6 +4012,55 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                 </div>
             )}
 
+            {/* Cài đặt số vào sổ - Modal */}
+            {showSettingsModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[60] p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-scale-up text-slate-800 overflow-hidden border border-slate-100">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                                <Settings size={18} className="text-indigo-500 animate-spin-slow" />
+                                Cài đặt số vào sổ
+                            </h3>
+                            <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-lg p-1 transition-all cursor-pointer"><X size={18}/></button>
+                        </div>
+                        <div className="p-6 space-y-4 text-left">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Số vào sổ hiện tại (phần số)</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 text-sm transition-all"
+                                    value={currentBookNumber}
+                                    onChange={(e) => setCurrentBookNumber(e.target.value)}
+                                />
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    Hệ thống sẽ tự động tăng số này và thêm tiền tố "CN" khi thực hiện vào số cho hồ sơ iGate.<br/>
+                                    Ví dụ: Nếu nhập <strong className="text-slate-800">{currentBookNumber}</strong>, số tiếp theo sẽ là <strong className="text-indigo-600 font-bold">CN {incrementString(currentBookNumber)}</strong>.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2.5">
+                            <button 
+                                onClick={() => setShowSettingsModal(false)}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-100 font-bold text-xs transition-all cursor-pointer"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                onClick={async () => {
+                                    await saveSystemSetting('vaoso_current_book_number', currentBookNumber);
+                                    setShowSettingsModal(false);
+                                }} 
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                            >
+                                Lưu cài đặt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* --- MODAL CÔNG CỤ PHÂN LOẠI HỒ SƠ QUA EXCEL --- */}
             {showExcelClassifyModal && (
                 <div id="igate-excel-classify-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
@@ -2474,7 +4068,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         <div className="bg-gradient-to-r from-indigo-900 to-[#1E293B] p-5 text-white flex justify-between items-center">
                             <h3 className="font-bold flex items-center gap-2 text-base col-span-2">
                                 <Tag size={18} className="text-indigo-400" />
-                                Công cụ phân loại hồ sơ bằng Excel (6 loại trạng thái)
+                                Công cụ phân loại hồ sơ bằng Excel (8 loại trạng thái)
                             </h3>
                             <button 
                                 onClick={() => {
@@ -2493,17 +4087,19 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                         </div>
 
                         <div className="p-6 overflow-y-auto space-y-5 flex-1">
-                            {/* KHỐI CHỌN CÔNG CỤ (6 TRẠNG THÁI) */}
+                            {/* KHỐI CHỌN CÔNG CỤ (8 TRẠNG THÁI) */}
                             <div className="space-y-2 text-left">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Chọn công cụ cập nhật (1 trong 6 loại trạng thái phục vụ):</label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Chọn công cụ cập nhật (1 trong 8 loại trạng thái phục vụ):</label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {[
                                         "Đã chuyển thông tin thuế",
                                         "Đã phát hành thông báo thuế",
+                                        "Đã thực hiện nghĩa vụ tài chính",
                                         "Chờ thực hiện nghĩa vụ tài chính",
                                         "Đã ký Giấy chứng nhận",
                                         "Chưa trả kết quả",
-                                        "Đã trả kết quả"
+                                        "Đã trả kết quả",
+                                        "Hồ sơ trả"
                                     ].map((status) => {
                                         const isActive = excelActiveToolStatus === status;
                                         return (
@@ -2733,6 +4329,22 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     </div>
                                 </div>
 
+                                {excelActiveToolStatus === 'Hồ sơ trả' && (
+                                    <div className="space-y-1.5 bg-rose-50/50 p-3 rounded-xl border border-rose-100 animate-fade-in text-left">
+                                        <label className="text-xs font-bold text-rose-900 block">
+                                            Lý do trả hồ sơ <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full text-xs font-semibold p-2.5 bg-white border border-rose-200 rounded-xl outline-none focus:border-rose-500 transition-all text-slate-850"
+                                            placeholder="Ghi rõ lý do trả hồ sơ (thông tin này sẽ tự động ghi vào Ghi chú và Lý do trả của từng hồ sơ)..."
+                                            value={excelLyDoTraUpdate || ''}
+                                            onChange={(e) => setExcelLyDoTraUpdate(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="pt-3 border-t border-slate-150/60 flex items-center justify-end gap-3 text-sm">
                                     <button 
                                         type="button"
@@ -2751,7 +4363,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     </button>
                                     <button 
                                         type="submit"
-                                        disabled={excelSelectedIds.size === 0}
+                                        disabled={excelSelectedIds.size === 0 || (excelActiveToolStatus === 'Hồ sơ trả' && !excelLyDoTraUpdate?.trim())}
                                         className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-colors shadow-md shadow-indigo-600/10 cursor-pointer"
                                     >
                                         Áp dụng thay đổi ({excelSelectedIds.size} hồ sơ)
@@ -2827,6 +4439,56 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">Bỏ trống nếu muốn giữ nguyên ngày hiện tại của hồ sơ.</p>
+                                </div>
+                            )}
+
+                            {batchStatus === 'Hồ sơ trả' && (
+                                <div className="space-y-3 bg-rose-50/50 border border-rose-200/60 rounded-xl p-3.5 animate-fade-in text-left">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-rose-900 block flex items-center gap-1.5">
+                                            <Calendar size={13} className="text-rose-600" />
+                                            <span>Ngày trả hồ sơ <span className="text-red-500">*</span></span>
+                                        </label>
+                                        <div className="flex gap-2 items-center">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ví dụ: 26/11/2025"
+                                                className="w-full text-xs p-2 bg-white border border-rose-200 rounded-lg outline-none text-rose-900 font-bold focus:border-rose-500 transition-all"
+                                                value={batchDate}
+                                                onChange={(e) => setBatchDate(e.target.value)}
+                                                required
+                                            />
+                                            <div className="relative shrink-0 w-8 h-8 flex items-center justify-center">
+                                                <input 
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const parts = val.split('-');
+                                                            const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                            setBatchDate(formatted);
+                                                        }
+                                                    }}
+                                                />
+                                                <button type="button" className="w-full h-full p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 border border-rose-200 rounded-lg flex items-center justify-center transition-all" title="Chọn ngày">
+                                                    <Calendar size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-rose-900 block">Lý do trả hồ sơ <span className="text-red-500">*</span></label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full text-xs font-semibold p-2.5 bg-white border border-rose-200 rounded-lg outline-none focus:border-rose-500 transition-all text-slate-850"
+                                            placeholder="Ghi rõ lý do trả hồ sơ (thông tin này sẽ tự động ghi vào Ghi chú)..."
+                                            value={batchLyDoTra}
+                                            onChange={(e) => setBatchLyDoTra(e.target.value)}
+                                            required
+                                        />
+                                    </div>
                                 </div>
                             )}
 
@@ -3210,6 +4872,8 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                     </div>
                                 )}
 
+
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-slate-600 block">Cơ quan/đơn vị xử lý</label>
@@ -3288,6 +4952,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         if (viewingRecord.trangThai === 'Mới tiếp nhận') b = "bg-sky-50 text-sky-700 border-sky-100";
                                         else if (viewingRecord.trangThai === 'Đã chuyển thông tin thuế') b = "bg-orange-50 text-orange-600 border-orange-100";
                                         else if (viewingRecord.trangThai === 'Đã phát hành thông báo thuế') b = "bg-amber-100 text-amber-800 border-amber-200";
+                                        else if (viewingRecord.trangThai === 'Đã thực hiện nghĩa vụ tài chính') b = "bg-emerald-100 text-emerald-800 border-emerald-200";
                                         else if (viewingRecord.trangThai === 'Chờ thực hiện nghĩa vụ tài chính') b = "bg-orange-150 text-orange-850 border-orange-200";
                                         else if (viewingRecord.trangThai === 'Đã ký Giấy chứng nhận') b = "bg-teal-50 text-teal-700 border-teal-150";
                                         else if (viewingRecord.trangThai === 'Chưa trả kết quả') b = "bg-yellow-50 text-yellow-800 border-yellow-200";
@@ -3399,7 +5064,7 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                             {Number(viewingRecord.dienTichDatO || 0) > 0 && (
                                                 <span className="text-indigo-800 font-bold">Đất ở: Lâu dài</span>
                                             )}
-                                            <span className="text-slate-500 font-semibold">Đất NN: {formatDisplayDateInClient(viewingRecord.thoiHanSuDung)}</span>
+                                            <span className="text-slate-500 font-semibold">Đất NN: {formatThoiHanSuDung(viewingRecord.thoiHanSuDung)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -3421,9 +5086,53 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                         <span className="text-sm font-mono font-bold text-orange-950 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">{formatDisplayDateInClient(viewingRecord.ngayHenTra) || 'Chưa lập giấy hẹn'}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-bold text-emerald-600 block">NGÀY TRẢ KẾT QUẢ THỰC TẾ</span>
-                                        <span className="text-sm font-mono font-bold text-emerald-950 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">{formatDisplayDateInClient(viewingRecord.ngayKetThuc) || 'Đang thụ lý'}</span>
+                                        <span className="text-[10px] font-bold text-emerald-600 block">NGÀY HOÀN THÀNH (ĐÃ TRẢ KẾT QUẢ)</span>
+                                        <span className="text-sm font-mono font-bold text-emerald-950 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">
+                                            {viewingRecord.trangThai === 'Đã trả kết quả' ? (formatDisplayDateInClient(viewingRecord.ngayKetThuc) || '-') : 'Chưa hoàn tất trả kết quả'}
+                                        </span>
                                     </div>
+                                    {viewingRecord.trangThai !== 'Mới tiếp nhận' && viewingRecord.trangThai !== 'Đã trả kết quả' && viewingRecord.trangThai !== 'Hồ sơ trả' && (
+                                        <div>
+                                            <span className="text-[10px] font-bold text-indigo-600 block uppercase">NGÀY ĐẠT TRẠNG THÁI: {viewingRecord.trangThai}</span>
+                                            <span className="text-sm font-mono font-bold text-indigo-950 bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded-lg w-fit block mt-0.5">
+                                                {formatDisplayDateInClient(viewingRecord.ngayKetThuc) || 'Chưa cập nhật ngày'}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {viewingRecord.trangThai === 'Hồ sơ trả' && (
+                                        <>
+                                            <div>
+                                                <span className="text-[10px] font-bold text-rose-600 block">NGÀY TRẢ HỒ SƠ</span>
+                                                <span className="text-sm font-mono font-bold text-rose-950 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg w-fit block mt-0.5">{formatDisplayDateInClient(viewingRecord.ngayTra) || '-'}</span>
+                                            </div>
+                                            <div className="md:col-span-1">
+                                                <span className="text-[10px] font-bold text-rose-600 block">LÝ DO TRẢ</span>
+                                                <span className="text-xs font-semibold text-rose-950 bg-rose-50/50 border border-rose-100 px-2.5 py-1.5 rounded-lg block mt-0.5 whitespace-pre-wrap">{viewingRecord.lyDoTra || 'Không ghi'}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {/* Thông tin Vào sổ & Bàn giao 1 cửa */}
+                            <div className="bg-indigo-50/40 rounded-2xl p-4 border border-indigo-100 grid grid-cols-1 sm:grid-cols-4 gap-4 text-left">
+                                <div>
+                                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block mb-1">Số vào sổ GCN</span>
+                                    <span className="text-sm font-extrabold text-indigo-900 bg-indigo-100/60 px-2 py-0.5 rounded-lg w-fit block">{viewingRecord.soVaoSo || 'Chưa vào sổ'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block mb-1">Ngày ký GCN</span>
+                                    <span className="text-sm font-mono font-bold text-indigo-950 bg-indigo-100/60 px-2 py-0.5 rounded-lg w-fit block">
+                                        {viewingRecord.trangThai === 'Đã ký Giấy chứng nhận' || viewingRecord.soVaoSo ? (formatDisplayDateInClient(viewingRecord.ngayKetThuc) || '-') : '-'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block mb-1">Đợt giao 1 cửa</span>
+                                    <span className="text-sm font-bold text-indigo-900 bg-indigo-100/60 px-2 py-0.5 rounded-lg w-fit block">{viewingRecord.dotGiao1Cua || 'Chưa bàn giao'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block mb-1">Ngày giao 1 cửa</span>
+                                    <span className="text-sm font-mono font-bold text-indigo-950 bg-indigo-100/60 px-2 py-0.5 rounded-lg w-fit block">{formatDisplayDateInClient(viewingRecord.ngayGiao1Cua) || 'Chưa bàn giao'}</span>
                                 </div>
                             </div>
 
@@ -3454,6 +5163,307 @@ const IGateView: React.FC<IGateViewProps> = ({ currentUser, wards }) => {
                                 className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
                             >
                                 Chỉnh sửa hồ sơ này
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL XÁC NHẬN BÀN GIAO & CẬP NHẬT --- */}
+            {showConfirmHandoverModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in text-left">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col animate-scale-up border border-slate-100">
+                        <div className="bg-gradient-to-r from-purple-900 to-indigo-950 p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base">
+                                <CheckCircle2 size={18} className="text-purple-400" />
+                                Xác nhận cập nhật số vào sổ & Bàn giao 1 cửa
+                            </h3>
+                            <button 
+                                onClick={() => setShowConfirmHandoverModal(false)}
+                                className="rounded-lg p-1 hover:bg-white/10 text-white transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-xs text-slate-750">
+                            <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl space-y-1.5">
+                                <p className="font-bold text-purple-900 text-sm">Tóm tắt dữ liệu chuẩn bị cập nhật:</p>
+                                <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
+                                    <li>Tổng số hồ sơ xử lý: <strong>{tempRecords.length}</strong> hồ sơ</li>
+                                    <li>Hồ sơ có thay đổi Tờ/Thửa/Diện tích: <strong>{tempRecords.filter(r => r.existsInSystem).length}</strong> hồ sơ</li>
+                                    <li>Hồ sơ chưa có sẵn (sẽ tự động tạo mới trên iGate): <strong>{tempRecords.filter(r => !r.existsInSystem).length}</strong> hồ sơ</li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-slate-600 block">Cấu hình Đợt bàn giao:</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setHandoverBatchMode('new')}
+                                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 font-bold ${
+                                            handoverBatchMode === 'new'
+                                                ? 'border-purple-600 bg-purple-50 text-purple-700 ring-2 ring-purple-600/20'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                                        }`}
+                                    >
+                                        <Plus size={16} />
+                                        <span>Tạo đợt bàn giao mới</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setHandoverBatchMode('existing')}
+                                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 font-bold ${
+                                            handoverBatchMode === 'existing'
+                                                ? 'border-purple-600 bg-purple-50 text-purple-700 ring-2 ring-purple-600/20'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                                        }`}
+                                    >
+                                        <ClipboardList size={16} />
+                                        <span>Gộp vào đợt có sẵn</span>
+                                    </button>
+                                </div>
+
+                                {handoverBatchMode === 'new' ? (
+                                    <div className="space-y-1 animate-fade-in">
+                                        <label className="text-[11px] font-bold text-slate-500 block">Tên đợt bàn giao mới:</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-purple-500 transition-all text-slate-800"
+                                            placeholder="Ví dụ: Đợt bàn giao ngày 21/06/2026..."
+                                            value={currentBookNumber}
+                                            onChange={(e) => setCurrentBookNumber(e.target.value)}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1 animate-fade-in">
+                                        <label className="text-[11px] font-bold text-slate-500 block">Chọn đợt bàn giao hiện có trong hôm nay:</label>
+                                        <select 
+                                            className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-purple-500 transition-all text-slate-800 cursor-pointer"
+                                            value={selectedExistingHandoverBatch}
+                                            onChange={(e) => setSelectedExistingHandoverBatch(e.target.value)}
+                                        >
+                                            <option value="">-- Chọn đợt bàn giao có sẵn --</option>
+                                            <option value="Đợt 1">Đợt 1</option>
+                                            <option value="Đợt 2">Đợt 2</option>
+                                            <option value="Đợt 3">Đợt 3</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2.5 text-xs text-amber-800 leading-relaxed">
+                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold mb-0.5">Xác nhận cập nhật dữ liệu:</p>
+                                    <p>Hệ thống sẽ cập nhật thông tin <b>Số vào sổ</b>, <b>Ngày ký GCN</b> và gán trạng thái hồ sơ thành <b>"Đã ký Giấy chứng nhận"</b>, đồng thời ghi lại nhật ký bàn giao 1 cửa.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-sm">
+                            <button 
+                                onClick={() => setShowConfirmHandoverModal(false)}
+                                disabled={isSubmittingHandover}
+                                className="px-4 py-2 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer disabled:opacity-50"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                onClick={handleConfirmHandover}
+                                disabled={isSubmittingHandover}
+                                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-all shadow-md shadow-purple-600/10 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                {isSubmittingHandover ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        Đang cập nhật...
+                                    </>
+                                ) : (
+                                    'Xác nhận cập nhật'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL XUẤT PHIẾU BÀN GIAO 1 CỬA --- */}
+            {showExportHandover1CuaModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in text-left">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col animate-scale-up border border-slate-100">
+                        <div className="bg-gradient-to-r from-pink-800 to-rose-950 p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base">
+                                <FileOutput size={18} className="text-pink-400" />
+                                Xuất danh sách bàn giao Một cửa
+                            </h3>
+                            <button 
+                                onClick={() => setShowExportHandover1CuaModal(false)}
+                                className="rounded-lg p-1 hover:bg-white/10 text-white transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-xs text-slate-750">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-600 block">Phương thức lọc dữ liệu bàn giao:</label>
+                                <select 
+                                    className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-pink-500 transition-all text-slate-800 cursor-pointer"
+                                    value={exportHandover1CuaParams.filterType}
+                                    onChange={(e) => setExportHandover1CuaParams(prev => ({ ...prev, filterType: e.target.value as 'by_date' | 'by_batch' }))}
+                                >
+                                    <option value="by_date">Lọc theo ngày bàn giao (Mặc định hôm nay)</option>
+                                    <option value="by_batch">Lọc theo đợt bàn giao cụ thể</option>
+                                </select>
+                            </div>
+
+                            {exportHandover1CuaParams.filterType === 'by_date' ? (
+                                <div className="space-y-1 animate-fade-in">
+                                    <label className="text-xs font-bold text-slate-600 block">Ngày bàn giao (dd/mm/yyyy):</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-pink-500 transition-all text-slate-800 font-mono"
+                                        value={exportHandover1CuaParams.dateStr}
+                                        onChange={(e) => setExportHandover1CuaParams(prev => ({ ...prev, dateStr: e.target.value }))}
+                                        placeholder="Ví dụ: 21/06/2026..."
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-1 animate-fade-in">
+                                    <label className="text-xs font-bold text-slate-600 block">Tên đợt bàn giao / Số đợt:</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-pink-500 transition-all text-slate-800"
+                                        value={exportHandover1CuaParams.batchName}
+                                        onChange={(e) => setExportHandover1CuaParams(prev => ({ ...prev, batchName: e.target.value }))}
+                                        placeholder="Ví dụ: Đợt bàn giao ngày 21/06/2026..."
+                                    />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-600 block">Cán bộ bàn giao (Chi nhánh VPĐK):</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-pink-500 transition-all text-slate-800"
+                                        value={exportHandover1CuaParams.deliverer}
+                                        onChange={(e) => setExportHandover1CuaParams(prev => ({ ...prev, deliverer: e.target.value }))}
+                                        placeholder="Tên cán bộ bàn giao..."
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-600 block">Cán bộ tiếp nhận (Bộ phận 1 cửa):</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-pink-500 transition-all text-slate-800"
+                                        value={exportHandover1CuaParams.receiver}
+                                        onChange={(e) => setExportHandover1CuaParams(prev => ({ ...prev, receiver: e.target.value }))}
+                                        placeholder="Tên cán bộ tiếp nhận..."
+                                    />
+                                </div>
+                            </div>
+
+                            <p className="text-[10px] text-slate-400 italic">
+                                * Lưu ý: Hệ thống sẽ truy vấn các bản ghi có trạng thái hoặc lịch sử thuộc đợt bàn giao tương ứng để xuất file Excel danh sách giao nhận chính thức có định dạng mẫu biên bản ký nhận đầy đủ.
+                            </p>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-sm">
+                            <button 
+                                onClick={() => setShowExportHandover1CuaModal(false)}
+                                className="px-4 py-2 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                onClick={handleTriggerExport}
+                                className="px-5 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all shadow-md shadow-pink-600/10 cursor-pointer flex items-center gap-1.5"
+                            >
+                                <Download size={14}/> Xuất biên bản Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL XUẤT BÁO CÁO THỐNG KÊ POPUP --- */}
+            {showExportReportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in text-left">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col animate-scale-up border border-slate-100">
+                        <div className="bg-gradient-to-r from-indigo-900 to-slate-900 p-5 text-white flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2 text-base">
+                                <Printer size={18} className="text-indigo-300" />
+                                Xuất báo cáo thống kê iGate
+                            </h3>
+                            <button 
+                                onClick={() => setShowExportReportModal(false)}
+                                className="rounded-lg p-1 hover:bg-white/10 text-white transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-xs text-slate-750">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-600 block">Từ ngày tiếp nhận:</label>
+                                    <input 
+                                        type="date"
+                                        className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-600 transition-all text-slate-800 font-mono"
+                                        value={exportFromDate}
+                                        onChange={(e) => setExportFromDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-600 block">Đến ngày tiếp nhận:</label>
+                                    <input 
+                                        type="date"
+                                        className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-600 transition-all text-slate-800 font-mono"
+                                        value={exportToDate}
+                                        onChange={(e) => setExportToDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-600 block">Lọc theo Xã / Phường:</label>
+                                <select 
+                                    className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-indigo-600 transition-all text-slate-800 cursor-pointer"
+                                    value={exportWard}
+                                    onChange={(e) => setExportWard(e.target.value)}
+                                >
+                                    <option value="Tất cả">Tất cả Xã / Phường</option>
+                                    {wards && wards.map((w, idx) => (
+                                        <option key={idx} value={w}>{w}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 text-[11px] leading-relaxed text-slate-500">
+                                <p className="font-semibold text-slate-700 mb-0.5">💡 Thông tin báo cáo bao gồm:</p>
+                                <ul className="list-disc pl-4 space-y-0.5">
+                                    <li>Thông tin chi tiết hồ sơ iGate (Mã HS, loại biến động, diện tích,...)</li>
+                                    <li>Thông tin vào số GCN &amp; Ngày ký GCN chính thức</li>
+                                    <li>Thông tin ngày giao 1 cửa &amp; đợt giao 1 cửa</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-sm">
+                            <button 
+                                onClick={() => setShowExportReportModal(false)}
+                                className="px-4 py-2 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                onClick={handleExportReportExcel}
+                                className="px-5 py-2 bg-indigo-900 hover:bg-indigo-950 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-900/10 cursor-pointer flex items-center gap-1.5"
+                            >
+                                <Download size={14}/> Xuất báo cáo Excel
                             </button>
                         </div>
                     </div>

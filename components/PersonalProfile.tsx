@@ -9,6 +9,7 @@ import { updateRecordApi } from '../services/api';
 import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../services/apiArchive';
 import PhieuXinLoiModal from './PhieuXinLoiModal';
 import { PlotCountModal } from './PlotCountModal';
+import BlockingWarningModal from './BlockingWarningModal';
 
 import PersonalReportView from './PersonalReportView';
 
@@ -58,6 +59,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
 
   const [isPlotCountModalOpen, setIsPlotCountModalOpen] = useState(false);
   const [selectedRecordForPlotCount, setSelectedRecordForPlotCount] = useState<RecordFile | null>(null);
+
+  // Trạng thái cho cảnh báo ngăn chặn
+  const [isBlockingWarningOpen, setIsBlockingWarningOpen] = useState(false);
+  const [blockingMatches, setBlockingMatches] = useState<{ record: any; source: 'active' | 'archive' }[]>([]);
+  const [pendingRecord, setPendingRecord] = useState<RecordFile | null>(null);
 
   useEffect(() => {
     const loadArchive = async () => {
@@ -289,9 +295,83 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       setSortConfig({ key, direction });
   };
 
+  const checkBlocking = (record: RecordFile) => {
+      const activeRaw = localStorage.getItem('offline_blocking_records');
+      const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
+      
+      const activeList = activeRaw ? JSON.parse(activeRaw) : [];
+      const archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
+      
+      const normalize = (str: string | null | undefined) => {
+          if (!str) return '';
+          return str
+              .trim()
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/đ/g, 'd');
+      };
+
+      const wardNorm = normalize(record.ward);
+      const plotNorm = normalize(record.landPlot);
+      const sheetNorm = normalize(record.mapSheet);
+
+      if (!wardNorm || !plotNorm) return [];
+
+      const matches: { record: any; source: 'active' | 'archive' }[] = [];
+
+      const checkList = (list: any[], source: 'active' | 'archive') => {
+          list.forEach(blocking => {
+              const blockOldNorm = normalize(blocking.oldCommune);
+              const blockNewNorm = normalize(blocking.newCommune);
+              
+              const isCommuneMatch = (blockOldNorm && (blockOldNorm.includes(wardNorm) || wardNorm.includes(blockOldNorm))) ||
+                                     (blockNewNorm && (blockNewNorm.includes(wardNorm) || wardNorm.includes(blockNewNorm)));
+              
+              if (!isCommuneMatch) return;
+
+              const plotMatch = blocking.plots?.some((p: any) => {
+                  const oldPlotNorm = normalize(p.oldPlotNumber);
+                  const newPlotNorm = normalize(p.newPlotNumber);
+                  const oldSheetNorm = normalize(p.oldMapSheetNumber);
+                  const newSheetNorm = normalize(p.newMapSheetNumber);
+
+                  const plotMatches = (oldPlotNorm && (plotNorm.includes(oldPlotNorm) || oldPlotNorm.includes(plotNorm))) ||
+                                      (newPlotNorm && (plotNorm.includes(newPlotNorm) || newPlotNorm.includes(plotNorm)));
+
+                  const sheetMatches = !sheetNorm || !oldSheetNorm || 
+                                       (oldSheetNorm && (sheetNorm.includes(oldSheetNorm) || oldSheetNorm.includes(sheetNorm))) ||
+                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || sheetNorm.includes(newSheetNorm)));
+
+                  return plotMatches && sheetMatches;
+              });
+
+              if (plotMatch) {
+                  matches.push({ record: blocking, source });
+              }
+          });
+      };
+
+      checkList(activeList, 'active');
+      checkList(archiveList, 'archive');
+
+      return matches;
+  };
+
   // --- ACTIONS ---
 
   const handleMarkAsDone = async (record: RecordFile) => {
+    const matches = checkBlocking(record);
+    if (matches.length > 0) {
+        setBlockingMatches(matches);
+        setPendingRecord(record);
+        setIsBlockingWarningOpen(true);
+        return;
+    }
+    await proceedMarkAsDone(record);
+  };
+
+  const proceedMarkAsDone = async (record: RecordFile) => {
     if (await confirmAction(`Xác nhận đã hoàn thành công việc cho hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã thực hiện".`)) {
         if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
             // Handle Archive Record
@@ -606,7 +686,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
             <>
                 <div className="flex-1 overflow-y-auto">
             {displayRecords.length > 0 ? (
-                <table className="w-full text-left table-fixed min-w-[1050px]">
+                <table className={`w-full text-left table-fixed ${activeTab === 'extended' ? 'min-w-[1250px]' : 'min-w-[1050px]'}`}>
                     <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                         <tr>
                             <th className="p-3 w-10 text-center">#</th>
@@ -616,7 +696,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                             {activeTab === 'completed_work' ? (
                                 <th className="p-3 w-[110px]">{renderSortHeader('Ngày thực hiện', 'workCompletedDate')}</th>
                             ) : activeTab === 'extended' ? (
-                                <th className="p-3 w-[110px]">{renderSortHeader('Hạn gốc', 'deadline')}</th>
+                                <>
+                                    <th className="p-3 w-[110px]">{renderSortHeader('Hạn gốc', 'deadline')}</th>
+                                    <th className="p-3 w-[110px]">{renderSortHeader('Ngày trình ký', 'submissionDate')}</th>
+                                    <th className="p-3 w-[110px]">{renderSortHeader('Ngày thực hiện', 'workCompletedDate')}</th>
+                                </>
                             ) : (
                                 <th className="p-3 w-[110px]">{renderSortHeader('Ngày trình', 'submissionDate')}</th>
                             )}
@@ -649,7 +733,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                     {activeTab === 'completed_work' ? (
                                         <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.workCompletedDate || undefined)}</td>
                                     ) : activeTab === 'extended' ? (
-                                        <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.deadline || undefined)}</td>
+                                        <>
+                                            <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.deadline || undefined)}</td>
+                                            <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.submissionDate || undefined)}</td>
+                                            <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.workCompletedDate || undefined)}</td>
+                                        </>
                                     ) : (
                                         <td className="p-3 text-gray-600 align-middle text-center">{formatDate(r.submissionDate || undefined)}</td>
                                     )}
@@ -716,13 +804,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                             </button>
 
                                             {/* Logic nút chuyển trạng thái theo từng Tab */}
-                                            {activeTab === 'pending' && (
+                                            {(activeTab === 'pending' || activeTab === 'extended') && r.status !== RecordStatus.COMPLETED_WORK && (
                                                 <button onClick={() => handleMarkAsDone(r)} title="Đánh dấu đã xong việc" className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
                                                     Đã thực hiện <CheckSquare size={14} />
                                                 </button>
                                             )}
 
-                                            {activeTab === 'completed_work' && (
+                                            {(activeTab === 'completed_work' || (activeTab === 'extended' && r.status === RecordStatus.COMPLETED_WORK)) && (
                                                 <button onClick={() => handleForwardToSign(r)} title="Chuyển sang bước Ký kiểm tra" className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
                                                     Trình ký <Send size={14} />
                                                 </button>
@@ -780,6 +868,22 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
         }}
         onConfirm={handleConfirmPlotCount}
         record={selectedRecordForPlotCount}
+      />
+
+      <BlockingWarningModal
+        isOpen={isBlockingWarningOpen}
+        onClose={() => {
+          setIsBlockingWarningOpen(false);
+          setPendingRecord(null);
+          setBlockingMatches([]);
+        }}
+        onConfirm={() => {
+          if (pendingRecord) {
+            proceedMarkAsDone(pendingRecord);
+          }
+        }}
+        matches={blockingMatches}
+        recordFile={pendingRecord}
       />
     </div>
   );

@@ -52,7 +52,8 @@ export const RECORD_TYPES = [
   'Cắm mốc',
   'Cung cấp thông tin quy hoạch',
   'Sao lục hồ sơ',
-  'Thuế chính quy'
+  'Thuế chính quy',
+  'Thu hồi Giấy chứng nhận'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
@@ -121,6 +122,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('thi hành án')) return 'Thi hành án';
   if (t.includes('tòa án')) return 'Tòa án';
   if (t.includes('thuế chính quy')) return 'Thuế CQ';
+  if (t.includes('thu hồi giấy chứng nhận')) return 'Thu hồi GCN';
   
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };

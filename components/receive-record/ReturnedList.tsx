@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
-import { Search, Eye, FileSpreadsheet, MapPin, Calendar, ClipboardCheck, ArrowUpDown } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, MapPin, Calendar, ClipboardCheck, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ReturnedListProps {
   records: RecordFile[];
@@ -92,6 +92,15 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
   const [filterWard, setFilterWard] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortByDate, setSortByDate] = useState<'desc' | 'asc'>('desc');
+  
+  // States cho phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Reset trang về 1 khi bất kỳ bộ lọc nào thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [fromDate, toDate, filterWard, searchTerm, sortByDate, itemsPerPage]);
 
   // Gom tất cả các nguồn hồ sơ đã trả kết quả
   const allReturnedRecords = useMemo(() => {
@@ -164,6 +173,14 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
         }
     });
   }, [allReturnedRecords, fromDate, toDate, filterWard, searchTerm, sortByDate]);
+
+  // Phân trang dữ liệu hiển thị trên bảng
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredRecords.slice(start, start + itemsPerPage);
+  }, [filteredRecords, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
 
   // Tạo tệp Excel danh sách trả kết quả chuyên nghiệp
   const buildExcelWorkbook = (exportList: RecordFile[], forPreviewOnly: boolean = false) => {
@@ -455,36 +472,39 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
-                        {filteredRecords.length > 0 ? (
-                            filteredRecords.map((r, index) => (
-                                <tr key={r.id} className="hover:bg-emerald-50/10 group transition-colors">
-                                    <td className="p-4 text-center text-slate-400 align-middle font-medium">{index + 1}</td>
-                                    <td className="p-4 font-bold text-slate-800 truncate align-middle tracking-tight">{r.code || '-'}</td>
-                                    <td className="p-4 font-bold text-slate-800 truncate align-middle" title={r.customerName}>{r.customerName || '-'}</td>
-                                    <td className="p-4 text-slate-700 truncate align-middle font-semibold">{getNormalizedWard(r.ward)}</td>
-                                    <td className="p-4 text-center font-mono align-middle font-semibold text-slate-600">{r.mapSheet || '-'}</td>
-                                    <td className="p-4 text-center font-mono align-middle font-semibold text-slate-600">{r.landPlot || '-'}</td>
-                                    <td className="p-4 text-slate-600 truncate align-middle font-medium">
-                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                                            (r.recordType || '').toLowerCase().includes('sao lục') 
-                                            ? 'bg-purple-100 text-purple-700' 
-                                            : (r.recordType || '').toLowerCase().includes('thuế')
-                                            ? 'bg-emerald-100 text-emerald-700'
-                                            : 'bg-blue-100 text-blue-700'
-                                        }`}>
-                                            {r.recordType || 'Sao lục hồ sơ'}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-center text-slate-600 align-middle font-medium">{formatDateDisplay(r.receivedDate)}</td>
-                                    <td className="p-4 text-center text-emerald-700 font-bold align-middle bg-emerald-50/30 border-x border-emerald-100">
-                                        {formatDateDisplay(r.resultReturnedDate || r.exportDate || r.completedDate)}
-                                    </td>
-                                    <td className="p-4 text-slate-700 font-semibold align-middle truncate" title={r.receiverName || ''}>
-                                        {r.receiverName || <span className="text-slate-400 font-normal italic">Chưa ghi nhận</span>}
-                                    </td>
-                                    <td className="p-4 text-slate-500 font-mono align-middle font-medium">{r.receiptNumber || '-'}</td>
-                                </tr>
-                            ))
+                        {paginatedRecords.length > 0 ? (
+                            paginatedRecords.map((r, index) => {
+                                const stt = (currentPage - 1) * itemsPerPage + index + 1;
+                                return (
+                                    <tr key={r.id} className="hover:bg-emerald-50/10 group transition-colors">
+                                        <td className="p-4 text-center text-slate-400 align-middle font-medium">{stt}</td>
+                                        <td className="p-4 font-bold text-slate-800 truncate align-middle tracking-tight">{r.code || '-'}</td>
+                                        <td className="p-4 font-bold text-slate-800 truncate align-middle" title={r.customerName}>{r.customerName || '-'}</td>
+                                        <td className="p-4 text-slate-700 truncate align-middle font-semibold">{getNormalizedWard(r.ward)}</td>
+                                        <td className="p-4 text-center font-mono align-middle font-semibold text-slate-600">{r.mapSheet || '-'}</td>
+                                        <td className="p-4 text-center font-mono align-middle font-semibold text-slate-600">{r.landPlot || '-'}</td>
+                                        <td className="p-4 text-slate-600 truncate align-middle font-medium">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                                (r.recordType || '').toLowerCase().includes('sao lục') 
+                                                ? 'bg-purple-100 text-purple-700' 
+                                                : (r.recordType || '').toLowerCase().includes('thuế')
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-blue-100 text-blue-700'
+                                            }`}>
+                                                {r.recordType || 'Sao lục hồ sơ'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center text-slate-600 align-middle font-medium">{formatDateDisplay(r.receivedDate)}</td>
+                                        <td className="p-4 text-center text-emerald-700 font-bold align-middle bg-emerald-50/30 border-x border-emerald-100">
+                                            {formatDateDisplay(r.resultReturnedDate || r.exportDate || r.completedDate)}
+                                        </td>
+                                        <td className="p-4 text-slate-700 font-semibold align-middle truncate" title={r.receiverName || ''}>
+                                            {r.receiverName || <span className="text-slate-400 font-normal italic">Chưa ghi nhận</span>}
+                                        </td>
+                                        <td className="p-4 text-slate-500 font-mono align-middle font-medium">{r.receiptNumber || '-'}</td>
+                                    </tr>
+                                );
+                            })
                         ) : (
                             <tr>
                                 <td colSpan={11} className="p-12 text-center text-slate-400 italic">
@@ -495,6 +515,45 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
                     </tbody>
                 </table>
             </div>
+
+            {/* Thanh điều khiển phân trang */}
+            {filteredRecords.length > 0 && (
+                <div className="border-t border-slate-200 p-4 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-xs text-slate-600">
+                    <div className="flex items-center gap-4 font-medium">
+                        <span>Tổng số: <strong className="text-emerald-800">{filteredRecords.length}</strong> bản ghi</span>
+                        <div className="flex items-center gap-2">
+                            <span>Hiển thị</span>
+                            <select 
+                                value={itemsPerPage} 
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))} 
+                                className="border border-slate-300 rounded-lg px-2 py-1 bg-white outline-none cursor-pointer focus:border-emerald-500 font-semibold"
+                            >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} 
+                            disabled={currentPage === 1} 
+                            className="p-2 border border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:hover:bg-white transition-all cursor-pointer shadow-xs"
+                        >
+                            <ChevronLeft size={14} />
+                        </button>
+                        <span className="font-bold text-slate-700">Trang {currentPage} / {totalPages}</span>
+                        <button 
+                            onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))} 
+                            disabled={currentPage === totalPages} 
+                            className="p-2 border border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:hover:bg-white transition-all cursor-pointer shadow-xs"
+                        >
+                            <ChevronRight size={14} />
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     </div>
   );

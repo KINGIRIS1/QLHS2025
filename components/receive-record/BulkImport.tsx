@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, User, Employee } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES } from '../../constants';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download, Sparkles, Loader2 } from 'lucide-react';
-import { confirmAction } from '../../utils/appHelpers';
+import { confirmAction, showToast } from '../../utils/appHelpers';
 
 interface BulkImportProps {
   onSave: (record: RecordFile) => Promise<boolean>;
@@ -107,16 +107,16 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
                   if (newOcrRecords.length > 0) {
                       setBulkRecords(prev => [...prev, ...newOcrRecords]);
-                      alert(`Nhận diện thành công ${newOcrRecords.length} hồ sơ từ hình ảnh!`);
+                      showToast(`Nhận diện thành công ${newOcrRecords.length} hồ sơ từ hình ảnh!`, "success");
                   } else {
-                      alert('Không nhận diện được hồ sơ nào từ hình ảnh này.');
+                      showToast('Không nhận diện được hồ sơ nào từ hình ảnh này.', "error");
                   }
               } else {
                   throw new Error(data.error || 'Server không phản hồi đúng định dạng.');
               }
           } catch (error: any) {
               console.error('Lỗi khi phân tích hình ảnh AI:', error);
-              alert('Không thể nhận diện hình ảnh. Vui lòng kiểm tra lại kết nối hoặc độ rõ nét của hình ảnh. Chi tiết lỗi: ' + error.message);
+              showToast('Không thể nhận diện hình ảnh. Vui lòng kiểm tra lại kết nối hoặc độ rõ nét của hình ảnh. Chi tiết lỗi: ' + error.message, "error");
           } finally {
               setIsOcrLoading(false);
               if (imageInputRef.current) imageInputRef.current.value = '';
@@ -124,7 +124,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       };
 
       reader.onerror = () => {
-          alert('Lỗi khi đọc file hình ảnh.');
+          showToast('Lỗi khi đọc file hình ảnh.', "error");
           setIsOcrLoading(false);
       };
 
@@ -276,7 +276,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
   const handleSaveBulkRecord = async (index: number) => {
       const record = bulkRecords[index];
-      if (!record.code || !record.customerName) { alert("Thiếu mã hoặc tên."); return; }
+      if (!record.code || !record.customerName) { showToast("Thiếu mã hoặc tên.", "error"); return; }
 
       const newRecord: RecordFile = { 
           ...record, 
@@ -291,7 +291,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       if (success) {
           setBulkRecords(prev => prev.filter(r => r.tempId !== record.tempId));
       } else {
-          alert("Lỗi khi lưu.");
+          showToast("Lỗi khi lưu.", "error");
       }
   };
 

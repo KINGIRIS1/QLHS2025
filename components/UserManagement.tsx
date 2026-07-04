@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Employee } from '../types';
 import { Plus, Trash2, Edit, Save, X, Shield, User as UserIcon, Lock, Briefcase, Download, FileSpreadsheet, Upload, Search } from 'lucide-react';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
 interface UserManagementProps {
@@ -51,7 +51,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.username || !formData.name || !formData.password) {
-        alert("Vui lòng điền đầy đủ thông tin bắt buộc.");
+        showToast("Vui lòng điền đầy đủ thông tin bắt buộc.", "error");
         return;
     }
 
@@ -60,7 +60,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     } else {
         // Check existence
         if (users.find(u => u.username === formData.username)) {
-            alert("Tên đăng nhập đã tồn tại!");
+            showToast("Tên đăng nhập đã tồn tại!", "error");
             return;
         }
         onAddUser(formData);
@@ -173,11 +173,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
            }
         });
 
-        alert(`Kết quả nhập liệu:\n- Thành công: ${successCount} tài khoản\n- Bỏ qua (Trùng lặp): ${failCount} tài khoản`);
+        showToast(`Kết quả nhập liệu:\n- Thành công: ${successCount} tài khoản\n- Bỏ qua (Trùng lặp): ${failCount} tài khoản`, "success");
 
       } catch (error) {
         console.error(error);
-        alert('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng.');
+        showToast('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng.', "error");
       } finally {
          if (fileInputRef.current) fileInputRef.current.value = '';
       }

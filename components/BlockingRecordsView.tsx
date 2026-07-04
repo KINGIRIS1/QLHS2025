@@ -4,6 +4,7 @@ import RecordForm from './RecordForm';
 import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip, Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { supabase, isConfigured } from '../services/supabaseClient';
+import { showToast } from '../utils/appHelpers';
 
 interface Props {
   currentUser: User;
@@ -71,7 +72,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         const data: any[] = XLSX.utils.sheet_to_json(ws);
 
         if (data.length === 0) {
-          alert('File Excel rỗng!');
+          showToast('File Excel rỗng!', 'error');
           return;
         }
 
@@ -117,6 +118,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
             newCommune: row['Phường - Xã mới']?.toString() || '',
             blockingDocuments,
             unblockDoc: row['Văn bản giải ngăn chặn']?.toString() || '',
+            unblockDate: parseExcelDate(row['Ngày văn bản giải ngăn chặn']) || parseExcelDate(row['Ngày giải ngăn chặn']) || '',
             notes: row['Ghi chú']?.toString() || '',
             isUnblocked,
             createdBy: currentUser?.name || currentUser?.username || 'Hệ thống',
@@ -124,7 +126,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         }
 
         if (newRecords.length === 0) {
-          alert('Không đọc được dữ liệu hợp lệ nào từ file!');
+          showToast('Không đọc được dữ liệu hợp lệ nào từ file!', 'error');
           return;
         }
 
@@ -139,12 +141,12 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           setRecords(prev => [...withIds, ...prev]);
         }
 
-        alert(`Đã nhập thành công ${newRecords.length} hồ sơ ngăn chặn!`);
+        showToast(`Đã nhập thành công ${newRecords.length} hồ sơ ngăn chặn!`, 'success');
         if (isConfigured) fetchBlockingRecords();
         else localStorage.setItem('offline_blocking_records', JSON.stringify([...newRecords, ...records]));
       } catch (error) {
         console.error('Lỗi khi import Excel:', error);
-        alert('Có lỗi xảy ra khi nhập file Excel. Hãy kiểm tra lại định dạng file.');
+        showToast('Có lỗi xảy ra khi nhập file Excel. Hãy kiểm tra lại định dạng file.', 'error');
       } finally {
         e.target.value = ''; // Reset input
       }
@@ -217,7 +219,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         } else {
            setRecords(prev => prev.map(p => p.id === formData.id ? formData : p));
         }
-        alert('Cập nhật thành công!');
+        showToast('Cập nhật thành công!', 'success');
       } else {
         if (isConfigured) {
           const { error } = await supabase.from('blocking_records').insert([formData]);
@@ -226,7 +228,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           formData.id = 'temp_' + Date.now();
           setRecords(prev => [formData, ...prev]);
         }
-        alert('Thêm mới thành công!');
+        showToast('Thêm mới thành công!', 'success');
       }
       setShowForm(false);
       setEditingRecord(undefined);
@@ -234,7 +236,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
       else localStorage.setItem('offline_blocking_records', JSON.stringify(records));
     } catch (error) {
       console.error('Lỗi khi lưu:', error);
-      alert('Đã có lỗi xảy ra. Hãy thử lại.');
+      showToast('Đã có lỗi xảy ra. Hãy thử lại.', 'error');
     }
   };
 
@@ -275,10 +277,10 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
       const newRecs = records.filter(r => r.id !== id);
       setRecords(newRecs);
       if (!isConfigured) localStorage.setItem('offline_blocking_records', JSON.stringify(newRecs));
-      alert('Xóa thành công!');
+      showToast('Xóa thành công!', 'success');
     } catch (error) {
       console.error('Lỗi khi xóa:', error);
-      alert('Đã có lỗi xảy ra khi xóa.');
+      showToast('Đã có lỗi xảy ra khi xóa.', 'error');
     }
   };
 
@@ -553,8 +555,11 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                               <div className="font-bold text-green-700 mb-1 uppercase flex items-center gap-1">
                                 <CheckCircle size={14} className="shrink-0"/> VĂN BẢN GIẢI NGĂN CHẶN
                               </div>
-                              <div className="text-gray-800 pl-5">
-                                 {record.unblockDoc}
+                              <div className="text-gray-800 pl-5 space-y-1">
+                                <div><span className="font-semibold text-gray-600">Số văn bản:</span> {record.unblockDoc}</div>
+                                {record.unblockDate && (
+                                  <div><span className="font-semibold text-gray-600">Ngày văn bản:</span> {record.unblockDate.includes('-') ? record.unblockDate.split('-').reverse().join('/') : record.unblockDate}</div>
+                                )}
                               </div>
                             </div>
                             {(record.unblock_attached_files && record.unblock_attached_files.length > 0) && (

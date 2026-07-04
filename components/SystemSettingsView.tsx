@@ -4,7 +4,7 @@ import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Cale
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, showToast } from '../utils/appHelpers';
 import { supabase, presenceChannel } from '../services/supabaseClient';
 import { ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 
@@ -80,11 +80,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const handleAddDevice = () => {
       const name = newDeviceName.trim();
       if (!name) {
-          alert("Vui lòng nhập tên thiết bị đo!");
+          showToast("Vui lòng nhập tên thiết bị đo!", "error");
           return;
       }
       if (deviceList.includes(name)) {
-          alert("Thiết bị này đã có trong danh sách!");
+          showToast("Thiết bị này đã có trong danh sách!", "error");
           return;
       }
       setDeviceList(prev => [...prev, name]);
@@ -103,13 +103,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           const { saveDeviceNames } = await import('../services/apiDeviceSchedule');
           const success = await saveDeviceNames(deviceList);
           if (success) {
-              alert("Lưu danh sách thiết bị đo thành công!");
+              showToast("Lưu danh sách thiết bị đo thành công!", "success");
           } else {
-              alert("Lỗi khi lưu cấu hình thiết bị.");
+              showToast("Lỗi khi lưu cấu hình thiết bị.", "error");
           }
       } catch (e) {
           console.error(e);
-          alert("Gặp sự cố khi lưu cấu hình thiết bị.");
+          showToast("Gặp sự cố khi lưu cấu hình thiết bị.", "error");
       } finally {
           setSavingDevices(false);
       }
@@ -121,13 +121,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           const { saveContactSettings } = await import('../services/apiSystem');
           const success = await saveContactSettings(contactSettings);
           if (success) {
-              alert("Lưu cấu hình thông tin liên hệ thành công!");
+              showToast("Lưu cấu hình thông tin liên hệ thành công!", "success");
           } else {
-              alert("Lỗi khi lưu cấu hình.");
+              showToast("Lỗi khi lưu cấu hình.", "error");
           }
       } catch (e) {
           console.error(e);
-          alert("Gặp sự cố khi lưu cấu hình.");
+          showToast("Gặp sự cố khi lưu cấu hình.", "error");
       } finally {
           setIsSavingContacts(false);
       }
@@ -198,9 +198,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   event: 'force_update',
                   payload: { target: username, version: manualVersion.trim(), url: manualUrl.trim() }
               });
-              alert('Đã gửi hiệu lệnh.');
+              showToast('Đã gửi hiệu lệnh.', 'success');
           } catch (e) {
-              alert('Không thể gửi hiệu lệnh broadcast. Lỗi: ' + e);
+              showToast('Không thể gửi hiệu lệnh broadcast. Lỗi: ' + e, 'error');
           }
       }
   };
@@ -251,7 +251,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   const handleSaveUpdateConfig = async () => {
       if (!manualVersion.trim()) {
-          alert("Vui lòng nhập số phiên bản.");
+          showToast("Vui lòng nhập số phiên bản.", "error");
           return;
       }
       setIsSavingUpdate(true);
@@ -271,16 +271,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           } catch (err) {
               console.error("Broadcast failed", err);
           }
-          alert(`Đã phát hành phiên bản ${manualVersion}!\nTất cả người dùng sẽ nhận được thông báo cập nhật sau vài giây.`);
+          showToast(`Đã phát hành phiên bản ${manualVersion}! Tất cả người dùng sẽ nhận được thông báo cập nhật sau vài giây.`, 'success');
       } else {
-          alert("Lỗi khi lưu cấu hình cập nhật. Vui lòng thử lại.");
+          showToast("Lỗi khi lưu cấu hình cập nhật. Vui lòng thử lại.", "error");
       }
   };
 
   // --- HOLIDAY HANDLERS ---
   const handleAddHoliday = () => {
-      if (!tempName.trim()) { alert("Vui lòng nhập tên ngày lễ"); return; }
-      if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
+      if (!tempName.trim()) { showToast("Vui lòng nhập tên ngày lễ", "error"); return; }
+      if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { showToast("Ngày tháng không hợp lệ", "error"); return; }
 
       const newId = Math.random().toString(36).substr(2, 9);
       const newHoliday: Holiday = {
@@ -310,11 +310,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       const success = await saveHolidays(holidays);
       setSavingHolidays(false);
       if (success) {
-          alert('Đã lưu danh sách ngày lễ thành công!');
+          showToast('Đã lưu danh sách ngày lễ thành công!', 'success');
           // Trigger refresh data ở App cha
           if (onHolidaysChanged) onHolidaysChanged();
       }
-      else alert('Lỗi khi lưu ngày lễ.');
+      else showToast('Lỗi khi lưu ngày lễ.', 'error');
   };
 
   return (

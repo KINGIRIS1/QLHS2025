@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile } from '../types';
 import { Ruler, Layers, AlertCircle } from 'lucide-react';
+import { showToast } from '../utils/appHelpers';
 
 interface PlotCountModalProps {
   isOpen: boolean;
@@ -29,13 +30,13 @@ export const PlotCountModal: React.FC<PlotCountModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (plotCount < 1) {
-      alert('Vui lòng nhập số lượng thửa đất hợp lệ (tối thiểu là 1).');
+      showToast('Vui lòng nhập số lượng thửa đất hợp lệ (tối thiểu là 1).', 'error');
       return;
     }
     onConfirm(plotCount);
   };
 
-  const isOther = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy'].includes(record.recordType || '');
+  const isOther = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(record.recordType || '');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">

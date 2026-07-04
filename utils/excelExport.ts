@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, showToast } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 export const exportReportToExcel = async (
@@ -34,7 +34,7 @@ export const exportReportToExcel = async (
     });
 
     if (filtered.length === 0) {
-        alert("Không có hồ sơ nào trong khoảng thời gian và địa bàn này.");
+        showToast("Không có hồ sơ nào trong khoảng thời gian và địa bàn này.", "error");
         return;
     }
 
@@ -291,7 +291,7 @@ export const exportReportToExcel = async (
 
 export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employee[], receiveFrom: string, receiveTo: string, deadlineFrom: string, deadlineTo: string) => {
     if (records.length === 0) {
-        alert("Không có hồ sơ nào để xuất.");
+        showToast("Không có hồ sơ nào để xuất.", "error");
         return;
     }
 
@@ -373,7 +373,7 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
 export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
     // ... Giữ nguyên code cũ cho exportReturnedListToExcel ...
     if (records.length === 0) {
-        alert("Không có hồ sơ nào để xuất.");
+        showToast("Không có hồ sơ nào để xuất.", "error");
         return;
     }
 

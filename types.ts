@@ -260,6 +260,7 @@ export interface LandRecord {
   newCommune: string;
   blockingDocuments: BlockingDocument[];
   unblockDoc: string;
+  unblockDate?: string;
   notes: string;
   isUnblocked: boolean;
   createdBy: string;

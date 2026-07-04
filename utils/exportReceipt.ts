@@ -175,34 +175,64 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                             new TextRun({ text: `${data.LOAI_HS ? data.LOAI_HS + ' - ' : ''}${data.NOI_DUNG || ''}`, font: "Times New Roman", size: 26, bold: true }),
                         ],
                     }),
-                    new Paragraph({
-                        spacing: { after: 80 },
-                        indent: { left: 360 },
-                        children: [
-                            new TextRun({ text: `1. ${data.TP1 || ''}`, font: "Times New Roman", size: 26 }),
-                        ],
-                    }),
-                    new Paragraph({
-                        spacing: { after: 80 },
-                        indent: { left: 360 },
-                        children: [
-                            new TextRun({ text: "2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)", font: "Times New Roman", size: 26 }),
-                        ],
-                    }),
-                    new Paragraph({
-                        spacing: { after: 80 },
-                        indent: { left: 360 },
-                        children: [
-                            new TextRun({ text: `3. Hợp đồng ủy quyền - ${data.NGUOI_UY_QUYEN || ''}`, font: "Times New Roman", size: 26 }),
-                        ],
-                    }),
-                    new Paragraph({
-                        spacing: { after: 80 },
-                        indent: { left: 360 },
-                        children: [
-                            new TextRun({ text: `4. ${data.GIAY_TO_KHAC || ''}`, font: "Times New Roman", size: 26 }),
-                        ],
-                    }),
+                    ...((data.LOAI_HS && (data.LOAI_HS.includes('Thu hồi Giấy chứng nhận') || data.LOAI_HS.includes('Thu hồi GCN'))) ? [
+                        new Paragraph({
+                            spacing: { after: 80 },
+                            indent: { left: 360 },
+                            children: [
+                                new TextRun({ text: "1. Giấy chứng nhận bản gốc", font: "Times New Roman", size: 26 }),
+                            ],
+                        }),
+                        ...(data.NGUOI_UY_QUYEN ? [
+                            new Paragraph({
+                                spacing: { after: 80 },
+                                indent: { left: 360 },
+                                children: [
+                                    new TextRun({ text: `2. Hợp đồng ủy quyền (Giấy ủy quyền): ${data.NGUOI_UY_QUYEN || ''}${data.LOAI_UY_QUYEN ? ` (${data.LOAI_UY_QUYEN})` : ''}`, font: "Times New Roman", size: 26 }),
+                                ],
+                            })
+                        ] : []),
+                        ...(data.GIAY_TO_KHAC ? [
+                            new Paragraph({
+                                spacing: { after: 80 },
+                                indent: { left: 360 },
+                                children: [
+                                    new TextRun({ text: `${data.NGUOI_UY_QUYEN ? '3' : '2'}. Giấy tờ kèm theo: ${data.GIAY_TO_KHAC || ''}`, font: "Times New Roman", size: 26 }),
+                                ],
+                            })
+                        ] : [])
+                    ] : [
+                        new Paragraph({
+                            spacing: { after: 80 },
+                            indent: { left: 360 },
+                            children: [
+                                new TextRun({ text: `1. ${data.TP1 || ''}`, font: "Times New Roman", size: 26 }),
+                            ],
+                        }),
+                        new Paragraph({
+                            spacing: { after: 80 },
+                            indent: { left: 360 },
+                            children: [
+                                new TextRun({ text: "2. Giấy chứng nhận quyền sử dụng đất bản sao (Photo)", font: "Times New Roman", size: 26 }),
+                            ],
+                        }),
+                        new Paragraph({
+                            spacing: { after: 80 },
+                            indent: { left: 360 },
+                            children: [
+                                new TextRun({ text: `3. Hợp đồng ủy quyền - ${data.NGUOI_UY_QUYEN || ''}`, font: "Times New Roman", size: 26 }),
+                            ],
+                        }),
+                        ...(data.GIAY_TO_KHAC ? [
+                            new Paragraph({
+                                spacing: { after: 80 },
+                                indent: { left: 360 },
+                                children: [
+                                    new TextRun({ text: `4. ${data.GIAY_TO_KHAC || ''}`, font: "Times New Roman", size: 26 }),
+                                ],
+                            })
+                        ] : [])
+                    ]),
                     new Paragraph({
                         spacing: { after: 80 },
                         indent: { left: 360 },

@@ -22,9 +22,10 @@ import SystemView from './SystemView';
 import DangKyView from './archive/DangKyView';
 import WarehouseView from './archive/WarehouseView';
 import BlockingRecordsView from './BlockingRecordsView';
+import QuickRecordTypeConverterModal from './QuickRecordTypeConverterModal';
 
 // Icons
-import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send } from 'lucide-react';
+import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send, RefreshCw } from 'lucide-react';
 
 interface AppRoutesProps {
     currentView: string;
@@ -84,6 +85,7 @@ interface AppRoutesProps {
     filterWard: string; setFilterWard: (s: string) => void;
     filterStatus: string; setFilterStatus: (s: string) => void;
     filterEmployee: string; setFilterEmployee: (s: string) => void;
+    filterRecordType: string; setFilterRecordType: (s: string) => void;
     warningFilter: string; setWarningFilter: React.Dispatch<React.SetStateAction<any>>;
     handoverTab: string; setHandoverTab: React.Dispatch<React.SetStateAction<any>>;
     
@@ -129,6 +131,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         (employees.find(e => e.id === currentUser.employeeId)?.department || '').trim().toLowerCase().includes('đo đạc');
 
     const [showColumnSelector, setShowColumnSelector] = React.useState(false);
+    const [isQuickConvertModalOpen, setIsQuickConvertModalOpen] = React.useState(false);
 
     // --- RENDER RECORD LIST (Extracted to be used in switch) ---
     const renderRecordList = () => {
@@ -145,6 +148,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         else if (currentView === 'other_records') title = 'Hồ sơ khác';
 
         return (
+            <>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
                 
                 {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
@@ -292,6 +296,31 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             </div>
                          )}
 
+                         {(currentView === 'all_records' || currentView === 'other_records') && (
+                            <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
+                                <SlidersHorizontal size={16} className="text-gray-500" />
+                                <select value={props.filterRecordType} onChange={(e) => props.setFilterRecordType(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[130px]">
+                                    <option value="all">Mọi loại HS</option>
+                                    {(() => {
+                                        const isOther = currentView === 'other_records';
+                                        const otherTypes = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'];
+                                        // Thu thập động các loại hồ sơ thuộc view này
+                                        const types = Array.from(new Set(records
+                                            .map(r => r.recordType || '')
+                                            .filter(t => {
+                                                if (!t) return false;
+                                                const inOther = otherTypes.includes(t);
+                                                return isOther ? inOther : !inOther;
+                                            })
+                                        )).sort();
+                                        return types.map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                        ));
+                                    })()}
+                                </select>
+                            </div>
+                         )}
+
                          {(canPerformAction || isDoDacEmployee) && (currentView === 'all_records' || currentView === 'other_records') && (
                             <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
                                 <UserIcon size={16} className="text-gray-500" />
@@ -317,6 +346,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                                 <div className="h-6 w-px bg-gray-300 mx-2"></div>
                                 <button onClick={() => { props.setIsModalOpen(true); props.setEditingRecord(null); }} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 shadow-sm text-sm font-bold"><Plus size={16} /> Nhập</button>
                                 <button onClick={() => props.setIsImportModalOpen(true)} className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 shadow-sm text-sm font-bold"><FileSpreadsheet size={16} /> Excel</button>
+                                {currentView === 'all_records' && (
+                                    <button onClick={() => setIsQuickConvertModalOpen(true)} className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md shadow-sm text-sm font-bold animate-fade-in" title="Chuyển đổi nhanh loại hồ sơ đo đạc"><RefreshCw size={16} /> Chuyển nhanh loại HS</button>
+                                )}
                             </>
                          )}
 
@@ -467,6 +499,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     </div>
                 )}
             </div>
+            <QuickRecordTypeConverterModal
+                isOpen={isQuickConvertModalOpen}
+                onClose={() => setIsQuickConvertModalOpen(false)}
+                records={records}
+                onSuccess={props.onRefreshData}
+            />
+            </>
         );
     };
 

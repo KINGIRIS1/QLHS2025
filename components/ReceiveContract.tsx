@@ -7,7 +7,7 @@ import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
-import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
+import { confirmAction, removeVietnameseTones, showToast } from '../utils/appHelpers';
 import saveAs from 'file-saver'; // Import saveAs
 
 // Child Components
@@ -218,7 +218,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
 
   // --- LOGIC IN ẤN (TẢI VỀ & MỞ) ---
   const handlePreviewDocx = async (dataToPrint: Partial<Contract> | undefined, printType: 'contract' | 'liquidation') => {
-      if (!dataToPrint || !dataToPrint.customerName) { alert("Vui lòng nhập Tên khách hàng để in."); return; }
+      if (!dataToPrint || !dataToPrint.customerName) { showToast("Vui lòng nhập Tên khách hàng để in.", "error"); return; }
       
       let templateKey = '', typeName = '';
       const isCamMoc = dataToPrint.contractType === 'Cắm mốc';
@@ -450,7 +450,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
                   });
                   
                   if (!result.success) {
-                      alert(`Lỗi khi lưu file: ${result.message}`);
+                      showToast(`Lỗi khi lưu file: ${result.message}`, "error");
                   }
               };
           } else {

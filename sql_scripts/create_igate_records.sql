@@ -22,6 +22,12 @@ CREATE TABLE IF NOT EXISTS igate_records (
     thoi_han_su_dung TEXT,
     cccd TEXT,
     ghi_chu TEXT,
+    ngay_tra DATE,
+    ly_do_tra TEXT,
+    so_vao_so TEXT,
+    ngay_ky_gcn DATE,
+    ngay_giao_1_cua DATE,
+    dot_giao_1_cua TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     created_by TEXT
 );
@@ -37,6 +43,12 @@ ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS so_phat_hanh
 ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS thoi_han_su_dung TEXT;
 ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS cccd TEXT;
 ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS ghi_chu TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS ngay_tra DATE;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS ly_do_tra TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS so_vao_so TEXT;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS ngay_ky_gcn DATE;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS ngay_giao_1_cua DATE;
+ALTER TABLE IF EXISTS public.igate_records ADD COLUMN IF NOT EXISTS dot_giao_1_cua TEXT;
 
 -- 2. Bật bảo mật Row Level Security (RLS)
 ALTER TABLE igate_records ENABLE ROW LEVEL SECURITY;

@@ -46,7 +46,17 @@ ADD COLUMN IF NOT EXISTS cccd TEXT DEFAULT '';
 ALTER TABLE public.igate_records 
 ADD COLUMN IF NOT EXISTS ghi_chu TEXT DEFAULT '';
 
+-- 12. Bổ sung cột da_thuc_hien_nvtc (Đã thực hiện nghĩa vụ tài chính)
+ALTER TABLE public.igate_records 
+ADD COLUMN IF NOT EXISTS da_thuc_hien_nvtc BOOLEAN DEFAULT FALSE;
+
+-- 13. Bổ sung cột ngay_thuc_hien_nvtc (Ngày thực hiện nghĩa vụ tài chính)
+ALTER TABLE public.igate_records 
+ADD COLUMN IF NOT EXISTS ngay_thuc_hien_nvtc DATE DEFAULT NULL;
+
 -- Tạo chỉ mục (Index) hỗ trợ tìm kiếm nhanh hơn cho các trường hay tra cứu
 CREATE INDEX IF NOT EXISTS idx_igate_records_so_to ON public.igate_records(so_to);
 CREATE INDEX IF NOT EXISTS idx_igate_records_so_thua ON public.igate_records(so_thua);
 CREATE INDEX IF NOT EXISTS idx_igate_records_cccd ON public.igate_records(cccd);
+CREATE INDEX IF NOT EXISTS idx_igate_records_da_thuc_hien_nvtc ON public.igate_records(da_thuc_hien_nvtc);
+CREATE INDEX IF NOT EXISTS idx_igate_records_ngay_thuc_hien_nvtc ON public.igate_records(ngay_thuc_hien_nvtc);

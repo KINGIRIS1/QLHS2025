@@ -5,7 +5,7 @@ import { getNormalizedWard, getFullWard } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock, ClipboardCheck } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
+import { confirmAction, calculateDeadlineHelper, showToast } from '../utils/appHelpers';
 import { fetchArchiveRecords, saveArchiveRecord } from '../services/apiArchive';
 import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 
@@ -311,6 +311,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         targetPrefixType = 'SLHS';
     } else if (recordType === 'Thuế chính quy') {
         targetPrefixType = 'TCQ';
+    } else if (recordType === 'Thu hồi Giấy chứng nhận') {
+        targetPrefixType = 'THG';
     }
 
     let maxSeq = 0;
@@ -373,7 +375,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   // ... (Phần logic in ấn và render giữ nguyên)
   const handlePreviewDocx = async (dataToUse: Partial<RecordFile>) => {
     if (!dataToUse.code || !dataToUse.customerName) { 
-        alert("Vui lòng nhập ít nhất Mã hồ sơ và Tên khách hàng để in."); 
+        showToast("Vui lòng nhập ít nhất Mã hồ sơ và Tên khách hàng để in.", "error"); 
         return; 
     }
 

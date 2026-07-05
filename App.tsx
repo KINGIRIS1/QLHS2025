@@ -26,6 +26,7 @@ import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
 import UpdateRequiredModal from './components/UpdateRequiredModal';
 import { PlotCountModal } from './components/PlotCountModal';
+import { supabase, isConfigured } from './services/supabaseClient';
 
 function App() {
   const isMobile = useIsMobile(768);
@@ -149,6 +150,37 @@ function App() {
 
   // Save visible columns
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
+
+  // Đồng bộ dữ liệu ngăn chặn từ Cloud vào localStorage để thực hiện check ngăn chặn ngoại tuyến
+  useEffect(() => {
+      const syncBlockingRecords = async () => {
+          if (!isConfigured) return;
+          try {
+              // 1. Fetch active blocking records
+              const { data: activeData, error: activeError } = await supabase
+                  .from('blocking_records')
+                  .select('*');
+              if (!activeError && activeData) {
+                  localStorage.setItem('offline_blocking_records', JSON.stringify(activeData));
+              }
+
+              // 2. Fetch archive blocking records
+              const { data: archiveData, error: archiveError } = await supabase
+                  .from('archive_blocking_records')
+                  .select('*');
+              if (!archiveError && archiveData) {
+                  localStorage.setItem('offline_archive_blocking_records', JSON.stringify(archiveData));
+              }
+              console.log('✅ Đã đồng bộ dữ liệu ngăn chặn từ Cloud vào bộ nhớ tạm.');
+          } catch (e) {
+              console.error('Lỗi khi đồng bộ dữ liệu ngăn chặn:', e);
+          }
+      };
+
+      if (currentUser) {
+          syncBlockingRecords();
+      }
+  }, [currentUser]);
 
   // --- CUSTOM HOOKS ---
   const { 
@@ -593,6 +625,8 @@ function App() {
 
       const checkList = (list: any[], source: 'active' | 'archive') => {
           list.forEach(blocking => {
+              if (blocking.isUnblocked) return;
+
               const blockOldNorm = normalize(blocking.oldCommune);
               const blockNewNorm = normalize(blocking.newCommune);
               
@@ -612,7 +646,7 @@ function App() {
 
                   const sheetMatches = !sheetNorm || !oldSheetNorm || 
                                        (oldSheetNorm && (sheetNorm.includes(oldSheetNorm) || oldSheetNorm.includes(sheetNorm))) ||
-                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || sheetNorm.includes(newSheetNorm)));
+                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || newSheetNorm.includes(sheetNorm)));
 
                   return plotMatches && sheetMatches;
               });

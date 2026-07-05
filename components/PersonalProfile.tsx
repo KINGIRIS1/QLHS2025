@@ -64,6 +64,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   const [isBlockingWarningOpen, setIsBlockingWarningOpen] = useState(false);
   const [blockingMatches, setBlockingMatches] = useState<{ record: any; source: 'active' | 'archive' }[]>([]);
   const [pendingRecord, setPendingRecord] = useState<RecordFile | null>(null);
+  const [pendingAction, setPendingAction] = useState<'mark_as_done' | 'forward_to_sign' | null>(null);
 
   useEffect(() => {
     const loadArchive = async () => {
@@ -322,6 +323,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
 
       const checkList = (list: any[], source: 'active' | 'archive') => {
           list.forEach(blocking => {
+              if (blocking.isUnblocked) return;
+
               const blockOldNorm = normalize(blocking.oldCommune);
               const blockNewNorm = normalize(blocking.newCommune);
               
@@ -341,7 +344,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
 
                   const sheetMatches = !sheetNorm || !oldSheetNorm || 
                                        (oldSheetNorm && (sheetNorm.includes(oldSheetNorm) || oldSheetNorm.includes(sheetNorm))) ||
-                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || sheetNorm.includes(newSheetNorm)));
+                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || newSheetNorm.includes(sheetNorm)));
 
                   return plotMatches && sheetMatches;
               });
@@ -365,6 +368,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
     if (matches.length > 0) {
         setBlockingMatches(matches);
         setPendingRecord(record);
+        setPendingAction('mark_as_done');
         setIsBlockingWarningOpen(true);
         return;
     }
@@ -412,6 +416,18 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   };
 
   const handleForwardToSign = async (record: RecordFile) => {
+    const matches = checkBlocking(record);
+    if (matches.length > 0) {
+        setBlockingMatches(matches);
+        setPendingRecord(record);
+        setPendingAction('forward_to_sign');
+        setIsBlockingWarningOpen(true);
+        return;
+    }
+    await proceedForwardToSign(record);
+  };
+
+  const proceedForwardToSign = async (record: RecordFile) => {
     if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
         if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
              // Handle Archive Record
@@ -876,11 +892,20 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           setIsBlockingWarningOpen(false);
           setPendingRecord(null);
           setBlockingMatches([]);
+          setPendingAction(null);
         }}
         onConfirm={() => {
           if (pendingRecord) {
-            proceedMarkAsDone(pendingRecord);
+            if (pendingAction === 'mark_as_done') {
+              proceedMarkAsDone(pendingRecord);
+            } else if (pendingAction === 'forward_to_sign') {
+              proceedForwardToSign(pendingRecord);
+            }
           }
+          setIsBlockingWarningOpen(false);
+          setPendingRecord(null);
+          setBlockingMatches([]);
+          setPendingAction(null);
         }}
         matches={blockingMatches}
         recordFile={pendingRecord}

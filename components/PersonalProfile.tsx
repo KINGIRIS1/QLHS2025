@@ -10,6 +10,7 @@ import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../servic
 import PhieuXinLoiModal from './PhieuXinLoiModal';
 import { PlotCountModal } from './PlotCountModal';
 import BlockingWarningModal from './BlockingWarningModal';
+import { supabase, isConfigured } from '../services/supabaseClient';
 
 import PersonalReportView from './PersonalReportView';
 
@@ -296,16 +297,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       setSortConfig({ key, direction });
   };
 
-  const checkBlocking = (record: RecordFile) => {
-      const activeRaw = localStorage.getItem('offline_blocking_records');
-      const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
-      
-      const activeList = activeRaw ? JSON.parse(activeRaw) : [];
-      const archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
-      
-      const normalize = (str: string | null | undefined) => {
-          if (!str) return '';
-          return str
+  const checkBlocking = async (record: RecordFile) => {
+      const normalize = (str: any) => {
+          if (str === null || str === undefined) return '';
+          return String(str)
               .trim()
               .toLowerCase()
               .normalize('NFD')
@@ -313,11 +308,85 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
               .replace(/đ/g, 'd');
       };
 
+      const cleanCommune = (c: string) => {
+          return c.replace(/^(xa|phuong|thi tran)\s+/gi, '').trim();
+      };
+
+      const matchTokens = (str1: string, str2: string) => {
+          if (!str1 || !str2) return false;
+          const tokens1 = str1.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
+          const tokens2 = str2.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
+          
+          return tokens1.some(t1 => {
+              return tokens2.some(t2 => {
+                  if (t1 === t2) return true;
+                  if (t1.includes('/') || t2.includes('/')) {
+                      const base1 = t1.split('/')[0];
+                      const base2 = t2.split('/')[0];
+                      return base1 === base2;
+                  }
+                  return false;
+              });
+          });
+      };
+
       const wardNorm = normalize(record.ward);
       const plotNorm = normalize(record.landPlot);
       const sheetNorm = normalize(record.mapSheet);
 
       if (!wardNorm || !plotNorm) return [];
+
+      const cleanWard = cleanCommune(wardNorm);
+
+      let activeList: any[] = [];
+      let archiveList: any[] = [];
+
+      if (isConfigured) {
+          try {
+              // Extract all plot tokens & bases to do a highly indexed JSONB containment query
+              const plotTokens = plotNorm.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
+              const searchTerms = new Set<string>();
+              plotTokens.forEach(token => {
+                  searchTerms.add(token);
+                  if (token.includes('/')) {
+                      const base = token.split('/')[0];
+                      if (base) searchTerms.add(base);
+                  }
+              });
+
+              if (searchTerms.size > 0) {
+                  // Build optimized OR filter using Supabase .or() on JSONB containment
+                  const orParts: string[] = [];
+                  searchTerms.forEach(term => {
+                      orParts.push(`plots.cs.[{"oldPlotNumber":"${term}"}]`);
+                      orParts.push(`plots.cs.[{"newPlotNumber":"${term}"}]`);
+                  });
+                  const orQuery = orParts.join(',');
+
+                  // Fetch candidate matching records instantly
+                  const [activeRes, archiveRes] = await Promise.all([
+                      supabase.from('blocking_records').select('*').or(orQuery),
+                      supabase.from('archive_blocking_records').select('*').or(orQuery)
+                  ]);
+
+                  if (!activeRes.error && activeRes.data) activeList = activeRes.data;
+                  if (!archiveRes.error && archiveRes.data) archiveList = archiveRes.data;
+              }
+          } catch (e) {
+              console.error('Lỗi khi tải dữ liệu ngăn chặn trực tuyến, chuyển sang offline:', e);
+              // Fallback to offline
+              const activeRaw = localStorage.getItem('offline_blocking_records');
+              const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
+              activeList = activeRaw ? JSON.parse(activeRaw) : [];
+              archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
+          }
+      } else {
+          // Offline Mode fallback
+          const activeRaw = localStorage.getItem('offline_blocking_records');
+          const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
+          activeList = activeRaw ? JSON.parse(activeRaw) : [];
+          archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
+      }
 
       const matches: { record: any; source: 'active' | 'archive' }[] = [];
 
@@ -328,8 +397,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
               const blockOldNorm = normalize(blocking.oldCommune);
               const blockNewNorm = normalize(blocking.newCommune);
               
-              const isCommuneMatch = (blockOldNorm && (blockOldNorm.includes(wardNorm) || wardNorm.includes(blockOldNorm))) ||
-                                     (blockNewNorm && (blockNewNorm.includes(wardNorm) || wardNorm.includes(blockNewNorm)));
+              const cleanBlockOld = cleanCommune(blockOldNorm);
+              const cleanBlockNew = cleanCommune(blockNewNorm);
+
+              const isCommuneMatch = 
+                  (cleanBlockOld && (cleanBlockOld === cleanWard || cleanBlockOld.includes(cleanWard) || cleanWard.includes(cleanBlockOld))) ||
+                  (cleanBlockNew && (cleanBlockNew === cleanWard || cleanBlockNew.includes(cleanWard) || cleanWard.includes(cleanBlockNew)));
               
               if (!isCommuneMatch) return;
 
@@ -339,12 +412,20 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                   const oldSheetNorm = normalize(p.oldMapSheetNumber);
                   const newSheetNorm = normalize(p.newMapSheetNumber);
 
-                  const plotMatches = (oldPlotNorm && (plotNorm.includes(oldPlotNorm) || oldPlotNorm.includes(plotNorm))) ||
-                                      (newPlotNorm && (plotNorm.includes(newPlotNorm) || newPlotNorm.includes(plotNorm)));
+                  const plotMatches = matchTokens(plotNorm, oldPlotNorm) || matchTokens(plotNorm, newPlotNorm);
 
-                  const sheetMatches = !sheetNorm || !oldSheetNorm || 
-                                       (oldSheetNorm && (sheetNorm.includes(oldSheetNorm) || oldSheetNorm.includes(sheetNorm))) ||
-                                       (newSheetNorm && (sheetNorm.includes(newSheetNorm) || newSheetNorm.includes(sheetNorm)));
+                  let sheetMatches = !sheetNorm;
+                  if (!sheetMatches) {
+                      const hasOldSheet = !!oldSheetNorm;
+                      const hasNewSheet = !!newSheetNorm;
+                      if (!hasOldSheet && !hasNewSheet) {
+                          sheetMatches = true;
+                      } else {
+                          const oldMatch = hasOldSheet && matchTokens(sheetNorm, oldSheetNorm);
+                          const newMatch = hasNewSheet && matchTokens(sheetNorm, newSheetNorm);
+                          sheetMatches = oldMatch || newMatch;
+                      }
+                  }
 
                   return plotMatches && sheetMatches;
               });
@@ -364,7 +445,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   // --- ACTIONS ---
 
   const handleMarkAsDone = async (record: RecordFile) => {
-    const matches = checkBlocking(record);
+    const matches = await checkBlocking(record);
     if (matches.length > 0) {
         setBlockingMatches(matches);
         setPendingRecord(record);
@@ -416,7 +497,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   };
 
   const handleForwardToSign = async (record: RecordFile) => {
-    const matches = checkBlocking(record);
+    const matches = await checkBlocking(record);
     if (matches.length > 0) {
         setBlockingMatches(matches);
         setPendingRecord(record);

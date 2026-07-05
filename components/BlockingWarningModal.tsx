@@ -78,60 +78,221 @@ const BlockingWarningModal: React.FC<BlockingWarningModalProps> = ({
           {/* List of matches */}
           <div className="space-y-4">
             {activeBlockings.map((match, idx) => (
-              <div key={`active-${idx}`} className="border border-red-200 rounded-lg overflow-hidden shadow-xs">
-                <div className="bg-red-50 px-4 py-2 border-b border-red-100 flex justify-between items-center">
+              <div key={`active-${idx}`} className="border border-red-200 rounded-lg overflow-hidden shadow-sm bg-white animate-fade-in">
+                <div className="bg-red-50 px-4 py-2.5 border-b border-red-100 flex justify-between items-center">
                   <span className="text-xs font-bold text-red-700 uppercase flex items-center gap-1.5">
-                    <AlertTriangle size={14} /> NGĂN CHẶN ĐANG CÓ HIỆU LỰC ({match.source === 'archive' ? 'TRONG LƯU TRỮ' : 'HIỆN HÀNH'})
+                    <AlertTriangle size={14} className="text-red-600 animate-pulse" /> NGĂN CHẶN ĐANG CÓ HIỆU LỰC ({match.source === 'archive' ? 'TRONG LƯU TRỮ' : 'HIỆN HÀNH'})
                   </span>
-                  <span className="text-xs text-red-600 font-medium">Bản ghi #{match.record.id?.substring(0, 8)}</span>
+                  <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-mono font-medium">Bản ghi #{match.record.id?.substring(0, 8)}</span>
                 </div>
-                <div className="p-4 bg-white text-sm space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <p><strong className="text-gray-700">Chủ ngăn chặn:</strong> {match.record.owners?.join(', ') || 'Chưa rõ'}</p>
-                    <p><strong className="text-gray-700">Số GCN / Vào sổ:</strong> {match.record.issueNumber || '---'} / {match.record.certNumber || '---'}</p>
+                
+                <div className="p-4 space-y-4">
+                  {/* 1. CHỦ SỬ DỤNG */}
+                  <div className="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                    <div className="flex items-center gap-2 mb-1.5 border-b border-slate-100 pb-1.5">
+                      <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                        <User size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">1. Chủ sử dụng</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800 pl-8">
+                      {match.record.owners?.join(', ') || 'Chưa rõ / Không có thông tin'}
+                    </p>
                   </div>
-                  <div className="bg-red-50/40 p-2.5 rounded text-xs text-red-900 border border-red-50">
-                    <p className="font-bold mb-1">Văn bản ngăn chặn:</p>
-                    {match.record.blockingDocuments && match.record.blockingDocuments.length > 0 ? (
-                      match.record.blockingDocuments.map((doc, dIdx) => (
-                        <div key={dIdx} className="pl-2 border-l-2 border-red-400 mb-1.5 last:mb-0">
-                          <p>• Số: <span className="font-semibold">{doc.docNumber || '---'}</span> {doc.date ? `ngày ${doc.date}` : ''} ({doc.agency || 'Cơ quan chưa rõ'})</p>
-                          <p className="italic text-gray-700">Nội dung: {doc.note || 'Không có ghi chú'}</p>
+
+                  {/* 2. GIẤY CHỨNG NHẬN */}
+                  <div className="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                    <div className="flex items-center gap-2 mb-1.5 border-b border-slate-100 pb-1.5">
+                      <div className="p-1 rounded-md bg-amber-50 text-amber-600">
+                        <FileText size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">2. Giấy chứng nhận</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8 text-sm text-slate-700">
+                      <div>
+                        <span className="text-slate-400 font-medium">Số GCN:</span>{' '}
+                        <span className="font-bold text-slate-800">{match.record.issueNumber || '---'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium">Số vào sổ:</span>{' '}
+                        <span className="font-bold text-slate-800">{match.record.certNumber || '---'}</span>
+                      </div>
+                      {match.record.issueDate && (
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 font-medium">Ngày cấp:</span>{' '}
+                          <span className="font-semibold text-slate-800">{match.record.issueDate}</span>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 italic">Không có chi tiết văn bản</p>
-                    )}
+                      )}
+                      {match.record.plots && match.record.plots.length > 0 && (
+                        <div className="sm:col-span-2 mt-1">
+                          <span className="text-slate-400 font-medium block mb-1">Thông tin thửa đất ngăn chặn:</span>
+                          <div className="space-y-1">
+                            {match.record.plots.map((p, pIdx) => (
+                              <div key={pIdx} className="bg-slate-100/70 p-1.5 rounded text-xs font-medium text-slate-700">
+                                • Tờ bản đồ:{' '}
+                                <span className="font-bold text-blue-700">{p.oldMapSheetNumber || p.newMapSheetNumber || '---'}</span>
+                                {' '}/{' '}
+                                Thửa số:{' '}
+                                <span className="font-bold text-blue-700">{p.oldPlotNumber || p.newPlotNumber || '---'}</span>
+                                {p.oldArea || p.newArea ? ` (${p.oldArea || p.newArea} m²)` : ''}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {match.record.notes && (
-                    <p className="text-xs text-gray-500 italic mt-1"><strong className="text-gray-700 not-italic">Ghi chú bổ sung:</strong> {match.record.notes}</p>
-                  )}
+
+                  {/* 3. THÔNG TIN NGĂN CHẶN */}
+                  <div className="border border-red-100 rounded-lg p-3 bg-red-50/20">
+                    <div className="flex items-center gap-2 mb-2 border-b border-red-100 pb-1.5">
+                      <div className="p-1 rounded-md bg-red-50 text-red-600">
+                        <ShieldAlert size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-red-700 uppercase tracking-wider">3. Thông tin ngăn chặn</span>
+                    </div>
+                    <div className="pl-8 space-y-2">
+                      {match.record.blockingDocuments && match.record.blockingDocuments.length > 0 ? (
+                        match.record.blockingDocuments.map((doc, dIdx) => (
+                          <div key={dIdx} className="bg-red-50/50 border border-red-100 p-2.5 rounded text-xs text-red-900">
+                            <p className="font-bold text-red-800 flex items-center gap-1">
+                              📄 Văn bản số: {doc.docNumber || '---'}
+                            </p>
+                            <p className="mt-1"><strong className="text-red-700">Ngày ban hành:</strong> {doc.date || '---'}</p>
+                            <p><strong className="text-red-700">Cơ quan ngăn chặn:</strong> {doc.agency || '---'}</p>
+                            <p className="mt-1.5 pt-1.5 border-t border-red-100/50 italic text-slate-700 font-medium">
+                              Nội dung ngăn chặn: {doc.note || 'Không có chi tiết'}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-500 italic">Không có chi tiết văn bản ngăn chặn chính thức</p>
+                      )}
+                      
+                      {match.record.notes && (
+                        <div className="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-100">
+                          <strong className="text-slate-600 block mb-0.5">Ghi chú bổ sung hệ thống:</strong>
+                          <p className="text-slate-700 italic">{match.record.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
 
             {resolvedBlockings.map((match, idx) => (
-              <div key={`resolved-${idx}`} className="border border-amber-200 rounded-lg overflow-hidden shadow-xs">
-                <div className="bg-amber-50 px-4 py-2 border-b border-amber-100 flex justify-between items-center">
+              <div key={`resolved-${idx}`} className="border border-amber-200 rounded-lg overflow-hidden shadow-sm bg-white animate-fade-in">
+                <div className="bg-amber-50 px-4 py-2.5 border-b border-amber-100 flex justify-between items-center">
                   <span className="text-xs font-bold text-amber-700 uppercase flex items-center gap-1.5">
                     <CheckCircle2 size={14} className="text-green-600" /> THỬA ĐẤT ĐÃ CÓ VĂN BẢN GIẢI TỎA ({match.source === 'archive' ? 'TRONG LƯU TRỮ' : 'HIỆN HÀNH'})
                   </span>
-                  <span className="text-xs text-amber-600 font-medium">Bản ghi #{match.record.id?.substring(0, 8)}</span>
+                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-mono font-medium">Bản ghi #{match.record.id?.substring(0, 8)}</span>
                 </div>
-                <div className="p-4 bg-white text-sm space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <p><strong className="text-gray-700">Chủ sở hữu:</strong> {match.record.owners?.join(', ') || 'Chưa rõ'}</p>
-                    <p><strong className="text-gray-700">Số GCN / Vào sổ:</strong> {match.record.issueNumber || '---'} / {match.record.certNumber || '---'}</p>
+                
+                <div className="p-4 space-y-4">
+                  {/* 1. CHỦ SỬ DỤNG */}
+                  <div className="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                    <div className="flex items-center gap-2 mb-1.5 border-b border-slate-100 pb-1.5">
+                      <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                        <User size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">1. Chủ sử dụng</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800 pl-8">
+                      {match.record.owners?.join(', ') || 'Chưa rõ / Không có thông tin'}
+                    </p>
                   </div>
-                  <div className="bg-amber-50/40 p-2.5 rounded text-xs text-amber-900 border border-amber-50">
-                    <p className="font-bold mb-1">Chi tiết Giải tỏa ngăn chặn:</p>
-                    <p className="text-green-800 font-medium flex items-center gap-1">
-                      <CheckCircle2 size={12} /> Số văn bản giải tỏa: {match.record.unblockDoc || 'Chưa cập nhật số'} {match.record.unblockDate ? `ngày ${match.record.unblockDate}` : ''}
-                    </p>
-                    <p className="text-gray-600 mt-1 italic font-medium text-[11px] bg-amber-100/50 p-1.5 rounded border border-amber-200 flex items-start gap-1">
-                      <BookOpen size={12} className="mt-0.5 shrink-0 text-amber-700" />
-                      <span>Để an toàn, đề nghị quý cán bộ kiểm tra kỹ hồ sơ lưu hoặc văn bản giải tỏa gốc trước khi thực hiện chuyển tiếp!</span>
-                    </p>
+
+                  {/* 2. GIẤY CHỨNG NHẬN */}
+                  <div className="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                    <div className="flex items-center gap-2 mb-1.5 border-b border-slate-100 pb-1.5">
+                      <div className="p-1 rounded-md bg-amber-50 text-amber-600">
+                        <FileText size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">2. Giấy chứng nhận</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8 text-sm text-slate-700">
+                      <div>
+                        <span className="text-slate-400 font-medium">Số GCN:</span>{' '}
+                        <span className="font-bold text-slate-800">{match.record.issueNumber || '---'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium">Số vào sổ:</span>{' '}
+                        <span className="font-bold text-slate-800">{match.record.certNumber || '---'}</span>
+                      </div>
+                      {match.record.issueDate && (
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 font-medium">Ngày cấp:</span>{' '}
+                          <span className="font-semibold text-slate-800">{match.record.issueDate}</span>
+                        </div>
+                      )}
+                      {match.record.plots && match.record.plots.length > 0 && (
+                        <div className="sm:col-span-2 mt-1">
+                          <span className="text-slate-400 font-medium block mb-1">Thông tin thửa đất ngăn chặn:</span>
+                          <div className="space-y-1">
+                            {match.record.plots.map((p, pIdx) => (
+                              <div key={pIdx} className="bg-slate-100/70 p-1.5 rounded text-xs font-medium text-slate-700">
+                                • Tờ bản đồ:{' '}
+                                <span className="font-bold text-blue-700">{p.oldMapSheetNumber || p.newMapSheetNumber || '---'}</span>
+                                {' '}/{' '}
+                                Thửa số:{' '}
+                                <span className="font-bold text-blue-700">{p.oldPlotNumber || p.newPlotNumber || '---'}</span>
+                                {p.oldArea || p.newArea ? ` (${p.oldArea || p.newArea} m²)` : ''}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. THÔNG TIN NGĂN CHẶN & GIẢI TỎA */}
+                  <div className="border border-green-100 rounded-lg p-3 bg-green-50/10">
+                    <div className="flex items-center gap-2 mb-2 border-b border-green-100 pb-1.5">
+                      <div className="p-1 rounded-md bg-green-50 text-green-600">
+                        <CheckCircle2 size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-green-700 uppercase tracking-wider">3. Thông tin ngăn chặn & Giải tỏa</span>
+                    </div>
+                    
+                    <div className="pl-8 space-y-3">
+                      {/* Quyết định giải tỏa */}
+                      <div className="bg-green-50 border border-green-100 p-2.5 rounded text-xs text-green-900">
+                        <p className="font-bold text-green-800 flex items-center gap-1.5">
+                          ✅ ĐÃ GIẢI TỎA THEO VĂN BẢN
+                        </p>
+                        <p className="mt-1"><strong className="text-green-700">Văn bản giải tỏa:</strong> {match.record.unblockDoc || '---'}</p>
+                        {match.record.unblockDate && <p><strong className="text-green-700">Ngày giải tỏa:</strong> {match.record.unblockDate}</p>}
+                        {match.record.unblockContent && (
+                          <p className="mt-1.5 pt-1.5 border-t border-green-100 italic text-slate-700 font-medium">
+                            Nội dung giải tỏa: {match.record.unblockContent}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Lịch sử ngăn chặn trước đó */}
+                      <div className="bg-slate-50 border border-slate-100 p-2.5 rounded text-xs text-slate-600">
+                        <p className="font-semibold text-slate-700 mb-1.5">Lịch sử văn bản ngăn chặn gốc:</p>
+                        {match.record.blockingDocuments && match.record.blockingDocuments.length > 0 ? (
+                          match.record.blockingDocuments.map((doc, dIdx) => (
+                            <div key={dIdx} className="pl-2 border-l border-slate-300 mb-1 last:mb-0">
+                              <p>• Văn bản số: <span className="font-semibold text-slate-800">{doc.docNumber || '---'}</span> {doc.date ? `ngày ${doc.date}` : ''} ({doc.agency || 'Cơ quan chưa rõ'})</p>
+                              {doc.note && <p className="italic text-slate-500">Nội dung: {doc.note}</p>}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-slate-400 italic">Không có chi tiết văn bản ngăn chặn gốc</p>
+                        )}
+                      </div>
+                      
+                      {match.record.notes && (
+                        <div className="text-xs bg-slate-50 p-2 rounded border border-slate-100">
+                          <strong className="text-slate-600 block mb-0.5">Ghi chú bổ sung hệ thống:</strong>
+                          <p className="text-slate-700 italic">{match.record.notes}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -8,11 +8,13 @@ import { showToast } from '../utils/appHelpers';
 
 const safeSaveOfflineRecords = (key: string, data: any[]) => {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    // Limit to maximum 500 records to prevent localStorage QuotaExceededError (5MB limit)
+    const truncatedData = data.length > 500 ? data.slice(0, 500) : data;
+    localStorage.setItem(key, JSON.stringify(truncatedData));
   } catch (e) {
-    console.error(`Error saving to localStorage for key ${key}:`, e);
+    console.warn(`Warning: Could not save records to localStorage for key ${key}:`, e);
     try {
-      localStorage.setItem(key, JSON.stringify(data.slice(0, 100)));
+      localStorage.setItem(key, JSON.stringify(data.slice(0, 50)));
     } catch (innerError) {
       console.error('Failed to save even a smaller slice to localStorage:', innerError);
     }
@@ -902,12 +904,17 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                   </button>
                   
                   {/* Số trang xung quanh trang hiện tại */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum = currentPage - 2 + i;
-                    if (pageNum < 1) pageNum = i + 1;
-                    if (pageNum > totalPages) return null;
-                    
-                    return (
+                  {(() => {
+                    let startPage = Math.max(1, currentPage - 2);
+                    let endPage = Math.min(totalPages, startPage + 4);
+                    if (endPage - startPage < 4) {
+                      startPage = Math.max(1, endPage - 4);
+                    }
+                    const pages = [];
+                    for (let p = startPage; p <= endPage; p++) {
+                      pages.push(p);
+                    }
+                    return pages.map(pageNum => (
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
@@ -919,8 +926,8 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                       >
                         {pageNum}
                       </button>
-                    );
-                  })}
+                    ));
+                  })()}
   
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES } from '../constants';
-import { fetchHolidays } from '../services/api';
+import { fetchHolidays, createRecordsBatchApi, forceUpdateRecordsBatchApi } from '../services/api';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
 
@@ -41,12 +41,26 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   const [mode, setMode] = useState<'create' | 'update'>('create');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // States cho tiến trình nhập dữ liệu chia lô (batch)
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasFinished, setHasFinished] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [failedCount, setFailedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [importStatus, setImportStatus] = useState('');
+
   useEffect(() => {
     if (isOpen) {
         fetchHolidays().then(setHolidays);
         setPreviewData([]);
         setFileName('');
         if(fileInputRef.current) fileInputRef.current.value = '';
+        setIsSaving(false);
+        setHasFinished(false);
+        setImportedCount(0);
+        setFailedCount(0);
+        setTotalCount(0);
+        setImportStatus('');
     }
   }, [isOpen]);
 
@@ -251,9 +265,63 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     reader.readAsBinaryString(file);
   };
 
-  const handleSave = () => {
-      onImport(previewData, mode);
-      onClose();
+  const handleSave = async () => {
+      if (previewData.length === 0) return;
+      setIsSaving(true);
+      setHasFinished(false);
+      setTotalCount(previewData.length);
+      setImportedCount(0);
+      setFailedCount(0);
+
+      const CHUNK_SIZE = 500;
+      let successTotal = 0;
+      let failTotal = 0;
+
+      for (let i = 0; i < previewData.length; i += CHUNK_SIZE) {
+          const chunk = previewData.slice(i, i + CHUNK_SIZE);
+          const currentBatch = Math.floor(i / CHUNK_SIZE) + 1;
+          const totalBatches = Math.ceil(previewData.length / CHUNK_SIZE);
+          
+          setImportStatus(`Đang xử lý gói ${currentBatch}/${totalBatches} (dòng ${i + 1} - ${Math.min(i + CHUNK_SIZE, previewData.length)})...`);
+
+          try {
+              if (mode === 'create') {
+                  const success = await createRecordsBatchApi(chunk);
+                  if (success) {
+                      successTotal += chunk.length;
+                      setImportedCount(successTotal);
+                  } else {
+                      failTotal += chunk.length;
+                      setFailedCount(failTotal);
+                  }
+              } else {
+                  const result = await forceUpdateRecordsBatchApi(chunk);
+                  if (result.success) {
+                      successTotal += result.count;
+                      setImportedCount(successTotal);
+                      const uncompleted = chunk.length - result.count;
+                      if (uncompleted > 0) {
+                          failTotal += uncompleted;
+                          setFailedCount(failTotal);
+                      }
+                  } else {
+                      failTotal += chunk.length;
+                      setFailedCount(failTotal);
+                  }
+              }
+          } catch (err) {
+              console.error("Lỗi khi import lô:", err);
+              failTotal += chunk.length;
+              setFailedCount(failTotal);
+          }
+
+          // Tránh chặn UI thread và tạo hiệu ứng mượt
+          await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      setIsSaving(false);
+      setHasFinished(true);
+      setImportStatus('Đã hoàn thành nhập dữ liệu!');
   };
 
   if (!isOpen) return null;
@@ -267,111 +335,182 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             <FileSpreadsheet className="text-green-600" />
             Xử Lý Dữ Liệu Excel
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-red-600">
+          <button onClick={onClose} disabled={isSaving} className="text-gray-500 hover:text-red-600 disabled:opacity-35">
             <X size={24} />
           </button>
         </div>
 
-        {/* MODE SWITCHER */}
-        <div className="p-5 border-b bg-gray-50 shrink-0 space-y-4">
-            <div className="flex justify-center">
-                <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
-                    <button 
-                        onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <PlusCircle size={16} /> Nhập hồ sơ mới
-                    </button>
-                    <button 
-                        onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <RefreshCw size={16} /> Cập nhật thông tin
-                    </button>
+        {/* BODY */}
+        {(isSaving || hasFinished) ? (
+          <div className="flex-1 overflow-auto p-8 flex flex-col items-center justify-center bg-gray-50">
+            <div className="bg-white p-8 rounded-xl shadow-md border border-gray-150 w-full max-w-lg text-center space-y-6 animate-fade-in">
+              {isSaving ? (
+                <div className="flex flex-col items-center">
+                  <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-2" />
+                  <h3 className="text-lg font-bold text-gray-800">Đang nhập dữ liệu vào hệ thống...</h3>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                    <Check className="w-8 h-8 text-green-600 stroke-[3]" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800">Đã hoàn thành nhập dữ liệu!</h3>
+                </div>
+              )}
+
+              <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{importStatus}</p>
+
+              <div className="space-y-2">
+                <div className="w-full bg-gray-150 h-4 rounded-full overflow-hidden shadow-inner">
+                  <div 
+                    className={`h-full transition-all duration-300 ${hasFinished ? 'bg-green-500' : 'bg-blue-600'}`}
+                    style={{ width: `${totalCount > 0 ? Math.round(((importedCount + failedCount) / totalCount) * 100) : 0}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-gray-500 font-bold px-1">
+                  <span>Tiến trình: {totalCount > 0 ? Math.round(((importedCount + failedCount) / totalCount) * 100) : 0}%</span>
+                  <span>{importedCount + failedCount} / {totalCount} dòng</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100 text-sm">
+                <div className="text-center p-2">
+                  <div className="text-xs text-gray-500 font-bold uppercase mb-1">Thành công</div>
+                  <div className="text-2xl font-black text-green-600">{importedCount}</div>
+                </div>
+                <div className="text-center p-2 border-l border-gray-200">
+                  <div className="text-xs text-gray-500 font-bold uppercase mb-1">Thất bại / Không đổi</div>
+                  <div className="text-2xl font-black text-red-500">{failedCount}</div>
+                </div>
+              </div>
+
+              {hasFinished && (
+                <div className="text-xs text-gray-400 italic font-medium">
+                  Hệ thống đã tự động lưu thông tin đồng bộ trên máy chủ Supabase.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* MODE SWITCHER */}
+            <div className="p-5 border-b bg-gray-50 shrink-0 space-y-4">
+                <div className="flex justify-center">
+                    <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
+                        <button 
+                            onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
+                            className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <PlusCircle size={16} /> Nhập hồ sơ mới
+                        </button>
+                        <button 
+                            onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
+                            className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <RefreshCw size={16} /> Cập nhật thông tin
+                        </button>
+                    </div>
+                </div>
+
+                <div className={`p-3 rounded border text-sm flex items-start gap-2 ${mode === 'create' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
+                    {mode === 'create' ? (
+                        <>
+                            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                            <span>Chế độ này sẽ <strong>thêm mới</strong> toàn bộ dòng trong file Excel vào hệ thống.</span>
+                        </>
+                    ) : (
+                        <>
+                            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                            <div>
+                                <strong>Chế độ Cập Nhật Thông Minh:</strong>
+                                <ul className="list-disc pl-5 mt-1 space-y-1">
+                                    <li>Hệ thống tìm hồ sơ theo <strong>Mã Hồ Sơ</strong>.</li>
+                                    <li>Chỉ cập nhật các cột <strong>CÓ</strong> trong file Excel (VD: chỉ có cột Ngày Xuất thì chỉ cập nhật Ngày Xuất).</li>
+                                    <li><strong>QUAN TRỌNG:</strong> Nếu có cột "Đợt" hoặc "Ngày xuất/Ngày trả", hệ thống sẽ tự động chuyển trạng thái sang "Đã giao 1 cửa" để không bị báo trễ hạn.</li>
+                                </ul>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
+                        <button onClick={() => fileInputRef.current?.click()} className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg hover:opacity-90 transition-colors shadow-sm font-medium ${mode === 'create' ? 'bg-green-600' : 'bg-orange-600'}`}>
+                            <Upload size={18} /> Chọn File Excel
+                        </button>
+                    </div>
+                    {fileName && <span className="text-sm text-gray-600 font-medium">{fileName}</span>}
+                    {previewData.length > 0 && <div className="ml-auto flex items-center gap-2 text-sm text-blue-700 bg-blue-100 px-3 py-1.5 rounded-full"><Check size={16} /> Đã đọc <strong>{previewData.length}</strong> dòng hợp lệ</div>}
                 </div>
             </div>
 
-            <div className={`p-3 rounded border text-sm flex items-start gap-2 ${mode === 'create' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
-                {mode === 'create' ? (
-                    <>
-                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                        <span>Chế độ này sẽ <strong>thêm mới</strong> toàn bộ dòng trong file Excel vào hệ thống.</span>
-                    </>
+            {/* PREVIEW TABLE */}
+            <div className="flex-1 overflow-auto p-0">
+                {loading ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                        <Loader2 className="w-10 h-10 animate-spin mb-2 text-blue-500" />
+                        <p>Đang xử lý dữ liệu...</p>
+                    </div>
+                ) : previewData.length > 0 ? (
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-100 sticky top-0 shadow-sm z-10 text-xs uppercase font-bold text-gray-600">
+                            <tr>
+                                <th className="p-3 border-b">#</th>
+                                <th className="p-3 border-b">Mã HS</th>
+                                <th className="p-3 border-b">Chủ Sử Dụng</th>
+                                <th className="p-3 border-b">Trạng Thái (Dự kiến)</th>
+                                <th className="p-3 border-b">Ngày Xuất</th>
+                                <th className="p-3 border-b">Đợt</th>
+                                <th className="p-3 border-b">Ghi Chú</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-gray-700 divide-y divide-gray-100">
+                            {previewData.map((record, idx) => (
+                                <tr key={idx} className="hover:bg-blue-50">
+                                    <td className="p-3">{idx + 1}</td>
+                                    <td className="p-3 font-medium text-blue-600">{record.code}</td>
+                                    <td className="p-3 font-medium text-gray-500">{record.customerName || <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
+                                    <td className="p-3">{record.status ? <span className={`text-xs px-2 py-1 rounded-full font-bold ${record.status === RecordStatus.HANDOVER ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{record.status}</span> : <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
+                                    <td className="p-3 font-mono text-green-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
+                                    <td className="p-3 font-bold">{record.exportBatch || '-'}</td>
+                                    <td className="p-3 text-gray-500 italic truncate max-w-[200px]">{record.content}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 ) : (
-                    <>
-                        <AlertTriangle size={18} className="shrink-0 mt-0.5" />
-                        <div>
-                            <strong>Chế độ Cập Nhật Thông Minh:</strong>
-                            <ul className="list-disc pl-5 mt-1 space-y-1">
-                                <li>Hệ thống tìm hồ sơ theo <strong>Mã Hồ Sơ</strong>.</li>
-                                <li>Chỉ cập nhật các cột <strong>CÓ</strong> trong file Excel (VD: chỉ có cột Ngày Xuất thì chỉ cập nhật Ngày Xuất).</li>
-                                <li><strong>QUAN TRỌNG:</strong> Nếu có cột "Đợt" hoặc "Ngày xuất/Ngày trả", hệ thống sẽ tự động chuyển trạng thái sang "Đã giao 1 cửa" để không bị báo trễ hạn.</li>
-                            </ul>
-                        </div>
-                    </>
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                        <FileSpreadsheet size={48} className="mb-2 opacity-50" />
+                        <p>Chưa có dữ liệu. Vui lòng chọn file Excel.</p>
+                    </div>
                 )}
             </div>
-
-            <div className="flex items-center gap-4">
-                <div className="relative">
-                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
-                    <button onClick={() => fileInputRef.current?.click()} className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg hover:opacity-90 transition-colors shadow-sm font-medium ${mode === 'create' ? 'bg-green-600' : 'bg-orange-600'}`}>
-                        <Upload size={18} /> Chọn File Excel
-                    </button>
-                </div>
-                {fileName && <span className="text-sm text-gray-600 font-medium">{fileName}</span>}
-                {previewData.length > 0 && <div className="ml-auto flex items-center gap-2 text-sm text-blue-700 bg-blue-100 px-3 py-1.5 rounded-full"><Check size={16} /> Đã đọc <strong>{previewData.length}</strong> dòng hợp lệ</div>}
-            </div>
-        </div>
-
-        {/* PREVIEW TABLE */}
-        <div className="flex-1 overflow-auto p-0">
-            {loading ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                    <Loader2 className="w-10 h-10 animate-spin mb-2 text-blue-500" />
-                    <p>Đang xử lý dữ liệu...</p>
-                </div>
-            ) : previewData.length > 0 ? (
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-100 sticky top-0 shadow-sm z-10 text-xs uppercase font-bold text-gray-600">
-                        <tr>
-                            <th className="p-3 border-b">#</th>
-                            <th className="p-3 border-b">Mã HS</th>
-                            <th className="p-3 border-b">Chủ Sử Dụng</th>
-                            <th className="p-3 border-b">Trạng Thái (Dự kiến)</th>
-                            <th className="p-3 border-b">Ngày Xuất</th>
-                            <th className="p-3 border-b">Đợt</th>
-                            <th className="p-3 border-b">Ghi Chú</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-sm text-gray-700 divide-y divide-gray-100">
-                        {previewData.map((record, idx) => (
-                            <tr key={idx} className="hover:bg-blue-50">
-                                <td className="p-3">{idx + 1}</td>
-                                <td className="p-3 font-medium text-blue-600">{record.code}</td>
-                                <td className="p-3 font-medium text-gray-500">{record.customerName || <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
-                                <td className="p-3">{record.status ? <span className={`text-xs px-2 py-1 rounded-full font-bold ${record.status === RecordStatus.HANDOVER ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{record.status}</span> : <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
-                                <td className="p-3 font-mono text-green-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
-                                <td className="p-3 font-bold">{record.exportBatch || '-'}</td>
-                                <td className="p-3 text-gray-500 italic truncate max-w-[200px]">{record.content}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <FileSpreadsheet size={48} className="mb-2 opacity-50" />
-                    <p>Chưa có dữ liệu. Vui lòng chọn file Excel.</p>
-                </div>
-            )}
-        </div>
+          </>
+        )}
 
         {/* FOOTER */}
         <div className="p-5 border-t bg-white flex justify-end gap-3 shrink-0 rounded-b-lg">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium">Hủy bỏ</button>
-            <button onClick={handleSave} disabled={previewData.length === 0} className={`flex items-center gap-2 px-6 py-2 text-white rounded-md disabled:opacity-50 font-medium shadow-sm active:scale-95 hover:opacity-90 ${mode === 'create' ? 'bg-blue-600' : 'bg-orange-600'}`}>
+          {(isSaving || hasFinished) ? (
+            hasFinished && (
+              <button 
+                onClick={async () => {
+                  onImport([], mode); // Để trigger loadData ở parent
+                  onClose();
+                }} 
+                className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-md font-bold shadow-md hover:bg-green-700 active:scale-95 transition-all text-sm"
+              >
+                <Check size={18} /> Đóng & Tải lại danh sách
+              </button>
+            )
+          ) : (
+            <>
+              <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium">Hủy bỏ</button>
+              <button onClick={handleSave} disabled={previewData.length === 0} className={`flex items-center gap-2 px-6 py-2 text-white rounded-md disabled:opacity-50 font-medium shadow-sm active:scale-95 hover:opacity-90 ${mode === 'create' ? 'bg-blue-600' : 'bg-orange-600'}`}>
                 <Save size={18} /> {mode === 'create' ? 'Lưu vào hệ thống' : 'Tiến hành cập nhật'}
-            </button>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

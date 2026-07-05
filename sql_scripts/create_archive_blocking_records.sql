@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS archive_blocking_records (
     "attached_files" JSONB,
     "isUnblocked" BOOLEAN DEFAULT false,
     "unblockDoc" TEXT,
+    "unblockDate" TEXT,
+    "unblockContent" TEXT,
     "unblock_attached_files" JSONB,
     "createdBy" TEXT
 );

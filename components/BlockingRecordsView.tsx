@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, LandRecord } from '../types';
 import RecordForm from './RecordForm';
-import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip, Download, Upload } from 'lucide-react';
+import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip, Download, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { supabase, isConfigured } from '../services/supabaseClient';
 import { showToast } from '../utils/appHelpers';
@@ -33,6 +33,17 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
   const [editingRecord, setEditingRecord] = useState<LandRecord | undefined>();
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // State cho tiến trình import Excel chia lô (batch)
+  const [importProgress, setImportProgress] = useState<{ active: boolean; current: number; total: number; status: string }>({ active: false, current: 0, total: 0, status: '' });
+
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, advancedFilters, showAdvancedSearch]);
 
   const parseExcelDate = (val: any) => {
     if (!val) return '';
@@ -78,9 +89,11 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
 
         const newRecords: any[] = [];
         for (const row of data) {
+          const hasAnyData = Object.values(row).some(val => val !== null && val !== undefined && val.toString().trim() !== '');
+          if (!hasAnyData) continue;
+
           const ownersStr = row['Chủ sử dụng']?.toString() || '';
           const owners = ownersStr ? ownersStr.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : [];
-          if (!ownersStr) continue; // Bỏ qua dòng trống
 
           const plots: any[] = [];
           if (row['Tờ bản đồ cũ'] || row['Thửa đất cũ'] || row['Tờ bản đồ mới'] || row['Thửa đất mới'] || row['Diện tích cũ'] || row['Diện tích mới']) {
@@ -119,9 +132,10 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
             blockingDocuments,
             unblockDoc: row['Văn bản giải ngăn chặn']?.toString() || '',
             unblockDate: parseExcelDate(row['Ngày văn bản giải ngăn chặn']) || parseExcelDate(row['Ngày giải ngăn chặn']) || '',
+            unblockContent: row['Nội dung giải ngăn chặn']?.toString() || '',
             notes: row['Ghi chú']?.toString() || '',
             isUnblocked,
-            createdBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+            createdBy: row['Người tạo']?.toString() || currentUser?.name || currentUser?.username || 'Hệ thống',
           });
         }
 
@@ -130,20 +144,47 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           return;
         }
 
-        if (isConfigured) {
-          const { error } = await supabase.from('blocking_records').insert(newRecords);
-          if (error) throw error;
-        } else {
-          const withIds = newRecords.map((r, i) => ({
-            ...r,
-            id: 'temp_import_' + Date.now() + '_' + i
+        setImportProgress({ active: true, current: 0, total: newRecords.length, status: 'Chuẩn bị dữ liệu...' });
+
+        const CHUNK_SIZE = 500;
+        let successCount = 0;
+
+        for (let i = 0; i < newRecords.length; i += CHUNK_SIZE) {
+          const chunk = newRecords.slice(i, i + CHUNK_SIZE);
+          const currentBatch = Math.floor(i / CHUNK_SIZE) + 1;
+          const totalBatches = Math.ceil(newRecords.length / CHUNK_SIZE);
+
+          setImportProgress(prev => ({
+            ...prev,
+            current: i,
+            status: `Đang tải lên gói ${currentBatch}/${totalBatches} (dòng ${i + 1} - ${Math.min(i + CHUNK_SIZE, newRecords.length)})...`
           }));
-          setRecords(prev => [...withIds, ...prev]);
+
+          if (isConfigured) {
+            const { error } = await supabase.from('blocking_records').insert(chunk);
+            if (error) throw error;
+            successCount += chunk.length;
+          } else {
+            const withIds = chunk.map((r, index) => ({
+              ...r,
+              id: 'temp_import_' + Date.now() + '_' + (i + index)
+            }));
+            setRecords(prev => [...withIds, ...prev]);
+            successCount += chunk.length;
+          }
+
+          // Tránh chặn UI thread và tạo hiệu ứng mượt
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
 
-        showToast(`Đã nhập thành công ${newRecords.length} hồ sơ ngăn chặn!`, 'success');
-        if (isConfigured) fetchBlockingRecords();
-        else localStorage.setItem('offline_blocking_records', JSON.stringify([...newRecords, ...records]));
+        setImportProgress({ active: false, current: newRecords.length, total: newRecords.length, status: '' });
+        showToast(`Đã nhập thành công ${successCount} hồ sơ ngăn chặn!`, 'success');
+        if (isConfigured) {
+          fetchBlockingRecords();
+        } else {
+          const updatedOffline = [...newRecords.map((r, i) => ({ ...r, id: 'temp_import_' + Date.now() + '_' + i })), ...records];
+          localStorage.setItem('offline_blocking_records', JSON.stringify(updatedOffline));
+        }
       } catch (error) {
         console.error('Lỗi khi import Excel:', error);
         showToast('Có lỗi xảy ra khi nhập file Excel. Hãy kiểm tra lại định dạng file.', 'error');
@@ -180,6 +221,10 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         'Nội dung ngăn chặn': 'Ngăn chặn giao dịch để phục vụ giải quyết tranh chấp hợp đồng đặt cọc',
         'Đã giải ngăn chặn': 'Không',
         'Văn bản giải ngăn chặn': '',
+        'Ngày giải ngăn chặn': '',
+        'Ngày văn bản giải ngăn chặn': '',
+        'Nội dung giải ngăn chặn': '',
+        'Người tạo': 'Hệ thống',
         'Ghi chú': 'Hồ sơ mẫu minh họa'
       }
     ];
@@ -199,10 +244,33 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
     if (!isConfigured) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('blocking_records').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      setRecords(data as LandRecord[]);
-      localStorage.setItem('offline_blocking_records', JSON.stringify(data));
+      let allRecords: LandRecord[] = [];
+      let from = 0;
+      let limit = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('blocking_records')
+          .select('*')
+          .range(from, from + limit - 1)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allRecords = [...allRecords, ...(data as LandRecord[])];
+          if (data.length < limit) {
+            hasMore = false;
+          } else {
+            from += limit;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setRecords(allRecords);
+      localStorage.setItem('offline_blocking_records', JSON.stringify(allRecords));
     } catch (error) {
       console.error('Lỗi khi tải danh sách ngăn chặn:', error);
     } finally {
@@ -284,6 +352,37 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (currentUser.role !== 'ADMIN') {
+      showToast('Chỉ quản trị viên mới có quyền thực hiện chức năng này!', 'error');
+      return;
+    }
+    const confirm1 = window.confirm('CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ hồ sơ ngăn chặn? Tất cả dữ liệu và các tệp đính kèm sẽ bị xóa vĩnh viễn và không thể khôi phục!');
+    if (!confirm1) return;
+
+    const confirm2 = window.prompt('Nhập chữ "DELETE" (viết hoa, không dấu nháy) để xác nhận việc xóa toàn bộ dữ liệu ngăn chặn:');
+    if (confirm2 !== 'DELETE') {
+      showToast('Xác nhận không khớp. Hủy thao tác xóa!', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isConfigured) {
+        const { error } = await supabase.from('blocking_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+      }
+      setRecords([]);
+      localStorage.setItem('offline_blocking_records', JSON.stringify([]));
+      showToast('Đã xóa toàn bộ dữ liệu ngăn chặn thành công!', 'success');
+    } catch (error) {
+      console.error('Lỗi khi xóa toàn bộ dữ liệu:', error);
+      showToast('Đã xảy ra lỗi khi xóa toàn bộ dữ liệu.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredRecords = records.filter(r => {
     if (showAdvancedSearch) {
         // Advanced search matching
@@ -314,6 +413,9 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         return docMatch || unblockMatch || ownersMatch;
     }
   });
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const clearFilters = () => {
       setAdvancedFilters({
@@ -376,6 +478,15 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
             accept=".xlsx, .xls"
             className="hidden"
           />
+          {currentUser.role === 'ADMIN' && (
+            <button
+              onClick={handleDeleteAll}
+              className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+              title="Xóa tất cả dữ liệu ngăn chặn"
+            >
+              <Trash2 size={18} /> Xóa tất cả
+            </button>
+          )}
           <button
             onClick={() => {
               setEditingRecord(undefined);
@@ -424,7 +535,8 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
               <p className="text-sm mt-1 text-gray-400">Hoặc không tìm thấy kết quả phù hợp.</p>
            </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-700 border-collapse">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b-2 border-blue-800">
                 <tr>
@@ -451,9 +563,9 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                 </tr>
               </thead>
               <tbody>
-                {filteredRecords.map((record, index) => (
+                {paginatedRecords.map((record, index) => (
                   <tr key={record.id} className="bg-white border-b hover:bg-gray-50/50 transition-colors">
-                    <td className="px-2 py-4 text-center border font-semibold text-[#003b5c]">{index + 1}</td>
+                    <td className="px-2 py-4 text-center border font-semibold text-[#003b5c]">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                     
                     <td className="px-4 py-4 border align-top">
                       <div className="font-bold text-[#003b5c] uppercase text-sm mb-2">
@@ -560,6 +672,9 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                                 {record.unblockDate && (
                                   <div><span className="font-semibold text-gray-600">Ngày văn bản:</span> {record.unblockDate.includes('-') ? record.unblockDate.split('-').reverse().join('/') : record.unblockDate}</div>
                                 )}
+                                {record.unblockContent && (
+                                  <div><span className="font-semibold text-gray-600">Nội dung giải tỏa:</span> {record.unblockContent}</div>
+                                )}
                               </div>
                             </div>
                             {(record.unblock_attached_files && record.unblock_attached_files.length > 0) && (
@@ -623,6 +738,72 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
               </tbody>
             </table>
           </div>
+          {/* PHÂN TRANG */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-gray-50/50">
+              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                Hiển thị <span className="font-bold text-[#003b5c]">{paginatedRecords.length}</span> / <span className="font-bold text-gray-700">{filteredRecords.length}</span> hồ sơ
+                {totalPages > 1 && ` (Trang ${currentPage}/${totalPages})`}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-40 disabled:hover:bg-white transition-all shadow-sm"
+                  title="Trang đầu"
+                >
+                  <ChevronsLeft size={16} />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-40 disabled:hover:bg-white transition-all shadow-sm"
+                  title="Trang trước"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                
+                {/* Số trang xung quanh trang hiện tại */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum = currentPage - 2 + i;
+                  if (pageNum < 1) pageNum = i + 1;
+                  if (pageNum > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1 text-sm font-bold rounded-md transition-all shadow-sm ${
+                        currentPage === pageNum
+                          ? 'bg-[#003b5c] text-white'
+                          : 'border border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-40 disabled:hover:bg-white transition-all shadow-sm"
+                  title="Trang sau"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-40 disabled:hover:bg-white transition-all shadow-sm"
+                  title="Trang cuối"
+                >
+                  <ChevronsRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -634,6 +815,33 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           onSubmit={handleSave}
           onCancel={() => setShowForm(false)}
         />
+      )}
+
+      {/* Progress Modal overlay */}
+      {importProgress.active && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center space-y-6 border border-gray-150 animate-fade-in">
+            <div className="flex flex-col items-center">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-2" />
+              <h3 className="text-lg font-bold text-gray-800">Đang nhập dữ liệu ngăn chặn...</h3>
+            </div>
+            
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide leading-relaxed min-h-[2.5rem] flex items-center justify-center bg-gray-50 p-3 rounded-lg border border-gray-100">{importProgress.status}</p>
+            
+            <div className="space-y-2">
+              <div className="w-full bg-gray-150 h-3 rounded-full overflow-hidden shadow-inner">
+                <div 
+                  className="bg-blue-600 h-full transition-all duration-300" 
+                  style={{ width: `${importProgress.total > 0 ? Math.round((importProgress.current / importProgress.total) * 100) : 0}%` }}
+                />
+              </div>
+              <div className="text-xs text-gray-500 font-bold flex justify-between px-1">
+                <span>Tiến trình: {importProgress.total > 0 ? Math.round((importProgress.current / importProgress.total) * 100) : 0}%</span>
+                <span>{importProgress.current} / {importProgress.total} dòng</span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

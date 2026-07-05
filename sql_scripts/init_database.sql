@@ -253,6 +253,8 @@ CREATE TABLE blocking_records (
     "newCommune" TEXT,
     "blockingDocuments" JSONB,
     "unblockDoc" TEXT,
+    "unblockDate" TEXT,
+    "unblockContent" TEXT,
     notes TEXT,
     "isUnblocked" BOOLEAN DEFAULT false,
     "createdBy" TEXT,

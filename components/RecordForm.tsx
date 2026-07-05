@@ -51,6 +51,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     blockingDocuments: [{ docNumber: '', date: new Date().toISOString().split('T')[0], agency: '', note: '' }],
     unblockDoc: '',
     unblockDate: '',
+    unblockContent: '',
     notes: '',
     isUnblocked: false,
     createdBy: currentUser.name, // Mặc định lấy tên người đăng nhập
@@ -82,6 +83,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
             date: d.date || ''
         })),
         unblockDate: initialData.unblockDate || '',
+        unblockContent: initialData.unblockContent || '',
         createdBy: initialData.createdBy || currentUser.name // Giữ nguyên người tạo cũ hoặc lấy user hiện tại nếu chưa có
       });
     }
@@ -797,6 +799,18 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                                     className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
                                 />
                             </div>
+                        </div>
+
+                        <div className="mb-3">
+                            <label className="block text-xs font-bold text-green-800 mb-1 uppercase">Nội dung giải ngăn chặn</label>
+                            <textarea
+                                name="unblockContent"
+                                value={formData.unblockContent || ''}
+                                onChange={handleChange}
+                                className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
+                                placeholder="Nhập nội dung giải ngăn chặn..."
+                                rows={2}
+                            />
                         </div>
 
                         <div className="mb-3">

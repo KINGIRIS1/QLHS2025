@@ -261,6 +261,7 @@ export interface LandRecord {
   blockingDocuments: BlockingDocument[];
   unblockDoc: string;
   unblockDate?: string;
+  unblockContent?: string;
   notes: string;
   isUnblocked: boolean;
   createdBy: string;

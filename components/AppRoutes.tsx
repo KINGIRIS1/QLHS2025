@@ -511,7 +511,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
     switch (currentView) {
         case 'dashboard':
-            return <DashboardView records={records} />;
+            return <DashboardView records={records} currentUser={currentUser} />;
         // case 'internal_chat':
         //     return (
         //         <InternalChat

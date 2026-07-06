@@ -68,121 +68,124 @@ const BlockingCheckToolModal: React.FC<BlockingCheckToolModalProps> = ({ isOpen,
       setLoadingText('Đang tải danh sách hồ sơ đo đạc từ máy chủ...');
       const landRecords = await fetchRecords(true);
 
-      // 2. Tải cơ sở dữ liệu ngăn chặn
-      setLoadingText('Đang đọc dữ liệu ngăn chặn ngoại tuyến (IndexedDB)...');
-      let activeBlockingList = await offlineDb.getRecords('blocking_records');
-      let archiveBlockingList = await offlineDb.getRecords('archive_blocking_records');
+      // 2. Tải số lượng cơ sở dữ liệu ngăn chặn
+      setLoadingText('Đang kiểm tra dữ liệu ngăn chặn ngoại tuyến...');
+      const activeCount = await offlineDb.countRecords('blocking_records');
+      const archiveCount = await offlineDb.countRecords('archive_blocking_records');
 
       setRecordsCount({
         received: landRecords.length,
-        activeBlocking: activeBlockingList.length,
-        archiveBlocking: archiveBlockingList.length
+        activeBlocking: activeCount,
+        archiveBlocking: archiveCount
       });
 
-      const totalRecords = landRecords.length;
-      setProgress({ current: 0, total: totalRecords });
+      const totalBlockingRecords = activeCount + archiveCount;
+      setProgress({ current: 0, total: totalBlockingRecords });
 
-      // 3. Tiến hành đối soát theo lô (Batching)
+      // 3. Tiến hành đối soát theo lô qua stream cursor của IndexedDB
       const matches: MatchedResult[] = [];
-      const BATCH_SIZE = 100;
+      let processedBlockingCount = 0;
 
-      for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
-        const chunk = landRecords.slice(i, i + BATCH_SIZE);
-        setLoadingText(`Đang đối soát: xử lý hồ sơ ${i.toLocaleString()} đến ${Math.min(i + BATCH_SIZE, totalRecords).toLocaleString()}...`);
+      const processBlockingBatch = async (blockingBatch: LandRecord[], source: 'active' | 'archive') => {
+        blockingBatch.forEach(blocking => {
+          const blockOldNorm = normalizeStr(blocking.oldCommune);
+          const blockNewNorm = normalizeStr(blocking.newCommune);
+          const cleanBlockOld = cleanCommuneName(blockOldNorm);
+          const cleanBlockNew = cleanCommuneName(blockNewNorm);
 
-        chunk.forEach(rec => {
-          const wardNorm = normalizeStr(rec.ward);
-          const plotNorm = normalizeStr(rec.landPlot);
-          const sheetNorm = normalizeStr(rec.mapSheet);
-          const fileCustomer = normalizeStr(rec.customerName);
+          landRecords.forEach(rec => {
+            const wardNorm = normalizeStr(rec.ward);
+            const plotNorm = normalizeStr(rec.landPlot);
+            const sheetNorm = normalizeStr(rec.mapSheet);
+            const fileCustomer = normalizeStr(rec.customerName);
 
-          if (!wardNorm && !plotNorm && !fileCustomer) return;
+            if (!wardNorm && !plotNorm && !fileCustomer) return;
 
-          const cleanWard = cleanCommuneName(wardNorm);
+            const cleanWard = cleanCommuneName(wardNorm);
 
-          const performCheck = (blockingList: LandRecord[], source: 'active' | 'archive') => {
-            blockingList.forEach(blocking => {
-              const blockOldNorm = normalizeStr(blocking.oldCommune);
-              const blockNewNorm = normalizeStr(blocking.newCommune);
-              const cleanBlockOld = cleanCommuneName(blockOldNorm);
-              const cleanBlockNew = cleanCommuneName(blockNewNorm);
+            // Khớp xã/phường thông minh
+            const isCommuneMatch = 
+              (!cleanWard) || 
+              (!cleanBlockOld && !cleanBlockNew) ||
+              (cleanBlockOld && (cleanBlockOld === cleanWard || cleanBlockOld.includes(cleanWard) || cleanWard.includes(cleanBlockOld))) ||
+              (cleanBlockNew && (cleanBlockNew === cleanWard || cleanBlockNew.includes(cleanWard) || cleanWard.includes(cleanBlockNew)));
 
-              // Khớp xã/phường thông minh
-              const isCommuneMatch = 
-                (!cleanWard) || 
-                (!cleanBlockOld && !cleanBlockNew) ||
-                (cleanBlockOld && (cleanBlockOld === cleanWard || cleanBlockOld.includes(cleanWard) || cleanWard.includes(cleanBlockOld))) ||
-                (cleanBlockNew && (cleanBlockNew === cleanWard || cleanBlockNew.includes(cleanWard) || cleanWard.includes(cleanBlockNew)));
+            // 1. Đối soát Tờ/Thửa
+            let isPlotMatch = false;
+            const matchedPlotsArr: string[] = [];
 
-              // 1. Đối soát Tờ/Thửa
-              let isPlotMatch = false;
-              const matchedPlotsArr: string[] = [];
+            if (isCommuneMatch && plotNorm && blocking.plots && blocking.plots.length > 0) {
+              isPlotMatch = blocking.plots.some(p => {
+                const oldPlotNorm = normalizeStr(p.oldPlotNumber);
+                const newPlotNorm = normalizeStr(p.newPlotNumber);
+                const oldSheetNorm = normalizeStr(p.oldMapSheetNumber);
+                const newSheetNorm = normalizeStr(p.newMapSheetNumber);
 
-              if (isCommuneMatch && plotNorm && blocking.plots && blocking.plots.length > 0) {
-                isPlotMatch = blocking.plots.some(p => {
-                  const oldPlotNorm = normalizeStr(p.oldPlotNumber);
-                  const newPlotNorm = normalizeStr(p.newPlotNumber);
-                  const oldSheetNorm = normalizeStr(p.oldMapSheetNumber);
-                  const newSheetNorm = normalizeStr(p.newMapSheetNumber);
+                const plotMatches = matchTokensList(plotNorm, oldPlotNorm) || matchTokensList(plotNorm, newPlotNorm);
 
-                  const plotMatches = matchTokensList(plotNorm, oldPlotNorm) || matchTokensList(plotNorm, newPlotNorm);
-
-                  let sheetMatches = !sheetNorm;
-                  if (!sheetMatches) {
-                    const hasOldSheet = !!oldSheetNorm;
-                    const hasNewSheet = !!newSheetNorm;
-                    if (!hasOldSheet && !hasNewSheet) {
-                      sheetMatches = true;
-                    } else {
-                      const oldMatch = hasOldSheet && matchTokensList(sheetNorm, oldSheetNorm);
-                      const newMatch = hasNewSheet && matchTokensList(sheetNorm, newSheetNorm);
-                      sheetMatches = oldMatch || newMatch;
-                    }
+                let sheetMatches = !sheetNorm;
+                if (!sheetMatches) {
+                  const hasOldSheet = !!oldSheetNorm;
+                  const hasNewSheet = !!newSheetNorm;
+                  if (!hasOldSheet && !hasNewSheet) {
+                    sheetMatches = true;
+                  } else {
+                    const oldMatch = hasOldSheet && matchTokensList(sheetNorm, oldSheetNorm);
+                    const newMatch = hasNewSheet && matchTokensList(sheetNorm, newSheetNorm);
+                    sheetMatches = oldMatch || newMatch;
                   }
+                }
 
-                  if (plotMatches && sheetMatches) {
-                    const plotDesc = `Tờ ${p.oldMapSheetNumber || p.newMapSheetNumber || '---'} / Thửa ${p.oldPlotNumber || p.newPlotNumber || '---'}`;
-                    matchedPlotsArr.push(plotDesc);
-                    return true;
-                  }
-                  return false;
-                });
-              }
+                if (plotMatches && sheetMatches) {
+                  const plotDesc = `Tờ ${p.oldMapSheetNumber || p.newMapSheetNumber || '---'} / Thửa ${p.oldPlotNumber || p.newPlotNumber || '---'}`;
+                  matchedPlotsArr.push(plotDesc);
+                  return true;
+                }
+                return false;
+              });
+            }
 
-              // 2. Đối soát Tên chủ sử dụng
-              let isOwnerMatch = false;
-              if (isCommuneMatch && fileCustomer && blocking.owners && blocking.owners.length > 0) {
-                isOwnerMatch = blocking.owners.some(bo => {
-                  const boNorm = normalizeStr(bo);
-                  return boNorm && (fileCustomer === boNorm || fileCustomer.includes(boNorm) || boNorm.includes(fileCustomer));
-                });
-              }
+            // 2. Đối soát Tên chủ sử dụng
+            let isOwnerMatch = false;
+            if (isCommuneMatch && fileCustomer && blocking.owners && blocking.owners.length > 0) {
+              isOwnerMatch = blocking.owners.some(bo => {
+                const boNorm = normalizeStr(bo);
+                return boNorm && (fileCustomer === boNorm || fileCustomer.includes(boNorm) || boNorm.includes(fileCustomer));
+              });
+            }
 
-              if (isPlotMatch || isOwnerMatch) {
-                let matchType: 'plot' | 'owner' | 'both' = 'plot';
-                if (isPlotMatch && isOwnerMatch) matchType = 'both';
-                else if (isOwnerMatch) matchType = 'owner';
+            if (isPlotMatch || isOwnerMatch) {
+              let matchType: 'plot' | 'owner' | 'both' = 'plot';
+              if (isPlotMatch && isOwnerMatch) matchType = 'both';
+              else if (isOwnerMatch) matchType = 'owner';
 
-                matches.push({
-                  recordFile: rec,
-                  blockingRecord: blocking,
-                  source,
-                  matchType,
-                  matchedPlots: matchedPlotsArr
-                });
-              }
-            });
-          };
-
-          performCheck(activeBlockingList, 'active');
-          performCheck(archiveBlockingList, 'archive');
+              matches.push({
+                recordFile: rec,
+                blockingRecord: blocking,
+                source,
+                matchType,
+                matchedPlots: matchedPlotsArr
+              });
+            }
+          });
         });
 
-        const currentProcessed = Math.min(i + BATCH_SIZE, totalRecords);
-        setProgress({ current: currentProcessed, total: totalRecords });
+        processedBlockingCount += blockingBatch.length;
+        setProgress({ current: processedBlockingCount, total: totalBlockingRecords });
+        setLoadingText(`Đang đối soát: đã quét ${processedBlockingCount.toLocaleString()} / ${totalBlockingRecords.toLocaleString()} dữ liệu ngăn chặn...`);
         
-        // Yield to browser rendering loop
-        await new Promise(resolve => setTimeout(resolve, 5));
+        // Thôi thúc trình duyệt cập nhật UI (giải phóng event loop)
+        await new Promise(resolve => setTimeout(resolve, 0));
+      };
+
+      // 4. Stream qua 'blocking_records' (dữ liệu ngăn chặn hiện hành)
+      if (activeCount > 0) {
+        await offlineDb.streamRecords('blocking_records', (batch) => processBlockingBatch(batch, 'active'), 1000);
+      }
+
+      // 5. Stream qua 'archive_blocking_records' (dữ liệu lịch sử lưu trữ)
+      if (archiveCount > 0) {
+        await offlineDb.streamRecords('archive_blocking_records', (batch) => processBlockingBatch(batch, 'archive'), 1000);
       }
 
       setAllMatches(matches);

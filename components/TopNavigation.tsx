@@ -44,7 +44,10 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const normalizedDept = (currentDepartment || '').trim().toLowerCase();
 
   if (normalizedDept.includes('đo đạc')) {
-    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records', 'blocking_records'];
+    if (!teamLeaderAllowedViews.includes('blocking_records')) {
+      teamLeaderAllowedViews.push('blocking_records');
+    }
   } else if (normalizedDept.includes('lưu trữ')) {
     employeeAllowedViews = ['dashboard', 'archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
   } else if (normalizedDept.includes('đăng ký')) {
@@ -101,7 +104,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin },
+        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin || ((isSubadmin || isTeamLeader || isEmployee) && normalizedDept.includes('đo đạc')) },
         { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: true },
         { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
         { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: true },

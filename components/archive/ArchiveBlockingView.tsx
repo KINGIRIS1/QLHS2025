@@ -4,6 +4,7 @@ import RecordForm from '../RecordForm';
 import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip, Download, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { supabase, isConfigured } from '../../services/supabaseClient';
+import { offlineDb } from '../../utils/offlineDb';
 
 const safeSaveOfflineRecords = (key: string, data: any[]) => {
   try {
@@ -20,21 +21,19 @@ const safeSaveOfflineRecords = (key: string, data: any[]) => {
   }
 };
 
+const stripAccents = (str: string) => {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+};
+
 interface Props {
   currentUser: User;
 }
 
 const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
-  const [records, setRecords] = useState<LandRecord[]>(() => {
-    try {
-      const cached = localStorage.getItem('offline_archive_blocking_records');
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      console.warn('Error reading from localStorage:', e);
-      return [];
-    }
-  });
+  const [records, setRecords] = useState<LandRecord[]>([]);
   const [loading, setLoading] = useState(false);
+
+
   
   const [searchFilters, setSearchFilters] = useState({
     issueNumber: '',
@@ -198,6 +197,7 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
 
         const CHUNK_SIZE = 500;
         let successCount = 0;
+        const importedRecords: any[] = [];
 
         for (let i = 0; i < newRecords.length; i += CHUNK_SIZE) {
           const chunk = newRecords.slice(i, i + CHUNK_SIZE);
@@ -211,14 +211,18 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
           }));
 
           if (isConfigured) {
-            const { error } = await supabase.from('archive_blocking_records').insert(chunk);
+            const { data, error } = await supabase.from('archive_blocking_records').insert(chunk).select();
             if (error) throw error;
+            const recordsWithIds = data || chunk;
+            importedRecords.push(...recordsWithIds);
+            setRecords(prev => [...recordsWithIds, ...prev]);
             successCount += chunk.length;
           } else {
             const withIds = chunk.map((r, index) => ({
               ...r,
               id: 'temp_import_' + Date.now() + '_' + (i + index)
             }));
+            importedRecords.push(...withIds);
             setRecords(prev => [...withIds, ...prev]);
             successCount += chunk.length;
           }
@@ -229,12 +233,10 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
 
         setImportProgress({ active: false, current: newRecords.length, total: newRecords.length, status: '' });
         alert(`Đã nhập thành công ${successCount} hồ sơ ngăn chặn lưu trữ!`);
-        if (isConfigured) {
-          fetchBlockingRecords();
-        } else {
-          const updatedOffline = [...newRecords.map((r, i) => ({ ...r, id: 'temp_import_' + Date.now() + '_' + i })), ...records];
-          safeSaveOfflineRecords('offline_archive_blocking_records', updatedOffline);
-        }
+        
+        const allNewRecords = [...importedRecords, ...records];
+        await offlineDb.saveRecords('archive_blocking_records', allNewRecords);
+        localStorage.removeItem('last_blocking_records_sync_time');
       } catch (error) {
         console.error('Lỗi khi import Excel:', error);
         alert('Có lỗi xảy ra khi nhập file Excel. Hãy kiểm tra lại định dạng file.');
@@ -246,8 +248,8 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
   };
 
   useEffect(() => {
-    fetchBlockingRecords();
-  }, []);
+    fetchBlockingRecords(appliedFilters);
+  }, [appliedFilters]);
 
   const handleExportTemplate = () => {
     const templateData = [
@@ -290,19 +292,82 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
     XLSX.writeFile(wb, "Mau_Nhap_Ho_So_Ngan_Chan_Luu_Tru.xlsx");
   };
 
-  const fetchBlockingRecords = async () => {
+  const fetchBlockingRecords = async (filters = appliedFilters) => {
     if (!isConfigured) return;
     setLoading(true);
     try {
+      const hasFilter = Object.values(filters).some(v => v !== '');
+      
+      if (!hasFilter) {
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+      
+      const buildQuery = () => {
+        let q = supabase.from('archive_blocking_records').select('*');
+        if (filters.issueNumber) {
+          q = q.ilike('issueNumber', `%${filters.issueNumber}%`);
+        }
+        if (filters.certNumber) {
+          q = q.ilike('certNumber', `%${filters.certNumber}%`);
+        }
+        if (filters.oldCommune) {
+          q = q.ilike('oldCommune', `%${filters.oldCommune}%`);
+        }
+        if (filters.newCommune) {
+          q = q.ilike('newCommune', `%${filters.newCommune}%`);
+        }
+        if (filters.unblockDoc) {
+          q = q.ilike('unblockDoc', `%${filters.unblockDoc}%`);
+        }
+        if (filters.oldPlotNumber) {
+          q = q.or(`plots.cs.[{"oldPlotNumber":"${filters.oldPlotNumber}"}]`);
+        }
+        if (filters.newPlotNumber) {
+          q = q.or(`plots.cs.[{"newPlotNumber":"${filters.newPlotNumber}"}]`);
+        }
+        
+        // Bổ sung lọc trực tiếp ở DB
+        if (filters.owner) {
+          const term = filters.owner.trim();
+          const variations = [
+            term,
+            term.toLowerCase(),
+            term.toUpperCase(),
+            stripAccents(term),
+            stripAccents(term).toLowerCase(),
+            stripAccents(term).toUpperCase()
+          ];
+          const uniqueVariations = Array.from(new Set(variations));
+          const orConditions = uniqueVariations.map(v => `owners.cs.["${v}"]`).join(',');
+          q = q.or(orConditions);
+        }
+        if (filters.docNumber) {
+          const term = filters.docNumber.trim();
+          const variations = [term, term.toUpperCase(), term.toLowerCase()];
+          const uniqueVariations = Array.from(new Set(variations));
+          const orConditions = uniqueVariations.map(v => `blockingDocuments.cs.[{"docNumber":"${v}"}]`).join(',');
+          q = q.or(orConditions);
+        }
+        if (filters.oldMapSheetNumber) {
+          q = q.or(`plots.cs.[{"oldMapSheetNumber":"${filters.oldMapSheetNumber}"}]`);
+        }
+        if (filters.newMapSheetNumber) {
+          q = q.or(`plots.cs.[{"newMapSheetNumber":"${filters.newMapSheetNumber}"}]`);
+        }
+        return q;
+      };
+
       let allRecords: LandRecord[] = [];
       let from = 0;
       let limit = 1000;
       let hasMore = true;
+      // Tránh tải 30k+ bản ghi cùng lúc nếu không lọc để tăng hiệu suất và vượt giới hạn 10k
+      const maxRows = hasFilter ? 10000 : 3000;
       
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('archive_blocking_records')
-          .select('*')
+      while (hasMore && from < maxRows) {
+        const { data, error } = await buildQuery()
           .range(from, from + limit - 1)
           .order('created_at', { ascending: false });
         
@@ -320,7 +385,8 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
       }
       
       setRecords(allRecords);
-      safeSaveOfflineRecords('offline_archive_blocking_records', allRecords);
+      // Lưu toàn bộ dữ liệu tải được vào IndexedDB
+      await offlineDb.saveRecords('archive_blocking_records', allRecords);
     } catch (error) {
       console.error('Lỗi khi tải danh sách ngăn chặn:', error);
     } finally {
@@ -335,15 +401,17 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
         if (isConfigured) {
           const { error } = await supabase.from('archive_blocking_records').update(formData).eq('id', formData.id);
           if (error) throw error;
-        } else {
-           updatedRecs = records.map(p => p.id === formData.id ? formData : p);
-           setRecords(updatedRecs);
         }
+        updatedRecs = records.map(p => p.id === formData.id ? formData : p);
+        setRecords(updatedRecs);
         alert('Cập nhật thành công!');
       } else {
         if (isConfigured) {
-          const { error } = await supabase.from('archive_blocking_records').insert([formData]);
+          const { data, error } = await supabase.from('archive_blocking_records').insert([formData]).select();
           if (error) throw error;
+          const inserted = data && data[0] ? data[0] : formData;
+          updatedRecs = [inserted, ...records];
+          setRecords(updatedRecs);
         } else {
           formData.id = 'temp_' + Date.now();
           updatedRecs = [formData, ...records];
@@ -351,10 +419,10 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
         }
         alert('Thêm mới thành công!');
       }
+      await offlineDb.saveRecords('archive_blocking_records', updatedRecs);
+      localStorage.removeItem('last_blocking_records_sync_time');
       setShowForm(false);
       setEditingRecord(undefined);
-      if (isConfigured) fetchBlockingRecords();
-      else safeSaveOfflineRecords('offline_archive_blocking_records', updatedRecs);
     } catch (error) {
       console.error('Lỗi khi lưu:', error);
       alert('Đã có lỗi xảy ra. Hãy thử lại.');
@@ -370,7 +438,8 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
       }
       const newRecs = records.filter(r => r.id !== id);
       setRecords(newRecs);
-      if (!isConfigured) safeSaveOfflineRecords('offline_archive_blocking_records', newRecs);
+      if (!isConfigured) await offlineDb.saveRecords('archive_blocking_records', newRecs);
+      localStorage.removeItem('last_blocking_records_sync_time');
       alert('Xóa thành công!');
     } catch (error) {
       console.error('Lỗi khi xóa:', error);
@@ -399,7 +468,8 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
         if (error) throw error;
       }
       setRecords([]);
-      safeSaveOfflineRecords('offline_archive_blocking_records', []);
+      await offlineDb.saveRecords('archive_blocking_records', []);
+      localStorage.removeItem('last_blocking_records_sync_time');
       alert('Đã xóa toàn bộ dữ liệu ngăn chặn lưu trữ thành công!');
     } catch (error) {
       console.error('Lỗi khi xóa toàn bộ dữ liệu:', error);
@@ -428,7 +498,7 @@ const ArchiveBlockingView: React.FC<Props> = ({ currentUser }) => {
 
     const docMatch = !appliedFilters.docNumber || r.blockingDocuments?.some(d => d.docNumber?.toLowerCase().includes(appliedFilters.docNumber.toLowerCase()));
 
-    return matchIssueNum && matchCertNum && matchOldCommune && matchNewCommune && matchOwner && matchUnblockDoc && (r.plots ? plotMatch : true) && docMatch;
+    return matchIssueNum && matchCertNum && matchOldCommune && matchNewCommune && matchOwner && matchUnblockDoc && (!r.plots || r.plots.length === 0 || plotMatch) && docMatch;
   });
 
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);

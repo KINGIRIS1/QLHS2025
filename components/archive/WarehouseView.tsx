@@ -122,7 +122,29 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
         return () => window.removeEventListener('archive_realtime_update', handleRealtimeUpdate);
     }, [currentPage]);
 
+    const hasActiveFilter = useMemo(() => {
+        return !!(
+            searchTerm ||
+            advMaBienNhan ||
+            advLoaiHoSo ||
+            advChuSuDung ||
+            advCccd ||
+            advToBando ||
+            advSoThua ||
+            advSoPhatHanh ||
+            advSoVaoSo ||
+            advXaPhuong
+        );
+    }, [searchTerm, advMaBienNhan, advLoaiHoSo, advChuSuDung, advCccd, advToBando, advSoThua, advSoPhatHanh, advSoVaoSo, advXaPhuong]);
+
     const loadData = async (pageToLoad: number = currentPage) => {
+        if (!hasActiveFilter) {
+            setRecords([]);
+            setTotalRecords(0);
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         try {
             const data = await fetchWarehouseRecordsPaginated(pageToLoad, itemsPerPage, {
@@ -799,7 +821,14 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                             ) : records.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="p-12 text-center text-slate-400 italic">
-                                        Không tìm thấy hồ sơ nào đáp ứng điều kiện tìm kiếm.
+                                        {hasActiveFilter ? (
+                                            "Không tìm thấy hồ sơ nào đáp ứng điều kiện tìm kiếm."
+                                        ) : (
+                                            <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-500 font-semibold not-italic">
+                                                <Search size={24} className="text-indigo-500 animate-pulse" />
+                                                <span>Vui lòng nhập thông tin tìm kiếm ở trên và bấm "Tìm kiếm ngay"</span>
+                                            </div>
+                                        )}
                                     </td>
                                 </tr>
                             ) : (

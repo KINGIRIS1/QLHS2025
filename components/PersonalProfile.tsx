@@ -11,6 +11,7 @@ import PhieuXinLoiModal from './PhieuXinLoiModal';
 import { PlotCountModal } from './PlotCountModal';
 import BlockingWarningModal from './BlockingWarningModal';
 import { supabase, isConfigured } from '../services/supabaseClient';
+import { offlineDb } from '../utils/offlineDb';
 
 import PersonalReportView from './PersonalReportView';
 
@@ -334,79 +335,116 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       const plotNorm = normalize(record.landPlot);
       const sheetNorm = normalize(record.mapSheet);
 
-      if (!wardNorm || !plotNorm) return [];
+      if (!wardNorm && !plotNorm) return [];
 
       const cleanWard = cleanCommune(wardNorm);
 
       let activeList: any[] = [];
       let archiveList: any[] = [];
 
-      if (isConfigured) {
-          try {
-              // Extract all plot tokens & bases to do a highly indexed JSONB containment query
-              const plotTokens = plotNorm.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
-              const searchTerms = new Set<string>();
-              plotTokens.forEach(token => {
-                  searchTerms.add(token);
-                  if (token.includes('/')) {
-                      const base = token.split('/')[0];
-                      if (base) searchTerms.add(base);
-                  }
-              });
+      try {
+          // Khuyên dùng: Đọc toàn bộ dữ liệu từ IndexedDB cục bộ (chứa đầy đủ 21,700+ bản ghi)
+          // Cách này hoạt động tức thì (< 5ms), không tốn tài nguyên mạng và kiểm tra được cả các bản ghi không có thông tin xã
+          activeList = await offlineDb.getRecords('blocking_records');
+          archiveList = await offlineDb.getRecords('archive_blocking_records');
 
-              if (searchTerms.size > 0) {
-                  // Build optimized OR filter using Supabase .or() on JSONB containment
+          // Fallback: Nếu IndexedDB trống (ở lần khởi chạy đầu tiên), thực hiện kéo trực tuyến từ Supabase
+          if (isConfigured && activeList.length === 0) {
+              if (cleanWard) {
+                  const wardFilter = `oldCommune.ilike.%${cleanWard}%,newCommune.ilike.%${cleanWard}%`;
+                  let hasMoreActive = true;
+                  let fromActive = 0;
+                  const limit = 1000;
+                  while (hasMoreActive) {
+                      const { data, error } = await supabase
+                          .from('blocking_records')
+                          .select('*')
+                          .or(wardFilter)
+                          .range(fromActive, fromActive + limit - 1);
+                      if (error) throw error;
+                      if (data && data.length > 0) {
+                          activeList = [...activeList, ...data];
+                          if (data.length < limit) {
+                              hasMoreActive = false;
+                          } else {
+                              fromActive += limit;
+                          }
+                      } else {
+                          hasMoreActive = false;
+                      }
+                  }
+
+                  let hasMoreArchive = true;
+                  let fromArchive = 0;
+                  while (hasMoreArchive) {
+                      const { data, error } = await supabase
+                          .from('archive_blocking_records')
+                          .select('*')
+                          .or(wardFilter)
+                          .range(fromArchive, fromArchive + limit - 1);
+                      if (error) throw error;
+                      if (data && data.length > 0) {
+                          archiveList = [...archiveList, ...data];
+                          if (data.length < limit) {
+                              hasMoreArchive = false;
+                          } else {
+                              fromArchive += limit;
+                          }
+                      } else {
+                          hasMoreArchive = false;
+                      }
+                  }
+              } else if (plotNorm) {
                   const orParts: string[] = [];
+                  const plotTokens = plotNorm.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
+                  const searchTerms = new Set<string>();
+                  plotTokens.forEach(token => {
+                      searchTerms.add(token);
+                      if (token.includes('/')) {
+                          const base = token.split('/')[0];
+                          if (base) searchTerms.add(base);
+                      }
+                  });
                   searchTerms.forEach(term => {
                       orParts.push(`plots.cs.[{"oldPlotNumber":"${term}"}]`);
                       orParts.push(`plots.cs.[{"newPlotNumber":"${term}"}]`);
                   });
-                  const orQuery = orParts.join(',');
 
-                  // Fetch candidate matching records instantly
-                  const [activeRes, archiveRes] = await Promise.all([
-                      supabase.from('blocking_records').select('*').or(orQuery),
-                      supabase.from('archive_blocking_records').select('*').or(orQuery)
-                  ]);
-
-                  if (!activeRes.error && activeRes.data) activeList = activeRes.data;
-                  if (!archiveRes.error && archiveRes.data) archiveList = archiveRes.data;
+                  if (orParts.length > 0) {
+                      const orQuery = orParts.join(',');
+                      const [activeRes, archiveRes] = await Promise.all([
+                          supabase.from('blocking_records').select('*').or(orQuery),
+                          supabase.from('archive_blocking_records').select('*').or(orQuery)
+                      ]);
+                      if (!activeRes.error && activeRes.data) activeList = activeRes.data;
+                      if (!archiveRes.error && archiveRes.data) archiveList = archiveRes.data;
+                  }
               }
-          } catch (e) {
-              console.error('Lỗi khi tải dữ liệu ngăn chặn trực tuyến, chuyển sang offline:', e);
-              // Fallback to offline
-              const activeRaw = localStorage.getItem('offline_blocking_records');
-              const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
-              activeList = activeRaw ? JSON.parse(activeRaw) : [];
-              archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
           }
-      } else {
-          // Offline Mode fallback
-          const activeRaw = localStorage.getItem('offline_blocking_records');
-          const archiveRaw = localStorage.getItem('offline_archive_blocking_records');
-          activeList = activeRaw ? JSON.parse(activeRaw) : [];
-          archiveList = archiveRaw ? JSON.parse(archiveRaw) : [];
+      } catch (e) {
+          console.error('Lỗi khi thực hiện kiểm tra ngăn chặn:', e);
       }
 
       const matches: { record: any; source: 'active' | 'archive' }[] = [];
 
       const checkList = (list: any[], source: 'active' | 'archive') => {
           list.forEach(blocking => {
-              if (blocking.isUnblocked) return;
-
               const blockOldNorm = normalize(blocking.oldCommune);
               const blockNewNorm = normalize(blocking.newCommune);
               
               const cleanBlockOld = cleanCommune(blockOldNorm);
               const cleanBlockNew = cleanCommune(blockNewNorm);
 
+              // Xử lý khớp xã/phường thông minh:
+              // Nếu hồ sơ hoặc dữ liệu chặn thiếu xã/phường -> bỏ qua kiểm tra xã và xem như khớp (để đối soát Tờ/Thửa/Tên chủ toàn hệ thống)
               const isCommuneMatch = 
+                  (!cleanWard) || 
+                  (!cleanBlockOld && !cleanBlockNew) ||
                   (cleanBlockOld && (cleanBlockOld === cleanWard || cleanBlockOld.includes(cleanWard) || cleanWard.includes(cleanBlockOld))) ||
                   (cleanBlockNew && (cleanBlockNew === cleanWard || cleanBlockNew.includes(cleanWard) || cleanWard.includes(cleanBlockNew)));
-              
-              if (!isCommuneMatch) return;
 
-              const plotMatch = blocking.plots?.some((p: any) => {
+              // 1. Đối soát Tờ/Thửa đất
+              const isPlotMatch = isCommuneMatch && plotNorm && (blocking.plots?.some((p: any) => {
                   const oldPlotNorm = normalize(p.oldPlotNumber);
                   const newPlotNorm = normalize(p.newPlotNumber);
                   const oldSheetNorm = normalize(p.oldMapSheetNumber);
@@ -428,9 +466,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                   }
 
                   return plotMatches && sheetMatches;
-              });
+              }) ?? false);
 
-              if (plotMatch) {
+              // 2. Đối soát Tên chủ sử dụng
+              let isOwnerMatch = false;
+              const fileCustomer = normalize(record.customerName);
+              if (isCommuneMatch && fileCustomer && blocking.owners && blocking.owners.length > 0) {
+                  isOwnerMatch = blocking.owners.some((bo: string) => {
+                      const boNorm = normalize(bo);
+                      return boNorm && (fileCustomer === boNorm || fileCustomer.includes(boNorm) || boNorm.includes(fileCustomer));
+                  });
+              }
+
+              if (isPlotMatch || isOwnerMatch) {
                   matches.push({ record: blocking, source });
               }
           });

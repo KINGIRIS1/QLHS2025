@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, LandRecord } from '../types';
 import RecordForm from './RecordForm';
-import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Paperclip, Download, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import BlockingCheckToolModal from './BlockingCheckToolModal';
+import { Search, Plus, User as UserIcon, Calendar, MapPin, Loader2, ShieldAlert, FileText, CheckCircle, Trash2, Edit, Eye, Paperclip, Download, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { supabase, isConfigured } from '../services/supabaseClient';
 import { showToast } from '../utils/appHelpers';
+import { offlineDb } from '../utils/offlineDb';
 
 const safeSaveOfflineRecords = (key: string, data: any[]) => {
   try {
@@ -21,21 +23,21 @@ const safeSaveOfflineRecords = (key: string, data: any[]) => {
   }
 };
 
+const stripAccents = (str: string) => {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+};
+
 interface Props {
   currentUser: User;
 }
 
 const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
-  const [records, setRecords] = useState<LandRecord[]>(() => {
-    try {
-      const cached = localStorage.getItem('offline_blocking_records');
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      console.warn('Error reading from localStorage:', e);
-      return [];
-    }
-  });
+  const isReadOnly = currentUser.role !== 'ADMIN' && currentUser.role !== 'SUBADMIN';
+  const [records, setRecords] = useState<LandRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showCheckToolModal, setShowCheckToolModal] = useState(false);
+
+
   
   const [searchFilters, setSearchFilters] = useState({
     issueNumber: '',
@@ -192,6 +194,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
 
         const CHUNK_SIZE = 500;
         let successCount = 0;
+        const importedRecords: any[] = [];
 
         for (let i = 0; i < newRecords.length; i += CHUNK_SIZE) {
           const chunk = newRecords.slice(i, i + CHUNK_SIZE);
@@ -205,14 +208,18 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           }));
 
           if (isConfigured) {
-            const { error } = await supabase.from('blocking_records').insert(chunk);
+            const { data, error } = await supabase.from('blocking_records').insert(chunk).select();
             if (error) throw error;
+            const recordsWithIds = data || chunk;
+            importedRecords.push(...recordsWithIds);
+            setRecords(prev => [...recordsWithIds, ...prev]);
             successCount += chunk.length;
           } else {
             const withIds = chunk.map((r, index) => ({
               ...r,
               id: 'temp_import_' + Date.now() + '_' + (i + index)
             }));
+            importedRecords.push(...withIds);
             setRecords(prev => [...withIds, ...prev]);
             successCount += chunk.length;
           }
@@ -223,12 +230,10 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
 
         setImportProgress({ active: false, current: newRecords.length, total: newRecords.length, status: '' });
         showToast(`Đã nhập thành công ${successCount} hồ sơ ngăn chặn!`, 'success');
-        if (isConfigured) {
-          fetchBlockingRecords();
-        } else {
-          const updatedOffline = [...newRecords.map((r, i) => ({ ...r, id: 'temp_import_' + Date.now() + '_' + i })), ...records];
-          safeSaveOfflineRecords('offline_blocking_records', updatedOffline);
-        }
+        
+        const allNewRecords = [...importedRecords, ...records];
+        await offlineDb.saveRecords('blocking_records', allNewRecords);
+        localStorage.removeItem('last_blocking_records_sync_time');
       } catch (error) {
         console.error('Lỗi khi import Excel:', error);
         showToast('Có lỗi xảy ra khi nhập file Excel. Hãy kiểm tra lại định dạng file.', 'error');
@@ -240,8 +245,8 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
   };
 
   useEffect(() => {
-    fetchBlockingRecords();
-  }, []);
+    fetchBlockingRecords(appliedFilters);
+  }, [appliedFilters]);
 
   const handleExportTemplate = () => {
     const templateData = [
@@ -284,19 +289,82 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
     XLSX.writeFile(wb, "Mau_Nhap_Ho_So_Ngan_Chan.xlsx");
   };
 
-  const fetchBlockingRecords = async () => {
+  const fetchBlockingRecords = async (filters = appliedFilters) => {
     if (!isConfigured) return;
     setLoading(true);
     try {
+      const hasFilter = Object.values(filters).some(v => v !== '');
+      
+      if (!hasFilter) {
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+      
+      const buildQuery = () => {
+        let q = supabase.from('blocking_records').select('*');
+        if (filters.issueNumber) {
+          q = q.ilike('issueNumber', `%${filters.issueNumber}%`);
+        }
+        if (filters.certNumber) {
+          q = q.ilike('certNumber', `%${filters.certNumber}%`);
+        }
+        if (filters.oldCommune) {
+          q = q.ilike('oldCommune', `%${filters.oldCommune}%`);
+        }
+        if (filters.newCommune) {
+          q = q.ilike('newCommune', `%${filters.newCommune}%`);
+        }
+        if (filters.unblockDoc) {
+          q = q.ilike('unblockDoc', `%${filters.unblockDoc}%`);
+        }
+        if (filters.oldPlotNumber) {
+          q = q.or(`plots.cs.[{"oldPlotNumber":"${filters.oldPlotNumber}"}]`);
+        }
+        if (filters.newPlotNumber) {
+          q = q.or(`plots.cs.[{"newPlotNumber":"${filters.newPlotNumber}"}]`);
+        }
+        
+        // Bổ sung lọc trực tiếp ở DB
+        if (filters.owner) {
+          const term = filters.owner.trim();
+          const variations = [
+            term,
+            term.toLowerCase(),
+            term.toUpperCase(),
+            stripAccents(term),
+            stripAccents(term).toLowerCase(),
+            stripAccents(term).toUpperCase()
+          ];
+          const uniqueVariations = Array.from(new Set(variations));
+          const orConditions = uniqueVariations.map(v => `owners.cs.["${v}"]`).join(',');
+          q = q.or(orConditions);
+        }
+        if (filters.docNumber) {
+          const term = filters.docNumber.trim();
+          const variations = [term, term.toUpperCase(), term.toLowerCase()];
+          const uniqueVariations = Array.from(new Set(variations));
+          const orConditions = uniqueVariations.map(v => `blockingDocuments.cs.[{"docNumber":"${v}"}]`).join(',');
+          q = q.or(orConditions);
+        }
+        if (filters.oldMapSheetNumber) {
+          q = q.or(`plots.cs.[{"oldMapSheetNumber":"${filters.oldMapSheetNumber}"}]`);
+        }
+        if (filters.newMapSheetNumber) {
+          q = q.or(`plots.cs.[{"newMapSheetNumber":"${filters.newMapSheetNumber}"}]`);
+        }
+        return q;
+      };
+
       let allRecords: LandRecord[] = [];
       let from = 0;
       let limit = 1000;
       let hasMore = true;
+      // Tránh việc tải 30k+ bản ghi cùng lúc nếu không lọc để tối ưu hiệu năng và tránh bị giới hạn 10k
+      const maxRows = hasFilter ? 10000 : 3000; 
       
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('blocking_records')
-          .select('*')
+      while (hasMore && from < maxRows) {
+        const { data, error } = await buildQuery()
           .range(from, from + limit - 1)
           .order('created_at', { ascending: false });
         
@@ -314,7 +382,8 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
       }
       
       setRecords(allRecords);
-      safeSaveOfflineRecords('offline_blocking_records', allRecords);
+      // Lưu toàn bộ dữ liệu tải được vào IndexedDB
+      await offlineDb.saveRecords('blocking_records', allRecords);
     } catch (error) {
       console.error('Lỗi khi tải danh sách ngăn chặn:', error);
     } finally {
@@ -324,33 +393,33 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
 
   const handleSave = async (formData: any) => {
     try {
+      let updated: LandRecord[] = [];
       if (formData.id) {
-        let updated: LandRecord[] = [];
         if (isConfigured) {
           const { error } = await supabase.from('blocking_records').update(formData).eq('id', formData.id);
           if (error) throw error;
-        } else {
-          updated = records.map(p => p.id === formData.id ? formData : p);
-          setRecords(updated);
         }
+        updated = records.map(p => p.id === formData.id ? formData : p);
+        setRecords(updated);
         showToast('Cập nhật thành công!', 'success');
-        if (!isConfigured) safeSaveOfflineRecords('offline_blocking_records', updated);
       } else {
-        let updated: LandRecord[] = [];
         if (isConfigured) {
-          const { error } = await supabase.from('blocking_records').insert([formData]);
+          const { data, error } = await supabase.from('blocking_records').insert([formData]).select();
           if (error) throw error;
+          const inserted = data && data[0] ? data[0] : formData;
+          updated = [inserted, ...records];
+          setRecords(updated);
         } else {
           formData.id = 'temp_' + Date.now();
           updated = [formData, ...records];
           setRecords(updated);
         }
         showToast('Thêm mới thành công!', 'success');
-        if (!isConfigured) safeSaveOfflineRecords('offline_blocking_records', updated);
       }
+      await offlineDb.saveRecords('blocking_records', updated);
+      localStorage.removeItem('last_blocking_records_sync_time');
       setShowForm(false);
       setEditingRecord(undefined);
-      if (isConfigured) fetchBlockingRecords();
     } catch (error) {
       console.error('Lỗi khi lưu:', error);
       showToast('Đã có lỗi xảy ra. Hãy thử lại.', 'error');
@@ -393,7 +462,8 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
       }
       const newRecs = records.filter(r => r.id !== id);
       setRecords(newRecs);
-      if (!isConfigured) safeSaveOfflineRecords('offline_blocking_records', newRecs);
+      if (!isConfigured) await offlineDb.saveRecords('blocking_records', newRecs);
+      localStorage.removeItem('last_blocking_records_sync_time');
       showToast('Xóa thành công!', 'success');
     } catch (error) {
       console.error('Lỗi khi xóa:', error);
@@ -422,7 +492,8 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         if (error) throw error;
       }
       setRecords([]);
-      safeSaveOfflineRecords('offline_blocking_records', []);
+      await offlineDb.saveRecords('blocking_records', []);
+      localStorage.removeItem('last_blocking_records_sync_time');
       showToast('Đã xóa toàn bộ dữ liệu ngăn chặn thành công!', 'success');
     } catch (error) {
       console.error('Lỗi khi xóa toàn bộ dữ liệu:', error);
@@ -451,7 +522,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
 
     const docMatch = !appliedFilters.docNumber || r.blockingDocuments?.some(d => d.docNumber?.toLowerCase().includes(appliedFilters.docNumber.toLowerCase()));
 
-    return matchIssueNum && matchCertNum && matchOldCommune && matchNewCommune && matchOwner && matchUnblockDoc && (r.plots ? plotMatch : true) && docMatch;
+    return matchIssueNum && matchCertNum && matchOldCommune && matchNewCommune && matchOwner && matchUnblockDoc && (!r.plots || r.plots.length === 0 || plotMatch) && docMatch;
   });
 
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
@@ -500,45 +571,58 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
             </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
-          <button
-            onClick={handleExportTemplate}
-            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
-            title="Tải tệp Excel cấu trúc mẫu"
-          >
-            <Download size={18} /> Mẫu nhập Excel
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
-            title="Nhập dữ liệu từ tệp Excel"
-          >
-            <Upload size={18} /> Nhập Excel
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImportExcel}
-            accept=".xlsx, .xls"
-            className="hidden"
-          />
-          {currentUser.role === 'ADMIN' && (
-            <button
-              onClick={handleDeleteAll}
-              className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
-              title="Xóa tất cả dữ liệu ngăn chặn"
-            >
-              <Trash2 size={18} /> Xóa tất cả
-            </button>
+          {!isReadOnly && (
+            <>
+              <button
+                onClick={handleExportTemplate}
+                className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+                title="Tải tệp Excel cấu trúc mẫu"
+              >
+                <Download size={18} /> Mẫu nhập Excel
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+                title="Nhập dữ liệu từ tệp Excel"
+              >
+                <Upload size={18} /> Nhập Excel
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImportExcel}
+                accept=".xlsx, .xls"
+                className="hidden"
+              />
+              {currentUser.role === 'ADMIN' && (
+                <>
+                  <button
+                    onClick={() => setShowCheckToolModal(true)}
+                    className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+                    title="Đối soát nhanh dữ liệu hồ sơ đo đạc với dữ liệu ngăn chặn"
+                  >
+                    <ShieldAlert size={18} /> Đối soát ngăn chặn
+                  </button>
+                  <button
+                    onClick={handleDeleteAll}
+                    className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+                    title="Xóa tất cả dữ liệu ngăn chặn"
+                  >
+                    <Trash2 size={18} /> Xóa tất cả
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => {
+                  setEditingRecord(undefined);
+                  setShowForm(true);
+                }}
+                className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
+              >
+                <Plus size={18} /> Thêm mới
+              </button>
+            </>
           )}
-          <button
-            onClick={() => {
-              setEditingRecord(undefined);
-              setShowForm(true);
-            }}
-            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium whitespace-nowrap text-sm"
-          >
-            <Plus size={18} /> Thêm mới
-          </button>
         </div>
       </div>
 
@@ -671,8 +755,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         ) : filteredRecords.length === 0 ? (
            <div className="flex flex-col justify-center items-center flex-1 text-gray-500 py-12">
               <ShieldAlert size={48} className="text-gray-300 mb-4" />
-              <p className="text-lg font-medium text-gray-600">Không có hồ sơ ngăn chặn nào</p>
-              <p className="text-sm mt-1 text-gray-400">Hoặc không tìm thấy kết quả phù hợp.</p>
+              <p className="text-lg font-medium text-gray-600">Vui lòng nhập thông tin tìm kiếm ở trên và bấm "Tìm kiếm"</p>
            </div>
         ) : (
           <>
@@ -860,17 +943,19 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                           <button 
                             onClick={() => { setEditingRecord(record); setShowForm(true); }} 
                             className="text-blue-500 hover:bg-blue-50 p-1.5 border border-transparent hover:border-blue-100 rounded-sm transition-all"
-                            title="Sửa"
+                            title={isReadOnly ? "Xem chi tiết" : "Sửa"}
                           >
-                            <Edit size={16} />
+                            {isReadOnly ? <Eye size={16} /> : <Edit size={16} />}
                           </button>
-                          <button 
-                            onClick={() => handleDelete(record.id)} 
-                            className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 border border-transparent hover:border-red-100 rounded-sm transition-all"
-                            title="Xóa"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {!isReadOnly && (
+                            <button 
+                              onClick={() => handleDelete(record.id)} 
+                              className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 border border-transparent hover:border-red-100 rounded-sm transition-all"
+                              title="Xóa"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -959,6 +1044,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           currentUser={currentUser}
           onSubmit={handleSave}
           onCancel={() => setShowForm(false)}
+          isReadOnly={isReadOnly}
         />
       )}
 
@@ -988,6 +1074,12 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
           </div>
         </div>
       )}
+
+      {/* Cross check modal for admin */}
+      <BlockingCheckToolModal
+        isOpen={showCheckToolModal}
+        onClose={() => setShowCheckToolModal(false)}
+      />
     </div>
   );
 };

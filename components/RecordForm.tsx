@@ -11,6 +11,7 @@ interface RecordFormProps {
   onSubmit: (data: LandRecordFormData) => Promise<void> | void;
   onCancel: () => void;
   filePrefix?: string;
+  isReadOnly?: boolean;
 }
 
 // Dữ liệu danh sách xã/phường (Giống như trong App.tsx để đồng bộ)
@@ -31,7 +32,7 @@ const PREDEFINED_OLD_COMMUNES = [
   'Minh Long'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
-const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSubmit, onCancel, filePrefix }) => {
+const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSubmit, onCancel, filePrefix, isReadOnly = false }) => {
   const [formData, setFormData] = useState<LandRecordFormData>({
     owners: [''],
     issueNumber: '',
@@ -367,7 +368,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
         <div className="flex justify-between items-center px-6 py-4 bg-[#003b5c] text-white border-b border-blue-800 shrink-0">
           <div>
             <h2 className="text-lg font-bold uppercase tracking-wide">
-              {initialData ? 'CẬP NHẬT THÔNG TIN HỒ SƠ' : 'NHẬP LIỆU HỒ SƠ NGĂN CHẶN MỚI'}
+              {isReadOnly ? 'CHI TIẾT HỒ SƠ NGĂN CHẶN' : (initialData ? 'CẬP NHẬT THÔNG TIN HỒ SƠ' : 'NHẬP LIỆU HỒ SƠ NGĂN CHẶN MỚI')}
             </h2>
             <div className="flex items-center gap-2 text-xs text-blue-200 opacity-80">
                 <span>Người nhập liệu: <b>{formData.createdBy}</b></span>
@@ -381,6 +382,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
         {/* Form Body */}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
           <form id="recordForm" onSubmit={handleSubmit} className="space-y-6">
+            <fieldset disabled={isReadOnly} className="space-y-6">
             
             {/* Group 1: Thông tin chủ & GCN */}
             <div className="bg-white border border-gray-300 shadow-sm rounded-sm">
@@ -401,7 +403,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                               placeholder="NGUYỄN VĂN A"
                               className="flex-1 border border-gray-300 px-3 py-2 text-sm rounded-sm focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none uppercase text-gray-900 bg-white"
                             />
-                            {formData.owners.length > 1 && (
+                            {formData.owners.length > 1 && !isReadOnly && (
                               <button
                                 type="button"
                                 onClick={() => removeOwnerField(index)}
@@ -412,13 +414,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                             )}
                           </div>
                         ))}
-                        <button
-                          type="button"
-                          onClick={addOwnerField}
-                          className="text-xs text-blue-700 hover:underline flex items-center gap-1 font-medium mt-1"
-                        >
-                          <Plus size={12} /> Thêm đồng sở hữu
-                        </button>
+                        {!isReadOnly && (
+                          <button
+                            type="button"
+                            onClick={addOwnerField}
+                            className="text-xs text-blue-700 hover:underline flex items-center gap-1 font-medium mt-1"
+                          >
+                            <Plus size={12} /> Thêm đồng sở hữu
+                          </button>
+                        )}
                      </div>
 
                      <div className="grid grid-cols-3 gap-3 md:col-span-2 border-t border-gray-100 pt-3 mt-1">
@@ -464,18 +468,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                         <span className="bg-[#003b5c] text-white w-6 h-6 flex items-center justify-center rounded-full text-xs">2</span>
                         Đặc điểm Thửa Đất
                     </div>
-                    <button
-                        type="button"
-                        onClick={addPlotField}
-                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded border border-blue-200 flex items-center gap-1 transition-colors"
-                    >
-                        <Plus size={12} /> Thêm thửa đất
-                    </button>
+                    {!isReadOnly && (
+                      <button
+                          type="button"
+                          onClick={addPlotField}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded border border-blue-200 flex items-center gap-1 transition-colors"
+                      >
+                          <Plus size={12} /> Thêm thửa đất
+                      </button>
+                    )}
                 </div>
                 <div className="p-4 space-y-4">
                      {formData.plots.map((plot, index) => (
                          <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-start border-b border-gray-200 pb-4 last:border-0 last:pb-0 relative">
-                             {formData.plots.length > 1 && (
+                             {formData.plots.length > 1 && !isReadOnly && (
                                  <button
                                      type="button"
                                      onClick={() => removePlotField(index)}
@@ -596,13 +602,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                          <span className="bg-red-700 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs">3</span>
                          Nội dung Ngăn Chặn
                     </div>
-                    <button
-                        type="button"
-                        onClick={addBlockingDoc}
-                        className="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded border border-red-200 flex items-center gap-1 transition-colors"
-                    >
-                        <Plus size={12} /> Thêm văn bản
-                    </button>
+                    {!isReadOnly && (
+                      <button
+                          type="button"
+                          onClick={addBlockingDoc}
+                          className="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded border border-red-200 flex items-center gap-1 transition-colors"
+                      >
+                          <Plus size={12} /> Thêm văn bản
+                      </button>
+                    )}
                 </div>
                 
                 <div className="p-4 space-y-4">
@@ -650,7 +658,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                                     <button
                                         type="button"
                                         onClick={() => removeBlockingDoc(index)}
-                                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded transition"
+                                        className={`text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded transition ${isReadOnly ? 'hidden' : ''}`}
                                         title="Xóa văn bản này"
                                     >
                                         <Trash2 size={16} />
@@ -687,31 +695,35 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                     <div className="pt-4 border-t border-gray-100">
                         <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (PDF, Word, Excel, Hình ảnh...)</label>
                         
-                        <input 
-                          type="file" 
-                          id="attached_files_input"
-                          multiple 
-                          className="hidden" 
-                          onChange={handleFileUpload} 
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div 
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDrop={handleDrop}
-                          className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
-                            isDragging 
-                              ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                              : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:bg-gray-50'
-                          }`}
-                          onClick={() => document.getElementById('attached_files_input')?.click()}
-                        >
-                            <div className="flex flex-col items-center justify-center gap-1.5">
-                                <Paperclip size={24} className={isDragging ? 'text-blue-600 animate-bounce' : 'text-gray-400'} />
-                                <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-blue-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
-                                <div className="text-[11px] text-gray-400">Hỗ trợ tải lên nhiều file cùng lúc</div>
+                        {!isReadOnly && (
+                          <>
+                            <input 
+                              type="file" 
+                              id="attached_files_input"
+                              multiple 
+                              className="hidden" 
+                              onChange={handleFileUpload} 
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div 
+                              onDragOver={handleDragOver}
+                              onDragLeave={handleDragLeave}
+                              onDrop={handleDrop}
+                              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                                isDragging 
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                                  : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:bg-gray-50'
+                              }`}
+                              onClick={() => document.getElementById('attached_files_input')?.click()}
+                            >
+                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <Paperclip size={24} className={isDragging ? 'text-blue-600 animate-bounce' : 'text-gray-400'} />
+                                    <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-blue-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
+                                    <div className="text-[11px] text-gray-400">Hỗ trợ tải lên nhiều file cùng lúc</div>
+                                </div>
                             </div>
-                        </div>
+                          </>
+                        )}
 
                         {/* Hiển thị danh sách file đã đính kèm */}
                         {formData.attached_files && formData.attached_files.length > 0 && (
@@ -816,31 +828,35 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                         <div className="mb-3">
                             <label className="block text-xs font-semibold text-green-800 mb-2 uppercase">File giải tỏa đính kèm (PDF, Word, Excel, Hình ảnh...)</label>
                             
-                            <input 
-                              type="file" 
-                              id="unblock_files_input"
-                              multiple 
-                              className="hidden" 
-                              onChange={handleUnblockFileUpload} 
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <div 
-                              onDragOver={handleDragOverUnblock}
-                              onDragLeave={handleDragLeaveUnblock}
-                              onDrop={handleDropUnblock}
-                              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
-                                isDraggingUnblock 
-                                  ? 'border-green-600 bg-green-50 text-green-800' 
-                                  : 'border-green-300 bg-white text-green-700 hover:border-green-500 hover:bg-green-50'
-                              }`}
-                              onClick={() => document.getElementById('unblock_files_input')?.click()}
-                            >
-                                <div className="flex flex-col items-center justify-center gap-1.5">
-                                    <Paperclip size={24} className={isDraggingUnblock ? 'text-green-600 animate-bounce' : 'text-green-500'} />
-                                    <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-green-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
-                                    <div className="text-[11px] text-green-700/80">Hỗ trợ tải lên nhiều file cùng lúc</div>
+                            {!isReadOnly && (
+                              <>
+                                <input 
+                                  type="file" 
+                                  id="unblock_files_input"
+                                  multiple 
+                                  className="hidden" 
+                                  onChange={handleUnblockFileUpload} 
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div 
+                                  onDragOver={handleDragOverUnblock}
+                                  onDragLeave={handleDragLeaveUnblock}
+                                  onDrop={handleDropUnblock}
+                                  className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                                    isDraggingUnblock 
+                                      ? 'border-green-600 bg-green-50 text-green-800' 
+                                      : 'border-green-300 bg-white text-green-700 hover:border-green-500 hover:bg-green-50'
+                                  }`}
+                                  onClick={() => document.getElementById('unblock_files_input')?.click()}
+                                >
+                                    <div className="flex flex-col items-center justify-center gap-1.5">
+                                        <Paperclip size={24} className={isDraggingUnblock ? 'text-green-600 animate-bounce' : 'text-green-500'} />
+                                        <div className="text-sm font-medium">Kéo thả tệp vào đây hoặc <span className="text-green-600 underline cursor-pointer font-bold">nhấp để chọn</span></div>
+                                        <div className="text-[11px] text-green-700/80">Hỗ trợ tải lên nhiều file cùng lúc</div>
+                                    </div>
                                 </div>
-                            </div>
+                              </>
+                            )}
                         </div>
 
                         {/* Hiển thị danh sách file giải tỏa đính kèm */}
@@ -885,6 +901,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                 )}
             </div>
 
+            </fieldset>
           </form>
         </div>
 
@@ -897,15 +914,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
           >
             Đóng
           </button>
-          <button
-            type="submit"
-            form="recordForm"
-            disabled={isSubmitting}
-            className={`px-5 py-2 text-white rounded-sm transition-colors text-sm font-bold uppercase shadow-sm flex items-center gap-2 ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#00507d] hover:bg-[#003b5c]'}`}
-          >
-            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-            {isSubmitting ? 'ĐANG LƯU...' : 'LƯU DỮ LIỆU'}
-          </button>
+          {!isReadOnly && (
+            <button
+              type="submit"
+              form="recordForm"
+              disabled={isSubmitting}
+              className={`px-5 py-2 text-white rounded-sm transition-colors text-sm font-bold uppercase shadow-sm flex items-center gap-2 ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#00507d] hover:bg-[#003b5c]'}`}
+            >
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+              {isSubmitting ? 'ĐANG LƯU...' : 'LƯU DỮ LIỆU'}
+            </button>
+          )}
         </div>
       </div>
     </div>

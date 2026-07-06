@@ -88,6 +88,13 @@ if (typeof window !== 'undefined' && isConfigured) {
                     } else if (row.key === 'contact_settings_v2') {
                         console.log("[DEBUG] contact_settings_v2 changed in DB", row);
                         window.dispatchEvent(new CustomEvent('contact_settings_changed', { detail: row.value }));
+                    } else if (row.key === 'weather_location') {
+                        console.log("[DEBUG] weather_location changed in DB", row);
+                        try {
+                            window.dispatchEvent(new CustomEvent('weather_location_changed', { detail: JSON.parse(row.value) }));
+                        } catch (e) {
+                            console.error("Lỗi parse weather_location realtime:", e);
+                        }
                     }
                 }
             }

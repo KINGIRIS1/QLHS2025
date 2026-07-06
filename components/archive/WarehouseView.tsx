@@ -1014,6 +1014,41 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
 
                         {/* Content */}
                         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+                            {/* 5. Vị trí lưu trữ */}
+                            <div className="space-y-3.5 bg-indigo-50/40 p-4 rounded-2xl border border-indigo-100/50">
+                                <h4 className="text-xs font-bold text-indigo-750 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
+                                    <Archive size={14} /> Vị trí lưu trữ trong kho
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <div className="text-[11px] text-slate-500">Kệ:</div>
+                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.soke_tang || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-500">Tầng:</div>
+                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.so_o || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-500">Hộp số (Số tệp):</div>
+                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.So_tep || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] text-slate-500">Số thứ tự tệp:</div>
+                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.sott_tep || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 4. Loại hồ sơ */}
+                            <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                                    <FileText size={14} /> Loại hồ sơ lưu kho
+                                </div>
+                                <div className="font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-fit text-xs">
+                                    {selectedRecord.data?.loaihoso || 'Chưa phân loại'}
+                                </div>
+                            </div>
+
                             {/* 1. Khối Thửa đất */}
                             <div className="space-y-3.5 bg-slate-50/30 p-4 rounded-2xl border border-slate-100">
                                 <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
@@ -1137,41 +1172,6 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                                 <div className="text-slate-700">{selectedRecord.data.diachitt2}</div>
                                             </div>
                                         )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 4. Loại hồ sơ */}
-                            <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                    <FileText size={14} /> Loại hồ sơ lưu kho
-                                </div>
-                                <div className="font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-fit text-xs">
-                                    {selectedRecord.data?.loaihoso || 'Chưa phân loại'}
-                                </div>
-                            </div>
-
-                            {/* 5. Vị trí lưu trữ */}
-                            <div className="space-y-3.5 bg-indigo-50/40 p-4 rounded-2xl border border-indigo-100/50">
-                                <h4 className="text-xs font-bold text-indigo-750 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
-                                    <Archive size={14} /> Vị trí lưu trữ trong kho
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Kệ:</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.soke_tang || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Tầng:</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.so_o || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Hộp số (Số tệp):</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.So_tep || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Số thứ tự tệp:</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.sott_tep || '-'}</div>
                                     </div>
                                 </div>
                             </div>

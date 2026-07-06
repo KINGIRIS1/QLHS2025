@@ -12,6 +12,7 @@ import {
   Clock, Activity, CloudSun, CloudRain, Sun, Wind, Droplets, User as UserIcon, Settings
 } from 'lucide-react';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
+import { getSystemSetting, saveSystemSetting } from '../services/apiSystem';
 
 interface DashboardViewProps {
     records: RecordFile[];
@@ -41,6 +42,7 @@ const STATUS_LABELS: Record<RecordStatus, string> = {
 };
 
 const PRESET_LOCATIONS = [
+    { name: 'Phường Chơn Thành', latitude: 11.4153, longitude: 106.646 },
     { name: 'Thành phố Bà Rịa', latitude: 10.4963, longitude: 107.1691 },
     { name: 'Thành phố Vũng Tàu', latitude: 10.3460, longitude: 107.0812 },
     { name: 'Thị xã Phú Mỹ', latitude: 10.5847, longitude: 107.0700 },
@@ -60,7 +62,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
     // State chọn năm (cho chế độ Year)
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-    // Weather location state
+    // Weather location state (defaults to Phường Chơn Thành)
     const [location, setLocation] = useState(() => {
         try {
             const saved = localStorage.getItem('weather_location');
@@ -71,9 +73,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             console.error("Lỗi đọc weather_location từ localStorage:", e);
         }
         return {
-            name: 'Thành phố Bà Rịa',
-            latitude: 10.4963,
-            longitude: 107.1691
+            name: 'Phường Chơn Thành',
+            latitude: 11.4153,
+            longitude: 106.646
         };
     });
 
@@ -90,6 +92,42 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
     const [weatherLoading, setWeatherLoading] = useState(true);
     const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
     const [schedulesLoading, setSchedulesLoading] = useState(true);
+
+    // Fetch system-wide weather location on mount
+    useEffect(() => {
+        const fetchSystemLocation = async () => {
+            try {
+                const sysLocStr = await getSystemSetting('weather_location');
+                if (sysLocStr) {
+                    const parsed = JSON.parse(sysLocStr);
+                    if (parsed && parsed.name && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
+                        setLocation(parsed);
+                        setEditName(parsed.name);
+                        setEditLat(parsed.latitude);
+                        setEditLon(parsed.longitude);
+                    }
+                }
+            } catch (e) {
+                console.error("Lỗi lấy địa điểm thời tiết hệ thống:", e);
+            }
+        };
+        fetchSystemLocation();
+    }, []);
+
+    // Listen to real-time weather location changes from other clients/users
+    useEffect(() => {
+        const handleLocationChange = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail) {
+                setLocation(detail);
+                setEditName(detail.name);
+                setEditLat(detail.latitude);
+                setEditLon(detail.longitude);
+            }
+        };
+        window.addEventListener('weather_location_changed', handleLocationChange);
+        return () => window.removeEventListener('weather_location_changed', handleLocationChange);
+    }, []);
 
     // 1. Fetch weather dynamic to the configured location coordinates
     useEffect(() => {
@@ -143,16 +181,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             try {
                 setSchedulesLoading(true);
                 const data = await fetchWorkSchedules();
-                const todayStr = new Date().toISOString().split('T')[0];
-                const sorted = data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                
-                // Lấy các lịch từ hôm nay trở đi, hoặc lấy lịch mới nhất nếu không có
-                const upcoming = sorted.filter(s => s.date >= todayStr);
-                if (upcoming.length > 0) {
-                    setSchedules(upcoming.slice(0, 3));
-                } else {
-                    setSchedules(data.slice(0, 3));
-                }
+                // Sắp xếp lịch công tác gần nhất (mới nhất theo thời gian giảm dần)
+                const sorted = data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setSchedules(sorted.slice(0, 3));
             } catch (error) {
                 console.error("Lỗi tải lịch công tác:", error);
             } finally {
@@ -614,11 +645,16 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
                                     Hủy
                                 </button>
                                 <button 
-                                    onClick={() => {
+                                    onClick={async () => {
                                         const newLoc = { name: editName, latitude: editLat, longitude: editLon };
                                         setLocation(newLoc);
                                         localStorage.setItem('weather_location', JSON.stringify(newLoc));
                                         setIsEditingLocation(false);
+                                        try {
+                                            await saveSystemSetting('weather_location', JSON.stringify(newLoc));
+                                        } catch (e) {
+                                            console.error("Lỗi lưu địa điểm thời tiết hệ thống:", e);
+                                        }
                                     }}
                                     className="px-3 py-1 text-[11px] font-bold text-slate-800 bg-white hover:bg-slate-100 rounded shadow-md transition-colors"
                                 >
@@ -694,7 +730,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
                             <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                                 <CalendarDays className="text-indigo-600" size={18} /> Lịch công tác tích hợp
                             </h3>
-                            <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Sắp tới</span>
+                            <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Gần nhất</span>
                         </div>
 
                         <div className="mt-3 space-y-3">

@@ -9,7 +9,8 @@ import {
   Bell,
   Menu,
   Search,
-  Plus
+  Plus,
+  Send
 } from 'lucide-react';
 
 interface MobileLayoutProps {
@@ -20,6 +21,7 @@ interface MobileLayoutProps {
   children: React.ReactNode;
   unreadMessages: number;
   activeRemindersCount: number;
+  currentDepartment?: string;
 }
 
 const MobileLayout: React.FC<MobileLayoutProps> = ({
@@ -29,11 +31,18 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
   onLogout,
   children,
   unreadMessages,
-  activeRemindersCount
+  activeRemindersCount,
+  currentDepartment
 }) => {
+  const isAdmin = currentUser.role === UserRole.ADMIN;
+  const isSubadmin = currentUser.role === UserRole.SUBADMIN;
+  const normalizedDept = (currentDepartment || '').trim().toLowerCase();
+  const isDoDacUser = normalizedDept.includes('đo đạc') || isAdmin || isSubadmin;
+
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'all_records', label: 'Hồ sơ', icon: FileText },
+    ...(isDoDacUser ? [{ id: 'send_measurement_files', label: 'Gửi file', icon: Send }] : []),
     { id: 'account_settings', label: 'Cài đặt', icon: Settings },
   ];
 

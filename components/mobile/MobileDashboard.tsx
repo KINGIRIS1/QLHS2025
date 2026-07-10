@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { RecordFile, RecordStatus } from '../../types';
+import { RecordFile, RecordStatus, User, UserRole } from '../../types';
 import { STATUS_LABELS } from '../../constants';
 import { 
   FileText, 
@@ -10,16 +10,30 @@ import {
   CalendarRange,
   CalendarDays,
   Calendar,
-  ArchiveX
+  ArchiveX,
+  Send
 } from 'lucide-react';
 
 interface MobileDashboardProps {
   records: RecordFile[];
+  currentUser?: User;
+  currentDepartment?: string;
+  setCurrentView?: (view: string) => void;
 }
 
-const MobileDashboard: React.FC<MobileDashboardProps> = ({ records }) => {
+const MobileDashboard: React.FC<MobileDashboardProps> = ({ 
+  records, 
+  currentUser, 
+  currentDepartment, 
+  setCurrentView 
+}) => {
   const [viewMode, setViewMode] = useState<'year' | 'month' | 'week'>('year');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
+  const normalizedDept = (currentDepartment || '').trim().toLowerCase();
+  const isDoDacUser = normalizedDept.includes('đo đạc') || isAdmin || isSubadmin;
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
@@ -110,6 +124,27 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ records }) => {
 
   return (
     <div className="p-4 space-y-6 pb-20">
+      {/* Quick Access Button to Send Measurement Files */}
+      {isDoDacUser && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 border border-blue-100 p-4 rounded-2xl shadow-sm flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3 duration-300">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-blue-600 text-white p-2.5 rounded-xl shadow-sm shrink-0">
+              <Send size={18} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm uppercase tracking-wider">Gửi file đo đạc</h3>
+              <p className="text-slate-500 text-[10px] font-semibold mt-0.5 truncate">Tải bản vẽ & ảnh hiện trường nhanh</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setCurrentView?.('send_measurement_files')}
+            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 flex items-center gap-1"
+          >
+            Mở ngay
+          </button>
+        </div>
+      )}
+
       {/* View Mode Switcher */}
       <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 space-y-3">
         <div className="flex items-center gap-2">

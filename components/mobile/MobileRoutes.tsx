@@ -15,6 +15,7 @@ interface MobileRoutesProps {
   wards: string[];
   holidays: Holiday[];
   onSaveRecord?: (r: RecordFile) => Promise<boolean>;
+  currentDepartment?: string;
   
   // Handlers
   handleViewRecord: (r: RecordFile) => void;
@@ -37,11 +38,18 @@ interface MobileRoutesProps {
 }
 
 const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
-  const { currentView, records, employees, currentUser, wards, users } = props;
+  const { currentView, records, employees, currentUser, wards, users, currentDepartment, setCurrentView } = props;
 
   switch (currentView) {
     case 'dashboard':
-      return <MobileDashboard records={records} />;
+      return (
+        <MobileDashboard 
+          records={records} 
+          currentUser={currentUser}
+          currentDepartment={currentDepartment}
+          setCurrentView={setCurrentView}
+        />
+      );
     
     case 'all_records':
     case 'received_list':

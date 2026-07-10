@@ -970,12 +970,13 @@ function App() {
         />
         <MobileLayout
           currentUser={currentUser}
-        currentView={currentView}
-        setCurrentView={setCurrentView}
-        onLogout={() => setCurrentUser(null)}
-        unreadMessages={unreadMessages}
-        activeRemindersCount={activeRemindersCount}
-      >
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+          onLogout={() => setCurrentUser(null)}
+          unreadMessages={unreadMessages}
+          activeRemindersCount={activeRemindersCount}
+          currentDepartment={currentDepartment}
+        >
         <MobileRoutes
           currentView={currentView}
           setCurrentView={setCurrentView}
@@ -986,6 +987,7 @@ function App() {
           wards={wards}
           holidays={holidays}
           onSaveRecord={handleAddOrUpdateRecord}
+          currentDepartment={currentDepartment}
           handleViewRecord={(r) => setViewingRecord(r)}
           setEditingRecord={setEditingRecord}
           setIsModalOpen={setIsModalOpen}

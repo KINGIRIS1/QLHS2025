@@ -313,6 +313,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           return c.replace(/^(xa|phuong|thi tran)\s+/gi, '').trim();
       };
 
+      const cleanCommuneAccents = (c: string) => {
+          if (!c) return '';
+          return c.replace(/^(xã|phường|thị trấn|xa|phuong|thi tran)\s+/gi, '').trim();
+      };
+
       const matchTokens = (str1: string, str2: string) => {
           if (!str1 || !str2) return false;
           const tokens1 = str1.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
@@ -341,74 +346,54 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
 
       let activeList: any[] = [];
       let archiveList: any[] = [];
+      let loadedFromSupabase = false;
 
       try {
-          // Khuyên dùng: Đọc toàn bộ dữ liệu từ IndexedDB cục bộ (chứa đầy đủ 21,700+ bản ghi)
-          // Cách này hoạt động tức thì (< 5ms), không tốn tài nguyên mạng và kiểm tra được cả các bản ghi không có thông tin xã
-          activeList = await offlineDb.getRecords('blocking_records');
-          archiveList = await offlineDb.getRecords('archive_blocking_records');
-
-          // Fallback: Nếu IndexedDB trống (ở lần khởi chạy đầu tiên), thực hiện kéo trực tuyến từ Supabase
-          if (isConfigured && activeList.length === 0) {
-              if (cleanWard) {
-                  const wardFilter = `oldCommune.ilike.%${cleanWard}%,newCommune.ilike.%${cleanWard}%`;
-                  let hasMoreActive = true;
-                  let fromActive = 0;
-                  const limit = 1000;
-                  while (hasMoreActive) {
-                      const { data, error } = await supabase
-                          .from('blocking_records')
-                          .select('*')
-                          .or(wardFilter)
-                          .range(fromActive, fromActive + limit - 1);
-                      if (error) throw error;
-                      if (data && data.length > 0) {
-                          activeList = [...activeList, ...data];
-                          if (data.length < limit) {
-                              hasMoreActive = false;
-                          } else {
-                              fromActive += limit;
-                          }
-                      } else {
-                          hasMoreActive = false;
-                      }
-                  }
-
-                  let hasMoreArchive = true;
-                  let fromArchive = 0;
-                  while (hasMoreArchive) {
-                      const { data, error } = await supabase
-                          .from('archive_blocking_records')
-                          .select('*')
-                          .or(wardFilter)
-                          .range(fromArchive, fromArchive + limit - 1);
-                      if (error) throw error;
-                      if (data && data.length > 0) {
-                          archiveList = [...archiveList, ...data];
-                          if (data.length < limit) {
-                              hasMoreArchive = false;
-                          } else {
-                              fromArchive += limit;
-                          }
-                      } else {
-                          hasMoreArchive = false;
-                      }
-                  }
-              } else if (plotNorm) {
+              // Ưu tiên dữ liệu trực tuyến từ Supabase khi có kết nối mạng và đã cấu hình
+              if (isConfigured && navigator.onLine) {
                   const orParts: string[] = [];
-                  const plotTokens = plotNorm.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
-                  const searchTerms = new Set<string>();
-                  plotTokens.forEach(token => {
-                      searchTerms.add(token);
-                      if (token.includes('/')) {
-                          const base = token.split('/')[0];
-                          if (base) searchTerms.add(base);
+
+                  // Ưu tiên truy vấn theo thửa đất hoặc tờ bản đồ để tối đa hóa hiệu năng và độ chính xác, tránh tải thừa dữ liệu xã
+                  if (plotNorm) {
+                      const plotTokens = plotNorm.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
+                      const searchTerms = new Set<string>();
+                      plotTokens.forEach(token => {
+                          searchTerms.add(token);
+                          if (token.includes('/')) {
+                              const base = token.split('/')[0];
+                              if (base) searchTerms.add(base);
+                          }
+                      });
+                      searchTerms.forEach(term => {
+                          orParts.push(`plots.cs.[{"oldPlotNumber":"${term}"}]`);
+                          orParts.push(`plots.cs.[{"newPlotNumber":"${term}"}]`);
+                      });
+                  } else if (sheetNorm) {
+                      const sheetTokens = sheetNorm.split(/[,;\s+vvn&]+/i).map(t => t.trim()).filter(Boolean);
+                      const searchTerms = new Set<string>();
+                      sheetTokens.forEach(token => {
+                          searchTerms.add(token);
+                          if (token.includes('/')) {
+                              const base = token.split('/')[0];
+                              if (base) searchTerms.add(base);
+                          }
+                      });
+                      searchTerms.forEach(term => {
+                          orParts.push(`plots.cs.[{"oldMapSheetNumber":"${term}"}]`);
+                          orParts.push(`plots.cs.[{"newMapSheetNumber":"${term}"}]`);
+                      });
+                  } else if (cleanWard) {
+                      const rawWard = record.ward || '';
+                      const rawCleanWard = cleanCommuneAccents(rawWard);
+                      if (rawCleanWard) {
+                          orParts.push(`oldCommune.ilike.%${rawCleanWard}%`);
+                          orParts.push(`newCommune.ilike.%${rawCleanWard}%`);
                       }
-                  });
-                  searchTerms.forEach(term => {
-                      orParts.push(`plots.cs.[{"oldPlotNumber":"${term}"}]`);
-                      orParts.push(`plots.cs.[{"newPlotNumber":"${term}"}]`);
-                  });
+                      if (cleanWard && cleanWard !== normalize(rawCleanWard)) {
+                          orParts.push(`oldCommune.ilike.%${cleanWard}%`);
+                          orParts.push(`newCommune.ilike.%${cleanWard}%`);
+                      }
+                  }
 
                   if (orParts.length > 0) {
                       const orQuery = orParts.join(',');
@@ -416,13 +401,26 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                           supabase.from('blocking_records').select('*').or(orQuery),
                           supabase.from('archive_blocking_records').select('*').or(orQuery)
                       ]);
-                      if (!activeRes.error && activeRes.data) activeList = activeRes.data;
-                      if (!archiveRes.error && archiveRes.data) archiveList = archiveRes.data;
+                      if (activeRes.error) throw activeRes.error;
+                      if (archiveRes.error) throw archiveRes.error;
+                      activeList = activeRes.data || [];
+                      archiveList = archiveRes.data || [];
+                      loadedFromSupabase = true;
                   }
               }
-          }
       } catch (e) {
-          console.error('Lỗi khi thực hiện kiểm tra ngăn chặn:', e);
+          console.warn('Lỗi khi truy vấn dữ liệu trực tuyến từ Supabase, chuyển sang sử dụng dữ liệu ngoại tuyến:', e);
+          loadedFromSupabase = false;
+      }
+
+      // Chỉ sử dụng dữ liệu ngoại tuyến khi không có mạng, chưa cấu hình, hoặc truy vấn trực tuyến thất bại
+      if (!loadedFromSupabase) {
+          try {
+              activeList = await offlineDb.getRecords('blocking_records');
+              archiveList = await offlineDb.getRecords('archive_blocking_records');
+          } catch (e) {
+              console.error('Lỗi khi truy xuất dữ liệu ngăn chặn ngoại tuyến:', e);
+          }
       }
 
       const matches: { record: any; source: 'active' | 'archive' }[] = [];
@@ -478,7 +476,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                   });
               }
 
-              if (isPlotMatch || isOwnerMatch) {
+              // Loại bỏ việc cảnh báo khi chỉ trùng tên chủ sử dụng (Yêu cầu phải trùng thửa đất/isPlotMatch)
+              if (isPlotMatch) {
                   matches.push({ record: blocking, source });
               }
           });

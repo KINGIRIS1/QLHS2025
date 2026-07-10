@@ -4,6 +4,7 @@ import { RecordFile, LandRecord } from '../types';
 import { fetchRecords } from '../services/apiRecords';
 import { offlineDb } from '../utils/offlineDb';
 import { showToast } from '../utils/appHelpers';
+import { supabase, isConfigured } from '../services/supabaseClient';
 import * as XLSX from 'xlsx-js-style';
 
 interface BlockingCheckToolModalProps {
@@ -67,6 +68,53 @@ const BlockingCheckToolModal: React.FC<BlockingCheckToolModalProps> = ({ isOpen,
       // 1. Tải hồ sơ đo đạc
       setLoadingText('Đang tải danh sách hồ sơ đo đạc từ máy chủ...');
       const landRecords = await fetchRecords(true);
+
+      // Đồng bộ hóa dữ liệu ngăn chặn mới nhất từ Supabase nếu có kết nối mạng
+      if (isConfigured && navigator.onLine) {
+        setLoadingText('Đang đồng bộ hóa dữ liệu ngăn chặn mới nhất từ máy chủ...');
+        try {
+          // Tải dữ liệu active blocking
+          let activeRecords: any[] = [];
+          let activeFrom = 0;
+          const limit = 1000;
+          let hasMoreActive = true;
+          while (hasMoreActive) {
+            const { data, error } = await supabase.from('blocking_records').select('*').range(activeFrom, activeFrom + limit - 1);
+            if (error) throw error;
+            if (data && data.length > 0) {
+              activeRecords = [...activeRecords, ...data];
+              if (data.length < limit) hasMoreActive = false;
+              else activeFrom += limit;
+            } else {
+              hasMoreActive = false;
+            }
+          }
+          if (activeRecords.length > 0) {
+            await offlineDb.saveRecords('blocking_records', activeRecords);
+          }
+
+          // Tải dữ liệu archive blocking
+          let archiveRecords: any[] = [];
+          let archiveFrom = 0;
+          let hasMoreArchive = true;
+          while (hasMoreArchive) {
+            const { data, error } = await supabase.from('archive_blocking_records').select('*').range(archiveFrom, archiveFrom + limit - 1);
+            if (error) throw error;
+            if (data && data.length > 0) {
+              archiveRecords = [...archiveRecords, ...data];
+              if (data.length < limit) hasMoreArchive = false;
+              else archiveFrom += limit;
+            } else {
+              hasMoreArchive = false;
+            }
+          }
+          if (archiveRecords.length > 0) {
+            await offlineDb.saveRecords('archive_blocking_records', archiveRecords);
+          }
+        } catch (syncError) {
+          console.warn('Không thể đồng bộ dữ liệu ngăn chặn trực tuyến, sử dụng dữ liệu ngoại tuyến sẵn có:', syncError);
+        }
+      }
 
       // 2. Tải số lượng cơ sở dữ liệu ngăn chặn
       setLoadingText('Đang kiểm tra dữ liệu ngăn chặn ngoại tuyến...');
@@ -154,10 +202,9 @@ const BlockingCheckToolModal: React.FC<BlockingCheckToolModalProps> = ({ isOpen,
               });
             }
 
-            if (isPlotMatch || isOwnerMatch) {
-              let matchType: 'plot' | 'owner' | 'both' = 'plot';
-              if (isPlotMatch && isOwnerMatch) matchType = 'both';
-              else if (isOwnerMatch) matchType = 'owner';
+            // Loại bỏ việc cảnh báo khi chỉ trùng tên chủ sử dụng (Yêu cầu phải trùng thửa đất/isPlotMatch)
+            if (isPlotMatch) {
+              const matchType: 'plot' | 'both' = isOwnerMatch ? 'both' : 'plot';
 
               matches.push({
                 recordFile: rec,

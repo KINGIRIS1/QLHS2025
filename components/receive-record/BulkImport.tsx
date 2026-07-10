@@ -74,6 +74,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                           else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
                           else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';
                           else if (lower.includes('cắm mốc')) recordType = 'Cắm mốc';
+                          else if (lower.includes('xin số thửa') || lower.includes('xin so thua') || lower.includes('xst')) recordType = 'Xin số thửa';
                           else if (lower.includes('thuế') || lower.includes('tcq')) recordType = 'Thuế chính quy';
                           else if (lower.includes('tòa án') || lower.includes('ta')) recordType = 'Tòa án';
                           else if (lower.includes('thi hành án') || lower.includes('tha')) recordType = 'Thi hành án';
@@ -195,7 +196,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
               'TÁCH THỬA': 'Trích đo bản đồ địa chính',
               'HỢP THỬA': 'Trích đo bản đồ địa chính',
-              'CẤP ĐỔI': 'Trích đo bản đồ địa chính'
+              'CẤP ĐỔI': 'Trích đo bản đồ địa chính',
+              'XST': 'Xin số thửa',
+              'XIN SỐ THỬA': 'Xin số thửa'
           };
 
           for (let i = headerRowIndex + 1; i < data.length; i++) {
@@ -222,6 +225,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
                   else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';
                   else if (lower.includes('cắm mốc')) recordType = 'Cắm mốc';
+                  else if (lower.includes('xin số thửa') || lower.includes('xin so thua') || lower.includes('xst')) recordType = 'Xin số thửa';
                   else if (lower.includes('thuế') || lower.includes('tcq')) recordType = 'Thuế chính quy';
                   else if (lower.includes('tòa án') || lower.includes('ta')) recordType = 'Tòa án';
                   else if (lower.includes('thi hành án') || lower.includes('tha')) recordType = 'Thi hành án';

@@ -131,9 +131,9 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
         
         if (isOtherView) {
-            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || ''));
+            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || ''));
         } else if (isMeasurementView) {
-            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || ''));
+            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || ''));
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)
@@ -237,8 +237,8 @@ export const useRecordFilter = (
                 if (!checkWarningPermission(r)) return; 
                 
                 // Filter by recordType based on view group
-                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || '')) return;
-                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'].includes(r.recordType || '')) return;
+                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || '')) return;
+                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || '')) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

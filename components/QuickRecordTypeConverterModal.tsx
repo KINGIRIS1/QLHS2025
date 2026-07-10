@@ -18,7 +18,7 @@ const QuickRecordTypeConverterModal: React.FC<QuickRecordTypeConverterModalProps
     onSuccess
 }) => {
     // Định nghĩa các loại hồ sơ KHÔNG thuộc Đo đạc (Hồ sơ Khác)
-    const otherTypes = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'];
+    const otherTypes = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'];
 
     // Lấy tất cả hồ sơ Đo đạc
     const measurementRecords = useMemo(() => {

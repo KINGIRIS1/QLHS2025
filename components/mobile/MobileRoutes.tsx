@@ -3,6 +3,7 @@ import { RecordFile, Employee, User, UserRole, Holiday } from '../../types';
 import MobileDashboard from './MobileDashboard';
 import MobileRecordList from './MobileRecordList';
 import MobileSettingsView from './MobileSettingsView';
+import { SendMeasurementFilesView } from '../SendMeasurementFilesView';
 
 interface MobileRoutesProps {
   currentView: string;
@@ -13,6 +14,7 @@ interface MobileRoutesProps {
   users: User[];
   wards: string[];
   holidays: Holiday[];
+  onSaveRecord?: (r: RecordFile) => Promise<boolean>;
   
   // Handlers
   handleViewRecord: (r: RecordFile) => void;
@@ -79,6 +81,15 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
           notificationEnabled={props.notificationEnabled}
           setNotificationEnabled={props.setNotificationEnabled}
           onLogout={props.onLogout}
+        />
+      );
+
+    case 'send_measurement_files':
+      return (
+        <SendMeasurementFilesView
+          currentUser={currentUser}
+          records={records}
+          onUpdateRecord={(updated) => props.onSaveRecord && props.onSaveRecord(updated)}
         />
       );
 

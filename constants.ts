@@ -62,7 +62,8 @@ export const EXTENDED_RECORD_TYPES = [
   'Cung cấp thông tin',
   'CMD',
   'Thi hành án',
-  'Tòa án'
+  'Tòa án',
+  'Xin số thửa'
 ];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
@@ -123,6 +124,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('tòa án')) return 'Tòa án';
   if (t.includes('thuế chính quy')) return 'Thuế CQ';
   if (t.includes('thu hồi giấy chứng nhận')) return 'Thu hồi GCN';
+  if (t.includes('xin số thửa')) return 'Xin số thửa';
   
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };

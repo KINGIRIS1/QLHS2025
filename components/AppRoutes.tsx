@@ -23,6 +23,7 @@ import DangKyView from './archive/DangKyView';
 import WarehouseView from './archive/WarehouseView';
 import BlockingRecordsView from './BlockingRecordsView';
 import QuickRecordTypeConverterModal from './QuickRecordTypeConverterModal';
+import { SendMeasurementFilesView } from './SendMeasurementFilesView';
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send, RefreshCw } from 'lucide-react';
@@ -303,7 +304,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                                     <option value="all">Mọi loại HS</option>
                                     {(() => {
                                         const isOther = currentView === 'other_records';
-                                        const otherTypes = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận'];
+                                        const otherTypes = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'];
                                         // Thu thập động các loại hồ sơ thuộc view này
                                         const types = Array.from(new Set(records
                                             .map(r => r.recordType || '')
@@ -594,6 +595,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 <UtilitiesView
                     currentUser={currentUser}
                     initialRecordForCorrection={props.recordForMapCorrection}
+                />
+            );
+        case 'send_measurement_files':
+            return (
+                <SendMeasurementFilesView
+                    currentUser={currentUser}
+                    records={records}
+                    onUpdateRecord={(updated) => props.handleAddOrUpdateRecord(updated)}
                 />
             );
         case 'archive_records':

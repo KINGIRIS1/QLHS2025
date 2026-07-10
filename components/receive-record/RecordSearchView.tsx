@@ -29,7 +29,8 @@ const SEARCHABLE_RECORD_TYPES = [
   'Cung cấp thông tin',
   'Thi hành án',
   'Tòa án',
-  'Thu hồi Giấy chứng nhận'
+  'Thu hồi Giấy chứng nhận',
+  'Xin số thửa'
 ];
 
 export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
@@ -164,6 +165,45 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
     }
   };
 
+  // Tính toán số liệu tổng hợp các loại hồ sơ
+  const stats = useMemo(() => {
+    let xinSoThua = 0;
+    let trichDo = 0;
+    let trichLuc = 0;
+    let doDac = 0;
+    let other = 0;
+
+    if (records) {
+      records.forEach(r => {
+        const type = (r.recordType || '').toLowerCase();
+        if (type.includes('xin số thửa') || type.includes('xin so thua') || type.includes('xst')) {
+          xinSoThua++;
+        } else if (type.includes('trích đo')) {
+          trichDo++;
+        } else if (type.includes('trích lục')) {
+          trichLuc++;
+        } else if (type.includes('đo đạc')) {
+          doDac++;
+        } else {
+          const isSearchable = SEARCHABLE_RECORD_TYPES.some(t => {
+            const normR = type.trim();
+            const normT = t.toLowerCase().trim();
+            return normR === normT || 
+                   (t === 'Sao lục hồ sơ' && normR.includes('sao lục')) ||
+                   (t === 'Thuế chính quy' && (normR.includes('thuế') || normR === 'tcq')) ||
+                   (t === 'Trích đo' && normR.includes('trích đo')) ||
+                   (t === 'Trích lục' && normR.includes('trích lục'));
+          });
+          if (isSearchable) {
+            other++;
+          }
+        }
+      });
+    }
+
+    return { xinSoThua, trichDo, trichLuc, doDac, other };
+  }, [records]);
+
   // Tiến hành lọc danh sách hồ sơ
   const filteredRecords = useMemo(() => {
     if (!records) return [];
@@ -286,6 +326,30 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
 
   return (
     <div className="flex flex-col h-full space-y-4" id="record-search-view-container">
+      {/* Khung tổng hợp loại hồ sơ */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" id="search-record-stats-cards">
+        <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Tổng nhận</span>
+          <span className="text-2xl font-extrabold text-blue-800 mt-1">{records ? records.length : 0}</span>
+        </div>
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Xin số thửa</span>
+          <span className="text-2xl font-extrabold text-amber-800 mt-1">{stats.xinSoThua}</span>
+        </div>
+        <div className="bg-purple-50/70 border border-purple-100 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">Trích đo</span>
+          <span className="text-2xl font-extrabold text-purple-800 mt-1">{stats.trichDo}</span>
+        </div>
+        <div className="bg-teal-50/70 border border-teal-100 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-teal-600 uppercase tracking-wider">Trích lục</span>
+          <span className="text-2xl font-extrabold text-teal-800 mt-1">{stats.trichLuc}</span>
+        </div>
+        <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 flex flex-col justify-between shadow-sm col-span-2 sm:col-span-1">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Khác</span>
+          <span className="text-2xl font-extrabold text-slate-800 mt-1">{stats.doDac + stats.other}</span>
+        </div>
+      </div>
+
       {/* Khung tìm kiếm và bộ lọc */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100" id="search-filter-mesh">
         <div className="relative">
@@ -540,14 +604,16 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
                         </span>
                       ) : (
                         <div className="flex flex-col gap-1.5 items-center justify-center">
-                          <button
-                            onClick={() => onReturnResult(r)}
-                            className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all hover:scale-[1.03] active:scale-[0.98]"
-                            title="Click để bấm trả kết quả cho dân"
-                            id={`btn-return-action-${r.id}`}
-                          >
-                            <CheckCircle size={14} /> Trả kết quả
-                          </button>
+                          {r.status === RecordStatus.HANDOVER && (
+                            <button
+                              onClick={() => onReturnResult(r)}
+                              className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all hover:scale-[1.03] active:scale-[0.98]"
+                              title="Click để bấm trả kết quả cho dân"
+                              id={`btn-return-action-${r.id}`}
+                            >
+                              <CheckCircle size={14} /> Trả kết quả
+                            </button>
+                          )}
                           
                           <button
                             onClick={() => {

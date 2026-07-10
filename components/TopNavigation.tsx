@@ -42,11 +42,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   
   let employeeAllowedViews: string[] = [];
   const normalizedDept = (currentDepartment || '').trim().toLowerCase();
+  const isDoDacUser = normalizedDept.includes('đo đạc') || isAdmin || isSubadmin;
 
   if (normalizedDept.includes('đo đạc')) {
-    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records', 'blocking_records'];
+    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records', 'blocking_records', 'send_measurement_files'];
     if (!teamLeaderAllowedViews.includes('blocking_records')) {
       teamLeaderAllowedViews.push('blocking_records');
+    }
+    if (!teamLeaderAllowedViews.includes('send_measurement_files')) {
+      teamLeaderAllowedViews.push('send_measurement_files');
     }
   } else if (normalizedDept.includes('lưu trữ')) {
     employeeAllowedViews = ['dashboard', 'archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
@@ -89,6 +93,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isTabGroup: true,
       subItems: [
         { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
+        { id: 'send_measurement_files', label: 'Gửi file ĐĐ', icon: Send, visible: isDoDacUser },
         { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardList, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
         { id: 'other_records', label: 'Khác', icon: Layers, visible: true },

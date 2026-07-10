@@ -123,7 +123,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             'TL': 'Trích lục bản đồ địa chính', 'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
             'TĐ': 'Trích đo bản đồ địa chính', 'TRÍCH ĐO': 'Trích đo bản đồ địa chính',
             'ĐĐ': 'Đo đạc theo yêu cầu', 'ĐO ĐẠC': 'Đo đạc theo yêu cầu', 'CM': 'Cắm mốc', 'CẮM MỐC': 'Cắm mốc',
-            'CL': 'Trích đo chỉnh lý bản đồ địa chính', 'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính'
+            'CL': 'Trích đo chỉnh lý bản đồ địa chính', 'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính',
+            'XST': 'Xin số thửa', 'XIN SỐ THỬA': 'Xin số thửa'
         };
 
         for (let i = headerRowIndex + 1; i < data.length; i++) {

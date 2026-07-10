@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, UserRole } from '../../types';
-import { ArchiveRecord, fetchWarehouseRecordsPaginated, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, initRealtimeArchive, importSingleWarehouseRecord } from '../../services/apiArchive';
-import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2, User as UserIcon, FileText } from 'lucide-react';
+import { ArchiveRecord, fetchWarehouseRecordsPaginated, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, initRealtimeArchive, importSingleWarehouseRecord, mapFromWarehouseRecord } from '../../services/apiArchive';
+import { supabase } from '../../services/supabaseClient';
+import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2, User as UserIcon, FileText, Upload } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -99,6 +100,425 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
     const importCancelRef = useRef(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // State cho tính năng Tìm kiếm theo File Excel
+    const [isExcelSearchOpen, setIsExcelSearchOpen] = useState(false);
+    const [excelSearchFile, setExcelSearchFile] = useState<File | null>(null);
+    const [excelHeaders, setExcelHeaders] = useState<string[]>([]);
+    const [excelRows, setExcelRows] = useState<any[]>([]);
+    const [columnMappings, setColumnMappings] = useState<Record<string, string>>({
+        hoten1: '',
+        socccd: '',
+        tobando: '',
+        sothua: '',
+        sophathanhgcnmoi: '',
+        so_hieu: '',
+        loaihoso: '',
+        sovaosomoi: '',
+        maxa: ''
+    });
+    const [matchingMode, setMatchingMode] = useState<'AND' | 'OR'>('AND');
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchProgress, setSearchProgress] = useState(0);
+    const [searchFoundCount, setSearchFoundCount] = useState(0);
+    const [searchCurrentRow, setSearchCurrentRow] = useState(0);
+    const [searchResults, setSearchResults] = useState<{ excelRowIndex: number; originalRow: any; matchedRecord: ArchiveRecord }[]>([]);
+    const [showSearchSummary, setShowSearchSummary] = useState(false);
+    const [searchResultPage, setSearchResultPage] = useState(1);
+    const searchResultItemsPerPage = 10;
+    const searchCancelRef = useRef(false);
+    const searchFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Hàm lấy danh sách tiêu đề từ Worksheet
+    const getExcelHeaders = (sheet: XLSX.WorkSheet): string[] => {
+        const headers: string[] = [];
+        const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+        const R = range.s.r; // Dòng đầu tiên làm tiêu đề
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cell_ref = XLSX.utils.encode_cell({ r: R, c: C });
+            const cell = sheet[cell_ref];
+            if (cell && cell.t) {
+                headers.push(String(cell.v).trim());
+            } else {
+                headers.push(`Cột ${C + 1}`);
+            }
+        }
+        return headers;
+    };
+
+    // Hàm xử lý upload file Excel để tìm kiếm
+    const handleExcelSearchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setExcelSearchFile(file);
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                
+                // Đọc ra dạng mảng các dòng
+                const rows = XLSX.utils.sheet_to_json<any>(ws);
+                if (rows.length === 0) {
+                    alert("Tệp Excel trống hoặc không có bản ghi nào!");
+                    return;
+                }
+
+                const headers = getExcelHeaders(ws);
+                setExcelHeaders(headers);
+                setExcelRows(rows);
+
+                // Ánh xạ cột thông minh tự động dựa trên từ khóa tiếng Việt
+                const autoMappings: Record<string, string> = {
+                    hoten1: '',
+                    socccd: '',
+                    tobando: '',
+                    sothua: '',
+                    sophathanhgcnmoi: '',
+                    so_hieu: '',
+                    loaihoso: '',
+                    sovaosomoi: '',
+                    maxa: ''
+                };
+
+                const lowercaseHeaders = headers.map(h => String(h).toLowerCase().trim());
+                
+                // Họ tên chủ sử dụng
+                const nameIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('họ tên') || h.includes('chủ sử dụng') || h.includes('hoten1') || 
+                    h.includes('tên chủ') || h.includes('họ và tên') || h.includes('người sử dụng') || h.includes('ten_chu')
+                );
+                if (nameIdx !== -1) autoMappings['hoten1'] = headers[nameIdx];
+
+                // Số CCCD
+                const cccdIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('cccd') || h.includes('cmnd') || h.includes('socccd') || 
+                    h.includes('số cccd') || h.includes('số cmnd') || h.includes('căn cước')
+                );
+                if (cccdIdx !== -1) autoMappings['socccd'] = headers[cccdIdx];
+
+                // Tờ bản đồ
+                const toBandoIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('tobando') || h.includes('tờ bản đồ') || h.includes('số tờ') || 
+                    h.includes('tờ') || h.includes('bản đồ') || h.includes('to_bando')
+                );
+                if (toBandoIdx !== -1) autoMappings['tobando'] = headers[toBandoIdx];
+
+                // Số thửa
+                const soThuaIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('sothua') || h.includes('số thửa') || h.includes('thửa') || 
+                    h.includes('thửa đất') || h.includes('so_thua')
+                );
+                if (soThuaIdx !== -1) autoMappings['sothua'] = headers[soThuaIdx];
+
+                // Số phát hành GCN
+                const gcnIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('sophathanh') || h.includes('gcn') || h.includes('số phát hành') || 
+                    h.includes('số gcn') || h.includes('phát hành')
+                );
+                if (gcnIdx !== -1) autoMappings['sophathanhgcnmoi'] = headers[gcnIdx];
+
+                // Mã biên nhận (Số hiệu)
+                const soHieuIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('biên nhận') || h.includes('số hiệu') || h.includes('mã hồ sơ') || 
+                    h.includes('so_hieu') || h.includes('sohieu') || h.includes('mã bn') || h.includes('ma_bn')
+                );
+                if (soHieuIdx !== -1) autoMappings['so_hieu'] = headers[soHieuIdx];
+
+                // Loại hồ sơ
+                const loaiHsIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('loại hồ sơ') || h.includes('loaihoso') || h.includes('loai_ho_so') || h.includes('loại hs')
+                );
+                if (loaiHsIdx !== -1) autoMappings['loaihoso'] = headers[loaiHsIdx];
+
+                // Số vào sổ mới
+                const soVaoSoIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('vào sổ') || h.includes('sovaosomoi') || h.includes('so_vao_so') || h.includes('sovaoso')
+                );
+                if (soVaoSoIdx !== -1) autoMappings['sovaosomoi'] = headers[soVaoSoIdx];
+
+                // Xã phường
+                const maxaIdx = lowercaseHeaders.findIndex(h => 
+                    h.includes('xã') || h.includes('phường') || h.includes('maxa') || h.includes('mã xã') || h.includes('ma_xa') || h.includes('địa bàn')
+                );
+                if (maxaIdx !== -1) autoMappings['maxa'] = headers[maxaIdx];
+
+                setColumnMappings(autoMappings);
+                setSearchResultPage(1);
+            } catch (err) {
+                console.error("Lỗi đọc Excel tìm kiếm:", err);
+                alert("Không thể phân tích tệp Excel này!");
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    // Hàm thực thi Tìm kiếm theo lô song song trên Supabase
+    const handleExcelSearch = async () => {
+        if (!excelRows || excelRows.length === 0) {
+            alert("Vui lòng tải tệp Excel lên trước!");
+            return;
+        }
+
+        const activeMappings = Object.values(columnMappings).filter(Boolean);
+        if (activeMappings.length === 0) {
+            alert("Vui lòng ánh xạ ít nhất một trường thông tin để tìm kiếm!");
+            return;
+        }
+
+        setIsSearching(true);
+        setSearchProgress(0);
+        setSearchFoundCount(0);
+        setSearchCurrentRow(0);
+        setShowSearchSummary(false);
+        setSearchResultPage(1);
+        searchCancelRef.current = false;
+
+        const results: { excelRowIndex: number; originalRow: any; matchedRecord: ArchiveRecord }[] = [];
+        const CONCURRENCY_LIMIT = 15; // Đẩy song song tối đa 15 truy vấn cùng lúc
+        
+        const nameCol = columnMappings['hoten1'];
+        const cccdCol = columnMappings['socccd'];
+        const toBandoCol = columnMappings['tobando'];
+        const soThuaCol = columnMappings['sothua'];
+        const gcnCol = columnMappings['sophathanhgcnmoi'];
+        const soHieuCol = columnMappings['so_hieu'];
+        const loaiHsCol = columnMappings['loaihoso'];
+        const soVaoSoCol = columnMappings['sovaosomoi'];
+        const maxaCol = columnMappings['maxa'];
+
+        for (let i = 0; i < excelRows.length; i += CONCURRENCY_LIMIT) {
+            if (searchCancelRef.current) break;
+
+            const batch = excelRows.slice(i, i + CONCURRENCY_LIMIT);
+            const promises = batch.map(async (row, idx) => {
+                const excelRowIndex = i + idx + 2; // Dòng thực tế trong file Excel (Header là dòng 1, dòng dữ liệu đầu là dòng 2)
+                
+                const nameVal = nameCol && row[nameCol] !== undefined ? String(row[nameCol]).trim() : '';
+                const cccdVal = cccdCol && row[cccdCol] !== undefined ? String(row[cccdCol]).trim() : '';
+                const toBandoVal = toBandoCol && row[toBandoCol] !== undefined ? String(row[toBandoCol]).trim() : '';
+                const soThuaVal = soThuaCol && row[soThuaCol] !== undefined ? String(row[soThuaCol]).trim() : '';
+                const gcnVal = gcnCol && row[gcnCol] !== undefined ? String(row[gcnCol]).trim() : '';
+                const soHieuVal = soHieuCol && row[soHieuCol] !== undefined ? String(row[soHieuCol]).trim() : '';
+                const loaiHsVal = loaiHsCol && row[loaiHsCol] !== undefined ? String(row[loaiHsCol]).trim() : '';
+                const soVaoSoVal = soVaoSoCol && row[soVaoSoCol] !== undefined ? String(row[soVaoSoCol]).trim() : '';
+                const maxaVal = maxaCol && row[maxaCol] !== undefined ? String(row[maxaCol]).trim() : '';
+
+                // Nếu tất cả các trường được ánh xạ của dòng này đều rỗng thì bỏ qua
+                if (!nameVal && !cccdVal && !toBandoVal && !soThuaVal && !gcnVal && !soHieuVal && !loaiHsVal && !soVaoSoVal && !maxaVal) return;
+
+                try {
+                    let query = supabase.from('warehouse_records').select('*');
+                    
+                    if (matchingMode === 'AND') {
+                        // Tìm trùng khớp tất cả các trường được điền
+                        if (nameVal) query = query.ilike('hoten1', `%${nameVal}%`);
+                        if (cccdVal) query = query.eq('socccd', cccdVal);
+                        if (toBandoVal) query = query.eq('tobando', toBandoVal);
+                        if (soThuaVal) query = query.eq('sothua', soThuaVal);
+                        if (gcnVal) query = query.eq('sophathanhgcnmoi', gcnVal);
+                        if (soHieuVal) query = query.ilike('so_hieu', `%${soHieuVal}%`);
+                        if (loaiHsVal) query = query.ilike('loaihoso', `%${loaiHsVal}%`);
+                        if (soVaoSoVal) query = query.eq('sovaosomoi', soVaoSoVal);
+                        
+                        if (maxaVal) {
+                            let matchedCode = maxaVal;
+                            const foundEntry = Object.entries(WARD_MAPPING).find(([code, name]) => 
+                                name.toLowerCase().includes(maxaVal.toLowerCase()) || 
+                                maxaVal.toLowerCase().includes(name.toLowerCase())
+                            );
+                            if (foundEntry) {
+                                matchedCode = foundEntry[0];
+                            }
+                            query = query.eq('maxa', matchedCode);
+                        }
+                    } else {
+                        // Tìm trùng khớp bất kỳ trường nào được điền (OR)
+                        const orParts: string[] = [];
+                        if (nameVal) orParts.push(`hoten1.ilike.%${nameVal}%`);
+                        if (cccdVal) orParts.push(`socccd.eq.${cccdVal}`);
+                        
+                        // Ghép cặp tờ thửa trong OR để tìm kiếm chính xác mảnh đất hơn
+                        if (toBandoVal && soThuaVal) {
+                            orParts.push(`and(tobando.eq.${toBandoVal},sothua.eq.${soThuaVal})`);
+                        } else {
+                            if (toBandoVal) orParts.push(`tobando.eq.${toBandoVal}`);
+                            if (soThuaVal) orParts.push(`sothua.eq.${soThuaVal}`);
+                        }
+                        
+                        if (gcnVal) orParts.push(`sophathanhgcnmoi.eq.${gcnVal}`);
+                        if (soHieuVal) orParts.push(`so_hieu.ilike.%${soHieuVal}%`);
+                        if (loaiHsCol) orParts.push(`loaihoso.ilike.%${loaiHsVal}%`);
+                        if (soVaoSoVal) orParts.push(`sovaosomoi.eq.${soVaoSoVal}`);
+                        
+                        if (maxaVal) {
+                            let matchedCode = maxaVal;
+                            const foundEntry = Object.entries(WARD_MAPPING).find(([code, name]) => 
+                                name.toLowerCase().includes(maxaVal.toLowerCase()) || 
+                                maxaVal.toLowerCase().includes(name.toLowerCase())
+                            );
+                            if (foundEntry) {
+                                matchedCode = foundEntry[0];
+                            }
+                            orParts.push(`maxa.eq.${matchedCode}`);
+                        }
+
+                        if (orParts.length > 0) {
+                            query = query.or(orParts.join(','));
+                        } else {
+                            return;
+                        }
+                    }
+
+                    // Thực thi query tối ưu, giới hạn tối đa 50 kết quả cho 1 cụm tìm kiếm tránh nghẽn RAM
+                    const { data, error } = await query.limit(50);
+                    if (error) {
+                        console.error(`Lỗi truy vấn dòng ${excelRowIndex}:`, error);
+                    } else if (data && data.length > 0) {
+                        data.forEach((wRecord: any) => {
+                            const compatRecord = mapFromWarehouseRecord(wRecord);
+                            results.push({
+                                excelRowIndex,
+                                originalRow: row,
+                                matchedRecord: compatRecord
+                            });
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Ngoại lệ truy vấn dòng ${excelRowIndex}:`, err);
+                }
+            });
+
+            await Promise.all(promises);
+
+            const processedCount = Math.min(excelRows.length, i + batch.length);
+            setSearchCurrentRow(processedCount);
+            setSearchFoundCount(results.length);
+            setSearchProgress(Math.min(100, Math.round((processedCount / excelRows.length) * 100)));
+        }
+
+        setSearchResults(results);
+        setIsSearching(false);
+        setShowSearchSummary(true);
+    };
+
+    // Hàm xuất báo cáo so sánh kết quả Tìm kiếm ra Excel
+    const exportSearchResultsToExcel = () => {
+        if (searchResults.length === 0) {
+            alert("Không có kết quả tìm kiếm trùng khớp nào để xuất!");
+            return;
+        }
+
+        const headers = [
+            'Dòng Excel Gốc',
+            ...excelHeaders,
+            'Mã Biên Nhận (KHO)',
+            'Xã Phường (KHO)',
+            'Họ Tên Chủ 1 (KHO)',
+            'CCCD Chủ 1 (KHO)',
+            'Họ Tên Chủ 2 (KHO)',
+            'CCCD Chủ 2 (KHO)',
+            'Tờ Bản Đồ (KHO)',
+            'Số Thửa (KHO)',
+            'Diện Tích (KHO)',
+            'Ngày Cấp GCN (KHO)',
+            'Loại Hồ Sơ (KHO)',
+            'Kệ/Tầng Lưu (KHO)',
+            'Số Ô Lưu (KHO)',
+            'Hộp/Tệp Lưu (KHO)',
+            'STT Trong Hộp (KHO)',
+            'Ghi Chú (KHO)'
+        ];
+
+        const dataRows = searchResults.map(item => {
+            const origRow = item.originalRow || {};
+            // Xuất tất cả các cột ban đầu trong file excel của người dùng
+            const origValues = excelHeaders.map(h => origRow[h] !== undefined ? origRow[h] : '');
+            
+            const rec = item.matchedRecord || {};
+            const d = rec.data || {};
+            
+            return [
+                item.excelRowIndex,
+                ...origValues,
+                rec.so_hieu || '',
+                getWardName(d.maxa),
+                d.hoten1 || '',
+                d.socccd || '',
+                d.hoten2 || '',
+                d.socccd2 || '',
+                d.tobando || '',
+                d.sothua || '',
+                d.dientich || '',
+                d.ngaycapgcnmoi || '',
+                d.loaihoso || '',
+                d.soke_tang || '',
+                d.so_o || '',
+                d.So_tep || d.so_tep || '',
+                d.sott_tep || '',
+                d.ghichu || ''
+            ];
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Ket_Qua_Tra_Cuu_Kho');
+
+        // Điều chỉnh chiều rộng các cột một chút cho dễ đọc
+        ws['!cols'] = [
+            { wch: 15 }, // Dòng Excel Gốc
+            ...excelHeaders.map(() => ({ wch: 15 })), // columns của file excel gốc
+            { wch: 20 }, // Mã Biên Nhận
+            { wch: 18 }, // Xã Phường
+            { wch: 22 }, // Họ Tên Chủ 1
+            { wch: 15 }, // CCCD Chủ 1
+            { wch: 22 }, // Họ Tên Chủ 2
+            { wch: 15 }, // CCCD Chủ 2
+            { wch: 12 }, // Tờ Bản Đồ
+            { wch: 12 }, // Số Thửa
+            { wch: 12 }, // Diện Tích
+            { wch: 18 }, // Ngày Cấp GCN
+            { wch: 22 }, // Loại Hồ Sơ
+            { wch: 15 }, // Kệ/Tầng Lưu
+            { wch: 10 }, // Số Ô Lưu
+            { wch: 12 }, // Hộp/Tệp Lưu
+            { wch: 15 }, // STT Trong Hộp
+            { wch: 20 }  // Ghi Chú
+        ];
+
+        XLSX.writeFile(wb, `Ket_Qua_Doi_Chieu_Kho_${Date.now().toString().slice(-6)}.xlsx`);
+    };
+
+    // Reset lại trạng thái Tìm kiếm
+    const resetExcelSearch = () => {
+        setExcelSearchFile(null);
+        setExcelHeaders([]);
+        setExcelRows([]);
+        setColumnMappings({
+            hoten1: '',
+            socccd: '',
+            tobando: '',
+            sothua: '',
+            sophathanhgcnmoi: '',
+            so_hieu: '',
+            loaihoso: '',
+            sovaosomoi: '',
+            maxa: ''
+        });
+        setMatchingMode('AND');
+        setSearchProgress(0);
+        setSearchFoundCount(0);
+        setSearchCurrentRow(0);
+        setSearchResults([]);
+        setShowSearchSummary(false);
+        setSearchResultPage(1);
+        if (searchFileInputRef.current) {
+            searchFileInputRef.current.value = '';
+        }
+    };
 
     // Dynamic load với cơ chế debounce 500ms tránh spam API (chỉ lắng nghe các biến chính thức)
     useEffect(() => {
@@ -610,6 +1030,14 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                     >
                         {isLoading ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
                         Nhập dữ liệu Excel
+                    </button>
+
+                    <button
+                        onClick={() => setIsExcelSearchOpen(true)}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 active:scale-95"
+                    >
+                        <Search size={14} />
+                        Tìm kiếm bằng Excel
                     </button>
 
                     <button
@@ -1601,6 +2029,530 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                     </button>
                                 </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL TÌM KIẾM THEO FILE EXCEL */}
+            {isExcelSearchOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up border border-slate-100">
+                        {/* Header */}
+                        <div className="flex justify-between items-center bg-indigo-600 text-white p-5 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-lg">
+                                    <Search size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-md font-bold">Tìm Kiếm Kho Hồ Sơ Bằng File Excel</h3>
+                                    <p className="text-[11px] opacity-80">Tra cứu nhanh hàng loạt thửa đất, CCCD hoặc chủ sử dụng từ tệp danh sách Excel</p>
+                                </div>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    if (isSearching) {
+                                        if (confirm("Đang trong quá trình tra cứu. Bạn có muốn dừng lại không?")) {
+                                            searchCancelRef.current = true;
+                                            setIsExcelSearchOpen(false);
+                                            resetExcelSearch();
+                                        }
+                                    } else {
+                                        setIsExcelSearchOpen(false);
+                                        resetExcelSearch();
+                                    }
+                                }}
+                                className="p-1.5 bg-white/10 hover:bg-white/20 rounded-full transition-all"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs font-medium text-slate-700">
+                            
+                            {/* BƯỚC 1: TẢI FILE EXCEL */}
+                            {!excelSearchFile ? (
+                                <div className="space-y-3">
+                                    <div className="text-sm font-bold text-slate-700">Bước 1: Chọn Tệp Tin Excel Chứa Danh Sách Cần Tra Cứu</div>
+                                    <div 
+                                        onClick={() => searchFileInputRef.current?.click()}
+                                        className="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-10 flex flex-col items-center justify-center gap-3 bg-slate-50/50 hover:bg-indigo-50/10 cursor-pointer transition-all select-none group"
+                                    >
+                                        <div className="p-4 bg-indigo-50 rounded-full text-indigo-600 group-hover:scale-110 transition-transform">
+                                            <Upload size={28} />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-xs font-bold text-slate-700">Kéo thả tệp Excel vào đây hoặc nhấp để chọn tệp</p>
+                                            <p className="text-[10px] text-slate-400 mt-1">Hỗ trợ định dạng .xlsx, .xls</p>
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            ref={searchFileInputRef}
+                                            onChange={handleExcelSearchUpload}
+                                            accept=".xlsx, .xls"
+                                            className="hidden"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {/* THÔNG TIN TỆP VÀ RESET */}
+                                    <div className="flex items-center justify-between bg-indigo-50/45 border border-indigo-100 p-4 rounded-2xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-indigo-600 text-white rounded-xl">
+                                                <FileSpreadsheet size={20} />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-800 text-xs">{excelSearchFile.name}</div>
+                                                <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                                                    Phát hiện <strong className="text-indigo-600 font-bold">{excelRows.length}</strong> dòng dữ liệu tra cứu
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {!isSearching && (
+                                            <button
+                                                type="button"
+                                                onClick={resetExcelSearch}
+                                                className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 rounded-lg font-bold text-[11px] text-slate-600 transition-all"
+                                            >
+                                                Chọn tệp khác
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* BƯỚC 2: CẤU HÌNH ÁNH XẠ CỘT & ĐIỀU KIỆN */}
+                                    {!showSearchSummary && !isSearching && (
+                                        <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-4">
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Bước 2: Cấu Hình Ánh Xạ Cột & Thiết Lập Điều Kiện</div>
+                                                <div className="text-[10px] text-slate-500">Ánh xạ các cột trong tệp Excel của bạn với các trường dữ liệu tương ứng để tìm kiếm chính xác nhất</div>
+                                            </div>
+
+                                            {/* Grid Mapping */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-3">
+                                                    <div className="font-semibold text-slate-600 border-b pb-1">Chủ Sử Dụng, CCCD & Giấy Tờ</div>
+                                                    
+                                                    {/* Họ tên chủ */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Họ tên chủ sử dụng:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['hoten1']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, hoten1: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Số CCCD */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Số CCCD / CMND:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['socccd']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, socccd: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Số phát hành GCN */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Số phát hành GCN:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['sophathanhgcnmoi']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, sophathanhgcnmoi: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Số vào sổ mới */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Số vào sổ mới:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['sovaosomoi']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, sovaosomoi: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <div className="font-semibold text-slate-600 border-b pb-1">Vị Trí Đất, Bản Đồ & Hồ Sơ</div>
+
+                                                    {/* Tờ bản đồ */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Tờ bản đồ:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['tobando']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, tobando: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Số thửa */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Số thửa đất:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['sothua']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, sothua: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Mã biên nhận */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Mã biên nhận (Số hiệu):</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['so_hieu']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, so_hieu: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Loại hồ sơ */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Loại hồ sơ:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['loaihoso']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, loaihoso: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Xã phường */}
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="font-medium text-slate-700">Xã phường:</span>
+                                                        <select
+                                                            className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-[180px] focus:outline-none"
+                                                            value={columnMappings['maxa']}
+                                                            onChange={(e) => setColumnMappings(p => ({ ...p, maxa: e.target.value }))}
+                                                        >
+                                                            <option value="">-- Không tìm kiếm --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Chế độ đối chiếu */}
+                                                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-dashed">
+                                                        <span className="font-bold text-slate-800">Phương thức đối chiếu:</span>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setMatchingMode('AND')}
+                                                                className={`px-2.5 py-1.5 rounded-lg font-bold text-[10px] transition-all ${matchingMode === 'AND' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                                            >
+                                                                Trùng TOÀN BỘ (AND)
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setMatchingMode('OR')}
+                                                                className={`px-2.5 py-1.5 rounded-lg font-bold text-[10px] transition-all ${matchingMode === 'OR' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                                            >
+                                                                Trùng 1 TRONG CÁC (OR)
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Tips */}
+                                            <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-150 text-[10px] leading-relaxed flex items-start gap-2">
+                                                <AlertCircle size={14} className="shrink-0 text-amber-600 mt-0.5" />
+                                                <div>
+                                                    <strong>Mẹo Tra Cứu Hiệu Năng Cao:</strong> Hãy ưu tiên ánh xạ các trường có tính chất định danh cao như <strong>Số thửa đất & Số tờ bản đồ</strong>, hoặc <strong>Số CCCD</strong>, hoặc <strong>Số phát hành GCN</strong>. Việc này giúp hệ thống truy vấn thẳng vào tập chỉ mục (Index) hiệu năng cao, cho tốc độ xử lý nhanh gấp hàng trăm lần so với tìm theo họ tên.
+                                                </div>
+                                            </div>
+
+                                            {/* Nút bấm Tìm kiếm */}
+                                            <div className="pt-2 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleExcelSearch}
+                                                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                                >
+                                                    <Search size={14} />
+                                                    Bắt đầu tra cứu đối chiếu
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* TIẾN TRÌNH TÌM KIẾM DỮ LIỆU */}
+                                    {isSearching && (
+                                        <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl flex flex-col gap-4 text-center">
+                                            <div className="flex flex-col items-center justify-center gap-2">
+                                                <Loader2 size={36} className="animate-spin text-indigo-600" />
+                                                <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">Hệ thống đang đối chiếu dữ liệu kho lớn...</div>
+                                                <div className="text-[11px] text-slate-500 font-semibold">
+                                                    Đang quét dòng <strong>{searchCurrentRow}</strong> / <strong>{excelRows.length}</strong> trong tệp Excel
+                                                </div>
+                                            </div>
+
+                                            {/* Progress Bar */}
+                                            <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                                                    style={{ width: `${searchProgress}%` }}
+                                                ></div>
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold px-1">
+                                                <span>Tiến trình: {searchProgress}%</span>
+                                                <span className="text-emerald-600">Đã phát hiện: {searchFoundCount} bản ghi trùng khớp</span>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    searchCancelRef.current = true;
+                                                    setIsSearching(false);
+                                                }}
+                                                className="mt-2 py-2 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold border border-rose-100 transition-all self-center text-[11px] active:scale-95 cursor-pointer"
+                                            >
+                                                Hủy / Dừng Tra Cứu
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* BÁO CÁO KẾT QUẢ TÌM KIẾM & BẢNG KẾT QUẢ */}
+                                    {showSearchSummary && (
+                                        <div className="space-y-4 text-left">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+                                                <div className="flex items-center gap-2 text-left">
+                                                    <div className="p-1.5 bg-emerald-600 text-white rounded-lg shrink-0">
+                                                        <CheckCircle2 size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-xs font-extrabold text-slate-800">Hoàn tất tra cứu đối chiếu kho dữ liệu lớn!</span>
+                                                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                                                            Đã tìm thấy <strong className="text-emerald-600 font-bold">{searchResults.length}</strong> kết quả trùng khớp cho <strong className="text-indigo-600 font-bold">{excelRows.length}</strong> yêu cầu.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={exportSearchResultsToExcel}
+                                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[11px] shadow-md shadow-emerald-600/10 active:scale-95 flex items-center gap-1 transition-all cursor-pointer"
+                                                    >
+                                                        <Download size={12} /> Xuất Báo Cáo Đối Chiếu
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={resetExcelSearch}
+                                                        className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-[11px] transition-all cursor-pointer"
+                                                    >
+                                                        Tìm kiếm tệp mới
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Results table */}
+                                            {searchResults.length === 0 ? (
+                                                <div className="text-center p-10 border border-dashed rounded-2xl text-slate-400 italic">
+                                                    Không tìm thấy bất kỳ hồ sơ nào trong kho trùng khớp với danh sách các tiêu chí đã ánh xạ.
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3 text-left">
+                                                    <div className="text-xs font-bold text-slate-700">Chi Tiết Danh Sách Hồ Sơ Trùng Khớp Phát Hiện Được:</div>
+                                                    <div className="border border-slate-150 rounded-2xl overflow-hidden bg-white">
+                                                        <table className="w-full border-collapse text-left text-[11px]">
+                                                            <thead className="bg-slate-50 border-b border-slate-150 text-slate-600 font-bold uppercase tracking-wider">
+                                                                <tr>
+                                                                    <th className="p-3 w-[80px] text-center">STT / Dòng</th>
+                                                                    <th className="p-3 w-[250px]">Dữ liệu tra cứu gốc (Excel)</th>
+                                                                    <th className="p-3">Hồ sơ phát hiện trong kho hệ thống (Supabase)</th>
+                                                                    <th className="p-3 w-[120px] text-center">Thao tác</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100 font-medium text-slate-705">
+                                                                {searchResults
+                                                                    .slice((searchResultPage - 1) * searchResultItemsPerPage, searchResultPage * searchResultItemsPerPage)
+                                                                    .map((item, idx) => {
+                                                                        const orig = item.originalRow;
+                                                                        const rec = item.matchedRecord;
+                                                                        const d = rec.data || {};
+                                                                        const realIndex = (searchResultPage - 1) * searchResultItemsPerPage + idx + 1;
+
+                                                                        // Tạo chuỗi tóm tắt dữ liệu Excel gốc để đối chiếu trực quan
+                                                                        const mappedKeys = Object.entries(columnMappings).filter(([_, exCol]) => !!exCol);
+                                                                        
+                                                                        return (
+                                                                            <tr key={idx} className="hover:bg-indigo-50/10">
+                                                                                <td className="p-3 text-center text-slate-400 font-mono">
+                                                                                    <span className="font-bold text-slate-700">{realIndex}</span>
+                                                                                    <div className="text-[9px] text-slate-400">Dòng {item.excelRowIndex}</div>
+                                                                                </td>
+                                                                                <td className="p-3 text-left">
+                                                                                    <div className="space-y-1">
+                                                                                        {mappedKeys.map(([dbKey, exCol]) => {
+                                                                                            const val = orig[exCol];
+                                                                                            if (val === undefined || val === '') return null;
+                                                                                            let label = '';
+                                                                                            if (dbKey === 'hoten1') label = 'Họ tên';
+                                                                                            if (dbKey === 'socccd') label = 'CCCD';
+                                                                                            if (dbKey === 'tobando') label = 'Tờ bđ';
+                                                                                            if (dbKey === 'sothua') label = 'Thửa';
+                                                                                            if (dbKey === 'sophathanhgcnmoi') label = 'GCN';
+                                                                                            if (dbKey === 'so_hieu') label = 'Mã BN';
+                                                                                            if (dbKey === 'loaihoso') label = 'Loại HS';
+                                                                                            if (dbKey === 'sovaosomoi') label = 'Vào sổ';
+                                                                                            if (dbKey === 'maxa') label = 'Xã phường';
+                                                                                            return (
+                                                                                                <div key={dbKey} className="text-[10px]">
+                                                                                                    <span className="text-slate-400 font-medium">{label}:</span> <strong className="text-slate-700">{String(val)}</strong>
+                                                                                                </div>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 text-xs text-left">
+                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-left">
+                                                                                        <div>
+                                                                                            <div className="font-bold text-indigo-700 text-[11px]">{d.hoten1 || '-'}</div>
+                                                                                            {d.socccd && <div className="text-[10px] text-slate-500 font-mono mt-0.5">CCCD: {d.socccd}</div>}
+                                                                                            <div className="text-[10px] text-slate-600 mt-0.5">
+                                                                                                Tờ: <strong className="text-slate-800">{d.tobando || '-'}</strong> / Thửa: <strong className="text-slate-800">{d.sothua || '-'}</strong>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="border-l border-dashed border-slate-200 md:pl-3 text-[10px] text-slate-500 space-y-0.5 text-left">
+                                                                                            <div>Mã hồ sơ: <strong className="text-slate-700 font-mono">{rec.so_hieu}</strong></div>
+                                                                                            <div>Kệ/Tầng: <strong className="text-indigo-650 font-bold">{d.soke_tang || '-'}</strong></div>
+                                                                                            <div>Hộp/Số ô: <strong className="text-indigo-600">{d.So_tep || d.so_tep || '-'}</strong> / ô <strong className="text-slate-700">{d.so_o || '-'}</strong></div>
+                                                                                            {d.sott_tep && <div>STT trong hộp: <strong className="text-slate-700 font-mono">{d.sott_tep}</strong></div>}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 text-center">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setSelectedRecord(rec);
+                                                                                            setIsDetailOpen(true);
+                                                                                        }}
+                                                                                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 rounded-lg text-[10px] font-bold transition-all shadow-sm cursor-pointer"
+                                                                                    >
+                                                                                        Xem chi tiết
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    {/* Phân trang kết quả tìm kiếm */}
+                                                    {searchResults.length > searchResultItemsPerPage && (
+                                                        <div className="flex items-center justify-between pt-2">
+                                                            <div className="text-[10px] text-slate-500 font-semibold">
+                                                                Hiển thị <strong>{(searchResultPage - 1) * searchResultItemsPerPage + 1}</strong> - <strong>{Math.min(searchResults.length, searchResultPage * searchResultItemsPerPage)}</strong> trong tổng số <strong>{searchResults.length}</strong> kết quả trùng khớp
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    disabled={searchResultPage === 1}
+                                                                    onClick={() => setSearchResultPage(1)}
+                                                                    className="p-1.5 border rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
+                                                                >
+                                                                    <ChevronsLeft size={12} />
+                                                                </button>
+                                                                <button
+                                                                    disabled={searchResultPage === 1}
+                                                                    onClick={() => setSearchResultPage(p => Math.max(1, p - 1))}
+                                                                    className="p-1.5 border rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
+                                                                >
+                                                                    <ChevronLeft size={12} />
+                                                                </button>
+                                                                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 rounded-lg">
+                                                                    {searchResultPage} / {Math.ceil(searchResults.length / searchResultItemsPerPage)}
+                                                                </span>
+                                                                <button
+                                                                    disabled={searchResultPage === Math.ceil(searchResults.length / searchResultItemsPerPage)}
+                                                                    onClick={() => setSearchResultPage(p => Math.min(Math.ceil(searchResults.length / searchResultItemsPerPage), p + 1))}
+                                                                    className="p-1.5 border rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
+                                                                >
+                                                                    <ChevronRight size={12} />
+                                                                </button>
+                                                                <button
+                                                                    disabled={searchResultPage === Math.ceil(searchResults.length / searchResultItemsPerPage)}
+                                                                    onClick={() => setSearchResultPage(Math.ceil(searchResults.length / searchResultItemsPerPage))}
+                                                                    className="p-1.5 border rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
+                                                                >
+                                                                    <ChevronsRight size={12} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (isSearching) {
+                                        if (confirm("Đang trong quá trình tra cứu. Bạn có muốn dừng lại không?")) {
+                                            searchCancelRef.current = true;
+                                            setIsExcelSearchOpen(false);
+                                            resetExcelSearch();
+                                        }
+                                    } else {
+                                        setIsExcelSearchOpen(false);
+                                        resetExcelSearch();
+                                    }
+                                }}
+                                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                            >
+                                Đóng lại
+                            </button>
                         </div>
                     </div>
                 </div>

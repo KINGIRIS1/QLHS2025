@@ -518,3 +518,241 @@ export const deleteAllMapSheetConversions = async (): Promise<boolean> => {
         return false;
     }
 };
+
+// ============================================================================
+// 7. MÃ MÀU QUY HOẠCH
+// ============================================================================
+
+export interface PlanningColor {
+    id: string;
+    created_at?: string;
+    loai_dat: string;
+    ky_hieu: string;
+    mau_sac: string;
+    so_mau_sac?: string;
+    r: number;
+    g: number;
+    b: number;
+}
+
+const DEFAULT_PLANNING_COLORS: PlanningColor[] = [
+    { id: '1', loai_dat: 'Đất ở tại đô thị', ky_hieu: 'ODT', mau_sac: 'Hồng sẫm', so_mau_sac: '85', r: 242, g: 63, b: 153 },
+    { id: '2', loai_dat: 'Đất ở tại nông thôn', ky_hieu: 'ONT', mau_sac: 'Hồng nhạt', so_mau_sac: '15', r: 254, g: 181, b: 181 },
+    { id: '3', loai_dat: 'Đất trồng lúa', ky_hieu: 'LUA', mau_sac: 'Vàng chanh', so_mau_sac: '3', r: 255, g: 255, b: 0 },
+    { id: '4', loai_dat: 'Đất trồng cây hàng năm khác', ky_hieu: 'BHK', mau_sac: 'Vàng nhạt', so_mau_sac: '4', r: 255, g: 255, b: 173 },
+    { id: '5', loai_dat: 'Đất trồng cây lâu năm', ky_hieu: 'CLN', mau_sac: 'Vàng cam', so_mau_sac: '5', r: 248, g: 181, b: 110 },
+    { id: '6', loai_dat: 'Đất rừng sản xuất', ky_hieu: 'RSX', mau_sac: 'Xanh lá cây nhạt', so_mau_sac: '120', r: 196, g: 236, b: 196 },
+    { id: '7', loai_dat: 'Đất rừng phòng hộ', ky_hieu: 'RPH', mau_sac: 'Xanh lá cây đậm', so_mau_sac: '123', r: 34, g: 139, b: 34 },
+    { id: '8', loai_dat: 'Đất rừng đặc dụng', ky_hieu: 'RDD', mau_sac: 'Xanh lá mạ', so_mau_sac: '125', r: 124, g: 252, b: 0 },
+    { id: '9', loai_dat: 'Đất nuôi trồng thủy sản', ky_hieu: 'NTS', mau_sac: 'Xanh biển lơ', so_mau_sac: '8', r: 135, g: 206, b: 250 },
+    { id: '10', loai_dat: 'Đất làm muối', ky_hieu: 'LMU', mau_sac: 'Xám nhạt', so_mau_sac: '10', r: 220, g: 220, b: 220 },
+    { id: '11', loai_dat: 'Đất thương mại, dịch vụ', ky_hieu: 'TMD', mau_sac: 'Đỏ cam', so_mau_sac: '11', r: 255, g: 127, b: 80 },
+    { id: '12', loai_dat: 'Đất cơ sở sản xuất phi nông nghiệp', ky_hieu: 'SKC', mau_sac: 'Xám đậm', so_mau_sac: '12', r: 169, g: 169, b: 169 },
+    { id: '13', loai_dat: 'Đất quốc phòng', ky_hieu: 'CQP', mau_sac: 'Đỏ tươi', so_mau_sac: '1', r: 255, g: 0, b: 0 },
+    { id: '14', loai_dat: 'Đất an ninh', ky_hieu: 'CAN', mau_sac: 'Đỏ nhạt', so_mau_sac: '14', r: 255, g: 102, b: 102 },
+    { id: '15', loai_dat: 'Đất khu vui chơi, giải trí công cộng', ky_hieu: 'DKV', mau_sac: 'Hồng cam', so_mau_sac: '24', r: 255, g: 192, b: 203 },
+    { id: '16', loai_dat: 'Đất giao thông', ky_hieu: 'DGT', mau_sac: 'Xám', so_mau_sac: '16', r: 192, g: 192, b: 192 },
+    { id: '17', loai_dat: 'Đất thủy lợi', ky_hieu: 'DTL', mau_sac: 'Xanh lam đậm', so_mau_sac: '17', r: 0, g: 0, b: 255 },
+    { id: '18', loai_dat: 'Đất xây dựng trụ sở cơ quan', ky_hieu: 'TSC', mau_sac: 'Tím nhạt', so_mau_sac: '18', r: 216, g: 191, b: 216 },
+    { id: '19', loai_dat: 'Đất nghĩa trang, nghĩa địa', ky_hieu: 'NTD', mau_sac: 'Xám xịt', so_mau_sac: '19', r: 128, g: 128, b: 128 },
+    { id: '20', loai_dat: 'Đất sinh hoạt cộng đồng', ky_hieu: 'DSH', mau_sac: 'Xanh ngọc', so_mau_sac: '20', r: 64, g: 224, b: 208 }
+];
+
+let MOCK_PLANNING_COLORS: PlanningColor[] = [...DEFAULT_PLANNING_COLORS];
+
+const LOCAL_STORAGE_KEY = 'PLANNING_COLORS_DATA';
+
+// Load from localStorage if present
+const initLocalStorageColors = () => {
+    try {
+        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (saved) {
+            MOCK_PLANNING_COLORS = JSON.parse(saved);
+        } else {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_PLANNING_COLORS));
+            MOCK_PLANNING_COLORS = [...DEFAULT_PLANNING_COLORS];
+        }
+    } catch (e) {
+        console.error('Error reading planning colors from localStorage', e);
+    }
+};
+
+initLocalStorageColors();
+
+export const fetchPlanningColors = async (): Promise<PlanningColor[]> => {
+    if (!isConfigured) {
+        initLocalStorageColors();
+        return MOCK_PLANNING_COLORS;
+    }
+    try {
+        const { data, error } = await supabase
+            .from('planning_colors')
+            .select('*')
+            .order('ky_hieu', { ascending: true });
+        if (error) throw error;
+        return data as PlanningColor[];
+    } catch (error) {
+        // Fallback to localStorage if table doesn't exist yet
+        initLocalStorageColors();
+        return MOCK_PLANNING_COLORS;
+    }
+};
+
+export const savePlanningColor = async (record: Partial<PlanningColor>): Promise<boolean> => {
+    if (!isConfigured) {
+        if (!record.id) {
+            const newRec = { 
+                ...record, 
+                id: generateId(), 
+                created_at: new Date().toISOString() 
+            } as PlanningColor;
+            MOCK_PLANNING_COLORS.push(newRec);
+        } else {
+            const idx = MOCK_PLANNING_COLORS.findIndex(r => r.id === record.id);
+            if (idx !== -1) {
+                MOCK_PLANNING_COLORS[idx] = { ...MOCK_PLANNING_COLORS[idx], ...record } as PlanningColor;
+            }
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_PLANNING_COLORS));
+        return true;
+    }
+    try {
+        if (record.id) {
+            const { error } = await supabase.from('planning_colors').update({
+                loai_dat: record.loai_dat,
+                ky_hieu: record.ky_hieu,
+                mau_sac: record.mau_sac,
+                so_mau_sac: record.so_mau_sac,
+                r: record.r,
+                g: record.g,
+                b: record.b
+            }).eq('id', record.id);
+            if (error) throw error;
+        } else {
+            const newRec = { ...record, id: generateId() };
+            const { error } = await supabase.from('planning_colors').insert([newRec]);
+            if (error) throw error;
+        }
+        return true;
+    } catch (error) {
+        logError("savePlanningColor", error);
+        // Fallback write
+        if (!record.id) {
+            const newRec = { ...record, id: generateId() } as PlanningColor;
+            MOCK_PLANNING_COLORS.push(newRec);
+        } else {
+            const idx = MOCK_PLANNING_COLORS.findIndex(r => r.id === record.id);
+            if (idx !== -1) {
+                MOCK_PLANNING_COLORS[idx] = { ...MOCK_PLANNING_COLORS[idx], ...record } as PlanningColor;
+            }
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_PLANNING_COLORS));
+        return true;
+    }
+};
+
+export const savePlanningColorsBulk = async (records: Partial<PlanningColor>[]): Promise<boolean> => {
+    if (!isConfigured) {
+        const newRecs = records.map(r => ({
+            ...r,
+            id: generateId(),
+            created_at: new Date().toISOString()
+        })) as PlanningColor[];
+        MOCK_PLANNING_COLORS = [...MOCK_PLANNING_COLORS, ...newRecs];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_PLANNING_COLORS));
+        return true;
+    }
+    try {
+        const newRecs = records.map(r => ({
+            id: generateId(),
+            loai_dat: r.loai_dat,
+            ky_hieu: r.ky_hieu,
+            mau_sac: r.mau_sac,
+            so_mau_sac: r.so_mau_sac,
+            r: Number(r.r),
+            g: Number(r.g),
+            b: Number(r.b)
+        }));
+        const { error } = await supabase.from('planning_colors').insert(newRecs);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("savePlanningColorsBulk", error);
+        // Fallback
+        const newRecs = records.map(r => ({
+            ...r,
+            id: generateId(),
+            created_at: new Date().toISOString()
+        })) as PlanningColor[];
+        MOCK_PLANNING_COLORS = [...MOCK_PLANNING_COLORS, ...newRecs];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_PLANNING_COLORS));
+        return true;
+    }
+};
+
+export const deletePlanningColor = async (id: string): Promise<boolean> => {
+    if (!isConfigured) {
+        const idx = MOCK_PLANNING_COLORS.findIndex(r => r.id === id);
+        if (idx !== -1) {
+            MOCK_PLANNING_COLORS.splice(idx, 1);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_PLANNING_COLORS));
+        }
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('planning_colors').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deletePlanningColor", error);
+        const idx = MOCK_PLANNING_COLORS.findIndex(r => r.id === id);
+        if (idx !== -1) {
+            MOCK_PLANNING_COLORS.splice(idx, 1);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_PLANNING_COLORS));
+        }
+        return true;
+    }
+};
+
+export const deleteAllPlanningColors = async (): Promise<boolean> => {
+    if (!isConfigured) {
+        MOCK_PLANNING_COLORS = [];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([]));
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('planning_colors').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteAllPlanningColors", error);
+        MOCK_PLANNING_COLORS = [];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([]));
+        return true;
+    }
+};
+
+export const resetPlanningColorsToDefault = async (): Promise<boolean> => {
+    MOCK_PLANNING_COLORS = [...DEFAULT_PLANNING_COLORS];
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_PLANNING_COLORS));
+    if (isConfigured) {
+        try {
+            await supabase.from('planning_colors').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            const dataToInsert = DEFAULT_PLANNING_COLORS.map(c => ({
+                id: c.id,
+                loai_dat: c.loai_dat,
+                ky_hieu: c.ky_hieu,
+                mau_sac: c.mau_sac,
+                so_mau_sac: c.so_mau_sac,
+                r: c.r,
+                g: c.g,
+                b: c.b
+            }));
+            await supabase.from('planning_colors').insert(dataToInsert);
+        } catch (e) {
+            console.error('Failed to reset in Supabase, kept locally', e);
+        }
+    }
+    return true;
+};
+

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet } from 'lucide-react';
+import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, Palette } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType, UserRole } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
@@ -9,6 +9,7 @@ import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
+import MaMauQuyHoachTab from './utilities/MaMauQuyHoachTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -17,7 +18,7 @@ interface UtilitiesViewProps {
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi'>(
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'mamau'>(
       currentUser.role === UserRole.ONEDOOR ? 'vphc' : 'bienban'
   );
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -142,9 +143,15 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
               >
                   <FileSpreadsheet size={16} /> Chuyển đổi tờ bản đồ
               </button>
+              <button 
+                  onClick={() => setActiveTab('mamau')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'mamau' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Palette size={16} /> Mã màu quy hoạch
+              </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'mamau' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -198,6 +205,11 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
           {/* TAB 7: CHUYỂN ĐỔI TỜ BẢN ĐỒ */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'chuyendoi' ? 'block' : 'hidden'}`}>
               <ChuyenDoiToBanDoTab notify={notify} />
+          </div>
+
+          {/* TAB 8: MÃ MÀU QUY HOẠCH */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'mamau' ? 'block' : 'hidden'}`}>
+              <MaMauQuyHoachTab notify={notify} />
           </div>
       </div>
     </div>

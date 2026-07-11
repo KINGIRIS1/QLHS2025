@@ -46,9 +46,22 @@ export const SendMeasurementFilesView: React.FC<SendMeasurementFilesViewProps> =
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [autoCompleteStatus, setAutoCompleteStatus] = useState(false); // Tu dong chuyen trang thai ho so sang Da thuc hien
+  const [activeMobileTab, setActiveMobileTab] = useState<'upload' | 'history'>('upload');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 5;
 
   const dropzoneRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const totalPages = Math.ceil(historyFiles.length / itemsPerPage);
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return historyFiles.slice(startIndex, startIndex + itemsPerPage);
+  }, [historyFiles, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [historyFiles.length, selectedRecord]);
 
   // Filter records available for measurement upload
   const filteredRecords = useMemo(() => {
@@ -373,11 +386,40 @@ export const SendMeasurementFilesView: React.FC<SendMeasurementFilesViewProps> =
         </div>
       </div>
 
+      {/* Mobile Tab Switcher */}
+      <div className="flex lg:hidden bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+        <button
+          onClick={() => setActiveMobileTab('upload')}
+          className={`flex-1 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+            activeMobileTab === 'upload' 
+              ? 'bg-white text-blue-600 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Upload size={14} /> Gửi file đo đạc
+        </button>
+        <button
+          onClick={() => setActiveMobileTab('history')}
+          className={`flex-1 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all relative ${
+            activeMobileTab === 'history' 
+              ? 'bg-white text-blue-600 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Activity size={14} /> Nhật ký
+          {historyFiles.length > 0 && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold">
+              {historyFiles.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Main Grid: Upload Form + History */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Left Side: Upload Form */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
+        <div className={`lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4 ${activeMobileTab === 'upload' ? 'block' : 'hidden lg:block'}`}>
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
             <Paperclip size={16} className="text-blue-600" /> Tạo yêu cầu gửi file
           </h3>
@@ -575,7 +617,7 @@ export const SendMeasurementFilesView: React.FC<SendMeasurementFilesViewProps> =
         </div>
 
         {/* Right Side: Upload History (Real-time logs) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col">
+        <div className={`lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col ${activeMobileTab === 'history' ? 'block' : 'hidden lg:flex'}`}>
           <div className="flex justify-between items-center mb-3 shrink-0">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <Activity size={16} className="text-emerald-500" /> Nhật ký đã gửi
@@ -611,7 +653,7 @@ export const SendMeasurementFilesView: React.FC<SendMeasurementFilesViewProps> =
                 <span className="text-[10px] text-slate-400 mt-1 block font-medium">Chọn hồ sơ ở khung bên trái để tải lên file đầu tiên</span>
               </div>
             ) : (
-              historyFiles.map((item) => (
+              paginatedHistory.map((item) => (
                 <div key={item.id} className="border border-slate-100 bg-slate-50/30 hover:bg-slate-50/60 p-3 rounded-xl space-y-2.5 transition-colors">
                   {/* Top line */}
                   <div className="flex justify-between items-start gap-2">
@@ -675,6 +717,61 @@ export const SendMeasurementFilesView: React.FC<SendMeasurementFilesViewProps> =
               ))
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {historyFiles.length > itemsPerPage && (
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between shrink-0">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition-all ${
+                    currentPage === 1
+                      ? 'border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-95'
+                  }`}
+                >
+                  Trước
+                </button>
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pNum = idx + 1;
+                  if (totalPages > 4 && Math.abs(pNum - currentPage) > 1 && pNum !== 1 && pNum !== totalPages) {
+                    if (pNum === 2 || pNum === totalPages - 1) {
+                      return <span key={idx} className="text-slate-300 px-0.5 text-xs">...</span>;
+                    }
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentPage(pNum)}
+                      className={`w-6 h-6 text-[10px] font-bold rounded-md transition-all ${
+                        currentPage === pNum
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition-all ${
+                    currentPage === totalPages
+                      ? 'border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-95'
+                  }`}
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>

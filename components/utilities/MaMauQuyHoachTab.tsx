@@ -367,23 +367,6 @@ const MaMauQuyHoachTab: React.FC<Props> = ({ notify }) => {
           </button>
 
           <button
-            onClick={handleDownloadTemplate}
-            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-            title="Tải file Excel mẫu"
-          >
-            <Download size={14} className="text-emerald-500" /> File mẫu
-          </button>
-
-          <button
-            onClick={handleResetToDefault}
-            disabled={saving}
-            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-            title="Khôi phục dữ liệu bảng mã màu về mặc định"
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} className="text-amber-500" />} Khôi phục mẫu
-          </button>
-
-          <button
             onClick={handleDeleteAll}
             disabled={saving}
             className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
@@ -442,7 +425,7 @@ const MaMauQuyHoachTab: React.FC<Props> = ({ notify }) => {
           <div className="bg-white rounded-2xl border border-slate-200 border-dashed p-10 text-center max-w-lg mx-auto mt-8 shadow-sm">
             <Palette size={48} className="text-slate-300 mx-auto mb-4" />
             <h3 className="text-slate-700 font-bold text-sm uppercase">Không tìm thấy mã màu quy hoạch</h3>
-            <p className="text-slate-400 text-xs mt-1.5 font-semibold">Thử nhập từ khóa khác, hoặc nhấn nút "Khôi phục mẫu" để tải dữ liệu tiêu chuẩn.</p>
+            <p className="text-slate-400 text-xs mt-1.5 font-semibold">Thử nhập từ khóa khác hoặc bấm nút thêm mã màu mới.</p>
           </div>
         ) : (
           <div className="space-y-4">

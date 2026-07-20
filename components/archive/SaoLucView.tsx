@@ -70,6 +70,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const [receiptNumberInput, setReceiptNumberInput] = useState('');
     const [receiverNameInput, setReceiverNameInput] = useState('');
 
+    // Ký duyệt (Signing/Approving) Modal State
+    const [showSignModal, setShowSignModal] = useState(false);
+    const [signRecord, setSignRecord] = useState<ArchiveRecord | null>(null);
+    const [signBatch, setSignBatch] = useState(false);
+    const [soGcnInput, setSoGcnInput] = useState('');
+    const [soTrangInput, setSoTrangInput] = useState('');
+
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
         so_hieu: '',
@@ -391,13 +398,21 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             return;
         }
 
+        if (newStatus === 'signed') {
+            setSignRecord(record);
+            setSignBatch(false);
+            setSoGcnInput(record.data?.so_gcn || '');
+            setSoTrangInput(record.data?.so_trang_sao_luc || '');
+            setShowSignModal(true);
+            return;
+        }
+
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
             case 'draft': confirmMsg = 'Thu hồi hồ sơ về trạng thái Nháp?'; actionName = 'Thu hồi'; break;
             case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
             case 'pending_sign': confirmMsg = 'Trình ký hồ sơ này?'; actionName = 'Trình ký'; break;
-            case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
             default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 
@@ -420,6 +435,65 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             });
             loadData();
         }
+    };
+
+    const confirmSigningSaoLuc = async () => {
+        const soGcnNum = soGcnInput ? parseInt(soGcnInput, 10) : null;
+        const soTrangNum = soTrangInput ? parseInt(soTrangInput, 10) : null;
+
+        if (signBatch) {
+            if (selectedIds.size === 0) return;
+
+            const historyEntry = {
+                action: 'Ký duyệt',
+                status: 'signed' as const,
+                timestamp: new Date().toISOString(),
+                user: currentUser.name
+            };
+
+            const updates = {
+                status: 'signed' as const,
+                so_gcn: soGcnNum,
+                so_trang_sao_luc: soTrangNum,
+                data: {
+                    so_gcn: soGcnInput,
+                    so_trang_sao_luc: soTrangInput,
+                    history: [historyEntry]
+                }
+            };
+
+            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            setSelectedIds(new Set());
+        } else if (signRecord) {
+            const historyEntry = {
+                action: 'Ký duyệt',
+                status: 'signed' as const,
+                timestamp: new Date().toISOString(),
+                user: currentUser.name
+            };
+            const oldHistory = Array.isArray(signRecord.data?.history) ? signRecord.data.history : [];
+            const newHistory = [...oldHistory, historyEntry];
+
+            await saveArchiveRecord({
+                ...signRecord,
+                status: 'signed',
+                so_gcn: soGcnNum,
+                so_trang_sao_luc: soTrangNum,
+                data: {
+                    ...signRecord.data,
+                    history: newHistory,
+                    so_gcn: soGcnInput,
+                    so_trang_sao_luc: soTrangInput
+                }
+            });
+        }
+
+        setShowSignModal(false);
+        setSignRecord(null);
+        setSignBatch(false);
+        setSoGcnInput('');
+        setSoTrangInput('');
+        loadData();
     };
 
     const confirmReturnResultSaoLuc = async () => {
@@ -456,12 +530,20 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     const handleBatchStatusChange = async (newStatus: ArchiveRecord['status']) => {
         if (selectedIds.size === 0) return;
 
+        if (newStatus === 'signed') {
+            setSignRecord(null);
+            setSignBatch(true);
+            setSoGcnInput('');
+            setSoTrangInput('');
+            setShowSignModal(true);
+            return;
+        }
+
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
             case 'executed': confirmMsg = `Xác nhận đã thực hiện xong ${selectedIds.size} hồ sơ?`; actionName = 'Đã thực hiện'; break;
             case 'pending_sign': confirmMsg = `Trình ký ${selectedIds.size} hồ sơ?`; actionName = 'Trình ký'; break;
-            case 'signed': confirmMsg = `Xác nhận đã ký duyệt ${selectedIds.size} hồ sơ?`; actionName = 'Ký duyệt'; break;
             case 'returned': confirmMsg = `Xác nhận đã trả kết quả ${selectedIds.size} hồ sơ?`; actionName = 'Đã trả kết quả'; break;
             default: return;
         }
@@ -990,6 +1072,82 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     </div>
                 )}
 
+                {/* Modal Nhập Số GCN và Số Trang Sao Lục khi chuyển sang Ký Duyệt */}
+                {showSignModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up border border-slate-100">
+                            
+                            {/* Header */}
+                            <div className="p-5 border-b border-indigo-100 bg-indigo-50/50 flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-indigo-800 text-lg flex items-center gap-2">
+                                        <PenTool size={20} className="text-indigo-600" /> Xác Nhận Ký Duyệt
+                                    </h3>
+                                    {!signBatch && signRecord && (
+                                        <p className="text-xs text-indigo-600 font-medium font-mono bg-indigo-100/50 px-2 py-0.5 rounded w-fit mt-1">Mã HS: {signRecord.so_hieu}</p>
+                                    )}
+                                    {signBatch && (
+                                        <p className="text-xs text-indigo-600 font-medium font-mono bg-indigo-100/50 px-2 py-0.5 rounded w-fit mt-1">Đang chọn: {selectedIds.size} hồ sơ</p>
+                                    )}
+                                </div>
+                                <button onClick={() => { setShowSignModal(false); setSignRecord(null); setSignBatch(false); }} className="text-slate-400 hover:text-red-500 bg-white/50 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                            </div>
+
+                            <div className="p-6 space-y-5">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                            <FileCheck size={14} className="text-blue-500"/> Số GCN <span className="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            type="number"
+                                            required
+                                            min="1"
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-medium text-slate-800 placeholder-slate-400 bg-slate-50/50"
+                                            placeholder="Ví dụ: 3..."
+                                            value={soGcnInput}
+                                            onChange={(e) => setSoGcnInput(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                            <LayoutGrid size={14} className="text-purple-500"/> Số trang sao lục <span className="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            type="number"
+                                            required
+                                            min="1"
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-medium text-slate-800 placeholder-slate-400 bg-slate-50/50"
+                                            placeholder="Ví dụ: 100..."
+                                            value={soTrangInput}
+                                            onChange={(e) => setSoTrangInput(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-xl text-xs text-slate-500 leading-relaxed border border-slate-100 flex gap-2">
+                                    <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                                    <span>Lưu ý: Hệ thống sẽ chuyển trạng thái hồ sơ thành <strong>Đã ký duyệt</strong>, đồng thời lưu trữ Số GCN và Số trang sao lục vào Supabase.</span>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-3">
+                                    <button type="button" onClick={() => { setShowSignModal(false); setSignRecord(null); setSignBatch(false); }} className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-bold text-sm transition-colors">
+                                        Hủy bỏ
+                                    </button>
+                                    <button 
+                                        onClick={confirmSigningSaoLuc}
+                                        disabled={!soGcnInput.trim() || !soTrangInput.trim()}
+                                        className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <CheckCircle size={16} /> Xác nhận ký duyệt
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Handover List Modal */}
                 <HandoverListModal 
                     isOpen={showHandoverModal}
@@ -1136,6 +1294,12 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                     <th className="p-3 w-48 text-center">Chủ sử dụng</th>
                                     <th className="p-3 w-32 text-center">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
+                                    {(subTab === 'completed') && (
+                                        <>
+                                            <th className="p-3 w-24 text-center text-indigo-700 font-bold">Số GCN</th>
+                                            <th className="p-3 w-24 text-center text-indigo-700 font-bold">Số trang</th>
+                                        </>
+                                    )}
                                     <th className="p-3 w-24 text-center">Ngày nhận</th>
                                     {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
                                     {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
@@ -1168,6 +1332,12 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                         <td className="p-3 font-medium text-gray-800">{toTitleCase(r.noi_nhan_gui)}</td>
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>
+                                        {(subTab === 'completed') && (
+                                            <>
+                                                <td className="p-3 text-center font-bold text-indigo-600">{r.so_gcn ?? r.data?.so_gcn ?? '-'}</td>
+                                                <td className="p-3 text-center font-bold text-indigo-600">{r.so_trang_sao_luc ?? r.data?.so_trang_sao_luc ?? '-'}</td>
+                                            </>
+                                        )}
                                         <td className="p-3 text-gray-600">{formatDate(r.ngay_thang)}</td>
                                         {(subTab === 'all') && (
                                             <td className="p-3 text-center">
@@ -1247,7 +1417,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                                         </td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={10 + (subTab === 'all' ? 1 : 0) + (subTab !== 'draft' ? 1 : 0) + (['all', 'completed', 'result'].includes(subTab) ? 1 : 0)} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
+                                    <tr><td colSpan={10 + (subTab === 'all' ? 1 : 0) + (subTab !== 'draft' ? 1 : 0) + (['all', 'completed', 'result'].includes(subTab) ? 1 : 0) + (subTab === 'completed' ? 2 : 0)} className="p-8 text-center text-gray-400 italic">Không có dữ liệu</td></tr>
                                 )}
                             </tbody>
                         </table>

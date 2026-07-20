@@ -608,6 +608,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <EmployeeStatsView 
                         records={activeRecords}
                         employees={activeEmployees}
+                        schedules={schedules}
                         fromDate={fromDate}
                         toDate={toDate}
                         selectedEmpId={selectedEmpId}

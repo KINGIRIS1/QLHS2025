@@ -549,6 +549,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 </div>
                                 <span className="font-bold text-sm text-gray-700">{getEmployeeName(record.assignedTo)}</span>
                             </div>
+                            {record.forwardHistory && (
+                                <div className="mt-3 p-3 bg-indigo-50/60 rounded-lg border border-indigo-100 text-xs text-indigo-950 space-y-1">
+                                    <div className="font-bold text-indigo-800 uppercase tracking-wide text-[9px] mb-1">Lịch sử chuyển tiếp</div>
+                                    <div className="whitespace-pre-line font-medium leading-relaxed">
+                                        {record.forwardHistory}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

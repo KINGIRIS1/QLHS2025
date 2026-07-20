@@ -94,6 +94,11 @@ export interface RecordFile {
   extendedDeadline?: string | null; // Ngày gia hạn trả kết quả mới (Mới)
   _isArchive?: boolean;         // Đánh dấu là hồ sơ lưu trữ
   _archiveType?: string;        // Loại hồ sơ lưu trữ ('saoluc', 'vaoso', 'dangky', 'congvan')
+  forwardPendingTo?: string | null;
+  forwardFrom?: string | null;
+  forwardDate?: string | null;
+  forwardNotes?: string | null;
+  forwardHistory?: string | null;
 }
 
 // Interface cho Item tách thửa

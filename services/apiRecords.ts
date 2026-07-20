@@ -15,7 +15,12 @@ const RECORD_DB_COLUMNS = [
     'needsMapCorrection', // Cột mới
     'plotCount',
     'createdBy', // Người tiếp nhận hồ sơ
-    'workCompletedDate' // Cột vật lý lưu ngày Đã thực hiện
+    'workCompletedDate', // Cột vật lý lưu ngày Đã thực hiện
+    'forwardPendingTo',
+    'forwardFrom',
+    'forwardDate',
+    'forwardNotes',
+    'forwardHistory'
 ];
 
 // Helper functions to serialize and deserialize workCompletedDate and extendedDeadline inside privateNotes securely
@@ -191,9 +196,12 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         if (error) {
             const errCode = (error as any).code;
             const errMsg = String((error as any).message || '');
-            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate')) {
+            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate') || errMsg.includes('forwardPendingTo') || errMsg.includes('forwardFrom') || errMsg.includes('forwardDate') || errMsg.includes('forwardNotes') || errMsg.includes('forwardHistory')) {
                 console.warn("⚠️ [Database out of sync] Thử lại createRecordApi loại bỏ cột lỗi...");
                 let fallbackColumns = RECORD_DB_COLUMNS.slice();
+                if (errCode === '42703') {
+                    fallbackColumns = fallbackColumns.filter(col => !errMsg.includes(col));
+                }
                 if (errCode === '42703' || errMsg.includes('createdBy')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'createdBy');
                 }
@@ -202,6 +210,21 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 }
                 if (errMsg.includes('workCompletedDate')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'workCompletedDate');
+                }
+                if (errMsg.includes('forwardPendingTo')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardPendingTo');
+                }
+                if (errMsg.includes('forwardFrom')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardFrom');
+                }
+                if (errMsg.includes('forwardDate')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardDate');
+                }
+                if (errMsg.includes('forwardNotes')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardNotes');
+                }
+                if (errMsg.includes('forwardHistory')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardHistory');
                 }
                 const fallbackPayload = sanitizeData(packed, fallbackColumns);
                 const { data: fbData, error: fbError } = await supabase.from('records').insert([fallbackPayload]).select();
@@ -249,9 +272,12 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         if (error) {
             const errCode = (error as any).code;
             const errMsg = String((error as any).message || '');
-            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate')) {
+            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate') || errMsg.includes('forwardPendingTo') || errMsg.includes('forwardFrom') || errMsg.includes('forwardDate') || errMsg.includes('forwardNotes') || errMsg.includes('forwardHistory')) {
                 console.warn("⚠️ [Database out of sync] Thử lại updateRecordApi loại bỏ cột lỗi...");
                 let fallbackColumns = RECORD_DB_COLUMNS.slice();
+                if (errCode === '42703') {
+                    fallbackColumns = fallbackColumns.filter(col => !errMsg.includes(col));
+                }
                 if (errCode === '42703' || errMsg.includes('createdBy')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'createdBy');
                 }
@@ -260,6 +286,21 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 }
                 if (errMsg.includes('workCompletedDate')) {
                     fallbackColumns = fallbackColumns.filter(col => col !== 'workCompletedDate');
+                }
+                if (errMsg.includes('forwardPendingTo')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardPendingTo');
+                }
+                if (errMsg.includes('forwardFrom')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardFrom');
+                }
+                if (errMsg.includes('forwardDate')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardDate');
+                }
+                if (errMsg.includes('forwardNotes')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardNotes');
+                }
+                if (errMsg.includes('forwardHistory')) {
+                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardHistory');
                 }
                 const fallbackPayload = sanitizeData(packed, fallbackColumns);
                 const { data: fbData, error: fbError } = await supabase.from('records').update(fallbackPayload).eq('id', record.id).select();

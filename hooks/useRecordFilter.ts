@@ -24,6 +24,24 @@ export const useRecordFilter = (
         }));
     };
 
+    // Advanced Search States (Mã hồ sơ, tờ, thửa, xã phường, số điện thoại, loại hồ sơ)
+    const [advCode, setAdvCode] = useState('');
+    const [advMapSheet, setAdvMapSheet] = useState('');
+    const [advLandPlot, setAdvLandPlot] = useState('');
+    const [advWard, setAdvWard] = useState('');
+    const [advPhone, setAdvPhone] = useState('');
+    const [advRecordType, setAdvRecordType] = useState('all');
+    const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+
+    const clearAdvancedSearch = () => {
+        setAdvCode('');
+        setAdvMapSheet('');
+        setAdvLandPlot('');
+        setAdvWard('');
+        setAdvPhone('');
+        setAdvRecordType('all');
+    };
+
     const [filterDate, setFilterDate] = useState(''); 
     const [filterSpecificDate, setFilterSpecificDate] = useState('');
     const [filterFromDate, setFilterFromDate] = useState('');
@@ -50,7 +68,7 @@ export const useRecordFilter = (
     // Reset pagination when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [currentView, sortConfig, warningFilter, filterWard, filterStatus, filterEmployee, filterRecordType, filterSpecificDate, filterFromDate, filterToDate, handoverTab, searchTerm]);
+    }, [currentView, sortConfig, warningFilter, filterWard, filterStatus, filterEmployee, filterRecordType, filterSpecificDate, filterFromDate, filterToDate, handoverTab, searchTerm, showAdvancedSearch, advCode, advMapSheet, advLandPlot, advWard, advPhone, advRecordType]);
 
     // Reset filterRecordType khi đổi view
     useEffect(() => {
@@ -148,6 +166,34 @@ export const useRecordFilter = (
             });
         }
 
+        // Advanced Search Filters (Mã hồ sơ, tờ, thửa, xã phường, số điện thoại, loại hồ sơ)
+        if (showAdvancedSearch) {
+            if (advCode) {
+                const lowerSearch = removeVietnameseTones(advCode);
+                result = result.filter(r => removeVietnameseTones(r.code || '').includes(lowerSearch));
+            }
+            if (advMapSheet) {
+                const lowerSearch = removeVietnameseTones(advMapSheet);
+                result = result.filter(r => removeVietnameseTones(r.mapSheet || '').includes(lowerSearch));
+            }
+            if (advLandPlot) {
+                const lowerSearch = removeVietnameseTones(advLandPlot);
+                result = result.filter(r => removeVietnameseTones(r.landPlot || '').includes(lowerSearch));
+            }
+            if (advWard) {
+                const lowerSearch = removeVietnameseTones(advWard);
+                result = result.filter(r => removeVietnameseTones(r.ward || '').includes(lowerSearch));
+            }
+            if (advPhone) {
+                const lowerSearch = advPhone.trim();
+                result = result.filter(r => r.phoneNumber && r.phoneNumber.includes(lowerSearch));
+            }
+            if (advRecordType && advRecordType !== 'all') {
+                const lowerSearch = removeVietnameseTones(advRecordType);
+                result = result.filter(r => removeVietnameseTones(r.recordType || '').includes(lowerSearch));
+            }
+        }
+
         // Ward, Status, Employee Filters
         if (filterWard !== 'all') {
             const wardSearch = removeVietnameseTones(filterWard);
@@ -215,7 +261,7 @@ export const useRecordFilter = (
         });
 
         return result;
-    }, [records, searchTerm, filterWard, filterStatus, filterEmployee, filterRecordType, filterDate, filterSpecificDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
+    }, [records, searchTerm, filterWard, filterStatus, filterEmployee, filterRecordType, filterDate, filterSpecificDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees, showAdvancedSearch, advCode, advMapSheet, advLandPlot, advWard, advPhone, advRecordType]);
 
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -250,6 +296,14 @@ export const useRecordFilter = (
     return {
         filteredRecords, paginatedRecords, totalPages, warningCount,
         searchTerm, setSearchTerm,
+        advCode, setAdvCode,
+        advMapSheet, setAdvMapSheet,
+        advLandPlot, setAdvLandPlot,
+        advWard, setAdvWard,
+        advPhone, setAdvPhone,
+        advRecordType, setAdvRecordType,
+        showAdvancedSearch, setShowAdvancedSearch,
+        clearAdvancedSearch,
         filterDate, setFilterDate,
         filterSpecificDate, setFilterSpecificDate,
         filterFromDate, setFilterFromDate,

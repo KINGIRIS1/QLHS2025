@@ -42,6 +42,14 @@ function removeVietnameseTones(str: string): string {
     return str;
 }
 
+function normalizeDept(dept: string | undefined): string {
+  if (!dept) return '';
+  const clean = removeVietnameseTones(dept).toLowerCase().trim();
+  if (clean.includes('do dac')) return 'to do dac';
+  if (clean.includes('dang ky') || clean.includes('vao so')) return 'to dang ky';
+  return clean;
+}
+
 const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, records, onUpdateStatus, onViewRecord, onCreateLiquidation, onMapCorrection }) => {
   // Thêm tab 'completed_work' và 'pending_sign'
   const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report' | 'approaching' | 'overdue' | 'extended'>('pending');
@@ -67,6 +75,58 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   const [blockingMatches, setBlockingMatches] = useState<{ record: any; source: 'active' | 'archive' }[]>([]);
   const [pendingRecord, setPendingRecord] = useState<RecordFile | null>(null);
   const [pendingAction, setPendingAction] = useState<'mark_as_done' | 'forward_to_sign' | null>(null);
+
+  // Trạng thái cho Chuyển tiếp hồ sơ
+  const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
+  const [selectedRecordForForward, setSelectedRecordForForward] = useState<RecordFile | null>(null);
+  const [selectedRecipientId, setSelectedRecipientId] = useState('');
+  const [forwardNotes, setForwardNotes] = useState('');
+  const [showOnlySameDept, setShowOnlySameDept] = useState(true);
+
+  // Hàm xác định tổ xử lý của hồ sơ
+  const getRecordDepartment = (record: RecordFile | null): string => {
+    if (!record) return '';
+    // 1. Kiểm tra tổ của người đang được giao việc
+    if (record.assignedTo) {
+      const assignedEmp = employees?.find(e => e.id === record.assignedTo);
+      if (assignedEmp?.department) {
+        return assignedEmp.department;
+      }
+    }
+    // 2. Dự phòng: Tổ của người dùng hiện tại đang đăng nhập
+    const currentEmp = employees?.find(e => e.id === user.employeeId);
+    if (currentEmp?.department) {
+      return currentEmp.department;
+    }
+    // 3. Dự phòng theo loại hồ sơ hoặc loại lưu trữ
+    if (record._archiveType === 'dangky' || record._archiveType === 'vaoso') {
+      return 'Tổ Đăng ký';
+    }
+    if (record.recordType?.toLowerCase().includes('dang ky') || record.recordType?.toLowerCase().includes('gcn') || record.recordType?.toLowerCase().includes('vao so')) {
+      return 'Tổ Đăng ký';
+    }
+    if (record.recordType?.toLowerCase().includes('do dac') || record.recordType?.toLowerCase().includes('trich do') || record.recordType?.toLowerCase().includes('ban do')) {
+      return 'Tổ Đo đạc';
+    }
+    return '';
+  };
+
+  const recordDept = useMemo(() => {
+    return getRecordDepartment(selectedRecordForForward);
+  }, [selectedRecordForForward, employees, user.employeeId]);
+
+  const visibleEmployeesForForward = useMemo(() => {
+    const otherEmployees = employees?.filter(e => e.id !== user.employeeId) || [];
+    if (showOnlySameDept && recordDept) {
+      const targetNorm = normalizeDept(recordDept);
+      return otherEmployees.filter(e => normalizeDept(e.department) === targetNorm);
+    }
+    return otherEmployees;
+  }, [employees, user.employeeId, showOnlySameDept, recordDept]);
+
+  const incomingForwards = useMemo(() => {
+    return records.filter(r => r.forwardPendingTo === user.employeeId);
+  }, [records, user.employeeId]);
 
   useEffect(() => {
     const loadArchive = async () => {
@@ -598,6 +658,57 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
     }
   };
 
+  const handleOpenForwardModal = (record: RecordFile) => {
+    setSelectedRecordForForward(record);
+    setSelectedRecipientId('');
+    setForwardNotes('');
+    setShowOnlySameDept(true);
+    setIsForwardModalOpen(true);
+  };
+
+  const handleConfirmForward = () => {
+    if (!selectedRecordForForward || !selectedRecipientId) return;
+    onUpdateStatus(selectedRecordForForward, selectedRecordForForward.status, {
+      forwardPendingTo: selectedRecipientId,
+      forwardFrom: user.employeeId,
+      forwardDate: new Date().toISOString(),
+      forwardNotes: forwardNotes || null
+    });
+    setIsForwardModalOpen(false);
+    setSelectedRecordForForward(null);
+    setSelectedRecipientId('');
+    setForwardNotes('');
+  };
+
+  const handleAcceptForward = (record: RecordFile) => {
+    const sender = employees?.find(e => e.id === record.forwardFrom);
+    const senderName = sender?.name || 'Nhân viên khác';
+    const todayFormatted = new Date().toLocaleDateString('vi-VN');
+    
+    const newHistoryLine = `Chuyển tiếp từ ${senderName} ngày ${todayFormatted}`;
+    const updatedHistory = record.forwardHistory ? `${record.forwardHistory}\n\n${newHistoryLine}` : newHistoryLine;
+
+    onUpdateStatus(record, record.status, {
+      assignedTo: user.employeeId,
+      forwardPendingTo: null,
+      forwardFrom: null,
+      forwardDate: null,
+      forwardNotes: null,
+      forwardHistory: updatedHistory
+    });
+  };
+
+  const handleDeclineForward = async (record: RecordFile) => {
+    if (await confirmAction(`Từ chối nhận hồ sơ chuyển tiếp ${record.code}?`)) {
+      onUpdateStatus(record, record.status, {
+        forwardPendingTo: null,
+        forwardFrom: null,
+        forwardDate: null,
+        forwardNotes: null
+      });
+    }
+  };
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '---';
     const date = new Date(dateStr);
@@ -729,6 +840,50 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
              </div>
         </div>
       </div>
+
+      {/* Thông báo tiếp nhận hồ sơ chuyển tiếp */}
+      {incomingForwards.length > 0 && (
+         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 shadow-sm space-y-3 shrink-0 animate-fade-in">
+             <div className="flex items-center gap-2 text-indigo-800 font-bold">
+                 <Bell size={18} className="text-indigo-600 animate-bounce" />
+                 <span>Yêu cầu chuyển tiếp hồ sơ cần xử lý ({incomingForwards.length})</span>
+             </div>
+             <div className="divide-y divide-indigo-100 max-h-48 overflow-y-auto pr-1">
+                 {incomingForwards.map(r => {
+                     const sender = employees?.find(e => e.id === r.forwardFrom);
+                     return (
+                         <div key={r.id} className="py-2.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+                             <div>
+                                 <div className="font-semibold text-gray-800">
+                                     Hồ sơ <span className="text-indigo-700 font-bold">{r.code}</span> - {r.customerName}
+                                 </div>
+                                 <div className="text-xs text-gray-500 mt-1">
+                                     Chuyển tiếp từ <span className="font-bold text-gray-700">{sender?.name || r.forwardFrom}</span> ngày <span className="font-bold text-gray-700">{formatDate(r.forwardDate || undefined)}</span>
+                                     {r.forwardNotes && (
+                                         <span className="italic text-gray-600"> — "{r.forwardNotes}"</span>
+                                     )}
+                                 </div>
+                             </div>
+                             <div className="flex items-center gap-2 shrink-0">
+                                 <button 
+                                     onClick={() => handleAcceptForward(r)}
+                                     className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-xs transition-colors shadow-sm flex items-center gap-1"
+                                 >
+                                     <CheckCircle size={14} /> Đồng ý nhận
+                                 </button>
+                                 <button 
+                                     onClick={() => handleDeclineForward(r)}
+                                     className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-md font-bold text-xs transition-colors shadow-sm"
+                                 >
+                                     Từ chối
+                                 </button>
+                             </div>
+                         </div>
+                     );
+                 })}
+             </div>
+         </div>
+      )}
 
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
@@ -947,6 +1102,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                                 <FileText size={14} /> XL
                                             </button>
 
+                                            {/* Nút Chuyển tiếp hồ sơ */}
+                                            {(activeTab === 'pending' || activeTab === 'extended') && r.status !== RecordStatus.COMPLETED_WORK && (
+                                                <button 
+                                                    onClick={() => handleOpenForwardModal(r)}
+                                                    className="px-2 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" 
+                                                    title="Chuyển tiếp hồ sơ cho nhân viên khác"
+                                                >
+                                                    <ArrowRight size={14} /> Chuyển tiếp
+                                                </button>
+                                            )}
+
                                             {/* Logic nút chuyển trạng thái theo từng Tab */}
                                             {(activeTab === 'pending' || activeTab === 'extended') && r.status !== RecordStatus.COMPLETED_WORK && (
                                                 <button onClick={() => handleMarkAsDone(r)} title="Đánh dấu đã xong việc" className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
@@ -1038,6 +1204,166 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
         matches={blockingMatches}
         recordFile={pendingRecord}
       />
+
+      {isForwardModalOpen && selectedRecordForForward && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-3xl w-full overflow-hidden animate-scale-up flex flex-col max-h-[95vh]">
+            <div className="bg-indigo-600 text-white p-4 font-bold text-lg flex items-center gap-2 shrink-0">
+              <ArrowRight size={20} />
+              Chuyển tiếp hồ sơ {selectedRecordForForward.code}
+            </div>
+            
+            {/* THÔNG TIN CƠ BẢN HỒ SƠ - TRÁNH BẤM LỘN */}
+            <div className="bg-indigo-50/50 border border-indigo-100/80 p-4 text-xs text-gray-700 space-y-2 shrink-0">
+              <div className="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Thông tin hồ sơ chuyển tiếp</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 font-medium">
+                <div>
+                  <span className="text-gray-400">Mã hồ sơ:</span>{' '}
+                  <span className="font-bold text-indigo-900">{selectedRecordForForward.code}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Loại hồ sơ:</span>{' '}
+                  <span className="font-bold text-gray-800">{selectedRecordForForward.recordType || 'Chưa rõ'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Chủ hồ sơ:</span>{' '}
+                  <span className="font-bold text-gray-800">{selectedRecordForForward.customerName}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Xã/Phường:</span>{' '}
+                  <span className="font-bold text-gray-800">{selectedRecordForForward.ward || '---'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Thửa / Tờ:</span>{' '}
+                  <span className="font-bold text-gray-800">
+                    {selectedRecordForForward.landPlot || '---'} / {selectedRecordForForward.mapSheet || '---'}
+                  </span>
+                </div>
+                {recordDept && (
+                  <div>
+                    <span className="text-indigo-600 font-bold bg-indigo-100/60 px-2 py-0.5 rounded text-[10px]">
+                      {recordDept}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {/* CHỌN NHÂN VIÊN TIẾP NHẬN - BẤM CHỌN TRỰC TIẾP */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block">
+                    Danh sách nhân viên đề xuất *
+                  </label>
+                  {recordDept && (
+                    <label className="flex items-center gap-1.5 text-xs text-indigo-700 font-semibold cursor-pointer select-none">
+                      <input 
+                        type="checkbox"
+                        checked={showOnlySameDept}
+                        onChange={(e) => {
+                          setShowOnlySameDept(e.target.checked);
+                          if (e.target.checked && selectedRecipientId) {
+                            const stillVisible = employees?.find(emp => emp.id === selectedRecipientId)?.department === recordDept;
+                            if (!stillVisible) setSelectedRecipientId('');
+                          }
+                        }}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                      />
+                      <span>Chỉ đề xuất cùng {recordDept}</span>
+                    </label>
+                  )}
+                </div>
+                
+                <div className="max-h-[360px] overflow-y-auto p-4 bg-gray-50/50 border border-gray-250 rounded-xl">
+                  {visibleEmployeesForForward.length === 0 ? (
+                    <div className="p-8 text-center text-gray-400 text-xs bg-white rounded-lg border border-gray-150">
+                      Không tìm thấy nhân viên nào cùng tổ phù hợp.
+                      {recordDept && showOnlySameDept && (
+                        <button
+                          type="button"
+                          onClick={() => setShowOnlySameDept(false)}
+                          className="mt-2 block mx-auto text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                        >
+                          Hiển thị tất cả nhân viên các tổ khác
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 animate-fade-in">
+                      {visibleEmployeesForForward.map(e => {
+                        const isSelected = selectedRecipientId === e.id;
+                        return (
+                          <div
+                            key={e.id}
+                            onClick={() => setSelectedRecipientId(e.id)}
+                            className={`p-4 rounded-xl border bg-white cursor-pointer transition-all flex items-center justify-between gap-3 select-none hover:shadow-sm ${
+                              isSelected 
+                                ? 'border-indigo-500 ring-2 ring-indigo-100 bg-indigo-50/10' 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center min-w-0">
+                              {/* Chi tiết */}
+                              <div className="min-w-0">
+                                <div className="font-bold text-gray-900 text-[14px] leading-tight truncate">
+                                  {e.name}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Chỉ báo đã chọn */}
+                            {isSelected ? (
+                              <div className="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-sm shrink-0">
+                                <CheckCircle size={12} />
+                              </div>
+                            ) : (
+                              <div className="w-5 h-5 border border-gray-200 rounded-full shrink-0 transition-colors hover:border-indigo-300 bg-white" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* GHI CHÚ CHUYỂN TIẾP */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block mb-2">Ghi chú chuyển tiếp (Không bắt buộc)</label>
+                <textarea 
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-gray-400 font-medium text-gray-700"
+                  placeholder="Nhập ghi chú hoặc yêu cầu chuyển tiếp..."
+                  value={forwardNotes}
+                  onChange={(e) => setForwardNotes(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 p-4 border-t border-gray-100 flex justify-end gap-2.5 shrink-0">
+              <button 
+                onClick={() => {
+                  setIsForwardModalOpen(false);
+                  setSelectedRecordForForward(null);
+                  setSelectedRecipientId('');
+                  setForwardNotes('');
+                }}
+                className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={handleConfirmForward}
+                disabled={!selectedRecipientId}
+                className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 rounded-lg shadow-md transition-all flex items-center gap-1"
+              >
+                <ArrowRight size={16} /> Xác nhận chuyển tiếp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

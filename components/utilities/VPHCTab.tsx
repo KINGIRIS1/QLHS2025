@@ -9,6 +9,7 @@ import VPHCList from './vphc-tab/VPHCList';
 import TemplateConfigModal from '../TemplateConfigModal';
 import { generateDocxBlobAsync, STORAGE_KEYS, hasTemplate } from '../../services/docxService';
 import { VphcRecord, fetchVphcRecords, saveVphcRecord, deleteVphcRecord } from '../../services/apiUtilities';
+import { toTitleCase } from '../../utils/appHelpers';
 
 interface VPHCTabProps {
     currentUser?: UserType;
@@ -72,7 +73,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     const handleChange = (field: string, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
         if (field === 'NGUOI' && !formData.CHUSDGCN) {
-             setFormData(prev => ({ ...prev, CHUSDGCN: value.toUpperCase() }));
+             setFormData(prev => ({ ...prev, CHUSDGCN: toTitleCase(value) }));
         }
         setExportedFilePath(null);
     };
@@ -147,7 +148,11 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     };
 
     const renderPreviewHTML = () => {
-        const data = { ...formData, NGUOI: formData.NGUOI.toUpperCase() };
+        const data = { 
+            ...formData, 
+            NGUOI: toTitleCase(formData.NGUOI),
+            CHUSDGCN: toTitleCase(formData.CHUSDGCN || formData.NGUOI)
+        };
         const creatorName = currentUser?.name || '...';
         
         const currentYear = new Date().getFullYear();
@@ -242,7 +247,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <p style="margin-left: 20px; margin-bottom: 5px;">Không thực hiện đăng ký biến động đất đai theo quy định tại điểm a, khoản 1 Điều 133 luật đất đai.</p>
                 <p style="margin-left: 20px; text-align: justify; margin-bottom: 10px;">
                     Cụ thể: Vào lúc…..giờ……phút, ngày .../.../${currentYear}, tại Trung Tâm phục vụ hành chính công ${data.XA_PHUONG}, nhân viên Văn phòng Đăng ký đất đai thành phố Đồng Nai – Chi nhánh Chơn Thành phát hiện đã quá 30 ngày kể từ ngày ký hợp đồng <b>${data.LOAIHS}</b> quyền sử dụng đất số: ${data.SOCC}, do Văn phòng Công chứng ${data.VPCC} lập ngày ${data.NGAYCC}. 
-                    Ông/bà <b>${data.NGUOI}</b> không thực hiện đăng ký biến động đất đai theo quy định tại điểm a khoản 1 và khoản 3 Điều 133 Luật Đất đai năm 2024 đối với thửa đất số <b>${data.THUA}</b>, tờ bản đồ số <b>${data.TO}</b>, diện tích <b>${data.DT}m²</b> theo Giấy chứng nhận Quyền sử dụng đất số <b>${data.SPH}</b>, số vào sổ <b>${data.SVS}</b> do ${data.COQUANCAP} cấp ngày ${data.NGAYCAPGCN} cho <b>${data.CHUSDGCN}</b>. Thửa đất tọa lạc tại ${data.DC_THUA}, ${data.XA_PHUONG}.
+                    Ông/bà <b>${data.NGUOI}</b> không thực hiện đăng ký biến động đất đai theo quy định tại điểm a khoản 1 và khoản 3 Điều 133 Luật Đất đai năm 2024 đối với thửa đất số <b>${data.THUA}</b>, tờ bản đồ số <b>${data.TO}</b>, diện tích <b>${data.DT}m²</b> theo Giấy chứng nhận Quyền sử dụng đất số <b>${data.SPH}</b>, số vào sổ <b>${data.SVS}</b> do ${data.COQUANCAP} cấp ngày ${data.NGAYCAPGCN} cho <b>${data.CHUSDGCN}</b>. Thửa đất tọa lạc tại ${data.DC_THUA}.
                 </p>
 
                 <p><b>3. Quy định tại: (9)</b></p>
@@ -471,8 +476,8 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
             const today = new Date();
             const dataToPrint = {
                 ...formData,
-                NGUOI: formData.NGUOI.toUpperCase(),
-                CHUSDGCN: formData.CHUSDGCN || formData.NGUOI.toUpperCase(),
+                NGUOI: toTitleCase(formData.NGUOI),
+                CHUSDGCN: toTitleCase(formData.CHUSDGCN || formData.NGUOI),
                 NGAY: today.getDate().toString().padStart(2, '0'),
                 THANG: (today.getMonth() + 1).toString().padStart(2, '0'),
                 NAM: today.getFullYear().toString(),

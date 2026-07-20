@@ -33,7 +33,7 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                         <label className={labelClass}>Họ và tên</label>
                         <div className="relative">
                             <User size={16} className={iconClass} />
-                            <input className={`${inputClass} font-bold uppercase text-red-700`} value={formData.NGUOI} onChange={e => handleChange('NGUOI', e.target.value)} />
+                            <input className={`${inputClass} font-bold text-red-700`} value={formData.NGUOI} onChange={e => handleChange('NGUOI', e.target.value)} />
                         </div>
                     </div>
                     <div>
@@ -135,7 +135,7 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                             </div>
                             <div className="col-span-2">
                                 <label className={labelClass}>Chủ sử dụng trên GCN (Nếu khác)</label>
-                                <input className={`${inputClass} font-bold uppercase`} value={formData.CHUSDGCN} onChange={e => handleChange('CHUSDGCN', e.target.value)} />
+                                <input className={`${inputClass} font-bold`} value={formData.CHUSDGCN} onChange={e => handleChange('CHUSDGCN', e.target.value)} />
                             </div>
                         </div>
                     </div>

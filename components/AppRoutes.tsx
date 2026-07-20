@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, Employee, User, UserRole, Holiday, RecordStatus } from '../types';
-import { STATUS_LABELS } from '../constants';
+import { STATUS_LABELS, RECORD_TYPES, EXTENDED_RECORD_TYPES } from '../constants';
 import { COLUMN_DEFS } from '../utils/appHelpers';
 
 // Components
@@ -76,6 +76,16 @@ interface AppRoutesProps {
     warningCount: { overdue: number; approaching: number };
     searchTerm: string;
     setSearchTerm: (s: string) => void;
+    
+    // Advanced Search Fields
+    advCode?: string; setAdvCode?: (s: string) => void;
+    advMapSheet?: string; setAdvMapSheet?: (s: string) => void;
+    advLandPlot?: string; setAdvLandPlot?: (s: string) => void;
+    advWard?: string; setAdvWard?: (s: string) => void;
+    advPhone?: string; setAdvPhone?: (s: string) => void;
+    advRecordType?: string; setAdvRecordType?: (s: string) => void;
+    showAdvancedSearch?: boolean; setShowAdvancedSearch?: (b: boolean) => void;
+    clearAdvancedSearch?: () => void;
     
     filterDate: string; setFilterDate: (s: string) => void;
     filterSpecificDate: string; setFilterSpecificDate: (s: string) => void;
@@ -243,11 +253,104 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             {title}
                             {!canPerformAction && <span className="text-xs font-normal text-gray-500 px-2 py-0.5 bg-gray-100 rounded-full border">Chỉ xem</span>}
                         </h2>
-                        <div className="relative flex-1 sm:w-64 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input type="text" placeholder="Tìm kiếm..." className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={props.searchTerm} onChange={(e) => props.setSearchTerm(e.target.value)} />
+                        <div className="flex items-center gap-2 w-full sm:w-auto max-w-md flex-1">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input type="text" placeholder="Tìm kiếm nhanh..." className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={props.searchTerm} onChange={(e) => props.setSearchTerm(e.target.value)} />
+                            </div>
+                            <button
+                                onClick={() => props.setShowAdvancedSearch?.(!props.showAdvancedSearch)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors shadow-sm whitespace-nowrap cursor-pointer ${props.showAdvancedSearch ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                title="Tìm kiếm nâng cao"
+                            >
+                                <SlidersHorizontal size={16} />
+                                <span className="hidden sm:inline">Tìm kiếm nâng cao</span>
+                            </button>
                         </div>
                     </div>
+
+                    {props.showAdvancedSearch && (
+                        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3 animate-fade-in">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Mã hồ sơ</label>
+                                <input
+                                    type="text"
+                                    placeholder="Mã hồ sơ..."
+                                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={props.advCode || ''}
+                                    onChange={(e) => props.setAdvCode?.(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Tờ bản đồ</label>
+                                <input
+                                    type="text"
+                                    placeholder="Tờ..."
+                                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={props.advMapSheet || ''}
+                                    onChange={(e) => props.setAdvMapSheet?.(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Thửa đất</label>
+                                <input
+                                    type="text"
+                                    placeholder="Thửa..."
+                                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={props.advLandPlot || ''}
+                                    onChange={(e) => props.setAdvLandPlot?.(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Xã phường</label>
+                                <select
+                                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                    value={props.advWard || ''}
+                                    onChange={(e) => props.setAdvWard?.(e.target.value)}
+                                >
+                                    <option value="">Tất cả</option>
+                                    {wards.map(w => (
+                                        <option key={w} value={w}>{w}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Số điện thoại</label>
+                                <input
+                                    type="text"
+                                    placeholder="SĐT..."
+                                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={props.advPhone || ''}
+                                    onChange={(e) => props.setAdvPhone?.(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Loại hồ sơ</label>
+                                <select
+                                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                    value={props.advRecordType || 'all'}
+                                    onChange={(e) => props.setAdvRecordType?.(e.target.value)}
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {RECORD_TYPES.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                    {EXTENDED_RECORD_TYPES.filter(x => !RECORD_TYPES.includes(x)).map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="md:col-span-3 lg:col-span-6 flex justify-end gap-2 mt-1">
+                                <button
+                                    onClick={props.clearAdvancedSearch}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-red-600 transition-colors bg-white hover:bg-red-50 border border-gray-200 rounded-lg shadow-sm cursor-pointer"
+                                >
+                                    <X size={14} />
+                                    Xóa bộ lọc nâng cao
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
                          {(currentView === 'handover_list' || currentView === 'other_handover_list') && (

@@ -149,6 +149,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             'Địa Chỉ (Xã)', 
             'Thửa', 
             'Tờ', 
+            ...(type === 'saoluc' ? ['Số GCN', 'Số trang'] : []),
             'Loại Hồ Sơ', 
             'Hẹn Trả', 
             'Ngày nhận hồ sơ', 
@@ -159,32 +160,43 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         // 3. Data Rows
         data.forEach((r, index) => {
-            wsData.push([
+            const rowData = [
                 index + 1,
                 r.so_hieu,
                 toTitleCase(r.noi_nhan_gui),
                 r.data?.xa_phuong || '',
                 r.data?.thua_dat || '',
                 r.data?.to_ban_do || '',
+            ];
+            if (type === 'saoluc') {
+                rowData.push(r.data?.so_gcn || r.so_gcn || '-');
+                rowData.push(r.data?.so_trang_sao_luc || r.so_trang_sao_luc || '-');
+            }
+            rowData.push(
                 type === 'saoluc' ? 'Sao lục' : 'Công văn',
                 r.data?.hen_tra ? r.data.hen_tra.split('-').reverse().join('/') : '',
                 '', // Ngày nhận hồ sơ (Empty)
                 '', // Ký tên (Empty)
                 ''  // Ghi Chú (Empty)
-            ]);
+            );
+            wsData.push(rowData);
         });
 
         // 4. Footer Section
         wsData.push(['']);
         wsData.push(['']);
-        wsData.push(['BÊN GIAO HỒ SƠ', '', '', '', '', '', '', '', '', 'BÊN NHẬN HỒ SƠ']);
+        
+        const lastCol = headers.length - 1;
+        const footerRow = Array(lastCol + 1).fill('');
+        footerRow[0] = 'BÊN GIAO HỒ SƠ';
+        footerRow[lastCol - 1] = 'BÊN NHẬN HỒ SƠ';
+        wsData.push(footerRow);
         
         // Create Worksheet
         const ws = XLSX.utils.aoa_to_sheet(wsData);
 
         // --- STYLING ---
         const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
-        const lastCol = headers.length - 1;
 
         // Merge Title Rows
         const merges = [
@@ -193,7 +205,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } }, // DANH SÁCH...
             { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } }, // NGÀY...
             { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 3 } }, // BÊN GIAO...
-            { s: { r: wsData.length - 1, c: 9 }, e: { r: wsData.length - 1, c: 10 } }, // BÊN NHẬN...
+            { s: { r: wsData.length - 1, c: lastCol - 1 }, e: { r: wsData.length - 1, c: lastCol } }, // BÊN NHẬN...
         ];
         
         if (exportType !== 'returned') {
@@ -210,6 +222,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             { wch: 15 }, // Địa Chỉ
             { wch: 8 },  // Thửa
             { wch: 8 },  // Tờ
+            ...(type === 'saoluc' ? [{ wch: 12 }, { wch: 12 }] : []), // Số GCN, Số trang
             { wch: 20 }, // Loại Hồ Sơ
             { wch: 12 }, // Hẹn Trả
             { wch: 15 }, // Ngày nhận
@@ -259,6 +272,11 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             ws[cellRef].s = headerStyle;
         }
 
+        // Center aligned columns mapping
+        const centerCols = type === 'saoluc' 
+            ? [0, 1, 3, 4, 5, 6, 7, 9] // STT, Mã, Địa chỉ, Thửa, Tờ, Số GCN, Số trang, Hẹn trả
+            : [0, 1, 3, 4, 5, 7];      // STT, Mã, Địa chỉ, Thửa, Tờ, Hẹn trả
+
         // Data Rows
         for (let r = headerRowIdx + 1; r < wsData.length - 3; r++) { // -3 for footer rows
             for (let c = 0; c <= lastCol; c++) {
@@ -267,7 +285,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                 ws[cellRef].s = borderStyle;
                 
                 // Center align specific columns
-                if ([0, 1, 3, 4, 5, 7].includes(c)) {
+                if (centerCols.includes(c)) {
                     ws[cellRef].s = { ...borderStyle, alignment: { horizontal: 'center', vertical: 'center' } };
                 }
             }
@@ -276,7 +294,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         // Footer Row
         const footerRowIdx = wsData.length - 1;
         if(ws[XLSX.utils.encode_cell({r:footerRowIdx, c:0})]) ws[XLSX.utils.encode_cell({r:footerRowIdx, c:0})].s = boldCenterStyle;
-        if(ws[XLSX.utils.encode_cell({r:footerRowIdx, c:9})]) ws[XLSX.utils.encode_cell({r:footerRowIdx, c:9})].s = boldCenterStyle;
+        if(ws[XLSX.utils.encode_cell({r:footerRowIdx, c:lastCol - 1})]) ws[XLSX.utils.encode_cell({r:footerRowIdx, c:lastCol - 1})].s = boldCenterStyle;
 
         XLSX.utils.book_append_sheet(wb, ws, exportType === 'returned' ? "DanhSachTraKetQua" : "DanhSachBanGiao");
         const fileNameDate = dateMode === 'single' ? selectedDate : `${fromDate}_den_${toDate}`;

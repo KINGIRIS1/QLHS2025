@@ -15,6 +15,8 @@ export interface ArchiveRecord {
     noi_nhan_gui: string;
     attached_files?: any[];
     data: any; // Các trường mở rộng khác
+    so_gcn?: number | null;
+    so_trang_sao_luc?: number | null;
 }
 
 // Mock Data Stores
@@ -223,7 +225,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         }
 
         if (record.id) {
-            const { data, error } = await supabase.from('archive_records').update({ 
+            const updatePayload: any = { 
                 type: payload.type,
                 status: payload.status,
                 so_hieu: payload.so_hieu,
@@ -232,9 +234,23 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 noi_nhan_gui: payload.noi_nhan_gui,
                 attached_files: payload.attached_files,
                 data: payload.data
-            }).eq('id', record.id).select().single();
+            };
+
+            if (payload.so_gcn !== undefined) updatePayload.so_gcn = payload.so_gcn;
+            if (payload.so_trang_sao_luc !== undefined) updatePayload.so_trang_sao_luc = payload.so_trang_sao_luc;
+
+            let res = await supabase.from('archive_records').update(updatePayload).eq('id', record.id).select();
             
-            if (error) throw error;
+            if (res.error && (res.error.message.includes('column') || res.error.code === '42703')) {
+                // If columns do not exist yet, fallback to saving without them (relying on data JSONB)
+                delete updatePayload.so_gcn;
+                delete updatePayload.so_trang_sao_luc;
+                res = await supabase.from('archive_records').update(updatePayload).eq('id', record.id).select();
+            }
+            
+            if (res.error) throw res.error;
+            const data = res.data && res.data[0] ? res.data[0] : null;
+            if (!data) throw new Error("Record not found after update");
             
             // Đồng bộ sang bảng warehouse_records chuyên dụng
             if (payload.type === 'kho') {
@@ -262,7 +278,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             // Để Supabase/Postgres tự sinh ID.
             delete payload.id; 
             
-            const insertPayload = {
+            const insertPayload: any = {
                 type: payload.type,
                 status: payload.status,
                 so_hieu: payload.so_hieu,
@@ -273,9 +289,22 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 data: payload.data,
                 created_by: payload.created_by
             };
+
+            if (payload.so_gcn !== undefined) insertPayload.so_gcn = payload.so_gcn;
+            if (payload.so_trang_sao_luc !== undefined) insertPayload.so_trang_sao_luc = payload.so_trang_sao_luc;
             
-            const { data, error } = await supabase.from('archive_records').insert([insertPayload]).select().single();
-            if (error) throw error;
+            let res = await supabase.from('archive_records').insert([insertPayload]).select();
+            
+            if (res.error && (res.error.message.includes('column') || res.error.code === '42703')) {
+                // If columns do not exist yet, fallback
+                delete insertPayload.so_gcn;
+                delete insertPayload.so_trang_sao_luc;
+                res = await supabase.from('archive_records').insert([insertPayload]).select();
+            }
+            
+            if (res.error) throw res.error;
+            const data = res.data && res.data[0] ? res.data[0] : null;
+            if (!data) throw new Error("Record not found after insert");
             
             // Đồng bộ sang bảng warehouse_records chuyên dụng
             if (payload.type === 'kho') {
@@ -529,12 +558,27 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         });
 
         // Use bulk upsert to save all in 1 request
-        const { data: results, error: upsertError } = await supabase
+        let res = await supabase
             .from('archive_records')
             .upsert(upsertPayloads)
             .select();
             
-        if (upsertError) throw upsertError;
+        if (res.error && (res.error.message.includes('column') || res.error.code === '42703')) {
+            // Fallback: strip those 2 keys from upsertPayloads and retry
+            const fallbackPayloads = upsertPayloads.map(p => {
+                const fallbackP = { ...p };
+                delete fallbackP.so_gcn;
+                delete fallbackP.so_trang_sao_luc;
+                return fallbackP;
+            });
+            res = await supabase
+                .from('archive_records')
+                .upsert(fallbackPayloads)
+                .select();
+        }
+
+        if (res.error) throw res.error;
+        const results = res.data;
 
         if (results) {
             results.forEach(res => {

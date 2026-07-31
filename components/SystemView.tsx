@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, Employee, UserRole } from '../types';
 import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
 import SystemAuditLogView from './SystemAuditLogView';
-import PermissionManagementView from './PermissionManagementView';
-import { Shield, Users, Settings2, History, ShieldCheck } from 'lucide-react';
+import { Shield, Users, Settings2, History } from 'lucide-react';
 
 interface SystemViewProps {
     currentUser: User;
@@ -19,8 +18,6 @@ interface SystemViewProps {
     wards: string[];
     onDeleteAllData: () => Promise<boolean>;
     onHolidaysChanged: () => void;
-    initialTab?: 'users' | 'employees' | 'settings' | 'logs' | 'permissions';
-    onOpenPermissions?: () => void;
 }
 
 const SystemView: React.FC<SystemViewProps> = ({
@@ -34,19 +31,11 @@ const SystemView: React.FC<SystemViewProps> = ({
     onDeleteEmployee,
     wards,
     onDeleteAllData,
-    onHolidaysChanged,
-    initialTab = 'employees',
-    onOpenPermissions
+    onHolidaysChanged
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const isTeamLeader = currentUser.role === UserRole.TEAM_LEADER;
-    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'settings' | 'logs' | 'permissions'>(initialTab);
-
-    useEffect(() => {
-        if (initialTab) {
-            setActiveTab(initialTab);
-        }
-    }, [initialTab]);
+    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'settings' | 'logs'>('employees');
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
@@ -58,14 +47,6 @@ const SystemView: React.FC<SystemViewProps> = ({
                         className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <Shield size={16}/> TK Hệ thống
-                    </button>
-                )}
-                {isAdmin && (
-                    <button 
-                        onClick={() => setActiveTab('permissions')}
-                        className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'permissions' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <ShieldCheck size={16}/> Phân quyền động
                     </button>
                 )}
                 <button 
@@ -101,14 +82,6 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onAddUser={onAddUser} 
                         onUpdateUser={onUpdateUser} 
                         onDeleteUser={onDeleteUser} 
-                        onOpenPermissions={onOpenPermissions || (() => setActiveTab('permissions'))}
-                    />
-                )}
-                {activeTab === 'permissions' && isAdmin && (
-                    <PermissionManagementView
-                        users={users}
-                        employees={employees}
-                        currentUser={currentUser}
                     />
                 )}
                 {activeTab === 'employees' && (

@@ -3,7 +3,6 @@ import React from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ClipboardSignature, HardDrive } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { APP_VERSION } from '../constants';
-import { usePermissions } from '../hooks/usePermissions';
 
 interface SidebarProps {
   currentView: string;
@@ -41,24 +40,29 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
   const hasManagerRights = isAdmin || isSubadmin || isTeamLeader;
 
-  const { canAccessView } = usePermissions(currentUser);
+  // Cập nhật danh sách các view được phép
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'personal_profile', 'account_settings', 'utilities', 'handover_list'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records'];
+  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records'];
 
   const menuItems = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: canAccessView('dashboard'), badge: reminderCount, badgeColor: 'bg-pink-500' },
-    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: canAccessView('internal_chat'), badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
-    { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: canAccessView('blocking_records') },
-    { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: canAccessView('work_schedule') }, 
-    { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: canAccessView('personal_profile') }, 
-    { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: canAccessView('warehouse_records') },
-    { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: canAccessView('receive_record') },
-    { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: canAccessView('receive_contract') },
-    { id: 'all_records', label: 'Hồ sơ đo đạc', icon: FileText, visible: canAccessView('all_records'), badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
-    { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardSignature, visible: canAccessView('dangky_records') },
-    { id: 'archive_records', label: 'Hồ sơ lưu trữ', icon: FolderArchive, visible: canAccessView('archive_records') },
-    { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: canAccessView('excerpt_management') },
-    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: canAccessView('utilities') },
-    { id: 'reports', label: 'Báo cáo & Thống kê', icon: BarChart3, visible: canAccessView('reports') },
-    { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: canAccessView('account_settings') },
+    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
+    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
+    { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin },
+    { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true }, 
+    { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
+    { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: true },
+    { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
+    { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
+    // Đổi tên thành "Hồ sơ đo đạc"
+    { id: 'all_records', label: 'Hồ sơ đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
+    { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardSignature, visible: true },
+    { id: 'archive_records', label: 'Hồ sơ lưu trữ', icon: FolderArchive, visible: true },
+    { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: !isOneDoor },
+    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
+    // Đã xóa menu "DS Ký kiểm tra" và "DS Giao 1 cửa" để đưa vào làm tab con của "Hồ sơ đo đạc"
+    { id: 'reports', label: 'Báo cáo & Thống kê', icon: BarChart3, visible: !isOneDoor },
+    { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: true },
   ];
 
   const handleMenuClick = (viewId: string) => {
@@ -103,25 +107,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const settingsSubItems = [
-    ...(canAccessView('user_management') ? [{
+    ...(isAdmin ? [{
       label: 'Tài khoản',
       icon: Users,
       onClick: () => handleMenuClick('user_management'),
       active: currentView === 'user_management'
     }] : []),
-    ...(canAccessView('permission_management') ? [{
-      label: 'Phân quyền',
-      icon: ShieldCheck,
-      onClick: () => handleMenuClick('permission_management'),
-      active: currentView === 'permission_management'
-    }] : []),
-    ...(canAccessView('employee_management') ? [{
+    {
       label: 'Nhân sự',
       icon: UserCog,
       onClick: () => handleMenuClick('employee_management'),
       active: currentView === 'employee_management'
-    }] : []),
-    ...(canAccessView('system_settings') ? [{
+    },
+    ...(isAdmin ? [{
       label: 'Cấu hình',
       icon: ShieldAlert,
       onClick: () => handleMenuClick('system_settings'),
@@ -129,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     }] : [])
   ];
 
-  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management' || currentView === 'system_settings' || currentView === 'permission_management';
+  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management' || currentView === 'system_settings';
 
   return (
     <>
@@ -177,7 +175,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* MENU */}
         <nav className="flex-1 py-2 space-y-1 overflow-y-auto custom-scrollbar overflow-x-visible">
-          {menuItems.filter(item => item.visible).map((item) => {
+          {menuItems.filter(item => {
+             if (isOneDoor && !oneDoorAllowedViews.includes(item.id)) return false;
+             if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
+             if (isEmployee && !employeeAllowedViews.includes(item.id)) return false;
+             return item.visible;
+          }).map((item) => {
             // Logic Active
             const isActive = currentView === item.id || 
                              (item.id === 'all_records' && ['assign_tasks', 'check_list', 'handover_list'].includes(currentView));

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight, User, Shield, Settings2, Layers, HardDrive } from 'lucide-react';
 import { User as UserType, UserRole } from '../types';
-import { usePermissions } from '../hooks/usePermissions';
 
 interface TopNavigationProps {
   currentView: string;
@@ -37,24 +36,50 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
-  const { canAccessView } = usePermissions(currentUser, currentDepartment);
+  // Cập nhật danh sách các view được phép
+  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'receive_group', 'reports', 'tools_group', 'management_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records', 'records_group', 'tools_group', 'management_group'];
+  
+  let employeeAllowedViews: string[] = [];
+  const normalizedDept = (currentDepartment || '').trim().toLowerCase();
+  const isDoDacUser = normalizedDept.includes('đo đạc') || isAdmin || isSubadmin;
+
+  if (normalizedDept.includes('đo đạc')) {
+    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records', 'blocking_records', 'send_measurement_files'];
+    if (!teamLeaderAllowedViews.includes('blocking_records')) {
+      teamLeaderAllowedViews.push('blocking_records');
+    }
+    if (!teamLeaderAllowedViews.includes('send_measurement_files')) {
+      teamLeaderAllowedViews.push('send_measurement_files');
+    }
+  } else if (normalizedDept.includes('lưu trữ')) {
+    employeeAllowedViews = ['dashboard', 'archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  } else if (normalizedDept.includes('đăng ký')) {
+    employeeAllowedViews = ['dashboard', 'dangky_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  } else if (!normalizedDept) {
+    // If department is not loaded yet or empty, show minimal views
+    employeeAllowedViews = ['dashboard', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  } else {
+    // Fallback for other departments
+    employeeAllowedViews = ['dashboard', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  }
 
   // Define menu structure
   const menuItems = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: canAccessView('dashboard'), badge: reminderCount, badgeColor: 'bg-pink-500' },
-    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: canAccessView('internal_chat'), badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
+    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
+    { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
     
     // "Tiếp nhận" tab group
     {
       id: 'receive_group',
       label: 'Tiếp nhận',
       icon: FolderInput,
-      visible: canAccessView('receive_record') || canAccessView('receive_contract'),
+      visible: !isTeamLeader && !isEmployee,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'receive_record', label: 'Hồ sơ', icon: FilePlus, visible: canAccessView('receive_record') },
-        { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: canAccessView('receive_contract') },
+        { id: 'receive_record', label: 'Hồ sơ', icon: FilePlus, visible: true },
+        { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: true },
       ]
     },
 
@@ -63,15 +88,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       id: 'records_group', 
       label: 'Hồ sơ', 
       icon: FileText, 
-      visible: canAccessView('all_records') || canAccessView('send_measurement_files') || canAccessView('dangky_records') || canAccessView('archive_records') || canAccessView('other_records'),
+      visible: true,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: canAccessView('all_records') },
-        { id: 'send_measurement_files', label: 'Gửi file ĐĐ', icon: Send, visible: canAccessView('send_measurement_files') },
-        { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardList, visible: canAccessView('dangky_records') },
-        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: canAccessView('archive_records') },
-        { id: 'other_records', label: 'Khác', icon: Layers, visible: canAccessView('other_records') },
+        { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
+        { id: 'send_measurement_files', label: 'Gửi file ĐĐ', icon: Send, visible: isDoDacUser },
+        { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardList, visible: true },
+        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
+        { id: 'other_records', label: 'Khác', icon: Layers, visible: true },
       ]
     },
 
@@ -80,14 +105,14 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       id: 'management_group',
       label: 'Quản lý',
       icon: Briefcase,
-      visible: canAccessView('blocking_records') || canAccessView('warehouse_records') || canAccessView('work_schedule') || canAccessView('personal_profile'),
+      visible: true,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: canAccessView('blocking_records') },
-        { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: canAccessView('warehouse_records') },
-        { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: canAccessView('work_schedule') },
-        { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: canAccessView('personal_profile') },
+        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin || ((isSubadmin || isTeamLeader || isEmployee) && normalizedDept.includes('đo đạc')) },
+        { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: true },
+        { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
+        { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: true },
       ]
     },
 
@@ -96,13 +121,13 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       id: 'tools_group',
       label: 'Công cụ',
       icon: PenTool,
-      visible: canAccessView('excerpt_management') || canAccessView('utilities') || canAccessView('reports'),
+      visible: true,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: canAccessView('excerpt_management') },
-        { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: canAccessView('utilities') },
-        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: canAccessView('reports') },
+        { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: !isOneDoor },
+        { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
+        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: true },
       ]
     }
   ];
@@ -144,6 +169,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
         <nav className="flex-1 overflow-y-auto py-2 px-1 space-y-1 custom-scrollbar">
           {menuItems.map((item) => {
             // Check visibility
+            if (isOneDoor && !oneDoorAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
+            if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
+            if (isEmployee && !employeeAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
             if (!item.visible) return null;
 
             // Check if any sub-item is active
@@ -153,7 +181,12 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             // Render Tab Group (Section Header + Items)
             if ((item as any).isTabGroup) {
               // Check if group has visible items for current user
-              const hasVisibleItems = item.subItems?.some(sub => sub.visible);
+              const hasVisibleItems = item.subItems?.some(sub => {
+                 if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return false;
+                 if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return false;
+                 if (isEmployee && !employeeAllowedViews.includes(sub.id)) return false;
+                 return sub.visible;
+              });
               
               if (!hasVisibleItems) return null;
 
@@ -164,6 +197,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                   </div>
                   <div className="space-y-2">
                     {item.subItems?.map(sub => {
+                       if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
+                       if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
+                       if (isEmployee && !employeeAllowedViews.includes(sub.id)) return null;
                        if (!sub.visible) return null;
     
                        const isSubActive = currentView === sub.id;
@@ -212,6 +248,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                   {isExpanded && (
                     <div className="mt-2 space-y-2 animate-in slide-in-from-top-2 duration-200 bg-black/20 rounded-xl p-1.5 shadow-inner">
                       {item.subItems?.map(sub => {
+                         if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
+                         if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
                          if (!sub.visible) return null;
   
                          return (

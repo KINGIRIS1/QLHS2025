@@ -11,7 +11,6 @@ interface UserManagementProps {
   onAddUser: (user: User) => void;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (username: string) => void;
-  onOpenPermissions?: () => void;
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({
@@ -19,8 +18,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
   employees,
   onAddUser,
   onUpdateUser,
-  onDeleteUser,
-  onOpenPermissions
+  onDeleteUser
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -224,15 +222,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     >
                         <FileSpreadsheet size={14} /> Nhập
                     </button>
-                    {onOpenPermissions && (
-                        <button 
-                            onClick={onOpenPermissions}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-purple-600 text-white px-3 py-2 rounded-xl hover:bg-purple-700 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
-                            title="Quản lý Phân quyền động theo vai trò & tổ công tác"
-                        >
-                            <Shield size={14} /> Phân quyền động
-                        </button>
-                    )}
                     <button 
                         onClick={handleExportExcel}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-xl hover:bg-indigo-700 font-medium text-sm shadow-sm transition-colors whitespace-nowrap"

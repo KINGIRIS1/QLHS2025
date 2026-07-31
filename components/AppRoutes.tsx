@@ -24,7 +24,6 @@ import WarehouseView from './archive/WarehouseView';
 import BlockingRecordsView from './BlockingRecordsView';
 import QuickRecordTypeConverterModal from './QuickRecordTypeConverterModal';
 import { SendMeasurementFilesView } from './SendMeasurementFilesView';
-import PermissionManagementView from './PermissionManagementView';
 
 // Icons
 import { Search, ListChecks, History, FileCheck, Calendar, X, CalendarRange, MapPin, Filter, User as UserIcon, AlertTriangle, Clock, SlidersHorizontal, Plus, FileSpreadsheet, Layers, CheckCircle, FileSignature, UserPlus, FileOutput, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight, FileText, UserPlus as UserPlusIcon, ClipboardList, Send, RefreshCw } from 'lucide-react';
@@ -731,17 +730,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     setNotificationEnabled={props.setNotificationEnabled}
                 />
             );
-        case 'permission_management':
-            return (
-                <PermissionManagementView
-                    users={users}
-                    employees={employees}
-                    currentUser={currentUser}
-                />
-            );
-        case 'user_management':
-        case 'employee_management':
-        case 'system_settings':
         case 'system_dashboard':
             return (
                 <SystemView
@@ -756,12 +744,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     wards={wards}
                     onDeleteAllData={props.handleDeleteAllData}
                     onHolidaysChanged={props.onRefreshData}
-                    initialTab={
-                        currentView === 'user_management' ? 'users' :
-                        currentView === 'employee_management' ? 'employees' :
-                        currentView === 'system_settings' ? 'settings' : 'employees'
-                    }
-                    onOpenPermissions={() => props.setCurrentView('permission_management')}
                 />
             );
         case 'reports':

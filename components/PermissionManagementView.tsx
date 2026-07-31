@@ -342,7 +342,8 @@ const PermissionManagementView: React.FC<PermissionManagementViewProps> = ({
     const success = await saveSystemPermissionsApi(permissionsState);
     setIsSaving(false);
     if (success) {
-      showToast('Đã lưu cấu hình phân quyền động thành công!', 'success');
+      window.dispatchEvent(new CustomEvent('permissions_updated', { detail: permissionsState }));
+      showToast('Đã lưu cấu hình phân quyền động thành công! Hệ thống đã áp dụng quyền mới ngay lập tức.', 'success');
     } else {
       showToast('Lỗi khi lưu cấu hình phân quyền.', 'error');
     }

@@ -9,6 +9,7 @@ import VPHCList from './vphc-tab/VPHCList';
 import TemplateConfigModal from '../TemplateConfigModal';
 import { generateDocxBlobAsync, STORAGE_KEYS, hasTemplate } from '../../services/docxService';
 import { VphcRecord, fetchVphcRecords, saveVphcRecord, deleteVphcRecord } from '../../services/apiUtilities';
+import { fetchEmployees } from '../../services/apiPeople';
 import { toTitleCase } from '../../utils/appHelpers';
 
 interface VPHCTabProps {
@@ -40,11 +41,66 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     const [isConfigOpen, setIsConfigOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [exportedFilePath, setExportedFilePath] = useState<string | null>(null);
+    const [userPosition, setUserPosition] = useState<string>('Tổ trưởng');
+    const [userDepartment, setUserDepartment] = useState<string>('Tổ Hành chính tổng hợp');
 
     // Initial Load
     useEffect(() => {
         loadRecords();
-    }, []);
+        loadUserPosition();
+    }, [currentUser]);
+
+    const loadUserPosition = async () => {
+        if (!currentUser) return;
+        try {
+            const employees = await fetchEmployees();
+            const linkedEmp = employees.find(e => 
+                (currentUser.employeeId && e.id === currentUser.employeeId) || 
+                (e.name.toLowerCase() === currentUser.name.toLowerCase())
+            );
+            if (linkedEmp) {
+                if (linkedEmp.position) {
+                    setUserPosition(linkedEmp.position);
+                } else {
+                    setUserPosition('Nhân viên');
+                }
+                if (linkedEmp.department) {
+                    setUserDepartment(linkedEmp.department);
+                } else {
+                    setUserDepartment('');
+                }
+            } else {
+                // Fallback based on role
+                let roleStr = 'Nhân viên';
+                let deptStr = 'Tổ Hành chính tổng hợp';
+                switch (currentUser.role) {
+                    case 'ADMIN':
+                        roleStr = 'Quản trị viên';
+                        deptStr = 'Ban Quản trị';
+                        break;
+                    case 'SUBADMIN':
+                        roleStr = 'Phó quản trị';
+                        deptStr = 'Ban Quản trị';
+                        break;
+                    case 'TEAM_LEADER':
+                        roleStr = 'Nhóm trưởng';
+                        deptStr = 'Tổ chuyên môn';
+                        break;
+                    case 'ONEDOOR':
+                        roleStr = 'Một cửa';
+                        deptStr = 'Bộ phận Một cửa';
+                        break;
+                    default:
+                        roleStr = 'Nhân viên';
+                        deptStr = 'Tổ Hành chính tổng hợp';
+                }
+                setUserPosition(roleStr);
+                setUserDepartment(deptStr);
+            }
+        } catch (e) {
+            console.error('Error loading user position:', e);
+        }
+    };
 
     // --- AUTO SAVE/LOAD CACHE ---
     useEffect(() => {
@@ -162,6 +218,11 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
             ? data.XA_PHUONG.replace(/^(xã|phường|thị trấn)\s+/i, '').trim() 
             : 'Chơn Thành';
 
+        const isChonThanh = data.XA_PHUONG && data.XA_PHUONG.toLowerCase().trim().includes('chơn thành');
+        const phatHienText = isChonThanh
+            ? 'Hồ sơ vụ việc do Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành phát hiện.'
+            : `Hồ sơ vụ việc do Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành phát hiện và chuyển đến Chủ tịch UBND ${data.XA_PHUONG} xử lý theo quy định.`;
+
         // Kẻ ngang dưới tên cơ quan (bên trái)
         const lineLeftHtml = `
             <table style="width: 100px; margin: 0 auto; border-collapse: collapse; border: none;">
@@ -203,13 +264,13 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <div style="text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 20px;">Về lĩnh vực đất đai(2)</div>
 
                 <p style="margin-bottom: 10px;">Hôm nay, hồi …..giờ……phút, ngày .../.../${currentYear}, tại (3) Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành.</p>
-                <p style="text-align: justify; margin-bottom: 10px;">Lý do lập biên bản tại &lt;trụ sở cơ quan của người có thẩm quyền lập biên bản/địa điểm khác:&gt;(*) Hồ sơ vụ việc do Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành phát hiện và chuyển đến Chủ tịch UBND ${data.XA_PHUONG} xử lý theo quy định.</p>
+                <p style="text-align: justify; margin-bottom: 10px;">Lý do lập biên bản tại &lt;trụ sở cơ quan của người có thẩm quyền lập biên bản/địa điểm khác:&gt;(*) ${phatHienText}</p>
                 <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../${currentYear} của Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành tại Trung tâm hành chính công ${data.XA_PHUONG}, thành phố Đồng Nai.</p>
 
                 <p><b>Chúng tôi gồm:</b></p>
                 
                 <p><b>1. Người có thẩm quyền lập biên bản:</b></p>
-                <p style="margin-left: 20px;">Họ và tên: Cao Thị Dung. Chức vụ: Tổ trưởng Tổ Hành chính tổng hợp.</p>
+                <p style="margin-left: 20px;">Họ và tên: ${currentUser?.name || '...'}. Chức vụ: ${userPosition}${userDepartment ? ` - ${userDepartment}` : ''}.</p>
                 <p style="margin-left: 20px; margin-bottom: 10px;">Cơ quan: Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành.</p>
 
                 <p><b>2. Với sự chứng kiến của: (5)</b></p>
@@ -315,7 +376,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                     </tr>
                     <tr style="vertical-align: top;">
                         <td><i>(Ký, ghi rõ họ và tên)</i><br/><br/><br/><br/>${data.NGUOI}</td>
-                        <td><i>(Ký, ghi rõ chức vụ, họ và tên)</i><br/><br/><br/><br/>Cao Thị Dung</td>
+                        <td><i>(Ký, ghi rõ chức vụ, họ và tên)</i><br/><br/><br/><br/>${currentUser?.name || '...'}</td>
                     </tr>
                     
                     <tr><td colspan="2" style="height: 30px;"></td></tr>
@@ -474,6 +535,14 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
 
         if (hasTemplate(templateKey)) {
             const today = new Date();
+            const isChonThanh = formData.XA_PHUONG && formData.XA_PHUONG.toLowerCase().trim().includes('chơn thành');
+            const phatHienChuyen = isChonThanh
+                ? 'phát hiện.'
+                : `phát hiện và chuyển đến Chủ tịch UBND ${formData.XA_PHUONG} xử lý theo quy định.`;
+            const phatHienText = isChonThanh
+                ? 'Hồ sơ vụ việc do Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành phát hiện.'
+                : `Hồ sơ vụ việc do Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Chơn Thành phát hiện và chuyển đến Chủ tịch UBND ${formData.XA_PHUONG} xử lý theo quy định.`;
+
             const dataToPrint = {
                 ...formData,
                 NGUOI: toTitleCase(formData.NGUOI),
@@ -481,7 +550,12 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 NGAY: today.getDate().toString().padStart(2, '0'),
                 THANG: (today.getMonth() + 1).toString().padStart(2, '0'),
                 NAM: today.getFullYear().toString(),
-                DIA_DANH: formData.XA_PHUONG ? formData.XA_PHUONG.replace(/^(xã|phường|thị trấn)\s+/i, '').trim() : ''
+                DIA_DANH: formData.XA_PHUONG ? formData.XA_PHUONG.replace(/^(xã|phường|thị trấn)\s+/i, '').trim() : '',
+                USER_NAME: currentUser?.name || '',
+                USER_POSITION: userPosition || '',
+                USER_DEPARTMENT: userDepartment || '',
+                PHAT_HIEN_CHUYEN: phatHienChuyen,
+                PHAT_HIEN_TEXT: phatHienText
             };
             
             const blob = await generateDocxBlobAsync(templateKey, dataToPrint);

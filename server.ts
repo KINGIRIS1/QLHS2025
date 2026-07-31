@@ -86,6 +86,7 @@ try {
 // Dữ liệu mặc định
 const DEFAULT_DATA = {
     records: [], 
+    audit_logs: [],
     excerpt_history: [],
     excerpt_counters: { "Chơn Thành": 0, "Minh Hưng": 0, "Nha Bích": 0 },
     employees: [],

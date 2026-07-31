@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { WorkSchedule } from '../../types';
-import { Search, Edit, Trash2, CalendarDays, FileSpreadsheet, Filter } from 'lucide-react';
+import { Search, Edit, Trash2, CalendarDays, FileSpreadsheet, Filter, MapPin } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
 
@@ -15,6 +15,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'week' | 'month' | 'range'>('month');
     const [dateRange, setDateRange] = useState({ from: '', to: '' });
+    const [selectedLocation, setSelectedLocation] = useState<string>('all');
 
     // Pagination States
     const [currentPage, setCurrentPage] = useState(1);
@@ -62,9 +63,16 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
             const matchText = 
                 s.content.toLowerCase().includes(lowerSearch) ||
                 s.executors.toLowerCase().includes(lowerSearch) ||
-                (s.partner || '').toLowerCase().includes(lowerSearch);
+                (s.partner || '').toLowerCase().includes(lowerSearch) ||
+                (s.location || '').toLowerCase().includes(lowerSearch);
             
             if (!matchText) return false;
+
+            // Filter Location / Ward
+            if (selectedLocation !== 'all') {
+                const sLoc = (s.location || '').toLowerCase();
+                if (!sLoc.includes(selectedLocation.toLowerCase())) return false;
+            }
 
             // Filter Date
             if (filterType !== 'all') {
@@ -75,7 +83,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
 
             return true;
         });
-    }, [schedules, searchTerm, filterType, dateRange]);
+    }, [schedules, searchTerm, filterType, dateRange, selectedLocation]);
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '';
@@ -92,8 +100,9 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
         const dataRows = filteredList.map((s, idx) => [
             idx + 1,
             formatDate(s.date),
+            s.location || '-',
             s.content,
-            s.partner,
+            s.partner || '-',
             s.executors,
             '' // Ghi chú
         ]);
@@ -113,25 +122,25 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
             ["LỊCH CÔNG TÁC"],
             [titleRange],
             [""],
-            ["STT", "Ngày", "Nội dung công việc", "Cơ quan phối hợp", "Người thực hiện", "Ghi chú"]
+            ["STT", "Ngày", "Địa bàn công tác", "Nội dung công việc", "Cơ quan phối hợp", "Người thực hiện", "Ghi chú"]
         ], { origin: "A1" });
 
         XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A5" });
 
         // Merges
         if(!ws['!merges']) ws['!merges'] = [];
-        ws['!merges'].push({ s: {r:0, c:0}, e: {r:0, c:5} });
-        ws['!merges'].push({ s: {r:1, c:0}, e: {r:1, c:5} });
+        ws['!merges'].push({ s: {r:0, c:0}, e: {r:0, c:6} });
+        ws['!merges'].push({ s: {r:1, c:0}, e: {r:1, c:6} });
 
         // Column widths
-        ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 40 }, { wch: 20 }, { wch: 25 }, { wch: 15 }];
+        ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 25 }, { wch: 15 }];
 
         // Apply styles
         ws['A1'].s = { font: { sz: 16, bold: true, name: "Times New Roman" }, alignment: { horizontal: "center" } };
         ws['A2'].s = { font: { sz: 12, italic: true, name: "Times New Roman" }, alignment: { horizontal: "center" } };
 
         // Header row
-        for(let c=0; c<=5; c++) {
+        for(let c=0; c<=6; c++) {
             const ref = XLSX.utils.encode_cell({r: 3, c: c});
             if(!ws[ref]) ws[ref] = {v: "", t:'s'};
             ws[ref].s = headerStyle;
@@ -139,10 +148,10 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
 
         // Data rows
         for(let r=4; r < 4 + dataRows.length; r++) {
-            for(let c=0; c<=5; c++) {
+            for(let c=0; c<=6; c++) {
                 const ref = XLSX.utils.encode_cell({r: r, c: c});
                 if(!ws[ref]) ws[ref] = {v: "", t:'s'};
-                if(c === 0 || c === 1) ws[ref].s = centerStyle;
+                if(c === 0 || c === 1 || c === 2) ws[ref].s = centerStyle;
                 else ws[ref].s = cellStyle;
             }
         }
@@ -160,7 +169,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     // Reset pagination when filter changes
     React.useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterType, dateRange]);
+    }, [searchTerm, filterType, dateRange, selectedLocation]);
 
     // Pagination Logic
     const totalPages = Math.ceil(filteredList.length / itemsPerPage);
@@ -189,11 +198,27 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input 
                             type="text" 
-                            placeholder="Tìm nội dung, người thực hiện..." 
+                            placeholder="Tìm nội dung, người thực hiện, địa bàn..." 
                             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
+                    </div>
+
+                    {/* Bộ lọc Địa bàn / Xã phường */}
+                    <div className="flex items-center gap-1.5 bg-white border border-purple-300 rounded-lg px-2.5 py-1.5 shadow-sm text-xs font-bold text-purple-900">
+                        <MapPin size={15} className="text-purple-600 shrink-0" />
+                        <span className="text-gray-500 font-semibold hidden sm:inline">Địa bàn:</span>
+                        <select
+                            value={selectedLocation}
+                            onChange={e => setSelectedLocation(e.target.value)}
+                            className="bg-transparent border-none outline-none font-extrabold text-purple-800 cursor-pointer pr-1"
+                        >
+                            <option value="all">Tất cả địa bàn</option>
+                            <option value="Minh Hưng">Minh Hưng</option>
+                            <option value="Chơn Thành">Chơn Thành</option>
+                            <option value="Nha Bích">Nha Bích</option>
+                        </select>
                     </div>
                     
                     {filterType !== 'all' && (
@@ -216,9 +241,10 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                         <tr>
                             <th className="p-3 w-10 text-center">#</th>
                             <th className="p-3 w-28">Ngày</th>
+                            <th className="p-3 w-36">Địa bàn</th>
                             <th className="p-3">Nội dung công việc</th>
-                            <th className="p-3 w-40">Cơ quan PH</th>
-                            <th className="p-3 w-48">Người thực hiện</th>
+                            <th className="p-3 w-36">Cơ quan PH</th>
+                            <th className="p-3 w-44">Người thực hiện</th>
                             <th className="p-3 w-20 text-center">Thao tác</th>
                         </tr>
                     </thead>
@@ -226,7 +252,17 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                         {paginatedList.length > 0 ? paginatedList.map((item, idx) => (
                             <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
                                 <td className="p-3 text-center text-gray-400">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                                <td className="p-3 font-medium text-blue-600">{formatDate(item.date)}</td>
+                                <td className="p-3 font-medium text-blue-600 whitespace-nowrap">{formatDate(item.date)}</td>
+                                <td className="p-3">
+                                    {item.location ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-3xs">
+                                            <MapPin size={11} className="text-purple-500" />
+                                            {item.location}
+                                        </span>
+                                    ) : (
+                                        <span className="text-gray-400 italic text-xs">-</span>
+                                    )}
+                                </td>
                                 <td className="p-3 text-gray-800 font-medium">{item.content}</td>
                                 <td className="p-3 text-gray-600">{item.partner || '-'}</td>
                                 <td className="p-3 text-gray-600 text-xs font-medium">{item.executors}</td>
@@ -238,7 +274,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                                 </td>
                             </tr>
                         )) : (
-                            <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Không có lịch công tác nào.</td></tr>
+                            <tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Không có lịch công tác nào.</td></tr>
                         )}
                     </tbody>
                 </table>

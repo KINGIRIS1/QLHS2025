@@ -384,7 +384,11 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     
     let standardDays = "30"; 
     const rType = (dataToUse.recordType || '').toLowerCase();
-    if (rType.includes('thuế chính quy')) standardDays = "15";
+    const isHienDat = rType.includes('hiến đất') || rType.includes('hien dat');
+    const isThamDinh = rType.includes('thẩm định') || rType.includes('tham dinh');
+    if (isHienDat) standardDays = "8";
+    else if (isThamDinh) standardDays = "30";
+    else if (rType.includes('thuế chính quy')) standardDays = "15";
     else if (rType.includes('cung cấp thông tin') || rType.includes('sao lục') || rType.includes('trích lục')) standardDays = "10";
     else if (rType.includes('trích đo chỉnh lý')) standardDays = "15";
     else if (rType.includes('trích đo') || rType.includes('đo đạc') || rType.includes('cắm mốc')) standardDays = "30";
@@ -481,8 +485,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         
         NOI_DUNG: val(dataToUse.content),
         CONTENT: val(dataToUse.content),
-        LOAI_HS: val(dataToUse.recordType), 
-        RECORD_TYPE: val(dataToUse.recordType),
+        LOAI_HS: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(dataToUse.recordType), 
+        RECORD_TYPE: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(dataToUse.recordType),
         GIAY_TO_KHAC: val(dataToUse.otherDocs),
         
         NGUOI_UY_QUYEN: val(dataToUse.authorizedBy).toUpperCase(),

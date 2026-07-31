@@ -215,6 +215,7 @@ export interface WorkSchedule {
   executors: string;  // Người thực hiện (Lưu dạng chuỗi text: "Nguyễn Văn A, Trần B")
   content: string;    // Văn bản / Nội dung công tác
   partner: string;    // Cơ quan phối hợp
+  location?: string;  // Địa bàn công tác (xã/phường: Chơn Thành, Minh Hưng, Nha Bích,...)
   created_at: string; // Ngày tạo
   created_by: string; // Người tạo
 }
@@ -273,6 +274,26 @@ export interface LandRecord {
   created_at?: string;
   attached_files?: { id: string; url: string; name: string }[];
   unblock_attached_files?: { id: string; url: string; name: string }[];
+}
+
+export type AuditActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'ASSIGN' | 'EXPORT' | 'RESTORE' | 'SYSTEM' | 'RETURN';
+
+export type AuditTargetType = 'RECORD' | 'CONTRACT' | 'USER' | 'EMPLOYEE' | 'SETTINGS' | 'EXCERPT' | 'ARCHIVE' | 'BLOCKING' | 'SYSTEM';
+
+export interface AuditLog {
+  id: string;
+  createdAt: string;
+  userId?: string;
+  userName?: string;
+  userRole?: string;
+  action: AuditActionType;
+  targetType: AuditTargetType;
+  targetId?: string;
+  targetCode?: string;
+  details: string;
+  oldData?: any;
+  newData?: any;
+  ipAddress?: string;
 }
 
 export type LandRecordFormData = Omit<LandRecord, 'id' | 'created_at'> & { id?: string };

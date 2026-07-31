@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Copy, FileText, ShieldAlert } from 'lucide-react';
+import { Copy, FileText, ShieldAlert, FileSignature } from 'lucide-react';
 import SaoLucView from './archive/SaoLucView';
 import CongVanView from './archive/CongVanView';
 import ArchiveBlockingView from './archive/ArchiveBlockingView';
+import VaoSoView from './archive/VaoSoView';
 
 interface ArchiveRecordsProps {
     currentUser: User;
@@ -12,7 +13,7 @@ interface ArchiveRecordsProps {
 }
 
 const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) => {
-    const [activeTab, setActiveTab] = useState<'saoluc' | 'congvan' | 'nganchan'>('saoluc');
+    const [activeTab, setActiveTab] = useState<'saoluc' | 'congvan' | 'nganchan' | 'vaoso'>('saoluc');
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
@@ -36,6 +37,12 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) =
                 >
                     <ShieldAlert size={16}/> Quản lý ngăn chặn
                 </button>
+                <button 
+                    onClick={() => setActiveTab('vaoso')}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'vaoso' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <FileSignature size={16}/> Vào số GCN
+                </button>
             </div>
 
             {/* CONTENT AREA */}
@@ -43,6 +50,7 @@ const ArchiveRecords: React.FC<ArchiveRecordsProps> = ({ currentUser, wards }) =
                 {activeTab === 'saoluc' && <SaoLucView currentUser={currentUser} wards={wards} />}
                 {activeTab === 'congvan' && <CongVanView currentUser={currentUser} />}
                 {activeTab === 'nganchan' && <ArchiveBlockingView currentUser={currentUser} />}
+                {activeTab === 'vaoso' && <VaoSoView currentUser={currentUser} wards={wards} />}
             </div>
         </div>
     );

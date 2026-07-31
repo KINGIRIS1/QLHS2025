@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, FileCheck2 } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, showToast } from '../utils/appHelpers';
@@ -11,6 +11,7 @@ import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
 import LateRecordsView from './report/LateRecordsView';
 import TeamWeeklyDetailsView from './report/TeamWeeklyDetailsView';
+import HandoverComparisonView from './report/HandoverComparisonView';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
 import { WorkSchedule } from '../types';
 
@@ -42,7 +43,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records' | 'team_weekly'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records' | 'team_weekly' | 'handover_control'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -492,6 +493,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <AlertTriangle size={16}/> Hồ sơ trễ hạn
                 </button>
                 <button 
+                    onClick={() => setActiveTab('handover_control')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'handover_control' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <FileCheck2 size={16}/> So sánh hạn trả 1 cửa
+                </button>
+                <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
@@ -623,6 +630,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         fromDate={fromDate}
                         toDate={toDate}
                         wards={wards}
+                    />
+                )}
+
+                {activeTab === 'handover_control' && (
+                    <HandoverComparisonView
+                        records={activeRecords}
+                        employees={employees}
+                        wards={wards}
+                        fromDate={fromDate}
+                        toDate={toDate}
                     />
                 )}
 

@@ -163,13 +163,15 @@ export const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-// Hàm tính hạn trả toàn cục (chỉ trừ ngày nghỉ lễ hệ thống và CHỦ NHẬT, THỨ BẢY VẪN LÀ NGÀY LÀM VIỆC)
+// Hàm tính hạn trả toàn cục (trừ ngày nghỉ lễ hệ thống, Thứ Bảy và Chủ Nhật)
 export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: Holiday[]): string => {
     if (!receivedDateStr) return '';
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    if (lowerType.includes('xin số thửa')) {
+    if (lowerType.includes('hiến đất') || lowerType.includes('hien dat')) {
+        daysToAdd = 8;
+    } else if (lowerType.includes('xin số thửa')) {
         daysToAdd = 5;
     } else if (lowerType.includes('thuế chính quy')) {
         daysToAdd = 15;
@@ -177,7 +179,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd = 10; 
     } else if (lowerType.includes('trích đo chỉnh lý')) {
         daysToAdd = 15; 
-    } else if (lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc') || lowerType.includes('thu hồi giấy chứng nhận')) {
+    } else if (lowerType.includes('thẩm định') || lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc') || lowerType.includes('thu hồi giấy chứng nhận')) {
         daysToAdd = 30; 
     }
     
@@ -210,11 +212,11 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         const dayOfWeek = currentDate.getDay(); // 0 là Chủ Nhật, 6 là Thứ Bảy
         const dateString = formatDateKey(currentDate);
         
-        // CHỈ TRỪ CHỦ NHẬT (Không trừ Thứ 7)
-        const isWeekend = dayOfWeek === 0;
+        // Trừ Thứ Bảy (6) và Chủ Nhật (0)
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
         const isHoliday = holidaySet.has(dateString);
 
-        // Nếu không phải Chủ Nhật và không phải ngày lễ thì mới tính là 1 ngày làm việc
+        // Nếu không phải Thứ Bảy, Chủ Nhật và không phải ngày lễ thì mới tính là 1 ngày làm việc
         if (!isWeekend && !isHoliday) {
             count++;
         }

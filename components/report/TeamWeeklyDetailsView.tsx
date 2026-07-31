@@ -32,6 +32,44 @@ function removeVietnameseTones(str: string): string {
   return str;
 }
 
+function groupSchedulesByLocation(schedulesList: WorkSchedule[]): [string, WorkSchedule[]][] {
+  const groups: Record<string, WorkSchedule[]> = {};
+
+  schedulesList.forEach(s => {
+    let rawLoc = (s.location || '').trim();
+    let locName = 'Địa bàn khác / Chưa chọn';
+
+    if (rawLoc) {
+      const lower = rawLoc.toLowerCase();
+      if (lower.includes('minh hưng')) {
+        locName = 'Phường Minh Hưng';
+      } else if (lower.includes('chơn thành')) {
+        locName = 'Phường Chơn Thành';
+      } else if (lower.includes('nha bích')) {
+        locName = 'Xã Nha Bích';
+      } else {
+        locName = rawLoc;
+      }
+    }
+
+    if (!groups[locName]) {
+      groups[locName] = [];
+    }
+    groups[locName].push(s);
+  });
+
+  const priorityOrder = ['Phường Minh Hưng', 'Phường Chơn Thành', 'Xã Nha Bích'];
+
+  return Object.entries(groups).sort(([aKey], [bKey]) => {
+    const idxA = priorityOrder.indexOf(aKey);
+    const idxB = priorityOrder.indexOf(bKey);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return aKey.localeCompare(bKey, 'vi');
+  });
+}
+
 const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
   records,
   employees,
@@ -996,16 +1034,21 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                   </table>
 
                   {report1Data.periodSchedules.length > 0 && (
-                    <>
-                      <div className="section-title">V. CHI TIẾT LỊCH TRÌNH CÔNG TÁC TRONG KỲ</div>
-                      <ul>
-                        {report1Data.periodSchedules.map((s) => (
-                          <li key={s.id}>
-                            - Ngày {new Date(s.date).toLocaleDateString("vi-VN")}: {s.executors} - Nội dung: {s.content} ({s.partner || '-'})
-                          </li>
-                        ))}
-                      </ul>
-                    </>
+                    <div style={{ marginTop: '12px' }}>
+                      <div className="section-title">V. CHI TIẾT LỊCH TRÌNH CÔNG TÁC THEO ĐỊA BÀN XÃ / PHƯỜNG</div>
+                      {groupSchedulesByLocation(report1Data.periodSchedules).map(([locName, items]) => (
+                        <div key={locName} style={{ marginTop: '8px', marginBottom: '8px' }}>
+                          <p className="bold" style={{ fontSize: '13px', margin: '4px 0', color: '#1e1b4b', textDecoration: 'underline' }}>{locName}:</p>
+                          <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
+                            {items.map((s) => (
+                              <li key={s.id} style={{ marginBottom: '3px' }}>
+                                Ngày {new Date(s.date).toLocaleDateString("vi-VN")}: {s.executors} - Nội dung: {s.content} {s.partner ? `(${s.partner})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -1155,18 +1198,26 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                 {/* SƯ SỬ LỊCH CÔNG TÁC THEO FORMAT CHUẨN */}
                 {report1Data.periodSchedules.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-extrabold text-slate-800 mb-3 flex items-center gap-1.5"><ChevronRight size={16} className="text-indigo-600" /> Lịch trình công tác trong kỳ tuyển chọn</h3>
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 font-medium">
-                      <ul className="space-y-2 text-xs text-slate-700">
-                        {report1Data.periodSchedules.map((s) => (
-                          <li key={s.id} className="flex items-start gap-1 pb-1.5 border-b border-slate-100/75 last:border-0 last:pb-0">
-                            <span className="text-indigo-600 mr-2 font-bold">•</span>
-                            <span>
-                              <strong>Ngày {new Date(s.date).toLocaleDateString("vi-VN")}</strong>: {s.executors} - Nội dung: {s.content} ({s.partner || '-'})
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                    <h3 className="text-sm font-extrabold text-slate-800 mb-3 flex items-center gap-1.5"><ChevronRight size={16} className="text-indigo-600" /> Lịch trình công tác theo địa bàn Xã / Phường</h3>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 font-medium space-y-4">
+                      {groupSchedulesByLocation(report1Data.periodSchedules).map(([locName, items]) => (
+                        <div key={locName} className="space-y-2 bg-white p-3.5 rounded-xl border border-slate-200 shadow-3xs">
+                          <div className="font-extrabold text-xs text-purple-900 bg-purple-100/80 px-3 py-1.5 rounded-lg border border-purple-200 inline-flex items-center gap-1.5 uppercase tracking-wide">
+                            <MapPin size={13} className="text-purple-600 shrink-0" />
+                            {locName} ({items.length} lượt công tác)
+                          </div>
+                          <ul className="space-y-2 text-xs text-slate-700 pt-1">
+                            {items.map((s) => (
+                              <li key={s.id} className="flex items-start gap-1.5 pb-2 border-b border-slate-100 last:border-0 last:pb-0">
+                                <span className="text-purple-600 font-bold select-none">•</span>
+                                <span className="flex-1 leading-relaxed">
+                                  <strong className="text-slate-900">Ngày {new Date(s.date).toLocaleDateString("vi-VN")}</strong>: <span className="font-bold text-blue-700">{s.executors}</span> - Nội dung: <span className="text-slate-900 font-semibold">{s.content}</span> {s.partner ? <span className="text-slate-500 font-normal">({s.partner})</span> : ''}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1367,16 +1418,21 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                   </table>
 
                   {report2Data.active.schedulesList.length > 0 && (
-                    <>
-                      <p className="normal-text"><span className="bold">* Chi tiết lịch trình công tác phục vụ nghiệp vụ dã ngoại:</span></p>
-                      <ul>
-                        {report2Data.active.schedulesList.map((s) => (
-                          <li key={s.id}>
-                            - Ngày {new Date(s.date).toLocaleDateString("vi-VN")}: {s.executors} - Nội dung: {s.content} ({s.partner || '-'})
-                          </li>
-                        ))}
-                      </ul>
-                    </>
+                    <div style={{ marginTop: '12px' }}>
+                      <p className="normal-text"><span className="bold">* Chi tiết lịch trình công tác phục vụ nghiệp vụ dã ngoại theo địa bàn Xã / Phường:</span></p>
+                      {groupSchedulesByLocation(report2Data.active.schedulesList).map(([locName, items]) => (
+                        <div key={locName} style={{ marginTop: '8px', marginBottom: '8px' }}>
+                          <p className="bold" style={{ fontSize: '13px', margin: '4px 0', color: '#1e1b4b', textDecoration: 'underline' }}>{locName}:</p>
+                          <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
+                            {items.map((s) => (
+                              <li key={s.id} style={{ marginBottom: '3px' }}>
+                                Ngày {new Date(s.date).toLocaleDateString("vi-VN")}: {s.executors} - Nội dung: {s.content} {s.partner ? `(${s.partner})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -1506,24 +1562,33 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                   <div>
                     <h4 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest mb-3.5 flex items-center gap-1.5">
                       <span className="w-1.5 h-3 bg-emerald-500 rounded-sm"></span>
-                      3. Biểu lịch trình công tác cụ thể:
+                      3. Biểu lịch trình công tác cụ thể theo địa bàn Xã / Phường:
                     </h4>
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 font-medium">
-                      <ul className="space-y-2.5 text-xs text-slate-700">
-                        {report2Data.active.schedulesList.map((s) => (
-                          <li key={s.id} className="flex items-start gap-1 pb-2 border-b border-slate-100 last:border-0 last:pb-0">
-                            <span className="text-indigo-500 mr-2 font-bold select-none">•</span>
-                            <span>
-                              <strong>Ngày {new Date(s.date).toLocaleDateString("vi-VN")}</strong>: {s.executors} - Nội dung: <span className="text-slate-900 font-semibold">{s.content}</span> ({s.partner || '-'})
-                            </span>
-                          </li>
-                        ))}
-                        {report2Data.active.schedulesList.length === 0 && (
-                          <li className="text-slate-400 italic py-2 text-center font-semibold">
-                            Chưa ghi nhận kế hoạch phục vụ dã ngoại hay thực địa nào cho kỳ này.
-                          </li>
-                        )}
-                      </ul>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 font-medium space-y-4">
+                      {report2Data.active.schedulesList.length > 0 ? (
+                        groupSchedulesByLocation(report2Data.active.schedulesList).map(([locName, items]) => (
+                          <div key={locName} className="space-y-2 bg-white p-3.5 rounded-xl border border-slate-200 shadow-3xs">
+                            <div className="font-extrabold text-xs text-purple-900 bg-purple-100/80 px-3 py-1.5 rounded-lg border border-purple-200 inline-flex items-center gap-1.5 uppercase tracking-wide">
+                              <MapPin size={13} className="text-purple-600 shrink-0" />
+                              {locName} ({items.length} lượt công tác)
+                            </div>
+                            <ul className="space-y-2 text-xs text-slate-700 pt-1">
+                              {items.map((s) => (
+                                <li key={s.id} className="flex items-start gap-1.5 pb-2 border-b border-slate-100 last:border-0 last:pb-0">
+                                  <span className="text-purple-600 font-bold select-none">•</span>
+                                  <span className="flex-1 leading-relaxed">
+                                    <strong className="text-slate-900">Ngày {new Date(s.date).toLocaleDateString("vi-VN")}</strong>: <span className="font-bold text-blue-700">{s.executors}</span> - Nội dung: <span className="text-slate-900 font-semibold">{s.content}</span> {s.partner ? <span className="text-slate-500 font-normal">({s.partner})</span> : ''}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-slate-400 italic py-2 text-center font-semibold text-xs">
+                          Chưa ghi nhận kế hoạch phục vụ dã ngoại hay thực địa nào cho kỳ này.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

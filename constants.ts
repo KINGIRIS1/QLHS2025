@@ -47,13 +47,15 @@ export const WARDS = DEFAULT_WARDS;
 export const RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
   'Trích đo bản đồ địa chính',
+  'Thẩm định Trích đo',
   'Trích lục bản đồ địa chính',
   'Đo đạc theo yêu cầu',     
   'Cắm mốc',
   'Cung cấp thông tin quy hoạch',
   'Sao lục hồ sơ',
   'Thuế chính quy',
-  'Thu hồi Giấy chứng nhận'
+  'Thu hồi Giấy chứng nhận',
+  'Hiến đất'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
@@ -105,6 +107,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   const t = type.toLowerCase();
   
   // Ưu tiên kiểm tra các từ khóa dài trước
+  if (t.includes('thẩm định') || t.includes('tham dinh')) return 'Thẩm định TĐ';
   if (t.includes('chỉnh lý') || t.includes('hiến đường') || t.includes('thay đổi hlbv')) return 'Chỉnh lý';
   if (t.includes('trích lục')) return 'Trích lục';
   // Kiểm tra "trích đo" sau "chỉnh lý" vì "trích đo chỉnh lý" chứa "trích đo"
@@ -125,6 +128,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('thuế chính quy')) return 'Thuế CQ';
   if (t.includes('thu hồi giấy chứng nhận')) return 'Thu hồi GCN';
   if (t.includes('xin số thửa')) return 'Xin số thửa';
+  if (t.includes('hiến đất') || t.includes('hien dat')) return 'Hiến đất';
   
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };

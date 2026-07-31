@@ -8,6 +8,7 @@ import {
     initRealtimeRecords
 } from '../services/api';
 import { saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
+import { logUserActivity } from '../services/apiLogs';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 
 export const useAppData = (currentUser: User | null) => {
@@ -207,15 +208,35 @@ export const useAppData = (currentUser: User | null) => {
         }
 
         if (isEdit) {
+            const oldRecord = records.find(r => r.id === recordData.id);
             const updated = await updateRecordApi(recordData);
             if (updated) {
                 setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+                logUserActivity({
+                    action: 'UPDATE',
+                    targetType: 'RECORD',
+                    targetId: updated.id,
+                    targetCode: updated.code,
+                    details: `Cập nhật thông tin hồ sơ ${updated.code} (${updated.customerName || 'N/A'})`,
+                    user: currentUser,
+                    oldData: oldRecord,
+                    newData: updated
+                });
                 return true;
             }
         } else {
             const newRecord = await createRecordApi({ ...recordData, id: Math.random().toString(36).substr(2, 9) });
             if (newRecord) {
                 setRecords(prev => [newRecord, ...prev]);
+                logUserActivity({
+                    action: 'CREATE',
+                    targetType: 'RECORD',
+                    targetId: newRecord.id,
+                    targetCode: newRecord.code,
+                    details: `Tạo mới hồ sơ ${newRecord.code} - ${newRecord.customerName || 'N/A'} (Loại: ${newRecord.recordType || 'N/A'})`,
+                    user: currentUser,
+                    newData: newRecord
+                });
                 return true;
             }
         }
@@ -223,19 +244,35 @@ export const useAppData = (currentUser: User | null) => {
     };
 
     const handleDeleteRecord = async (id: string) => {
+        const deletedRecord = records.find(r => r.id === id);
         const hasInRecords = records.some(r => r.id === id);
         if (hasInRecords) {
             const success = await deleteRecordApi(id);
             if (success) {
                 setRecords(prev => prev.filter(r => r.id !== id));
+                logUserActivity({
+                    action: 'DELETE',
+                    targetType: 'RECORD',
+                    targetId: id,
+                    targetCode: deletedRecord?.code || id,
+                    details: `Xóa hồ sơ ${deletedRecord?.code || id} (${deletedRecord?.customerName || 'N/A'})`,
+                    user: currentUser,
+                    oldData: deletedRecord
+                });
             }
             return success;
         } else {
             // Nếu không có trong records (hoặc là hồ sơ chỉ nằm trong archive_records), thực hiện xóa ở archive_records
             const success = await deleteArchiveRecord(id);
             if (success) {
-                // Kích hoạt sự kiện để màn hình Tiếp Nhận làm mới
                 window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: 'saoluc' } }));
+                logUserActivity({
+                    action: 'DELETE',
+                    targetType: 'ARCHIVE',
+                    targetId: id,
+                    details: `Xóa hồ sơ lưu trữ sao lục (ID: ${id})`,
+                    user: currentUser
+                });
             }
             return success;
         }
@@ -245,6 +282,12 @@ export const useAppData = (currentUser: User | null) => {
         const success = await createRecordsBatchApi(newRecords);
         if (success) {
             await loadData();
+            logUserActivity({
+                action: 'CREATE',
+                targetType: 'RECORD',
+                details: `Nhập khẩu ${newRecords.length} hồ sơ từ tệp Excel`,
+                user: currentUser
+            });
             return true;
         }
         return false;
@@ -266,27 +309,72 @@ export const useAppData = (currentUser: User | null) => {
         if (savedEmp) {
             if (exists) setEmployees(prev => prev.map(e => e.id === savedEmp.id ? savedEmp : e));
             else setEmployees(prev => [...prev, savedEmp]);
+
+            logUserActivity({
+                action: exists ? 'UPDATE' : 'CREATE',
+                targetType: 'EMPLOYEE',
+                targetId: savedEmp.id,
+                targetCode: savedEmp.id,
+                details: exists ? `Cập nhật nhân sự ${savedEmp.name} (${savedEmp.department || 'N/A'})` : `Thêm mới nhân sự ${savedEmp.name} (${savedEmp.department || 'N/A'})`,
+                user: currentUser,
+                oldData: exists,
+                newData: savedEmp
+            });
         }
     };
 
     const handleDeleteEmployee = async (id: string) => {
+        const empToDelete = employees.find(e => e.id === id);
         const success = await deleteEmployeeApi(id);
-        if (success) setEmployees(prev => prev.filter(e => e.id !== id));
+        if (success) {
+            setEmployees(prev => prev.filter(e => e.id !== id));
+            logUserActivity({
+                action: 'DELETE',
+                targetType: 'EMPLOYEE',
+                targetId: id,
+                details: `Xóa nhân sự ${empToDelete?.name || id}`,
+                user: currentUser,
+                oldData: empToDelete
+            });
+        }
     };
 
     // --- User Handlers ---
     const handleUpdateUser = async (u: User, isUpdate: boolean) => {
+        const oldUser = users.find(x => x.username === u.username);
         const res = await saveUserApi(u, isUpdate);
         if (res) {
             if (isUpdate) setUsers(prev => prev.map(x => x.username === u.username ? res : x));
             else setUsers(prev => [...prev, res]);
+
+            logUserActivity({
+                action: isUpdate ? 'UPDATE' : 'CREATE',
+                targetType: 'USER',
+                targetId: res.username,
+                targetCode: res.username,
+                details: isUpdate ? `Cập nhật tài khoản ${res.username} (${res.name})` : `Tạo tài khoản mới ${res.username} (${res.name})`,
+                user: currentUser,
+                oldData: oldUser,
+                newData: res
+            });
         }
         return res;
     };
 
     const handleDeleteUser = async (username: string) => {
+        const userToDelete = users.find(u => u.username === username);
         const success = await deleteUserApi(username);
-        if (success) setUsers(prev => prev.filter(u => u.username !== username));
+        if (success) {
+            setUsers(prev => prev.filter(u => u.username !== username));
+            logUserActivity({
+                action: 'DELETE',
+                targetType: 'USER',
+                targetId: username,
+                details: `Xóa tài khoản ${username} (${userToDelete?.name || ''})`,
+                user: currentUser,
+                oldData: userToDelete
+            });
+        }
     };
 
     // --- System Handlers ---
@@ -294,6 +382,12 @@ export const useAppData = (currentUser: User | null) => {
         const success = await deleteAllDataApi();
         if (success) {
             setRecords([]);
+            logUserActivity({
+                action: 'DELETE',
+                targetType: 'SYSTEM',
+                details: `Thực hiện XÓA TOÀN BỘ DỮ LIỆU HỆ THỐNG`,
+                user: currentUser
+            });
             return true;
         }
         return false;

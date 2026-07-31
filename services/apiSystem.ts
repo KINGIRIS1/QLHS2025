@@ -207,6 +207,8 @@ export interface ContactSettings {
   ward_chonthanh: string;
   type_saoluc: string;
   type_thue: string;
+  type_hiendat?: string;
+  type_thamdinh?: string;
 }
 
 export const DEFAULT_CONTACT_SETTINGS: ContactSettings = {
@@ -214,7 +216,9 @@ export const DEFAULT_CONTACT_SETTINGS: ContactSettings = {
   ward_nhabich: "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344",
   ward_chonthanh: "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691",
   type_saoluc: "Nhân viên phụ trách Hoàng Anh Thanh: 0961 239 393",
-  type_thue: "Nhân viên phụ trách [Tên phụ trách]: [Số điện thoại]"
+  type_thue: "Nhân viên phụ trách [Tên phụ trách]: [Số điện thoại]",
+  type_hiendat: "Nhân viên phụ trách [Tên phụ trách]: [Số điện thoại]",
+  type_thamdinh: "Nhân viên phụ trách [Tên phụ trách]: [Số điện thoại]"
 };
 
 // Global in-memory cache to make lookups synchronous and lightning-fast!
@@ -289,6 +293,12 @@ export const getContactInfo = (settings: ContactSettings, ward: string, type: st
     const tLower = (type || "").toLowerCase();
     
     // Check type-specific settings first
+    if (tLower.includes("thẩm định") || tLower.includes("tham dinh")) {
+        return settings.type_thamdinh || DEFAULT_CONTACT_SETTINGS.type_thamdinh || "";
+    }
+    if (tLower.includes("hiến đất") || tLower.includes("hien dat")) {
+        return settings.type_hiendat || DEFAULT_CONTACT_SETTINGS.type_hiendat || "";
+    }
     if (tLower.includes("sao lục") || tLower.includes("saoluc")) {
         return settings.type_saoluc || DEFAULT_CONTACT_SETTINGS.type_saoluc;
     }

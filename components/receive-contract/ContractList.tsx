@@ -5,6 +5,7 @@ import { fetchContracts } from '../../services/api';
 import { Search, RotateCcw, Edit, Printer, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, Download, X } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
+import { PaginationControls } from '../PaginationControls';
 
 interface ContractListProps {
   onEdit: (c: Contract) => void;
@@ -18,6 +19,8 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
 
   const loadContracts = async () => {
       setLoading(true);
@@ -27,6 +30,10 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
   };
 
   useEffect(() => { loadContracts(); }, []);
+
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [searchTerm, viewMode]);
 
   const filtered = useMemo(() => {
       let list = contracts;
@@ -41,6 +48,12 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
           (c.ward || '').toLowerCase().includes(lower)
       );
   }, [contracts, searchTerm]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const paginatedContracts = useMemo(() => {
+      const start = (currentPage - 1) * itemsPerPage;
+      return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
 
   const isLiquidationMode = viewMode === 'liquidation';
 
@@ -218,10 +231,10 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                                 </div>
                             </td>
                         </tr>
-                    ) : filtered.length > 0 ? (
-                        filtered.map((c, index) => (
+                    ) : paginatedContracts.length > 0 ? (
+                        paginatedContracts.map((c, index) => (
                             <tr key={c.id} className={`transition-colors group ${isLiquidationMode ? 'hover:bg-orange-50/50' : 'hover:bg-purple-50/50'}`}>
-                                <td className="p-4 text-center text-gray-400 align-middle">{index + 1}</td>
+                                <td className="p-4 text-center text-gray-400 align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                                 <td className={`p-4 font-medium truncate align-middle ${isLiquidationMode ? 'text-orange-700' : 'text-purple-700'}`} title={c.code}>{c.code}</td>
                                 <td className="p-4 font-medium truncate align-middle" title={c.customerName}>{c.customerName}</td>
                                 <td className="p-4 align-middle"> 
@@ -268,6 +281,16 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                 </tbody>
             </table>
         </div>
+
+        <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+            unitName={isLiquidationMode ? "hợp đồng thanh lý" : "hợp đồng"}
+        />
 
         {/* Modal xuất Excel */}
         {showExportModal && (

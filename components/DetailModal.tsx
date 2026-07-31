@@ -215,9 +215,15 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     
     let standardDays = "30"; 
     const type = (record.recordType || '').toLowerCase();
+    const isHienDat = type.includes('hiến đất') || type.includes('hien dat');
+    const isThamDinh = type.includes('thẩm định') || type.includes('tham dinh');
 
     // Logic tính số ngày
-    if (type.includes('thuế chính quy')) {
+    if (isHienDat) {
+        standardDays = "8";
+    } else if (isThamDinh) {
+        standardDays = "30";
+    } else if (type.includes('thuế chính quy')) {
         standardDays = "15";
     } else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
@@ -337,8 +343,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         // --- NHÓM NỘI DUNG ---
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: val(record.recordType), 
-        RECORD_TYPE: val(record.recordType),
+        LOAI_HS: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(record.recordType), 
+        RECORD_TYPE: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(record.recordType),
         GIAY_TO_KHAC: val(record.otherDocs),
         
         // --- NHÓM ỦY QUYỀN ---

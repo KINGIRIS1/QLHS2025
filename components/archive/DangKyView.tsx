@@ -12,7 +12,6 @@ import AssignModal from '../AssignModal';
 import RecordDetailModal from './RecordDetailModal';
 import ReturnReasonModal from './ReturnReasonModal';
 import IGateView from './IGateView';
-import VaoSoView from './VaoSoView';
 
 interface DangKyViewProps {
     currentUser: User;
@@ -38,7 +37,7 @@ interface DangKyFormData {
 }
 
 const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
-    const [subView, setSubView] = useState<'record_dangky' | 'igate' | 'vaoso'>('igate');
+    const [subView, setSubView] = useState<'record_dangky' | 'igate'>('igate');
     const [activeTab, setActiveTab] = useState<'all' | 'xu_ly' | 'thue' | 'gcn'>('all');
     const [thueSubTab, setThueSubTab] = useState<'tham_tra_thue' | 'chuyen_thue' | 'dong_thue'>('tham_tra_thue');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
@@ -725,25 +724,11 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 >
                     <ClipboardList size={16} /> Hồ sơ Đăng ký
                 </button>
-                <button
-                    onClick={() => { setSubView('vaoso'); }}
-                    className={`pb-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                        subView === 'vaoso' 
-                            ? 'border-indigo-600 text-indigo-700' 
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-                    }`}
-                >
-                    <FileSignature size={16} /> Vào số GCN
-                </button>
             </div>
 
             {subView === 'igate' ? (
                 <div className="flex-1 overflow-auto p-4">
                     <IGateView currentUser={currentUser} wards={wards} />
-                </div>
-            ) : subView === 'vaoso' ? (
-                <div className="flex-1 overflow-auto p-4">
-                    <VaoSoView currentUser={currentUser} wards={wards} />
                 </div>
             ) : (
                 <>

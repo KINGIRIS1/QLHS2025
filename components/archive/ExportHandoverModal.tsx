@@ -274,7 +274,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         // Center aligned columns mapping
         const centerCols = type === 'saoluc' 
-            ? [0, 1, 3, 4, 5, 6, 7, 9] // STT, Mã, Địa chỉ, Thửa, Tờ, Số GCN, Số trang, Hẹn trả
+            ? [0, 1, 3, 4, 5, 6, 7, 9] // STT, Mã, Địa chỉ, Thửa, Tờ, Số GCN, Số tờ, Hẹn trả
             : [0, 1, 3, 4, 5, 7];      // STT, Mã, Địa chỉ, Thửa, Tờ, Hẹn trả
 
         // Data Rows

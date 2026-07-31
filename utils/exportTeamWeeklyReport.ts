@@ -137,9 +137,38 @@ export const exportTeamWeeklyReportToWord = async (
       addText(`- Tổng số lượng thửa đất đã thực hiện: ${plotCountExecuted} thửa`, true, 1440);
     }
     
-    addText(`d) Lịch công tác: ${data.schedules.length} lịch`, true, 720);
+    addText(`d) Lịch công tác theo địa bàn: ${data.schedules.length} lịch`, true, 720);
+    const groups: Record<string, any[]> = {};
     data.schedules.forEach((s: any) => {
-      addText(`- Ngày ${new Date(s.date).toLocaleDateString("vi-VN")} (${s.partner}): ${s.content}`, false, 1080);
+      let rawLoc = (s.location || '').trim();
+      let locName = 'Địa bàn khác / Chưa chọn';
+      if (rawLoc) {
+        const lower = rawLoc.toLowerCase();
+        if (lower.includes('minh hưng')) locName = 'Phường Minh Hưng';
+        else if (lower.includes('chơn thành')) locName = 'Phường Chơn Thành';
+        else if (lower.includes('nha bích')) locName = 'Xã Nha Bích';
+        else locName = rawLoc;
+      }
+      if (!groups[locName]) groups[locName] = [];
+      groups[locName].push(s);
+    });
+
+    const priorityOrder = ['Phường Minh Hưng', 'Phường Chơn Thành', 'Xã Nha Bích'];
+    const sortedGroups = Object.entries(groups).sort(([aKey], [bKey]) => {
+      const idxA = priorityOrder.indexOf(aKey);
+      const idxB = priorityOrder.indexOf(bKey);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return aKey.localeCompare(bKey, 'vi');
+    });
+
+    sortedGroups.forEach(([locName, items]) => {
+      addText(`* ${locName}:`, true, 1080);
+      items.forEach((s: any) => {
+        const partnerStr = s.partner ? ` (${s.partner})` : '';
+        addText(`- Ngày ${new Date(s.date).toLocaleDateString("vi-VN")}: ${s.executors || ''} - Nội dung: ${s.content}${partnerStr}`, false, 1440);
+      });
     });
     
     children.push(new Paragraph({ spacing: { before: 200 } }));

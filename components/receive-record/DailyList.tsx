@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
 import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX } from 'lucide-react';
+import { PaginationControls } from '../PaginationControls';
 
 interface DailyListProps {
   records: RecordFile[];
@@ -308,6 +309,20 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       return filteredArchiveRecords;
   }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredTaxRecords, filteredInfoRecords, filteredWithdrawRecords, filteredArchiveRecords]);
 
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [subTab, filterDate, filterWard, searchTerm]);
+
+  const totalPages = Math.ceil(currentTabRecords.length / itemsPerPage) || 1;
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return currentTabRecords.slice(start, start + itemsPerPage);
+  }, [currentTabRecords, currentPage, itemsPerPage]);
+
   // Hàm hỗ trợ in Excel: Trả về tiêu đề hiển thị tương ứng với Tab hiện tại
   const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw') => {
       if (tab === 'inside') return 'Hồ sơ đo đạc trong địa giới';
@@ -590,10 +605,10 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
-                        {currentTabRecords.length > 0 ? (
-                            currentTabRecords.map((r, index) => (
+                        {paginatedRecords.length > 0 ? (
+                            paginatedRecords.map((r, index) => (
                                 <tr key={r.id} className="hover:bg-blue-50/20 group transition-colors">
-                                    <td className="p-4 text-center text-gray-400 align-middle font-medium">{index + 1}</td> 
+                                    <td className="p-4 text-center text-gray-400 align-middle font-medium font-mono">{(currentPage - 1) * itemsPerPage + index + 1}</td> 
                                     <td className="p-4 font-bold text-blue-600 truncate align-middle tracking-tight" title={r.code}>{r.code}</td> 
                                     <td className="p-4 font-bold text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
                                     <td className="p-4 text-gray-700 truncate align-middle font-semibold" title={getNormalizedWard(r.ward)}>
@@ -640,6 +655,15 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                     </tbody>
                 </table>
             </div>
+            <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={currentTabRecords.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+                unitName="hồ sơ"
+            />
         </div>
 
     </div>

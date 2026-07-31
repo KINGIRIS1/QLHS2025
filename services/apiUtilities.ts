@@ -31,6 +31,10 @@ export interface TachThuaRecord extends GenericRecord {
     // data chứa các trường tách thửa (cấu trúc giống ChinhLyRecord)
 }
 
+export interface GiayMoiRecord extends GenericRecord {
+    // data chứa formData của Giấy mời
+}
+
 export interface MapSheetConversion {
     id: string;
     created_at: string;
@@ -46,6 +50,7 @@ const MOCK_BIENBAN: BienBanRecord[] = [];
 const MOCK_THONGTIN: ThongTinRecord[] = [];
 const MOCK_CHINHLY: ChinhLyRecord[] = [];
 const MOCK_TACHTHUA: TachThuaRecord[] = [];
+const MOCK_GIAYMOI: GiayMoiRecord[] = [];
 let MOCK_MAP_CONVERSIONS: MapSheetConversion[] = [];
 
 // Helper sinh ID ngẫu nhiên
@@ -384,6 +389,71 @@ export const deleteTachThuaRecord = async (id: string): Promise<boolean> => {
         return true;
     } catch (error) {
         logError("deleteTachThuaRecord", error);
+        return false;
+    }
+};
+
+// ============================================================================
+// 6. GIẤY MỜI
+// ============================================================================
+
+export const fetchGiayMoiRecords = async (): Promise<GiayMoiRecord[]> => {
+    if (!isConfigured) return MOCK_GIAYMOI;
+    try {
+        const { data, error } = await supabase
+            .from('giaymoi_records')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data as GiayMoiRecord[];
+    } catch (error) {
+        return MOCK_GIAYMOI;
+    }
+};
+
+export const saveGiayMoiRecord = async (record: Partial<GiayMoiRecord>): Promise<boolean> => {
+    if (!isConfigured) {
+        if (!record.id) {
+            const newRec = { ...record, id: generateId(), created_at: new Date().toISOString() } as GiayMoiRecord;
+            MOCK_GIAYMOI.unshift(newRec);
+        } else {
+            const idx = MOCK_GIAYMOI.findIndex(r => r.id === record.id);
+            if (idx !== -1) MOCK_GIAYMOI[idx] = { ...MOCK_GIAYMOI[idx], ...record } as GiayMoiRecord;
+        }
+        return true;
+    }
+    try {
+        if (record.id) {
+            const { error } = await supabase.from('giaymoi_records').update({ 
+                customer_name: record.customer_name,
+                data: record.data,
+                created_by: record.created_by
+            }).eq('id', record.id);
+            if (error) throw error;
+        } else {
+            const newRecord = { ...record, id: generateId() };
+            const { error } = await supabase.from('giaymoi_records').insert([newRecord]);
+            if (error) throw error;
+        }
+        return true;
+    } catch (error) {
+        logError("saveGiayMoiRecord", error);
+        return false;
+    }
+};
+
+export const deleteGiayMoiRecord = async (id: string): Promise<boolean> => {
+    if (!isConfigured) {
+        const idx = MOCK_GIAYMOI.findIndex(r => r.id === id);
+        if (idx !== -1) MOCK_GIAYMOI.splice(idx, 1);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('giaymoi_records').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        logError("deleteGiayMoiRecord", error);
         return false;
     }
 };

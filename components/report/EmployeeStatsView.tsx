@@ -261,6 +261,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const scheduleData = selectedEmpStats.schedules.map((s, idx) => ({
             'STT': idx + 1,
             'Ngày công tác': formatLocalDate(s.date),
+            'Địa bàn công tác': s.location || 'Chưa chọn',
             'Nội dung công tác': s.content,
             'Cơ quan phối hợp': s.partner || 'Không',
             'Nhân sự tham gia': s.executors
@@ -620,8 +621,13 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                                                     </span>
                                                 </div>
                                                 <div className="min-w-0 flex-1 space-y-1">
-                                                    <div className="font-bold text-gray-900 text-xs flex items-center justify-between">
+                                                    <div className="font-bold text-gray-900 text-xs flex items-center justify-between gap-2">
                                                         <span>Ngày: {formatLocalDate(s.date)}</span>
+                                                        {s.location && (
+                                                            <span className="text-[10px] font-extrabold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200 shrink-0">
+                                                                📍 {s.location}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <p className="text-xs text-gray-700 leading-relaxed font-semibold">
                                                         {s.content}

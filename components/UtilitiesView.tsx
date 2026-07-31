@@ -10,6 +10,8 @@ import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import MaMauQuyHoachTab from './utilities/MaMauQuyHoachTab';
+import GiayMoiTab from './utilities/GiayMoiTab';
+import { Mail } from 'lucide-react';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -18,7 +20,7 @@ interface UtilitiesViewProps {
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'mamau'>(
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'mamau' | 'giaymoi'>(
       currentUser.role === UserRole.ONEDOOR ? 'vphc' : 'bienban'
   );
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -149,6 +151,14 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
               >
                   <Palette size={16} /> Mã màu quy hoạch
               </button>
+              {!isOneDoor && (
+                  <button 
+                      onClick={() => setActiveTab('giaymoi')}
+                      className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'giaymoi' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      <Mail size={16} /> Giấy mời
+                  </button>
+              )}
           </div>
           
           {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'mamau' && (
@@ -210,6 +220,11 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
           {/* TAB 8: MÃ MÀU QUY HOẠCH */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'mamau' ? 'block' : 'hidden'}`}>
               <MaMauQuyHoachTab notify={notify} />
+          </div>
+
+          {/* TAB 9: GIẤY MỜI */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'giaymoi' ? 'block' : 'hidden'}`}>
+              <GiayMoiTab currentUser={currentUser} notify={notify} />
           </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User, Employee } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare, FileText } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare, FileText, Eye, ShieldAlert, RefreshCw } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
@@ -12,6 +12,7 @@ import { PlotCountModal } from './PlotCountModal';
 import BlockingWarningModal from './BlockingWarningModal';
 import { supabase, isConfigured } from '../services/supabaseClient';
 import { offlineDb } from '../utils/offlineDb';
+import { PaginationControls } from './PaginationControls';
 
 import PersonalReportView from './PersonalReportView';
 
@@ -54,7 +55,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   // Thêm tab 'completed_work' và 'pending_sign'
   const [activeTab, setActiveTab] = useState<'pending' | 'completed_work' | 'pending_sign' | 'finished' | 'reminder' | 'report' | 'approaching' | 'overdue' | 'extended'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof RecordFile; direction: 'asc' | 'desc' }>({
@@ -75,6 +76,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   const [blockingMatches, setBlockingMatches] = useState<{ record: any; source: 'active' | 'archive' }[]>([]);
   const [pendingRecord, setPendingRecord] = useState<RecordFile | null>(null);
   const [pendingAction, setPendingAction] = useState<'mark_as_done' | 'forward_to_sign' | null>(null);
+
+  // Trạng thái hiển thị popup "Đang kiểm tra ngăn chặn"
+  const [isCheckingBlocking, setIsCheckingBlocking] = useState(false);
+  const [checkingRecord, setCheckingRecord] = useState<RecordFile | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState<'checking' | 'passed' | 'found'>('checking');
 
   // Trạng thái cho Chuyển tiếp hồ sơ
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
@@ -552,19 +558,33 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   // --- ACTIONS ---
 
   const handleMarkAsDone = async (record: RecordFile) => {
-    const matches = await checkBlocking(record);
-    if (matches.length > 0) {
+    setCheckingRecord(record);
+    setPendingAction('mark_as_done');
+    setCheckingStatus('checking');
+    setIsCheckingBlocking(true);
+
+    try {
+      const matches = await checkBlocking(record);
+      if (matches.length > 0) {
+        setCheckingStatus('found');
+        setIsCheckingBlocking(false);
         setBlockingMatches(matches);
         setPendingRecord(record);
-        setPendingAction('mark_as_done');
         setIsBlockingWarningOpen(true);
         return;
+      }
+
+      setCheckingStatus('passed');
+    } catch (e) {
+      console.error('Lỗi kiểm tra ngăn chặn:', e);
+      setIsCheckingBlocking(false);
+      setCheckingRecord(null);
+      await proceedMarkAsDone(record);
     }
-    await proceedMarkAsDone(record);
   };
 
-  const proceedMarkAsDone = async (record: RecordFile) => {
-    if (await confirmAction(`Xác nhận đã hoàn thành công việc cho hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã thực hiện".`)) {
+  const proceedMarkAsDone = async (record: RecordFile, skipConfirm = false) => {
+    if (skipConfirm || await confirmAction(`Xác nhận đã hoàn thành công việc cho hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã thực hiện".`)) {
         if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
             // Handle Archive Record
             const archiveType = record.recordType === 'Sao lục' ? 'saoluc' : 'congvan';
@@ -604,20 +624,34 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   };
 
   const handleForwardToSign = async (record: RecordFile) => {
-    const matches = await checkBlocking(record);
-    if (matches.length > 0) {
+    setCheckingRecord(record);
+    setPendingAction('forward_to_sign');
+    setCheckingStatus('checking');
+    setIsCheckingBlocking(true);
+
+    try {
+      const matches = await checkBlocking(record);
+      if (matches.length > 0) {
+        setCheckingStatus('found');
+        setIsCheckingBlocking(false);
         setBlockingMatches(matches);
         setPendingRecord(record);
-        setPendingAction('forward_to_sign');
         setIsBlockingWarningOpen(true);
         return;
+      }
+
+      setCheckingStatus('passed');
+    } catch (e) {
+      console.error('Lỗi kiểm tra ngăn chặn:', e);
+      setIsCheckingBlocking(false);
+      setCheckingRecord(null);
+      await proceedForwardToSign(record);
     }
-    await proceedForwardToSign(record);
   };
 
-  const proceedForwardToSign = async (record: RecordFile) => {
+  const proceedForwardToSign = async (record: RecordFile, skipConfirm = false) => {
     if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
-        if (await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
+        if (skipConfirm || await confirmAction(`Bạn muốn chuyển hồ sơ ${record.code} sang trạng thái "Chờ ký duyệt"?`)) {
              // Handle Archive Record
             const historyEntry = {
                 action: 'Trình ký',
@@ -1015,7 +1049,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                             
                             <th className="p-3 text-center w-[120px]">Trạng thái</th>
                             <th className="p-3 text-center w-[100px]">Chỉnh lý</th>
-                            <th className="p-3 text-center w-[180px]">Thao tác chính</th>
+                            <th className="p-3 text-center min-w-[280px] whitespace-nowrap">Thao tác chính</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
@@ -1067,66 +1101,88 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                         {onMapCorrection && (
                                             <button 
                                                 onClick={() => onMapCorrection(r)}
-                                                className={`flex items-center justify-center gap-1 px-2 py-1 rounded border transition-all text-[10px] font-bold shadow-sm mx-auto ${
+                                                className={`inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md border transition-all text-xs font-semibold shadow-2xs whitespace-nowrap cursor-pointer ${
                                                     r.needsMapCorrection 
-                                                    ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100 w-full' 
-                                                    : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:bg-gray-50'
+                                                    ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600' 
+                                                    : 'bg-white text-slate-500 border-slate-200 hover:text-slate-700 hover:bg-slate-50'
                                                 }`}
                                                 title={r.needsMapCorrection ? "Đang có yêu cầu. Bấm để HỦY." : "Yêu cầu chỉnh lý bản đồ"}
                                             >
-                                                <Map size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
-                                                {r.needsMapCorrection && <span>CHỈNH LÝ</span>}
+                                                <Map size={13} />
+                                                <span>{r.needsMapCorrection ? "Đang chỉnh lý" : "Yêu cầu"}</span>
                                             </button>
                                         )}
                                     </td>
 
                                     <td className="p-3 align-middle">
-                                        <div className="flex justify-center gap-2">
-                                            <button onClick={() => onViewRecord(r)} className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm">
-                                                Chi tiết
+                                        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                            {/* Nút Xem chi tiết */}
+                                            <button 
+                                                onClick={() => onViewRecord(r)} 
+                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                                                title="Xem chi tiết hồ sơ"
+                                            >
+                                                <Eye size={13} className="text-slate-500" />
+                                                <span>Chi tiết</span>
                                             </button>
                                             
                                             {/* Nút Thanh lý */}
                                             {onCreateLiquidation && (
-                                                <button onClick={() => onCreateLiquidation(r)} className="px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" title="Thanh lý hợp đồng">
-                                                    <FileCheck size={14} /> Thanh lý
+                                                <button 
+                                                    onClick={() => onCreateLiquidation(r)} 
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 text-xs font-semibold shadow-2xs transition-all cursor-pointer" 
+                                                    title="Thanh lý hợp đồng"
+                                                >
+                                                    <FileCheck size={13} />
+                                                    <span>Thanh lý</span>
                                                 </button>
                                             )}
 
                                             {/* Nút Phiếu xin lỗi */}
                                             <button 
                                                 onClick={() => { setSelectedRecordForPhieu(r); setShowPhieuXinLoi(true); }}
-                                                className="px-2 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" 
-                                                title="Phiếu xin lỗi"
+                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-lg hover:bg-amber-100 hover:border-amber-300 text-xs font-semibold shadow-2xs transition-all cursor-pointer" 
+                                                title="Lập phiếu xin lỗi do trễ hạn"
                                             >
-                                                <FileText size={14} /> XL
+                                                <FileText size={13} />
+                                                <span>Phiếu XL</span>
                                             </button>
 
-                                            {/* Nút Chuyển tiếp hồ sơ */}
+                                            {/* Nút Chuyển tiếp */}
                                             {(activeTab === 'pending' || activeTab === 'extended') && r.status !== RecordStatus.COMPLETED_WORK && (
                                                 <button 
                                                     onClick={() => handleOpenForwardModal(r)}
-                                                    className="px-2 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all" 
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 text-xs font-semibold shadow-2xs transition-all cursor-pointer" 
                                                     title="Chuyển tiếp hồ sơ cho nhân viên khác"
                                                 >
-                                                    <ArrowRight size={14} /> Chuyển tiếp
+                                                    <ArrowRight size={13} />
+                                                    <span>Chuyển tiếp</span>
                                                 </button>
                                             )}
 
-                                            {/* Logic nút chuyển trạng thái theo từng Tab */}
+                                            {/* Nút Đã thực hiện */}
                                             {(activeTab === 'pending' || activeTab === 'extended') && r.status !== RecordStatus.COMPLETED_WORK && (
-                                                <button onClick={() => handleMarkAsDone(r)} title="Đánh dấu đã xong việc" className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
-                                                    Đã thực hiện <CheckSquare size={14} />
+                                                <button 
+                                                    onClick={() => handleMarkAsDone(r)} 
+                                                    title="Đánh dấu đã thực hiện" 
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 text-white border border-teal-600 rounded-lg hover:bg-teal-700 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                                >
+                                                    <CheckSquare size={13} />
+                                                    <span>Đã thực hiện</span>
                                                 </button>
                                             )}
 
+                                            {/* Nút Trình ký */}
                                             {(activeTab === 'completed_work' || (activeTab === 'extended' && r.status === RecordStatus.COMPLETED_WORK)) && (
-                                                <button onClick={() => handleForwardToSign(r)} title="Chuyển sang bước Ký kiểm tra" className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
-                                                    Trình ký <Send size={14} />
+                                                <button 
+                                                    onClick={() => handleForwardToSign(r)} 
+                                                    title="Chuyển sang bước Ký kiểm tra" 
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white border border-purple-600 rounded-lg hover:bg-purple-700 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                                >
+                                                    <Send size={13} />
+                                                    <span>Trình ký</span>
                                                 </button>
                                             )}
-                                            
-                                            {/* Tab Chờ ký không có nút hành động (chỉ xem) */}
                                         </div>
                                     </td>
                                 </tr>
@@ -1144,16 +1200,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
 
         {/* PAGINATION FOOTER */}
         {displayRecords.length > 0 && (
-            <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-between items-center shrink-0">
-                <span className="text-xs text-gray-500">
-                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, displayRecords.length)}</strong> trên tổng <strong>{displayRecords.length}</strong>
-                </span>
-                <div className="flex items-center gap-1">
-                    <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={18} /></button>
-                    <span className="text-xs font-medium mx-2">Trang {currentPage} / {totalPages}</span>
-                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={18} /></button>
-                </div>
-            </div>
+            <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={displayRecords.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+                unitName="hồ sơ"
+            />
         )}
         </>
         )}
@@ -1179,6 +1234,150 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
         onConfirm={handleConfirmPlotCount}
         record={selectedRecordForPlotCount}
       />
+
+      {/* POPUP THÔNG BÁO ĐANG KIỂM TRA NGĂN CHẶN */}
+      {isCheckingBlocking && checkingRecord && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full p-6 text-center animate-scale-up space-y-4">
+            {checkingStatus === 'checking' ? (
+              <>
+                <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-inner relative">
+                  <ShieldAlert size={34} className="animate-pulse" />
+                  <span className="absolute inset-0 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></span>
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="font-bold text-gray-900 text-lg flex items-center justify-center gap-2">
+                    <span>Đang kiểm tra ngăn chặn...</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                    Hệ thống đang đối soát dữ liệu thửa đất, tờ bản đồ và chủ sử dụng của hồ sơ <span className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-mono">{checkingRecord.code}</span> với CSDL ngăn chặn.
+                  </p>
+                </div>
+                
+                {/* Chi tiết thông tin đối soát */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-left text-xs space-y-1.5">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thông tin đối soát ngăn chặn</div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Mã hồ sơ:</span>
+                    <span className="font-bold font-mono text-slate-900">{checkingRecord.code}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Chủ sử dụng:</span>
+                    <span className="font-bold text-slate-900 truncate max-w-[200px]" title={checkingRecord.customerName}>{checkingRecord.customerName || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Thửa đất / Tờ BD:</span>
+                    <span className="font-bold font-mono text-slate-900">{checkingRecord.landPlot || '---'} / {checkingRecord.mapSheet || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Xã / Phường:</span>
+                    <span className="font-bold text-slate-900">{checkingRecord.ward || '---'}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-amber-700 bg-amber-50 py-1.5 px-3 rounded-lg border border-amber-200/80">
+                  <RefreshCw size={12} className="animate-spin shrink-0" />
+                  <span>Đang thực hiện đối soát tự động...</span>
+                </div>
+              </>
+            ) : checkingStatus === 'passed' ? (
+              <>
+                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner animate-scale-up">
+                  <CheckCircle size={38} />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="font-bold text-emerald-800 text-lg">Kiểm tra ngăn chặn hoàn tất</h3>
+                  <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 py-1 px-3 rounded-full border border-emerald-200 shadow-2xs">
+                    <CheckCircle size={14} className="text-emerald-600" />
+                    <span>Không phát hiện thông tin ngăn chặn</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                    Hồ sơ <span className="font-bold text-gray-900 font-mono">{checkingRecord.code}</span> hoàn toàn an toàn, đủ điều kiện để thực hiện chuyển bước tiếp theo.
+                  </p>
+                </div>
+
+                {/* Chi tiết thông tin đối soát an toàn */}
+                <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 text-left text-xs space-y-1.5">
+                  <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center justify-between">
+                    <span>Thông tin đối soát</span>
+                    <span className="text-emerald-600 font-normal">An toàn (0 trùng khớp)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Mã hồ sơ:</span>
+                    <span className="font-bold font-mono text-slate-900">{checkingRecord.code}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Chủ sử dụng:</span>
+                    <span className="font-bold text-slate-900 truncate max-w-[200px]" title={checkingRecord.customerName}>{checkingRecord.customerName || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Thửa đất / Tờ BD:</span>
+                    <span className="font-bold font-mono text-slate-900">{checkingRecord.landPlot || '---'} / {checkingRecord.mapSheet || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Xã / Phường:</span>
+                    <span className="font-bold text-slate-900">{checkingRecord.ward || '---'}</span>
+                  </div>
+                </div>
+
+                {/* Nút thao tác xác nhận chuyển bước ngay trên popup */}
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCheckingBlocking(false);
+                      setCheckingRecord(null);
+                      setPendingAction(null);
+                    }}
+                    className="w-1/3 py-2.5 px-3 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl transition-colors"
+                  >
+                    Đóng / Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const rec = checkingRecord;
+                      const act = pendingAction;
+                      setIsCheckingBlocking(false);
+                      setCheckingRecord(null);
+                      setPendingAction(null);
+                      if (rec) {
+                        if (act === 'mark_as_done') {
+                          await proceedMarkAsDone(rec, true);
+                        } else if (act === 'forward_to_sign') {
+                          await proceedForwardToSign(rec, true);
+                        }
+                      }
+                    }}
+                    className={`w-2/3 py-2.5 px-4 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-2 ${
+                      pendingAction === 'forward_to_sign'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-500/20'
+                        : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                    }`}
+                  >
+                    <CheckSquare size={16} />
+                    <span>
+                      {pendingAction === 'forward_to_sign' ? 'Xác nhận chuyển "Trình ký"' : 'Xác nhận "Đã thực hiện"'}
+                    </span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                  <ShieldAlert size={38} />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="font-bold text-red-700 text-lg">Phát hiện thông tin ngăn chặn!</h3>
+                  <p className="text-xs text-red-600 font-medium">
+                    Đang hiển thị chi tiết văn bản ngăn chặn liên quan...
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <BlockingWarningModal
         isOpen={isBlockingWarningOpen}

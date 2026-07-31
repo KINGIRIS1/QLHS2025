@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import { Search, Printer, Calendar, Clock, MapPin, User, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { PaginationControls } from '../PaginationControls';
 
 interface ExtendedListProps {
   records: RecordFile[];
@@ -105,6 +106,20 @@ export const ExtendedList: React.FC<ExtendedListProps> = ({
     });
   }, [allExtendedRecords, searchTerm, wardFilter]);
 
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, wardFilter]);
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage) || 1;
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredRecords.slice(start, start + itemsPerPage);
+  }, [filteredRecords, currentPage, itemsPerPage]);
+
   // Format dạng ngày DD/MM/YYYY
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
@@ -199,7 +214,7 @@ export const ExtendedList: React.FC<ExtendedListProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-sm text-gray-700">
-              {filteredRecords.map((r, index) => {
+              {paginatedRecords.map((r, index) => {
                 const getRowTypeColor = (typeStr: string) => {
                   const t = (typeStr || '').toLowerCase();
                   if (t.includes('sao lục') || t.includes('lưu trữ')) return 'bg-cyan-50 text-cyan-700 border-cyan-100';
@@ -217,7 +232,7 @@ export const ExtendedList: React.FC<ExtendedListProps> = ({
                 return (
                   <tr key={r.id || index} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3 text-center font-mono text-xs text-gray-400">
-                      {index + 1}
+                      {(currentPage - 1) * itemsPerPage + index + 1}
                     </td>
                     <td className="px-4 py-3 font-semibold text-blue-600 font-mono">
                       {r.code}
@@ -281,6 +296,16 @@ export const ExtendedList: React.FC<ExtendedListProps> = ({
           </table>
         )}
       </div>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredRecords.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={setItemsPerPage}
+        unitName="hồ sơ gia hạn"
+      />
     </div>
   );
 };

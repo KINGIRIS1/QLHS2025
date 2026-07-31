@@ -118,8 +118,14 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const wardNameNoPrefix = wardName.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
 
     const type = (data.recordType || '').toLowerCase();
+    const isHienDat = type.includes('hiến đất') || type.includes('hien dat');
+    const isThamDinhTrichDo = type.includes('thẩm định') || type.includes('tham dinh');
     let standardDays = "30"; 
-    if (type.includes('thuế chính quy')) {
+    if (isHienDat) {
+        standardDays = "8";
+    } else if (isThamDinhTrichDo) {
+        standardDays = "30";
+    } else if (type.includes('thuế chính quy')) {
         standardDays = "15";
     } else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
@@ -195,9 +201,33 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div>Tờ bản đồ số: {data.mapSheet}</div>
                             <div>Diện tích: {data.area}m<sup>2</sup></div>
                             <div>Địa chỉ thửa đất: {data.address ? data.address + ' - ' : ''}{getFullWard(data.ward || '')}</div>
-                            <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{data.recordType ? `${data.recordType} - ` : ''}{data.content}</span></div>
+                            <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{isHienDat ? `Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.${data.content ? ' - ' + data.content : ''}` : isThamDinhTrichDo ? `Kiểm tra, thẩm định bản trích đo địa chính.${data.content ? ' - ' + data.content : ''}` : `${data.recordType ? data.recordType + ' - ' : ''}${data.content}`}</span></div>
                             
-                            {(type.includes('thu hồi giấy chứng nhận') || type.includes('thu hồi gcn')) ? (
+                            {isHienDat ? (
+                                <>
+                                    <div>1. Giấy chứng nhận (gốc)</div>
+                                    <div>2. Hợp đồng tặng cho quyền sử dụng đất</div>
+                                    <div>3. Đơn đăng ký biến động</div>
+                                    <div>4. Phiếu đo đạc chỉnh lý thửa đất</div>
+                                    {data.otherDocs ? (
+                                        <div>5. Giấy tờ khác: {data.otherDocs}</div>
+                                    ) : null}
+                                    {data.authorizedBy ? (
+                                        <div>{data.otherDocs ? '6' : '5'}. Giấy tờ ủy quyền: {data.authorizedBy?.toUpperCase()}{data.authDocType ? ` (${data.authDocType})` : ''}</div>
+                                    ) : null}
+                                </>
+                            ) : isThamDinhTrichDo ? (
+                                <>
+                                    <div>1. Giấy chứng nhận (photo)</div>
+                                    <div>2. Mảnh trích đo bản đồ địa chính</div>
+                                    {data.otherDocs ? (
+                                        <div>3. Giấy tờ khác: {data.otherDocs}</div>
+                                    ) : null}
+                                    {data.authorizedBy ? (
+                                        <div>{data.otherDocs ? '4' : '3'}. Giấy tờ ủy quyền: {data.authorizedBy?.toUpperCase()}{data.authDocType ? ` (${data.authDocType})` : ''}</div>
+                                    ) : null}
+                                </>
+                            ) : (type.includes('thu hồi giấy chứng nhận') || type.includes('thu hồi gcn')) ? (
                                 <>
                                     <div>1. Giấy chứng nhận bản gốc</div>
                                     {data.authorizedBy ? (

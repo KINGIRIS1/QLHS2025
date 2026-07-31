@@ -125,10 +125,10 @@ export const useRecordFilter = (
                     });
                 }
             } else {
-                // Tab Lịch sử giao: Bao gồm Đã giao HOẶC (Đã rút VÀ đã có đợt xuất)
+                // Tab Lịch sử giao: Bao gồm tất cả hồ sơ đã có đợt xuất (HANDOVER, WITHDRAWN, RETURNED, v.v.)
                 result = result.filter(r => 
-                    r.status === RecordStatus.HANDOVER || 
-                    (r.status === RecordStatus.WITHDRAWN && r.exportBatch)
+                    !!r.exportBatch || 
+                    r.status === RecordStatus.HANDOVER
                 );
                 // Giữ nguyên logic lọc ngày đơn cho Lịch sử giao (theo đợt)
                 if (filterDate) {
@@ -149,9 +149,9 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
         
         if (isOtherView) {
-            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || ''));
+            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(r.recordType || ''));
         } else if (isMeasurementView) {
-            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || ''));
+            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(r.recordType || ''));
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)
@@ -283,8 +283,8 @@ export const useRecordFilter = (
                 if (!checkWarningPermission(r)) return; 
                 
                 // Filter by recordType based on view group
-                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || '')) return;
-                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(r.recordType || '')) return;
+                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(r.recordType || '')) return;
+                if (isMeasurementView && ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(r.recordType || '')) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

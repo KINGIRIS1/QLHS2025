@@ -25,8 +25,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     records.forEach(r => {
       if (type === 'handover') {
           // Logic cho Giao 1 cửa: Dựa vào exportBatch
-          // Bao gồm cả HANDOVER, SIGNED và WITHDRAWN (nếu đã có batch)
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN) && r.exportBatch && r.exportDate) {
+          // Bao gồm cả HANDOVER, SIGNED, WITHDRAWN và RETURNED (nếu đã có batch)
+          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.RETURNED || !!r.exportBatch) && r.exportBatch && r.exportDate) {
             const dateStr = r.exportDate.split('T')[0];
             const key = `${dateStr}_${r.exportBatch}`;
             if (!batches[key]) {

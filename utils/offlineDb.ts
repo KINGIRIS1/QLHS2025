@@ -2,19 +2,25 @@ import { LandRecord } from '../types';
 
 class OfflineDB {
   private dbName = 'QLHS_Offline_DB';
-  private version = 1;
+  private version = 3;
 
   private getDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
       
-      request.onupgradeneeded = () => {
+      request.onupgradeneeded = (event) => {
         const db = request.result;
         if (!db.objectStoreNames.contains('blocking_records')) {
           db.createObjectStore('blocking_records', { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains('archive_blocking_records')) {
           db.createObjectStore('archive_blocking_records', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('system_backups')) {
+          db.createObjectStore('system_backups', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('backup_handles')) {
+          db.createObjectStore('backup_handles');
         }
       };
 
@@ -161,6 +167,99 @@ class OfflineDB {
       });
     } catch (e) {
       console.error(`Error clearing IndexedDB store ${storeName}:`, e);
+    }
+  }
+
+  async saveBackupPoint(id: string, backupData: any): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('system_backups', 'readwrite');
+        const store = transaction.objectStore('system_backups');
+        store.put({ id, data: backupData });
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } catch (e) {
+      console.error('Error saving backup point to IndexedDB:', e);
+      throw e;
+    }
+  }
+
+  async getBackupPoint(id: string): Promise<any | null> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('system_backups', 'readonly');
+        const store = transaction.objectStore('system_backups');
+        const request = store.get(id);
+        request.onsuccess = () => resolve(request.result ? request.result.data : null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Error getting backup point from IndexedDB:', e);
+      return null;
+    }
+  }
+
+  async deleteBackupPoint(id: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('system_backups', 'readwrite');
+        const store = transaction.objectStore('system_backups');
+        store.delete(id);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } catch (e) {
+      console.error('Error deleting backup point from IndexedDB:', e);
+    }
+  }
+
+  async saveDirectoryHandle(handle: any): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('backup_handles', 'readwrite');
+        const store = transaction.objectStore('backup_handles');
+        store.put(handle, 'auto_backup_folder');
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } catch (e) {
+      console.error('Error saving directory handle:', e);
+    }
+  }
+
+  async getDirectoryHandle(): Promise<any | null> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('backup_handles', 'readonly');
+        const store = transaction.objectStore('backup_handles');
+        const request = store.get('auto_backup_folder');
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Error getting directory handle:', e);
+      return null;
+    }
+  }
+
+  async clearDirectoryHandle(): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('backup_handles', 'readwrite');
+        const store = transaction.objectStore('backup_handles');
+        store.delete('auto_backup_folder');
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } catch (e) {
+      console.error('Error clearing directory handle:', e);
     }
   }
 }

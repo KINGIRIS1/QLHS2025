@@ -69,7 +69,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                       let recordType = r.recordType || 'Đo đạc theo yêu cầu';
                       if (!EXTENDED_RECORD_TYPES.includes(recordType)) {
                           const lower = recordType.toLowerCase();
-                          if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
+                          if (lower.includes('hiến đất') || lower.includes('hien dat')) recordType = 'Hiến đất';
+                          else if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
                           else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                           else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
                           else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';
@@ -183,6 +184,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           const typeMapping: Record<string, string> = {
               'TL': 'Trích lục bản đồ địa chính',
               'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
+              'TĐTĐ': 'Thẩm định Trích đo',
+              'THẨM ĐỊNH': 'Thẩm định Trích đo',
+              'THẨM ĐỊNH TRÍCH ĐO': 'Thẩm định Trích đo',
               'TĐ': 'Trích đo bản đồ địa chính',
               'TD': 'Trích đo bản đồ địa chính',
               'TRÍCH ĐO': 'Trích đo bản đồ địa chính',
@@ -197,6 +201,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'TÁCH THỬA': 'Trích đo bản đồ địa chính',
               'HỢP THỬA': 'Trích đo bản đồ địa chính',
               'CẤP ĐỔI': 'Trích đo bản đồ địa chính',
+              'HIẾN ĐẤT': 'Hiến đất',
+              'HIEN DAT': 'Hiến đất',
+              'HD': 'Hiến đất',
               'XST': 'Xin số thửa',
               'XIN SỐ THỬA': 'Xin số thửa'
           };
@@ -220,7 +227,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
               if (!recordType) {
                   const lower = rawType.toLowerCase();
-                  if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
+                  if (lower.includes('thẩm định')) recordType = 'Thẩm định Trích đo';
+                  else if (lower.includes('hiến đất') || lower.includes('hien dat')) recordType = 'Hiến đất';
+                  else if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                   else if (lower.includes('trích đo') || lower.includes('tách thửa') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
                   else if (lower.includes('đo đạc')) recordType = 'Đo đạc theo yêu cầu';

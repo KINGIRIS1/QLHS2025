@@ -1072,7 +1072,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
                     </div>
                 )}
 
-                {/* Modal Nhập Số GCN và Số Trang Sao Lục khi chuyển sang Ký Duyệt */}
+                {/* Modal Nhập Số GCN và Số Tờ Sao Lục khi chuyển sang Ký Duyệt */}
                 {showSignModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm animate-fade-in">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up border border-slate-100">
@@ -1112,7 +1112,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
                                     <div>
                                         <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                            <LayoutGrid size={14} className="text-purple-500"/> Số trang sao lục <span className="text-red-500">*</span>
+                                            <LayoutGrid size={14} className="text-purple-500"/> Số trang cung cấp <span className="text-red-500">*</span>
                                         </label>
                                         <input 
                                             type="number"
@@ -1128,7 +1128,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
                                 <div className="bg-slate-50 p-3.5 rounded-xl text-xs text-slate-500 leading-relaxed border border-slate-100 flex gap-2">
                                     <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                                    <span>Lưu ý: Hệ thống sẽ chuyển trạng thái hồ sơ thành <strong>Đã ký duyệt</strong>, đồng thời lưu trữ Số GCN và Số trang sao lục vào Supabase.</span>
+                                    <span>Lưu ý: Hệ thống sẽ chuyển trạng thái hồ sơ thành <strong>Đã ký duyệt</strong>, đồng thời lưu trữ Số GCN và Số trang cung cấp vào Supabase.</span>
                                 </div>
 
                                 <div className="pt-2 flex justify-end gap-3">

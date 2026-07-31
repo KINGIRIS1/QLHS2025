@@ -156,9 +156,11 @@ CREATE TABLE IF NOT EXISTS work_schedules (
     executors TEXT NOT NULL, -- Lưu chuỗi tên người thực hiện
     content TEXT NOT NULL,
     partner VARCHAR(255),
+    location TEXT, -- Địa bàn công tác (Chơn Thành, Minh Hưng, Nha Bích, ...)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50) NOT NULL
 );
+ALTER TABLE work_schedules ADD COLUMN IF NOT EXISTS location TEXT;
 
 -- ==========================================
 -- 4b. BẢNG ĐĂNG KÝ MÁY ĐO (Tab Đăng ký máy đo)
@@ -306,6 +308,15 @@ CREATE TABLE chinhly_records (
 
 -- Bảng Tách thửa
 CREATE TABLE tachthua_records (
+    id VARCHAR(50) PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(50) NOT NULL,
+    customer_name VARCHAR(255),
+    data JSON
+);
+
+-- Bảng Giấy mời
+CREATE TABLE giaymoi_records (
     id VARCHAR(50) PRIMARY KEY,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50) NOT NULL,

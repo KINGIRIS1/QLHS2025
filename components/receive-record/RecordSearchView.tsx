@@ -18,6 +18,7 @@ interface RecordSearchViewProps {
 const SEARCHABLE_RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
   'Trích đo bản đồ địa chính',
+  'Thẩm định Trích đo',
   'Trích lục bản đồ địa chính',
   'Trích đo',
   'Trích lục',
@@ -30,7 +31,8 @@ const SEARCHABLE_RECORD_TYPES = [
   'Thi hành án',
   'Tòa án',
   'Thu hồi Giấy chứng nhận',
-  'Xin số thửa'
+  'Xin số thửa',
+  'Hiến đất'
 ];
 
 export const RecordSearchView: React.FC<RecordSearchViewProps> = ({

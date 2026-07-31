@@ -13,6 +13,7 @@ import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExp
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, saveArchiveRecord, fetchArchiveRecordById } from './services/api';
+import { logUserActivity } from './services/apiLogs';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -223,6 +224,15 @@ function App() {
 
       if (currentUser) {
           syncBlockingRecords();
+      }
+  }, [currentUser]);
+
+  // Tự động kiểm tra và thực hiện Sao lưu định kỳ (Auto Backup) nếu đến hạn
+  useEffect(() => {
+      if (currentUser) {
+          import('./services/backupService').then(({ checkAndRunAutoBackup }) => {
+              checkAndRunAutoBackup(currentUser.name);
+          });
       }
   }, [currentUser]);
 
@@ -578,6 +588,14 @@ function App() {
       }
 
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
+      logUserActivity({
+          action: 'RETURN',
+          targetType: 'RECORD',
+          targetId: returnRecord.id,
+          targetCode: returnRecord.code,
+          details: `Xác nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName} (Số biên lai: ${receiptNumber || 'N/A'})`,
+          user: currentUser
+      });
       setReturnRecord(null);
   }, [returnRecord, currentUser]);
 
@@ -927,6 +945,13 @@ function App() {
 
   const handleLogin = (user: User) => {
       setCurrentUser(user);
+      logUserActivity({
+          action: 'LOGIN',
+          targetType: 'USER',
+          targetId: user.username,
+          details: `Người dùng ${user.name} (${user.username}) đăng nhập hệ thống`,
+          user: user
+      });
       if (user.role === UserRole.EMPLOYEE) {
           const emp = employees.find(e => e.id === user.employeeId);
           const dept = (emp?.department || '').trim().toLowerCase();

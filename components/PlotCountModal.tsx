@@ -36,7 +36,7 @@ export const PlotCountModal: React.FC<PlotCountModalProps> = ({
     onConfirm(plotCount);
   };
 
-  const isOther = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa'].includes(record.recordType || '');
+  const isOther = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(record.recordType || '');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">

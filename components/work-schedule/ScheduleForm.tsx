@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { WorkSchedule, User } from '../../types';
-import { Calendar, User as UserIcon, FileText, Building, Save, X, Plus, Check } from 'lucide-react';
+import { Calendar, User as UserIcon, FileText, Building, Save, X, Plus, Check, MapPin } from 'lucide-react';
 
 interface ScheduleFormProps {
     initialData?: WorkSchedule | null;
@@ -15,7 +15,8 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
         date: new Date().toISOString().split('T')[0],
         executors: currentUser.name,
         content: '',
-        partner: ''
+        partner: '',
+        location: ''
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -26,14 +27,18 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
 
     useEffect(() => {
         if (initialData) {
-            setFormData(initialData);
+            setFormData({
+                ...initialData,
+                location: initialData.location || ''
+            });
         } else {
             // Reset khi tạo mới
             setFormData({
                 date: new Date().toISOString().split('T')[0],
                 executors: currentUser.name,
                 content: '',
-                partner: ''
+                partner: '',
+                location: ''
             });
         }
     }, [initialData, currentUser]);
@@ -52,6 +57,11 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
             return;
         }
 
+        if (!formData.location || !formData.location.trim()) {
+            alert('Vui lòng chọn Địa bàn công tác (Minh Hưng, Chơn Thành, Nha Bích) trước khi lưu lịch.');
+            return;
+        }
+
         setIsSaving(true);
         const success = await onSave({
             ...formData,
@@ -61,6 +71,17 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
         
         if (!success) {
             alert('Lỗi khi lưu lịch công tác.');
+        } else {
+            // Reset form sau khi lưu thành công
+            setFormData({
+                date: new Date().toISOString().split('T')[0],
+                executors: currentUser.name,
+                content: '',
+                partner: '',
+                location: ''
+            });
+            setTempPersonName('');
+            setIsAddingPerson(false);
         }
     };
 
@@ -163,6 +184,29 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
                                 <Plus size={14} /> Thêm người
                             </button>
                         )}
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                            <MapPin size={13} className="text-purple-600" />
+                            Địa bàn công tác <span className="text-red-500">*</span>
+                        </span>
+                        <span className="text-[10px] text-purple-600 font-bold lowercase bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">bắt buộc</span>
+                    </label>
+                    <div className="relative">
+                        <MapPin size={16} className="absolute left-3 top-3 text-purple-500" />
+                        <select 
+                            className="w-full pl-9 pr-3 py-2 border border-purple-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none font-bold text-purple-950 bg-purple-50/30"
+                            value={formData.location || ''}
+                            onChange={e => setFormData({...formData, location: e.target.value})}
+                        >
+                            <option value="">-- Chọn địa bàn --</option>
+                            <option value="Minh Hưng">Phường Minh Hưng</option>
+                            <option value="Chơn Thành">Phường Chơn Thành</option>
+                            <option value="Nha Bích">Xã Nha Bích</option>
+                        </select>
                     </div>
                 </div>
 

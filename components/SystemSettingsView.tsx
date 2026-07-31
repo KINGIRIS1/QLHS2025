@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu, HardDrive } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
 import { confirmAction, showToast } from '../utils/appHelpers';
 import { supabase, presenceChannel } from '../services/supabaseClient';
 import { ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
+import SystemBackupView from './SystemBackupView';
 
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
@@ -17,7 +18,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onDeleteAllData,
   onHolidaysChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'devices' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'devices' | 'backup' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
@@ -347,6 +348,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <Cpu size={16} /> Thiết bị đo
             </button>
             <button 
+                onClick={() => setActiveTab('backup')}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'backup' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+                <HardDrive size={16} /> Sao lưu & Khôi phục
+            </button>
+            <button 
                 onClick={() => setActiveTab('data')}
                 className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
@@ -456,7 +463,27 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5 pt-2">
                                     <span className="w-1.5 h-3 bg-blue-500 rounded-full"></span> Loại hồ sơ đặc thù (Được ưu tiên hiển thị trước)
                                 </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Hồ sơ Thẩm định Trích đo</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại cho hồ sơ Thẩm định..."
+                                            value={contactSettings.type_thamdinh || ''}
+                                            onChange={e => setContactSettings({...contactSettings, type_thamdinh: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-100/50">
+                                        <label className="block text-xs font-bold text-slate-600 mb-2">Hồ sơ Hiến đất</label>
+                                        <textarea 
+                                            rows={2}
+                                            className="w-full border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                                            placeholder="Tên người phụ trách & Số điện thoại cho hồ sơ Hiến đất..."
+                                            value={contactSettings.type_hiendat || ''}
+                                            onChange={e => setContactSettings({...contactSettings, type_hiendat: e.target.value})}
+                                        />
+                                    </div>
                                     <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-100/50">
                                         <label className="block text-xs font-bold text-slate-600 mb-2">Hồ sơ Sao lục</label>
                                         <textarea 
@@ -764,6 +791,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {activeTab === 'backup' && (
+                <SystemBackupView />
             )}
 
             {activeTab === 'data' && (

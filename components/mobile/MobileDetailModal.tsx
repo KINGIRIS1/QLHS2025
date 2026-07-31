@@ -176,7 +176,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     
     let standardDays = "30"; 
     const type = (record.recordType || '').toLowerCase();
-    if (type.includes('thuế chính quy')) standardDays = "15";
+    const isHienDat = type.includes('hiến đất') || type.includes('hien dat');
+    const isThamDinh = type.includes('thẩm định') || type.includes('tham dinh');
+    if (isHienDat) standardDays = "8";
+    else if (isThamDinh) standardDays = "30";
+    else if (type.includes('thuế chính quy')) standardDays = "15";
     else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) standardDays = "10";
     else if (type.includes('trích đo chỉnh lý')) standardDays = "15"; 
     else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) standardDays = "30";
@@ -263,8 +267,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         USER: val(currentUser?.name),
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: val(record.recordType), 
-        RECORD_TYPE: val(record.recordType),
+        LOAI_HS: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(record.recordType), 
+        RECORD_TYPE: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(record.recordType),
         GIAY_TO_KHAC: val(record.otherDocs),
         NGUOI_UY_QUYEN: val(record.authorizedBy).toUpperCase(),
         UY_QUYEN: val(record.authorizedBy).toUpperCase(),

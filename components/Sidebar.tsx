@@ -113,6 +113,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       onClick: () => handleMenuClick('user_management'),
       active: currentView === 'user_management'
     }] : []),
+    ...(isAdmin ? [{
+      label: 'Phân quyền',
+      icon: ShieldCheck,
+      onClick: () => handleMenuClick('permission_management'),
+      active: currentView === 'permission_management'
+    }] : []),
     {
       label: 'Nhân sự',
       icon: UserCog,
@@ -127,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     }] : [])
   ];
 
-  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management' || currentView === 'system_settings';
+  const isSettingsActive = currentView === 'user_management' || currentView === 'employee_management' || currentView === 'system_settings' || currentView === 'permission_management';
 
   return (
     <>

@@ -63,8 +63,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             
             <div className="relative z-10">
                 <div className="mb-8">
-                    <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-500/20 ring-1 ring-blue-400/30 w-fit">
-                        <ShieldCheck size={32} className="text-white" />
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 bg-transparent ring-2 ring-white/20 shadow-lg overflow-hidden">
+                        <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
                     </div>
                 </div>
                 
@@ -187,7 +187,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl transition-all font-bold text-base shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 active:scale-[0.98] mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {isLoading ? (
-                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <span className="flex items-center gap-2">
+                                <img src="./logo.png" alt="Logo" className="w-5 h-5 object-contain animate-spin shrink-0" />
+                                <span>Đang đăng nhập hệ thống...</span>
+                            </span>
                         ) : (
                             <>
                                 <LogIn size={20} />

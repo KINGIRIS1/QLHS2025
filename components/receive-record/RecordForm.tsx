@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
 import { RECORD_TYPES } from '../../constants';
-import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map } from 'lucide-react';
+import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, AlertTriangle } from 'lucide-react';
 
 interface RecordFormProps {
   onSave: (record: RecordFile) => Promise<boolean>;
@@ -26,7 +26,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const [formData, setFormData] = useState<Partial<RecordFile>>({
     code: '', customerName: '', phoneNumber: '', cccd: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '',
     receivedDate: new Date().toISOString().split('T')[0], deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0,
-    address: '', recordType: '', status: RecordStatus.RECEIVED 
+    address: '', recordType: '', status: RecordStatus.RECEIVED, isPriority: false, priorityNote: ''
   });
 
   useEffect(() => {
@@ -99,7 +99,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   };
 
   const handleReset = (keepNotification = false) => {
-      setFormData({ code: '', customerName: '', phoneNumber: '', cccd: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '', receivedDate: new Date().toISOString().split('T')[0], deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0, address: '', recordType: '', status: RecordStatus.RECEIVED });
+      setFormData({ code: '', customerName: '', phoneNumber: '', cccd: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '', receivedDate: new Date().toISOString().split('T')[0], deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0, address: '', recordType: '', status: RecordStatus.RECEIVED, isPriority: false, priorityNote: '' });
       if (!keepNotification) setNotification(null);
       if (onCancelEdit && initialData) onCancelEdit();
   };
@@ -184,6 +184,33 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <div className="relative"><label className={labelClass}>Loại hồ sơ <span className="text-red-500">*</span></label><BookOpen size={16} className={iconWrapperClass} /><select className={`${inputClass} appearance-none bg-white cursor-pointer`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}><option value="">-- Chọn loại hồ sơ --</option>{RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                         <div className="relative"><label className={labelClass}>Nội dung chi tiết</label><textarea rows={6} className="w-full p-4 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white resize-none" value={formData.content || ''} onChange={(e) => handleChange('content', e.target.value)} placeholder="Nhập ghi chú..." /></div>
                         <div className="relative"><label className={labelClass}>Giấy tờ kèm theo</label><Map size={16} className={iconWrapperClass} /><input type="text" className={inputClass} value={formData.otherDocs || ''} onChange={(e) => handleChange('otherDocs', e.target.value)} placeholder="Sổ đỏ, CMND..." /></div>
+                        
+                        {/* HỒ SƠ CHÚ Ý / CẦN BÁO CÁO GẤP */}
+                        <div className={`p-4 rounded-xl border transition-all ${formData.isPriority ? 'bg-red-50/80 border-red-300 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-xs uppercase text-slate-800">
+                                <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500" 
+                                    checked={!!formData.isPriority} 
+                                    onChange={(e) => handleChange('isPriority', e.target.checked)} 
+                                />
+                                <span className="flex items-center gap-1.5 text-amber-700">
+                                    <AlertTriangle size={16} className="text-amber-500 fill-yellow-400" /> Hồ sơ cần chú ý / Báo cáo ngay khi ký
+                                </span>
+                            </label>
+                            {formData.isPriority && (
+                                <div className="mt-2.5 space-y-1.5 animate-fade-in">
+                                    <label className="block text-[10px] font-bold text-red-700 uppercase">Ghi chú lý do chú ý (Hồ sơ khiếu nại cần xử lý ngay...)</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full text-xs p-2 bg-white border border-red-200 rounded-lg outline-none focus:ring-2 focus:ring-red-400 font-medium text-slate-800" 
+                                        placeholder="Ví dụ: Hồ sơ khiếu nại cần xử lý ngay..." 
+                                        value={formData.priorityNote || ''} 
+                                        onChange={(e) => handleChange('priorityNote', e.target.value)} 
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="mt-6 pt-6 border-t border-slate-100 grid grid-cols-2 gap-3">
                         <button type="submit" disabled={loading} className="col-span-2 flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg font-bold transition-all active:scale-95 disabled:opacity-70"><Save size={20} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU HỒ SƠ')}</button>

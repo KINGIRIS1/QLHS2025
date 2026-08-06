@@ -96,8 +96,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             <header className="h-14 bg-[#1e3a8a] text-white flex items-center justify-between px-4 shadow-md z-50 shrink-0 border-b border-blue-800">
                 {/* LEFT: BRAND */}
                 <div className="flex items-center gap-3">
-                    <div className="bg-white/10 p-1.5 rounded-lg">
-                        <ShieldCheck size={24} className="text-white" />
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-transparent ring-1 ring-white/20 shadow-sm overflow-hidden">
+                        <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
                     </div>
                     <div className="flex flex-col items-center text-center leading-tight">
                         <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và quản lý hồ sơ</h1>

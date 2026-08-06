@@ -185,7 +185,10 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
 
           {loading && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
-              <Loader2 className="animate-spin text-blue-600 mb-2" size={40} />
+              <div className="relative w-16 h-16 flex items-center justify-center mb-2">
+                <img src="./logo.png" alt="Logo" className="w-10 h-10 object-contain animate-pulse" />
+                <Loader2 className="animate-spin text-blue-600 absolute inset-0" size={64} />
+              </div>
               <p className="text-gray-500 font-medium">Đang tạo bản xem trước...</p>
             </div>
           )}

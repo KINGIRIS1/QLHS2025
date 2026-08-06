@@ -8,7 +8,7 @@ const RECORD_DB_COLUMNS = [
     'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'deadline', 
     'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 
     'notes', 'privateNotes', 'personalNotes', 
-    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 
+    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'receivingWard',
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt',
     'receiptNumber', 'resultReturnedDate', 'receiverName',
@@ -20,10 +20,12 @@ const RECORD_DB_COLUMNS = [
     'forwardFrom',
     'forwardDate',
     'forwardNotes',
-    'forwardHistory'
+    'forwardHistory',
+    'isPriority',
+    'priorityNote'
 ];
 
-// Helper functions to serialize and deserialize workCompletedDate and extendedDeadline inside privateNotes securely
+// Helper functions to serialize and deserialize workCompletedDate, extendedDeadline, receivingWard, isPriority inside privateNotes securely
 export const packRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
     let notes = copy.privateNotes || '';
@@ -31,9 +33,24 @@ export const packRecord = (record: RecordFile): RecordFile => {
     // Xoá các tag cũ để chèn lại chuẩn xác
     notes = notes.replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '').trim();
     notes = notes.replace(/\[EXT_DL:\d{4}-\d{2}-\d{2}\]/g, '').trim();
+    notes = notes.replace(/\[REC_WARD:[^\]]+\]/g, '').trim();
+    notes = notes.replace(/\[PRIO:(true|false)\]/g, '').trim();
+    notes = notes.replace(/\[PRIO_NOTE:[^\]]*\]/g, '').trim();
     
     if (copy.extendedDeadline) {
         notes = `${notes} [EXT_DL:${copy.extendedDeadline}]`.trim();
+    }
+    if (copy.receivingWard) {
+        notes = `${notes} [REC_WARD:${copy.receivingWard}]`.trim();
+    }
+    if (copy.isPriority) {
+        notes = `${notes} [PRIO:true]`.trim();
+    } else {
+        notes = `${notes} [PRIO:false]`.trim();
+    }
+    if (copy.priorityNote) {
+        const safeNote = encodeURIComponent(copy.priorityNote);
+        notes = `${notes} [PRIO_NOTE:${safeNote}]`.trim();
     }
     
     copy.privateNotes = notes === '' ? null : notes;
@@ -43,8 +60,32 @@ export const packRecord = (record: RecordFile): RecordFile => {
 export const unpackRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
     copy.extendedDeadline = null;
+    copy.isPriority = !!record.isPriority;
+    copy.priorityNote = record.priorityNote || null;
     
     if (copy.privateNotes) {
+        // Parse PRIO
+        const prioMatch = copy.privateNotes.match(/\[PRIO:(true|false)\]/);
+        if (prioMatch) {
+            copy.isPriority = prioMatch[1] === 'true';
+        }
+
+        // Parse PRIO_NOTE
+        const noteMatch = copy.privateNotes.match(/\[PRIO_NOTE:([^\]]*)\]/);
+        if (noteMatch) {
+            try {
+                copy.priorityNote = decodeURIComponent(noteMatch[1]);
+            } catch (e) {
+                copy.priorityNote = noteMatch[1];
+            }
+        }
+
+        // Parse REC_WARD
+        const recMatch = copy.privateNotes.match(/\[REC_WARD:([^\]]+)\]/);
+        if (recMatch) {
+            copy.receivingWard = recMatch[1];
+        }
+
         // Parse EXT_DL
         const extMatch = copy.privateNotes.match(/\[EXT_DL:(\d{4}-\d{2}-\d{2})\]/);
         if (extMatch) {
@@ -63,6 +104,9 @@ export const unpackRecord = (record: RecordFile): RecordFile => {
         const cleanedNotes = copy.privateNotes
             .replace(/\[WCD:\d{4}-\d{2}-\d{2}\]/g, '')
             .replace(/\[EXT_DL:\d{4}-\d{2}-\d{2}\]/g, '')
+            .replace(/\[REC_WARD:[^\]]+\]/g, '')
+            .replace(/\[PRIO:(true|false)\]/g, '')
+            .replace(/\[PRIO_NOTE:[^\]]*\]/g, '')
             .trim();
             
         copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
@@ -186,75 +230,76 @@ export const fetchRecords = async (forceUpdate: boolean = false): Promise<Record
   }
 };
 
+const extractMissingColumn = (error: any): string | null => {
+    if (!error) return null;
+    const msg = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+    const match1 = msg.match(/Could not find the '([^']+)' column/i);
+    if (match1) return match1[1];
+    const match2 = msg.match(/column ["']?([a-zA-Z0-9_]+)["']? (?:of relation|does not exist)/i);
+    if (match2) return match2[1];
+    return null;
+};
+
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
     if (!isConfigured) return { ...record, createdBy: record.createdBy || null };
     try {
         const packed = packRecord(record);
-        const payload = sanitizeData(packed, RECORD_DB_COLUMNS);
-        const { data, error } = await supabase.from('records').insert([payload]).select();
-        
-        if (error) {
-            const errCode = (error as any).code;
-            const errMsg = String((error as any).message || '');
-            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate') || errMsg.includes('forwardPendingTo') || errMsg.includes('forwardFrom') || errMsg.includes('forwardDate') || errMsg.includes('forwardNotes') || errMsg.includes('forwardHistory')) {
-                console.warn("⚠️ [Database out of sync] Thử lại createRecordApi loại bỏ cột lỗi...");
-                let fallbackColumns = RECORD_DB_COLUMNS.slice();
-                if (errCode === '42703') {
-                    fallbackColumns = fallbackColumns.filter(col => !errMsg.includes(col));
-                }
-                if (errCode === '42703' || errMsg.includes('createdBy')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'createdBy');
-                }
-                if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
-                }
-                if (errMsg.includes('workCompletedDate')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'workCompletedDate');
-                }
-                if (errMsg.includes('forwardPendingTo')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardPendingTo');
-                }
-                if (errMsg.includes('forwardFrom')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardFrom');
-                }
-                if (errMsg.includes('forwardDate')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardDate');
-                }
-                if (errMsg.includes('forwardNotes')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardNotes');
-                }
-                if (errMsg.includes('forwardHistory')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardHistory');
-                }
-                const fallbackPayload = sanitizeData(packed, fallbackColumns);
-                const { data: fbData, error: fbError } = await supabase.from('records').insert([fallbackPayload]).select();
-                
-                if (fbError) {
-                    // Thử an toàn hoàn toàn bằng cách loại bỏ cả plotCount lẫn createdBy
-                    const safeColumns = RECORD_DB_COLUMNS.filter(col => col !== 'plotCount' && col !== 'createdBy');
-                    const safePayload = sanitizeData(packed, safeColumns);
-                    const { data: safeData, error: safeError } = await supabase.from('records').insert([safePayload]).select();
-                    if (safeError) throw safeError;
-                    if (safeData?.[0]) {
-                        const unpacked = unpackRecord(safeData[0] as RecordFile);
-                        if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
-                        return unpacked;
+        let activeColumns = [...RECORD_DB_COLUMNS];
+        let attempts = 0;
+        let lastError: any = null;
+
+        while (attempts < 10) {
+            attempts++;
+            const payload = sanitizeData(packed, activeColumns);
+            const { data, error } = await supabase.from('records').insert([payload]).select();
+
+            if (!error && data?.[0]) {
+                const unpacked = unpackRecord(data[0] as RecordFile);
+                if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
+                return unpacked;
+            }
+
+            if (error) {
+                lastError = error;
+                const errCode = (error as any).code;
+                const errMsg = String((error as any).message || '');
+                const errDetails = String((error as any).details || '');
+
+                if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('column') || errDetails.includes('column')) {
+                    const missingCol = extractMissingColumn(error);
+                    if (missingCol && activeColumns.includes(missingCol)) {
+                        console.warn(`⚠️ [Database out of sync] Thử lại createRecordApi loại bỏ cột '${missingCol}'...`);
+                        activeColumns = activeColumns.filter(c => c !== missingCol);
+                        continue;
+                    }
+
+                    const suspectCols = [
+                        'workCompletedDate', 'forwardPendingTo', 'forwardFrom', 'forwardDate', 
+                        'forwardNotes', 'forwardHistory', 'createdBy', 'plotCount', 'needsMapCorrection',
+                        'receiverName', 'personalNotes', 'reminderDate', 'lastRemindedAt', 'receiptNumber',
+                        'resultReturnedDate', 'receivingWard', 'authorizedBy', 'authDocType', 'otherDocs'
+                    ];
+                    const found = suspectCols.find(c => activeColumns.includes(c) && (errMsg.includes(c) || errDetails.includes(c)));
+                    if (found) {
+                        console.warn(`⚠️ [Database out of sync] Loại bỏ cột nghi ngờ '${found}'...`);
+                        activeColumns = activeColumns.filter(c => c !== found);
+                        continue;
+                    }
+
+                    const remainingSuspects = suspectCols.filter(c => activeColumns.includes(c));
+                    if (remainingSuspects.length > 0) {
+                        const toRemove = remainingSuspects[remainingSuspects.length - 1];
+                        console.warn(`⚠️ [Database out of sync] Fallback loại bỏ cột '${toRemove}'...`);
+                        activeColumns = activeColumns.filter(c => c !== toRemove);
+                        continue;
                     }
                 }
-                if (fbData?.[0]) {
-                    const unpacked = unpackRecord(fbData[0] as RecordFile);
-                    if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
-                    return unpacked;
-                }
+
+                break;
             }
-            throw error;
         }
-        
-        if (data?.[0]) {
-            const unpacked = unpackRecord(data[0] as RecordFile);
-            if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
-            return unpacked;
-        }
+
+        if (lastError) throw lastError;
         return null;
     } catch (error) {
         logError("createRecordApi", error);
@@ -266,79 +311,66 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
     if (!isConfigured) return record;
     try {
         const packed = packRecord(record);
-        const payload = sanitizeData(packed, RECORD_DB_COLUMNS);
-        const { data, error } = await supabase.from('records').update(payload).eq('id', record.id).select();
-        
-        if (error) {
-            const errCode = (error as any).code;
-            const errMsg = String((error as any).message || '');
-            if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('createdBy') || errMsg.includes('plotCount') || errMsg.includes('workCompletedDate') || errMsg.includes('forwardPendingTo') || errMsg.includes('forwardFrom') || errMsg.includes('forwardDate') || errMsg.includes('forwardNotes') || errMsg.includes('forwardHistory')) {
-                console.warn("⚠️ [Database out of sync] Thử lại updateRecordApi loại bỏ cột lỗi...");
-                let fallbackColumns = RECORD_DB_COLUMNS.slice();
-                if (errCode === '42703') {
-                    fallbackColumns = fallbackColumns.filter(col => !errMsg.includes(col));
+        let activeColumns = [...RECORD_DB_COLUMNS];
+        let attempts = 0;
+        let lastError: any = null;
+
+        while (attempts < 10) {
+            attempts++;
+            const payload = sanitizeData(packed, activeColumns);
+            const { data, error } = await supabase.from('records').update(payload).eq('id', record.id).select();
+
+            if (!error && data?.[0]) {
+                const unpacked = unpackRecord(data[0] as RecordFile);
+                if (IS_CACHED_RECORDS_LOADED) {
+                    const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
+                    if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
+                    else CACHED_RECORDS.unshift(unpacked);
                 }
-                if (errCode === '42703' || errMsg.includes('createdBy')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'createdBy');
-                }
-                if (errCode === 'PGRST204' || errMsg.includes('plotCount')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'plotCount');
-                }
-                if (errMsg.includes('workCompletedDate')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'workCompletedDate');
-                }
-                if (errMsg.includes('forwardPendingTo')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardPendingTo');
-                }
-                if (errMsg.includes('forwardFrom')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardFrom');
-                }
-                if (errMsg.includes('forwardDate')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardDate');
-                }
-                if (errMsg.includes('forwardNotes')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardNotes');
-                }
-                if (errMsg.includes('forwardHistory')) {
-                    fallbackColumns = fallbackColumns.filter(col => col !== 'forwardHistory');
-                }
-                const fallbackPayload = sanitizeData(packed, fallbackColumns);
-                const { data: fbData, error: fbError } = await supabase.from('records').update(fallbackPayload).eq('id', record.id).select();
-                
-                if (fbError) {
-                    const safeColumns = RECORD_DB_COLUMNS.filter(col => col !== 'plotCount' && col !== 'createdBy');
-                    const safePayload = sanitizeData(packed, safeColumns);
-                    const { data: safeData, error: safeError } = await supabase.from('records').update(safePayload).eq('id', record.id).select();
-                    if (safeError) throw safeError;
-                    if (safeData?.[0]) {
-                        const unpacked = unpackRecord(safeData[0] as RecordFile);
-                        if (IS_CACHED_RECORDS_LOADED) {
-                            const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
-                            if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
-                        }
-                        return unpacked;
+                return unpacked;
+            }
+
+            if (error) {
+                lastError = error;
+                const errCode = (error as any).code;
+                const errMsg = String((error as any).message || '');
+                const errDetails = String((error as any).details || '');
+
+                if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('column') || errDetails.includes('column')) {
+                    const missingCol = extractMissingColumn(error);
+                    if (missingCol && activeColumns.includes(missingCol)) {
+                        console.warn(`⚠️ [Database out of sync] Thử lại updateRecordApi loại bỏ cột '${missingCol}'...`);
+                        activeColumns = activeColumns.filter(c => c !== missingCol);
+                        continue;
+                    }
+
+                    const suspectCols = [
+                        'workCompletedDate', 'forwardPendingTo', 'forwardFrom', 'forwardDate', 
+                        'forwardNotes', 'forwardHistory', 'createdBy', 'plotCount', 'needsMapCorrection',
+                        'receiverName', 'personalNotes', 'reminderDate', 'lastRemindedAt', 'receiptNumber',
+                        'resultReturnedDate', 'receivingWard', 'authorizedBy', 'authDocType', 'otherDocs'
+                    ];
+                    const found = suspectCols.find(c => activeColumns.includes(c) && (errMsg.includes(c) || errDetails.includes(c)));
+                    if (found) {
+                        console.warn(`⚠️ [Database out of sync] Loại bỏ cột nghi ngờ '${found}'...`);
+                        activeColumns = activeColumns.filter(c => c !== found);
+                        continue;
+                    }
+
+                    const remainingSuspects = suspectCols.filter(c => activeColumns.includes(c));
+                    if (remainingSuspects.length > 0) {
+                        const toRemove = remainingSuspects[remainingSuspects.length - 1];
+                        console.warn(`⚠️ [Database out of sync] Fallback loại bỏ cột '${toRemove}'...`);
+                        activeColumns = activeColumns.filter(c => c !== toRemove);
+                        continue;
                     }
                 }
-                if (fbData?.[0]) {
-                    const unpacked = unpackRecord(fbData[0] as RecordFile);
-                    if (IS_CACHED_RECORDS_LOADED) {
-                        const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
-                        if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
-                    }
-                    return unpacked;
-                }
+
+                break;
             }
-            throw error;
         }
-        
-        if (data?.[0]) {
-            const unpacked = unpackRecord(data[0] as RecordFile);
-            if (IS_CACHED_RECORDS_LOADED) {
-                const idx = CACHED_RECORDS.findIndex(r => r.id === unpacked.id);
-                if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
-            }
-            return unpacked;
-        }
+
+        if (lastError) throw lastError;
         return null;
     } catch (error) {
         logError("updateRecordApi", error);

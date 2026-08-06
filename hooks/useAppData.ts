@@ -10,6 +10,7 @@ import {
 import { saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
 import { logUserActivity } from '../services/apiLogs';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
+import { triggerPrioritySignedAlert } from '../utils/appHelpers';
 
 export const useAppData = (currentUser: User | null) => {
     const [records, setRecords] = useState<RecordFile[]>([]);
@@ -148,22 +149,50 @@ export const useAppData = (currentUser: User | null) => {
 
     // --- Record Handlers ---
     const handleAddOrUpdateRecord = async (recordData: any) => {
-        const isSaoLuc = recordData.recordType === 'Sao lục hồ sơ';
-        const isEdit = recordData.id && records.find(r => r.id === recordData.id);
+        const isSaoLuc = recordData.recordType === 'Sao lục hồ sơ' || recordData.recordType === 'Sao lục' || recordData._archiveType === 'saoluc';
+        const isEdit = recordData.id && (records.some(r => r.id === recordData.id) || recordData._isArchive);
 
         if (isSaoLuc) {
             const saoLucData = {
-                so_hieu: recordData.code,
-                chu_su_dung: recordData.customerName,
-                xa_phuong: recordData.ward,
-                to_ban_do: recordData.mapSheet,
-                thua_dat: recordData.landPlot,
-                ngay_nhan: recordData.receivedDate,
-                hen_tra: recordData.deadline,
-                noi_dung: recordData.content,
+                so_hieu: recordData.code || '',
+                chu_su_dung: recordData.customerName || '',
+                ten_chu_su_dung: recordData.customerName || '',
+                xa_phuong: recordData.ward || '',
+                dia_danh: recordData.ward || '',
+                to_ban_do: recordData.mapSheet || '',
+                so_to: recordData.mapSheet || '',
+                thua_dat: recordData.landPlot || '',
+                so_thua: recordData.landPlot || '',
+                dien_tich: recordData.area || 0,
+                tong_dien_tich: recordData.area || 0,
+                area: recordData.area || 0,
+                ngay_nhan: recordData.receivedDate || '',
+                hen_tra: recordData.deadline || '',
+                noi_dung: recordData.content || '',
+                trich_yeu: recordData.content || '',
+                
+                // Bổ sung đầy đủ các trường nhập từ Tiếp Nhận
+                so_dien_thoai: recordData.phoneNumber || '',
+                so_dt: recordData.phoneNumber || '',
+                phoneNumber: recordData.phoneNumber || '',
+                cccd: recordData.cccd || '',
+                nguoi_uy_quyen: recordData.authorizedBy || '',
+                authorizedBy: recordData.authorizedBy || '',
+                loai_uy_quyen: recordData.authDocType || '',
+                authDocType: recordData.authDocType || '',
+                giay_to_kem_theo: recordData.otherDocs || '',
+                otherDocs: recordData.otherDocs || '',
+                dia_chi: recordData.address || '',
+                address: recordData.address || '',
+                notes: recordData.notes || '',
+                privateNotes: recordData.privateNotes || '',
+                loai_ho_so: recordData.recordType || 'Sao lục hồ sơ',
+                nguoi_tiep_nhan: recordData.createdBy || (currentUser?.name || ''),
+                createdBy: recordData.createdBy || (currentUser?.name || ''),
+                
                 status: 'draft',
-                ngay_hoan_thanh: '',
-                danh_sach: ''
+                ngay_hoan_thanh: recordData.exportDate || recordData.workCompletedDate || '',
+                danh_sach: recordData.exportBatch || ''
             };
 
             if (!isEdit) {
@@ -171,9 +200,9 @@ export const useAppData = (currentUser: User | null) => {
                     type: 'saoluc' as 'saoluc',
                     status: 'draft' as any,
                     so_hieu: recordData.code,
-                    trich_yeu: recordData.content,
-                    ngay_thang: recordData.receivedDate,
-                    noi_nhan_gui: recordData.customerName,
+                    trich_yeu: recordData.content || '',
+                    ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
+                    noi_nhan_gui: recordData.customerName || '',
                     data: saoLucData,
                     created_by: recordData.createdBy || (currentUser?.name || ''),
                     created_at: new Date().toISOString()
@@ -184,7 +213,7 @@ export const useAppData = (currentUser: User | null) => {
                 }
             } else {
                 try {
-                    const existingArchive = await findArchiveRecordBySoHieu('saoluc', recordData.code);
+                    let existingArchive = await findArchiveRecordBySoHieu('saoluc', recordData.code);
                     if (existingArchive) {
                         const archId = existingArchive.id;
                         const archData = existingArchive.data || {};
@@ -193,11 +222,35 @@ export const useAppData = (currentUser: User | null) => {
                             type: 'saoluc' as 'saoluc',
                             status: existingArchive.status || 'draft',
                             so_hieu: recordData.code,
-                            trich_yeu: recordData.content,
-                            ngay_thang: recordData.receivedDate,
-                            noi_nhan_gui: recordData.customerName,
+                            trich_yeu: recordData.content || existingArchive.trich_yeu || '',
+                            ngay_thang: recordData.receivedDate || existingArchive.ngay_thang || '',
+                            noi_nhan_gui: recordData.customerName || existingArchive.noi_nhan_gui || '',
                             data: { ...archData, ...saoLucData },
                         });
+                    } else if (recordData._isArchive && recordData.id) {
+                        await saveArchiveRecord({
+                            id: recordData.id,
+                            type: 'saoluc' as 'saoluc',
+                            status: recordData.status || 'draft',
+                            so_hieu: recordData.code,
+                            trich_yeu: recordData.content || '',
+                            ngay_thang: recordData.receivedDate || '',
+                            noi_nhan_gui: recordData.customerName || '',
+                            data: saoLucData,
+                        });
+                    } else {
+                        const arToSave = {
+                            type: 'saoluc' as 'saoluc',
+                            status: 'draft' as any,
+                            so_hieu: recordData.code,
+                            trich_yeu: recordData.content || '',
+                            ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
+                            noi_nhan_gui: recordData.customerName || '',
+                            data: saoLucData,
+                            created_by: recordData.createdBy || (currentUser?.name || ''),
+                            created_at: new Date().toISOString()
+                        };
+                        await saveArchiveRecord(arToSave);
                     }
                 } catch (e) {
                     console.error("Lỗi cập nhật archive_record khi edit:", e);
@@ -212,6 +265,7 @@ export const useAppData = (currentUser: User | null) => {
             const updated = await updateRecordApi(recordData);
             if (updated) {
                 setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+                triggerPrioritySignedAlert(updated, updated.status);
                 logUserActivity({
                     action: 'UPDATE',
                     targetType: 'RECORD',
@@ -228,6 +282,7 @@ export const useAppData = (currentUser: User | null) => {
             const newRecord = await createRecordApi({ ...recordData, id: Math.random().toString(36).substr(2, 9) });
             if (newRecord) {
                 setRecords(prev => [newRecord, ...prev]);
+                triggerPrioritySignedAlert(newRecord, newRecord.status);
                 logUserActivity({
                     action: 'CREATE',
                     targetType: 'RECORD',

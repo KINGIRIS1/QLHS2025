@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, CheckCircle } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
@@ -486,6 +486,19 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6">
+            {record.isPriority && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-red-600 via-amber-600 to-red-600 text-white rounded-2xl shadow-md border-2 border-red-500 flex items-start gap-3">
+                    <AlertTriangle size={24} className="shrink-0 text-yellow-300 mt-0.5 animate-bounce" />
+                    <div className="flex-1">
+                        <h4 className="font-black text-sm uppercase tracking-wide text-white flex items-center gap-2">
+                            <AlertTriangle size={20} className="text-yellow-300 fill-yellow-400 shrink-0" /> HỒ SƠ CẦN CHÚ Ý / CẦN BÁO CÁO NGAY KHI KÝ DUYỆT
+                        </h4>
+                        <p className="text-xs text-red-50 font-semibold mt-1">
+                            {record.priorityNote || 'Hồ sơ này đã được đánh dấu CẦN CHÚ Ý. Khi ký duyệt xong, vui lòng báo ngay cho Lãnh đạo / Tổ trưởng hoặc bộ phận 1 Cửa.'}
+                        </p>
+                    </div>
+                </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* COLUMN 1: THÔNG TIN CHUNG */}

@@ -749,7 +749,10 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
       <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading && records.length === 0 ? (
            <div className="flex flex-col justify-center items-center flex-1 py-12">
-             <Loader2 size={36} className="animate-spin text-blue-600 mb-3" />
+             <div className="relative w-16 h-16 flex items-center justify-center mb-3">
+               <img src="./logo.png" alt="Logo" className="w-10 h-10 object-contain animate-pulse" />
+               <Loader2 size={60} className="animate-spin text-blue-600 absolute inset-0" />
+             </div>
              <p className="text-sm text-gray-500 font-medium">Đang tải dữ liệu hồ sơ ngăn chặn...</p>
            </div>
         ) : filteredRecords.length === 0 ? (

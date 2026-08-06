@@ -7,6 +7,15 @@ import fs from 'fs';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { 
+  handleGetAuthUrl, 
+  handleOAuthCallback, 
+  handleGetStatus, 
+  handleDisconnect, 
+  handleUploadBackup, 
+  handleListDriveFiles, 
+  performAutoGoogleDriveBackup 
+} from './server/googleDrive';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +86,11 @@ try {
             fs.unlinkSync(fileToDelete);
             console.log(`[DON DEP] Da xoa ban sao luu cu: ${fileToDelete}`);
         }
+
+        // Tu dong đay len Google Drive neu da ket noi
+        performAutoGoogleDriveBackup().catch(err => {
+            console.error("[GOOGLE DRIVE] Loi khi tu dong backup khoi dong:", err);
+        });
     }
 } catch (err) {
     console.error("[LOI] Khong the sao luu du lieu tu dong:", err);
@@ -111,6 +125,15 @@ server.use((req: Request, res: Response, next: NextFunction) => {
     }
     next();
 });
+
+// Google Drive & OAuth Routes
+server.get('/api/oauth/google/auth-url', handleGetAuthUrl);
+server.get('/api/oauth/google/callback', handleOAuthCallback);
+server.get('/api/oauth/google/status', handleGetStatus);
+server.post('/api/oauth/google/disconnect', handleDisconnect);
+
+server.post('/api/backup/google-drive/upload', handleUploadBackup);
+server.get('/api/backup/google-drive/files', handleListDriveFiles);
 
 // Custom Routes
 server.post('/custom/bulk', (req: Request, res: Response) => {

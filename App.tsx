@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, getNormalizedWard } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 import BlockingWarningModal from './components/BlockingWarningModal';
 
-import { DEFAULT_VISIBLE_COLUMNS, confirmAction } from './utils/appHelpers';
+import { DEFAULT_VISIBLE_COLUMNS, confirmAction, getReceivingWard, triggerPrioritySignedAlert } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
@@ -27,6 +27,8 @@ import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
 import UpdateRequiredModal from './components/UpdateRequiredModal';
 import { PlotCountModal } from './components/PlotCountModal';
+import WelcomeModal from './components/WelcomeModal';
+import PrioritySignedModalAlert from './components/PrioritySignedModalAlert';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { offlineDb } from './utils/offlineDb';
 
@@ -73,6 +75,10 @@ function App() {
 
   const [isPlotCountModalOpen, setIsPlotCountModalOpen] = useState(false);
   const [selectedRecordForPlotCount, setSelectedRecordForPlotCount] = useState<RecordFile | null>(null);
+
+  // Welcome Popup State
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const [welcomeUser, setWelcomeUser] = useState<User | null>(null);
 
   // Trạng thái cho cảnh báo ngăn chặn trình ký duyệt
   const [isBlockingWarningOpen, setIsBlockingWarningOpen] = useState(false);
@@ -519,7 +525,11 @@ function App() {
 
       setRecords(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, ...updates } : r));
       const targets = records.filter(r => selectedIds.includes(r.id));
-      await Promise.all(targets.map(r => updateRecordApi({ ...r, ...updates })));
+      const updatedTargets = targets.map(r => ({ ...r, ...updates }));
+      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+      if (field === 'status') {
+          updatedTargets.forEach(r => triggerPrioritySignedAlert(r, value as RecordStatus));
+      }
       setToast({ type: 'success', message: `Đã cập nhật ${selectedIds.length} hồ sơ thành công!` });
       setSelectedRecordIds(new Set()); 
   };
@@ -532,12 +542,18 @@ function App() {
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
       const record = records.find(r => r.id === id); 
       if (record) {
-          try { await updateRecordApi({ ...record, ...updates }); } catch (e) { console.error("Quick update failed", e); }
+          const updatedRecord = { ...record, ...updates };
+          try { 
+              await updateRecordApi(updatedRecord); 
+              if (field === 'status') {
+                  triggerPrioritySignedAlert(updatedRecord, value as RecordStatus);
+              }
+          } catch (e) { console.error("Quick update failed", e); }
       } else {
-          const tempRecord = { id } as RecordFile; 
-          await updateRecordApi({ ...tempRecord, ...updates });
+          const tempRecord = { id, ...updates } as RecordFile; 
+          await updateRecordApi(tempRecord);
       }
-  }, [records]);
+  }, [records, getUpdatesForStatusChange]);
 
   const handleOpenReturnModal = useCallback((record: RecordFile) => {
       setReturnRecord(record);
@@ -864,8 +880,10 @@ function App() {
               return;
           }
           const updates = getUpdatesForStatusChange(nextStatus);
-          setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
-          await updateRecordApi({ ...record, ...updates });
+          const updatedRecord = { ...record, ...updates };
+          setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+          await updateRecordApi(updatedRecord);
+          triggerPrioritySignedAlert(updatedRecord, nextStatus);
       }
   }, [getUpdatesForStatusChange]);
 
@@ -907,22 +925,38 @@ function App() {
       }
   }, [selectedRecordForPlotCount, getUpdatesForStatusChange]);
 
-  const executeBatchExport = async (batchNumber: number, batchDate: string) => {
+  const executeBatchExport = async (batchNumber: number, batchDate: string, customWardsMap?: Record<string, string> | string) => {
       const todayStr = recordFilterProps.filterDate || new Date().toISOString().split('T')[0];
       const candidates = selectedRecordIds.size > 0 ? records.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
       const recordsToExport = candidates.filter(r => r.status === RecordStatus.SIGNED || (r.status === RecordStatus.WITHDRAWN && !r.exportBatch));
       if (recordsToExport.length === 0) return;
+
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : RecordStatus.HANDOVER;
-          return { ...r, exportBatch: batchNumber, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || todayStr };
+          let recWard = r.receivingWard || getReceivingWard(r);
+          if (typeof customWardsMap === 'object' && customWardsMap && customWardsMap[r.id]) {
+              recWard = customWardsMap[r.id];
+          } else if (typeof customWardsMap === 'string' && customWardsMap) {
+              recWard = customWardsMap;
+          }
+          return { 
+              ...r, 
+              exportBatch: batchNumber, 
+              exportDate: batchDate, 
+              status: nextStatus, 
+              completedDate: r.completedDate || todayStr,
+              receivingWard: recWard
+          };
       });
+
       setRecords(prev => prev.map(r => {
           const updated = updatesToApply.find(u => u.id === r.id);
           return updated ? updated : r;
       }));
       await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
+      updatesToApply.forEach(r => triggerPrioritySignedAlert(r, r.status));
       setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `Đã chốt danh sách ĐỢT ${batchNumber} thành công.` });
+      setToast({ type: 'success', message: `Đã chốt danh sách ĐỢT ${batchNumber} (${recordsToExport.length} hồ sơ) thành công.` });
   };
 
   const handleConfirmSignBatch = async () => {
@@ -932,8 +966,10 @@ function App() {
       if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ sang "Đã ký"?`)) {
           const todayStr = new Date().toISOString().split('T')[0];
           const updates = { status: RecordStatus.SIGNED, approvalDate: todayStr, completedDate: null };
+          const updatedList = pendingSign.map(r => ({ ...r, ...updates }));
           setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, ...updates } : r));
-          await Promise.all(pendingSign.map(r => updateRecordApi({ ...r, ...updates })));
+          await Promise.all(updatedList.map(r => updateRecordApi(r)));
+          updatedList.forEach(r => triggerPrioritySignedAlert(r, RecordStatus.SIGNED));
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
       }
   };
@@ -945,6 +981,8 @@ function App() {
 
   const handleLogin = (user: User) => {
       setCurrentUser(user);
+      setWelcomeUser(user);
+      setIsWelcomeModalOpen(true);
       logUserActivity({
           action: 'LOGIN',
           targetType: 'USER',
@@ -1086,6 +1124,12 @@ function App() {
                 {toast.message}
             </div>
         )}
+        <WelcomeModal
+            isOpen={isWelcomeModalOpen}
+            onClose={() => setIsWelcomeModalOpen(false)}
+            user={welcomeUser || currentUser}
+            employees={employees}
+        />
       </MobileLayout>
       </>
     );
@@ -1262,6 +1306,15 @@ function App() {
             matches={blockingMatches}
             recordFile={pendingAdvanceRecord}
         />
+
+        <WelcomeModal
+            isOpen={isWelcomeModalOpen}
+            onClose={() => setIsWelcomeModalOpen(false)}
+            user={welcomeUser || currentUser}
+            employees={employees}
+        />
+
+        <PrioritySignedModalAlert records={records} />
     </MainLayout>
   );
 }

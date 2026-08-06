@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
 import { isRecordOverdue, isRecordApproaching, getReceivingWard } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
-import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
+import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map, AlertTriangle } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
@@ -89,6 +89,12 @@ const RecordRow: React.FC<RecordRowProps> = ({
               <div className="break-words font-bold leading-normal text-sm" title={record.code}>
                   {record.code}
               </div>
+              {record.isPriority && (
+                <div className="inline-flex items-center gap-1 text-[11px] font-black text-amber-950 bg-amber-100 border border-amber-400 px-2 py-0.5 rounded-full shadow-sm animate-pulse" title={record.priorityNote || 'Hồ sơ cần chú ý / báo cáo ngay'}>
+                  <AlertTriangle size={13} className="text-amber-500 fill-yellow-400 shrink-0" />
+                  <span>Chú ý</span>
+                </div>
+              )}
               {hasActiveReminder && <div className="flex items-center gap-1 text-xs text-pink-600 font-bold bg-pink-100 px-1.5 py-0.5 rounded"><Bell size={12} className="fill-pink-600" /> Nhắc hẹn</div>}
           </div>
           {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">Quá hạn</span>}

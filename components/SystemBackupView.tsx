@@ -3,7 +3,8 @@ import {
     Download, Upload, HardDrive, RotateCcw, Clock, CheckCircle2, 
     FileJson, History, RefreshCw, Trash2, Loader2, ShieldCheck, 
     AlertCircle, Database, Check, Settings, FolderDown, FolderPlus, FolderCheck, Folder,
-    CheckSquare, Square, AlertTriangle, Layers, X, ShieldAlert
+    CheckSquare, Square, AlertTriangle, Layers, X, ShieldAlert,
+    Cloud, UploadCloud, ExternalLink, Link2, Unlink
 } from 'lucide-react';
 import { 
     BackupData, BackupPointInfo, AutoBackupConfig, 
@@ -12,7 +13,10 @@ import {
     saveAutoBackupConfig, getAutoBackupPoints, 
     getBackupPointData, deleteBackupPoint, restoreSystemBackup,
     pickAutoBackupDirectory, clearAutoBackupDirectory,
-    RESTORE_CATEGORIES, getCategoryRecordCount, RestoreCategory
+    RESTORE_CATEGORIES, getCategoryRecordCount, RestoreCategory,
+    getGoogleDriveStatus, getGoogleDriveAuthUrl, disconnectGoogleDrive,
+    uploadBackupToGoogleDrive, fetchGoogleDriveBackupFiles,
+    GoogleDriveStatus, GoogleDriveFile
 } from '../services/backupService';
 import { getSystemSetting } from '../services/apiSystem';
 import { confirmAction, showToast } from '../utils/appHelpers';
@@ -39,6 +43,84 @@ export const SystemBackupView: React.FC<SystemBackupViewProps> = ({ currentUsern
     // Auto backup settings state
     const [autoConfig, setAutoConfig] = useState<AutoBackupConfig>(getAutoBackupConfig());
     const [backupPoints, setBackupPoints] = useState<BackupPointInfo[]>(getAutoBackupPoints());
+
+    // Google Drive integration state
+    const [gdriveStatus, setGdriveStatus] = useState<GoogleDriveStatus>({ connected: false });
+    const [gdriveFiles, setGdriveFiles] = useState<GoogleDriveFile[]>([]);
+    const [isCheckingGdrive, setIsCheckingGdrive] = useState(false);
+    const [isUploadingGdrive, setIsUploadingGdrive] = useState(false);
+
+    const checkGdrive = async () => {
+        setIsCheckingGdrive(true);
+        try {
+            const status = await getGoogleDriveStatus();
+            setGdriveStatus(status);
+            if (status.connected) {
+                const files = await fetchGoogleDriveBackupFiles();
+                setGdriveFiles(files);
+            }
+        } catch (_) {
+        } finally {
+            setIsCheckingGdrive(false);
+        }
+    };
+
+    useEffect(() => {
+        checkGdrive();
+
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data && event.data.type === 'GDRIVE_CONNECTED') {
+                showToast('Kết nối Google Drive thành công!', 'success');
+                checkGdrive();
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
+    const handleConnectGdrive = async () => {
+        const url = await getGoogleDriveAuthUrl();
+        if (!url) {
+            showToast('Không thể tạo đường dẫn kết nối Google Drive.', 'error');
+            return;
+        }
+        const width = 600;
+        const height = 700;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
+        window.open(url, 'GoogleDriveOAuth', `width=${width},height=${height},top=${top},left=${left}`);
+    };
+
+    const handleDisconnectGdrive = async () => {
+        if (await confirmAction("Bạn có chắc chắn muốn hủy kết nối tài khoản Google Drive?")) {
+            const ok = await disconnectGoogleDrive();
+            if (ok) {
+                showToast("Đã hủy kết nối Google Drive.", "success");
+                setGdriveStatus({ connected: false });
+                setGdriveFiles([]);
+            }
+        }
+    };
+
+    const handleManualGdriveUpload = async () => {
+        setIsUploadingGdrive(true);
+        try {
+            showToast("Đang tạo bản sao lưu và tải lên Google Drive...");
+            const fullData = await fetchFullSystemBackupData(currentUsername || 'Admin');
+            const res = await uploadBackupToGoogleDrive(fullData);
+            if (res.success) {
+                showToast(res.message || "Đẩy bản sao lưu lên Google Drive thành công!", "success");
+                const files = await fetchGoogleDriveBackupFiles();
+                setGdriveFiles(files);
+            } else {
+                showToast(`Thất bại: ${res.error}`, "error");
+            }
+        } catch (e: any) {
+            showToast(`Lỗi: ${e.message}`, "error");
+        } finally {
+            setIsUploadingGdrive(false);
+        }
+    };
 
     useEffect(() => {
         const syncConfig = async () => {
@@ -268,6 +350,146 @@ export const SystemBackupView: React.FC<SystemBackupViewProps> = ({ currentUsern
                     <span>{exportProgress}</span>
                 </div>
             )}
+
+            {/* SECTION: Google Drive Cloud Auto Backup Integration */}
+            <div className="bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 text-white rounded-3xl p-6 md:p-8 shadow-xl space-y-6 relative overflow-hidden border border-emerald-500/30">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                    <Cloud size={160} />
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10 relative z-10">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0">
+                            <Cloud size={24} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-lg md:text-xl font-black text-white tracking-tight">
+                                    Tích hợp Tự động Sao lưu Google Drive
+                                </h3>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                    gdriveStatus.connected 
+                                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40' 
+                                        : 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                                }`}>
+                                    {gdriveStatus.connected ? 'Đã liên kết Cloud' : 'Chưa kết nối'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-emerald-200/80 font-medium mt-0.5">
+                                Tự động đẩy bản sao lưu dữ liệu lên đám mây Google Drive hàng ngày, bảo vệ tuyệt đối khỏi rủi ro mất máy hoặc hỏng ổ đĩa.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        {gdriveStatus.connected ? (
+                            <>
+                                <button
+                                    onClick={handleManualGdriveUpload}
+                                    disabled={isUploadingGdrive}
+                                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isUploadingGdrive ? <Loader2 className="animate-spin" size={16} /> : <UploadCloud size={16} />}
+                                    {isUploadingGdrive ? 'Đang đẩy lên Drive...' : 'Đẩy bản sao lưu ngay'}
+                                </button>
+                                <button
+                                    onClick={checkGdrive}
+                                    disabled={isCheckingGdrive}
+                                    className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
+                                    title="Làm mới trạng thái"
+                                >
+                                    <RefreshCw size={16} className={isCheckingGdrive ? 'animate-spin' : ''} />
+                                </button>
+                                <button
+                                    onClick={handleDisconnectGdrive}
+                                    className="p-2.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 rounded-xl transition-all"
+                                    title="Hủy kết nối Google Drive"
+                                >
+                                    <Unlink size={16} />
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={handleConnectGdrive}
+                                className="px-5 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center gap-2"
+                            >
+                                <Link2 size={16} />
+                                Kết nối Google Drive
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Connected Info & Cloud Files */}
+                {gdriveStatus.connected ? (
+                    <div className="space-y-4 relative z-10">
+                        <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-3">
+                                {gdriveStatus.picture ? (
+                                    <img src={gdriveStatus.picture} alt="Avatar" className="w-8 h-8 rounded-full border border-emerald-400" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center font-bold text-emerald-300">
+                                        GD
+                                    </div>
+                                )}
+                                <div>
+                                    <span className="text-emerald-300 font-bold block">Tài khoản Google liên kết:</span>
+                                    <span className="font-mono text-white text-sm font-semibold">{gdriveStatus.email || 'Google User'}</span>
+                                </div>
+                            </div>
+                            <div className="text-right sm:border-l sm:border-white/10 sm:pl-4">
+                                <span className="text-emerald-300 font-bold block">Thư mục lưu trữ:</span>
+                                <span className="text-white font-mono">Sao Luu Quan Ly Ho So</span>
+                            </div>
+                        </div>
+
+                        {/* List of files on Drive */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center text-xs text-emerald-200 font-bold">
+                                <span>Các bản sao lưu gần đây trên Google Drive ({gdriveFiles.length})</span>
+                                <span className="text-[11px] text-emerald-300/70">Tự động đồng bộ</span>
+                            </div>
+
+                            {gdriveFiles.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                                    {gdriveFiles.map(file => (
+                                        <div key={file.id} className="p-3 bg-slate-950/40 hover:bg-slate-950/60 border border-white/10 rounded-xl flex items-center justify-between gap-3 text-xs transition-all">
+                                            <div className="min-w-0">
+                                                <span className="font-bold text-white truncate block">{file.name}</span>
+                                                <span className="text-[10px] text-emerald-300/80">
+                                                    {file.createdTime ? new Date(file.createdTime).toLocaleString('vi-VN') : ''} 
+                                                    {file.size ? ` • ${(parseInt(file.size)/1024).toFixed(1)} KB` : ''}
+                                                </span>
+                                            </div>
+                                            {file.webViewLink && (
+                                                <a
+                                                    href={file.webViewLink}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/30 rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+                                                >
+                                                    <ExternalLink size={12} /> Xem Drive
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-white/5 border border-dashed border-white/10 rounded-xl text-center text-xs text-emerald-200/60">
+                                    Chưa có bản sao lưu nào được đẩy lên Google Drive. Bấm nút "Đẩy bản sao lưu ngay" ở trên để tạo file đầu tiên!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-4 bg-emerald-950/50 border border-emerald-500/20 rounded-2xl text-xs text-emerald-200 leading-relaxed space-y-2">
+                        <span className="font-bold text-white block">💡 Tại sao nên bật sao lưu Google Drive?</span>
+                        <p>
+                            Khi liên kết Google Drive, mỗi lần hệ thống thực hiện sao lưu tự động (hoặc khi bạn bấm tạo điểm khôi phục), tệp JSON sao lưu sẽ được đẩy trực tiếp vào thư mục riêng <strong>"Sao Luu Quan Ly Ho So"</strong> trên Google Drive của bạn.
+                        </p>
+                    </div>
+                )}
+            </div>
 
             {/* Grid 2 Columns: Auto Backup Settings + Restore from File */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

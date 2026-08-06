@@ -25,6 +25,13 @@ interface SaoLucFormData {
     so_hieu: string;        // Mã hồ sơ
     so_sao_luc?: string;     // Số sao lục
     chu_su_dung: string;    // Chủ sử dụng (Map vào noi_nhan_gui)
+    so_dien_thoai?: string; // Số điện thoại
+    cccd?: string;          // Số CCCD/CMND
+    nguoi_uy_quyen?: string;// Người được ủy quyền
+    loai_uy_quyen?: string; // Loại văn bản ủy quyền
+    giay_to_kem_theo?: string;// Giấy tờ kèm theo
+    address?: string;       // Địa chỉ chi tiết
+    dien_tich?: string | number; // Diện tích
     xa_phuong: string;      // Xã phường (Lưu trong data)
     to_ban_do: string;      // Tờ (Lưu trong data)
     thua_dat: string;       // Thửa (Lưu trong data)
@@ -34,6 +41,7 @@ interface SaoLucFormData {
     status: 'draft' | 'assigned' | 'executed' | 'pending_sign' | 'signed' | 'completed' | 'returned';
     ngay_hoan_thanh?: string;
     danh_sach?: string;
+    notes?: string;
 }
 
 const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hưng', 'Chơn Thành', 'Nha Bích'] }) => {
@@ -331,6 +339,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             return; 
         }
         
+        const editingRecord = editingId ? records.find(r => r.id === editingId) : null;
+        const existingData = editingRecord?.data || {};
+
         // Map form data về cấu trúc ArchiveRecord
         const recordToSave: Partial<ArchiveRecord> = {
             id: editingId || undefined,
@@ -341,13 +352,30 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             ngay_thang: formData.ngay_nhan,     // Ngày nhận
             trich_yeu: formData.noi_dung,       // Nội dung
             data: {                             // Các trường mở rộng
+                ...existingData,
                 so_sao_luc: formData.so_sao_luc,
+                chu_su_dung: formData.chu_su_dung,
+                ten_chu_su_dung: formData.chu_su_dung,
                 xa_phuong: formData.xa_phuong,
                 to_ban_do: formData.to_ban_do,
                 thua_dat: formData.thua_dat,
+                dien_tich: formData.dien_tich,
+                area: formData.dien_tich,
                 hen_tra: formData.hen_tra,
                 ngay_hoan_thanh: formData.ngay_hoan_thanh,
-                danh_sach: formData.danh_sach
+                danh_sach: formData.danh_sach,
+                so_dien_thoai: formData.so_dien_thoai,
+                phoneNumber: formData.so_dien_thoai,
+                cccd: formData.cccd,
+                nguoi_uy_quyen: formData.nguoi_uy_quyen,
+                authorizedBy: formData.nguoi_uy_quyen,
+                loai_uy_quyen: formData.loai_uy_quyen,
+                authDocType: formData.loai_uy_quyen,
+                giay_to_kem_theo: formData.giay_to_kem_theo,
+                otherDocs: formData.giay_to_kem_theo,
+                address: formData.address,
+                dia_chi: formData.address,
+                notes: formData.notes
             },
             created_by: currentUser.username
         };
@@ -369,6 +397,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             so_hieu: '',
             so_sao_luc: '',
             chu_su_dung: '',
+            so_dien_thoai: '',
+            cccd: '',
+            nguoi_uy_quyen: '',
+            loai_uy_quyen: '',
+            giay_to_kem_theo: '',
+            address: '',
+            dien_tich: '',
             xa_phuong: 'Chơn Thành',
             to_ban_do: '',
             thua_dat: '',
@@ -377,7 +412,8 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             noi_dung: '',
             status: 'draft',
             ngay_hoan_thanh: '',
-            danh_sach: ''
+            danh_sach: '',
+            notes: ''
         });
     };
 
@@ -632,16 +668,24 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
             id: r.id,
             so_hieu: r.so_hieu,
             so_sao_luc: r.data?.so_sao_luc || '',
-            chu_su_dung: r.noi_nhan_gui,
-            ngay_nhan: r.ngay_thang,
-            noi_dung: r.trich_yeu,
+            chu_su_dung: r.noi_nhan_gui || r.data?.chu_su_dung || '',
+            so_dien_thoai: r.data?.so_dien_thoai || r.data?.phoneNumber || '',
+            cccd: r.data?.cccd || '',
+            nguoi_uy_quyen: r.data?.nguoi_uy_quyen || r.data?.authorizedBy || '',
+            loai_uy_quyen: r.data?.loai_uy_quyen || r.data?.authDocType || '',
+            giay_to_kem_theo: r.data?.giay_to_kem_theo || r.data?.otherDocs || '',
+            address: r.data?.address || r.data?.dia_chi || '',
+            dien_tich: r.data?.dien_tich || r.data?.area || '',
+            ngay_nhan: r.ngay_thang || r.data?.ngay_nhan || '',
+            noi_dung: r.trich_yeu || r.data?.noi_dung || '',
             status: r.status as any,
             xa_phuong: r.data?.xa_phuong || 'Chơn Thành',
             to_ban_do: r.data?.to_ban_do || '',
             thua_dat: r.data?.thua_dat || '',
             hen_tra: r.data?.hen_tra || '',
             ngay_hoan_thanh: r.data?.ngay_hoan_thanh || '',
-            danh_sach: r.data?.danh_sach || ''
+            danh_sach: r.data?.danh_sach || '',
+            notes: r.data?.notes || r.data?.ghi_chu || ''
         });
         setIsFormOpen(true);
     };

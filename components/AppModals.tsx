@@ -67,7 +67,7 @@ interface AppModalsProps {
     handleDeleteRecord: () => void;
     confirmDelete: (r: RecordFile) => void;
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;
-    executeBatchExport: (batch: number, date: string) => void;
+    executeBatchExport: (batch: number, date: string, customWardsMap?: Record<string, string> | string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>;
     confirmReturnResult: (receiptNumber: string, receiverName: string) => void;
@@ -167,6 +167,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 records={props.records}
                 selectedCount={props.selectedCount}
                 targetRecords={targetRecordsForBatch} 
+                wards={props.wards}
             />
 
             <ExcelPreviewModal 

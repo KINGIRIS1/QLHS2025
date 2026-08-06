@@ -1417,223 +1417,245 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                 )}
             </div>
 
-            {/* MODAL CHI TIẾT HỒ SƠ */}
+            {/* MODAL CHI TIẾT HỒ SƠ KHO */}
             {isDetailOpen && selectedRecord && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up border border-slate-100">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] p-3 md:p-6 animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up border border-slate-200">
                         {/* Header */}
-                        <div className="flex justify-between items-center bg-indigo-600 text-white p-5 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white/20 rounded-lg">
-                                    <BookOpen size={18} />
+                        <div className="flex justify-between items-center bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 text-white p-5 md:px-7 shrink-0 shadow-md">
+                            <div className="flex items-center gap-3.5">
+                                <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md shadow-inner">
+                                    <BookOpen size={22} className="text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-md font-bold">Chi Tiết Hồ Sơ Kho</h3>
-                                    <p className="text-[11px] opacity-80">Số GCN: {selectedRecord.data?.sophathanhgcnmoi || '-'}</p>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg md:text-xl font-black tracking-wide">Chi Tiết Hồ Sơ Kho Lưu Trữ</h3>
+                                        {selectedRecord.so_hieu && (
+                                            <span className="bg-white/20 text-white font-mono font-bold text-xs px-2.5 py-0.5 rounded-full border border-white/20">
+                                                {selectedRecord.so_hieu}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-indigo-100 font-medium mt-0.5">
+                                        Số GCN phát hành: <strong className="text-yellow-300 font-bold">{selectedRecord.data?.sophathanhgcnmoi || 'Chưa cập nhật'}</strong>
+                                    </p>
                                 </div>
                             </div>
                             <button 
                                 onClick={() => setIsDetailOpen(false)}
-                                className="p-1.5 bg-white/10 hover:bg-white/20 rounded-full transition-all"
+                                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all active:scale-95"
+                                title="Đóng modal"
                             >
-                                <X size={16} />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
-                            {/* 5. Vị trí lưu trữ */}
-                            <div className="space-y-3.5 bg-indigo-50/40 p-4 rounded-2xl border border-indigo-100/50">
-                                <h4 className="text-xs font-bold text-indigo-750 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
-                                    <Archive size={14} /> Vị trí lưu trữ trong kho
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Kệ:</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.soke_tang || '-'}</div>
+                        {/* Content Scrollable */}
+                        <div className="p-5 md:p-7 overflow-y-auto space-y-6 flex-1 text-sm bg-slate-50/50">
+                            
+                            {/* 1. Thanh vị trí lưu trữ kho & Loại hồ sơ (Highlight Bar) */}
+                            <div className="bg-white p-4 md:p-5 rounded-2xl border border-indigo-100 shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-50 pb-2.5">
+                                    <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-2">
+                                        <Archive size={16} className="text-indigo-600" /> Vị trí lưu trữ trong kho
+                                    </h4>
+                                    <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 flex items-center gap-1.5">
+                                        <FileText size={13} className="text-indigo-600" />
+                                        Loại hồ sơ: <strong className="text-indigo-700">{selectedRecord.data?.loaihoso || 'Chưa phân loại'}</strong>
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-1">
+                                    <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100/80">
+                                        <div className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">Kệ lưu trữ</div>
+                                        <div className="font-extrabold text-slate-800 text-base md:text-lg mt-0.5">{selectedRecord.data?.soke_tang || '-'}</div>
                                     </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Tầng:</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.so_o || '-'}</div>
+                                    <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100/80">
+                                        <div className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">Tầng / Ô / Ngăn</div>
+                                        <div className="font-extrabold text-slate-800 text-base md:text-lg mt-0.5">{selectedRecord.data?.so_o || '-'}</div>
                                     </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Hộp số (Số tệp):</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.So_tep || '-'}</div>
+                                    <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100/80">
+                                        <div className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">Hộp số / Số tệp</div>
+                                        <div className="font-extrabold text-slate-800 text-base md:text-lg mt-0.5">{selectedRecord.data?.So_tep || '-'}</div>
                                     </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-500">Số thứ tự tệp:</div>
-                                        <div className="font-extrabold text-indigo-850">{selectedRecord.data?.sott_tep || '-'}</div>
+                                    <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100/80">
+                                        <div className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">STT Tệp</div>
+                                        <div className="font-extrabold text-indigo-700 text-base md:text-lg mt-0.5">{selectedRecord.data?.sott_tep || '-'}</div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 4. Loại hồ sơ */}
-                            <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                    <FileText size={14} /> Loại hồ sơ lưu kho
-                                </div>
-                                <div className="font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-fit text-xs">
-                                    {selectedRecord.data?.loaihoso || 'Chưa phân loại'}
-                                </div>
-                            </div>
+                            {/* 2. Grid Bố cục 2 Cột Rộng Rãi */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                                
+                                {/* Cột Trái (6/12): Thửa đất & Giấy chứng nhận */}
+                                <div className="lg:col-span-6 space-y-5">
+                                    
+                                    {/* Khối Thửa Đất */}
+                                    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                                        <h4 className="text-xs font-black text-indigo-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                                            <Layers size={16} className="text-indigo-600" /> Thông tin thửa đất & Địa chỉ
+                                        </h4>
 
-                            {/* 1. Khối Thửa đất */}
-                            <div className="space-y-3.5 bg-slate-50/30 p-4 rounded-2xl border border-slate-100">
-                                <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-indigo-100 pb-1.5">
-                                    <Layers size={14} /> Thông tin thửa đất
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Tờ bản đồ:</div>
-                                        <div className="font-bold text-slate-800">{selectedRecord.data?.tobando || '-'}</div>
+                                        {/* Metrics Grid */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                                            <div className="p-1">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Tờ bản đồ</div>
+                                                <div className="font-extrabold text-slate-800 text-sm mt-0.5">{selectedRecord.data?.tobando || '-'}</div>
+                                            </div>
+                                            <div className="p-1 border-l border-slate-200">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Số thửa</div>
+                                                <div className="font-extrabold text-slate-800 text-sm mt-0.5">{selectedRecord.data?.sothua || '-'}</div>
+                                            </div>
+                                            <div className="p-1 border-l border-slate-200">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Diện tích</div>
+                                                <div className="font-extrabold text-indigo-600 text-sm mt-0.5">{selectedRecord.data?.dientich ? `${selectedRecord.data.dientich} m²` : '-'}</div>
+                                            </div>
+                                            <div className="p-1 border-l border-slate-200">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Hình thức SD</div>
+                                                <div className="font-bold text-slate-700 text-xs mt-0.5 truncate">{selectedRecord.data?.hinhthucsd || '-'}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Chi tiết vị trí */}
+                                        <div className="space-y-2.5 text-xs pt-1">
+                                            <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                                                <span className="text-slate-500 font-medium">Xã / Phường:</span>
+                                                <span className="font-bold text-indigo-800 bg-indigo-50 px-2.5 py-0.5 rounded-md">{getWardName(selectedRecord.data?.maxa)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-start py-1.5 border-b border-slate-100">
+                                                <span className="text-slate-500 font-medium shrink-0 mr-2">Địa chỉ thửa đất:</span>
+                                                <span className="font-semibold text-slate-800 text-right">{selectedRecord.data?.diachiap || '-'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-1.5">
+                                                <span className="text-slate-500 font-medium">Loại đất ở / Diện tích:</span>
+                                                <span className="font-bold text-slate-800">
+                                                    {selectedRecord.data?.loaidato || '-'} {selectedRecord.data?.dientichdato ? `(${selectedRecord.data.dientichdato} m²)` : ''}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Số thửa:</div>
-                                        <div className="font-bold text-slate-800">{selectedRecord.data?.sothua || '-'}</div>
+
+                                    {/* Khối Giấy chứng nhận */}
+                                    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3.5">
+                                        <h4 className="text-xs font-black text-teal-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                                            <BookOpen size={16} className="text-teal-600" /> Thông tin Giấy chứng nhận
+                                        </h4>
+                                        <div className="grid grid-cols-3 gap-3 text-center">
+                                            <div className="bg-teal-50/60 p-3 rounded-xl border border-teal-100">
+                                                <div className="text-[10px] font-bold text-teal-600 uppercase">Số phát hành</div>
+                                                <div className="font-extrabold text-indigo-800 text-xs md:text-sm mt-1">{selectedRecord.data?.sophathanhgcnmoi || '-'}</div>
+                                            </div>
+                                            <div className="bg-teal-50/60 p-3 rounded-xl border border-teal-100">
+                                                <div className="text-[10px] font-bold text-teal-600 uppercase">Số vào sổ</div>
+                                                <div className="font-bold text-slate-800 text-xs md:text-sm mt-1">{selectedRecord.data?.sovaosomoi || '-'}</div>
+                                            </div>
+                                            <div className="bg-teal-50/60 p-3 rounded-xl border border-teal-100">
+                                                <div className="text-[10px] font-bold text-teal-600 uppercase">Ngày cấp GCN</div>
+                                                <div className="font-bold text-slate-800 text-xs md:text-sm mt-1">{selectedRecord.data?.ngaycapgcnmoi || '-'}</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Diện tích:</div>
-                                        <div className="font-bold text-indigo-650">{selectedRecord.data?.dientich || '-'} m²</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Hình thức sử dụng:</div>
-                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.hinhthucsd || '-'}</div>
-                                    </div>
+
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Xã / Phường:</div>
-                                        <div className="font-bold text-indigo-700">{getWardName(selectedRecord.data?.maxa)}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Địa chỉ thửa đất:</div>
-                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.diachiap || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Loại đất ở / Diện tích:</div>
-                                        <div className="font-semibold text-slate-800">
-                                            {selectedRecord.data?.loaidato || '-'} {selectedRecord.data?.dientichdato ? `/ ${selectedRecord.data.dientichdato} m²` : ''}
+                                {/* Cột Phải (6/12): Chủ sử dụng đất */}
+                                <div className="lg:col-span-6 space-y-5">
+                                    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4 h-full flex flex-col">
+                                        <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5 shrink-0">
+                                            <UserIcon size={16} className="text-indigo-600" /> Thông tin chủ sử dụng đất
+                                        </h4>
+
+                                        <div className="space-y-4 flex-1">
+                                            {/* Chủ sử dụng 1 */}
+                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/70 space-y-2">
+                                                <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                                                    <span className="text-xs font-extrabold text-indigo-800 uppercase tracking-wide">Chủ sử dụng chính (1)</span>
+                                                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">Đại diện</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                                                    <div>
+                                                        <div className="text-[10px] text-slate-400 font-medium">Họ và tên</div>
+                                                        <div className="font-extrabold text-slate-800 text-sm">{selectedRecord.data?.hoten1 || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-slate-400 font-medium">Năm sinh</div>
+                                                        <div className="font-bold text-slate-700">{selectedRecord.data?.namsinh1 || '-'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs">
+                                                    <div className="text-[10px] text-slate-400 font-medium">Số CCCD / CMND ({selectedRecord.data?.loaicccd1 || 'CCCD'})</div>
+                                                    <div className="font-mono font-bold text-slate-800">{selectedRecord.data?.socccd || '-'}</div>
+                                                </div>
+                                                <div className="text-xs">
+                                                    <div className="text-[10px] text-slate-400 font-medium">Địa chỉ thường trú</div>
+                                                    <div className="font-medium text-slate-700">{selectedRecord.data?.diachitt1 || '-'}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Chủ sử dụng 2 */}
+                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/70 space-y-2">
+                                                <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                                                    <span className="text-xs font-extrabold text-indigo-800 uppercase tracking-wide">Chủ sử dụng 2</span>
+                                                    <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">Đồng sở hữu</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                                                    <div>
+                                                        <div className="text-[10px] text-slate-400 font-medium">Họ và tên</div>
+                                                        <div className="font-extrabold text-slate-800 text-sm">{selectedRecord.data?.hoten2 || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-slate-400 font-medium">Năm sinh</div>
+                                                        <div className="font-bold text-slate-700">{selectedRecord.data?.namsinh2 || '-'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs">
+                                                    <div className="text-[10px] text-slate-400 font-medium">Số CCCD / CMND</div>
+                                                    <div className="font-mono font-bold text-slate-800">{selectedRecord.data?.socccd2 || '-'}</div>
+                                                </div>
+                                                <div className="text-xs">
+                                                    <div className="text-[10px] text-slate-400 font-medium">Địa chỉ thường trú</div>
+                                                    <div className="font-medium text-slate-700">{selectedRecord.data?.diachitt2 || '-'}</div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
                             </div>
 
-                            {/* 2. Khối Giấy chứng nhận */}
-                            <div className="space-y-3.5 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                                <h4 className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-teal-100 pb-1.5">
-                                    <BookOpen size={14} /> Thông tin Giấy chứng nhận
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
+                            {/* 3. Footer Metadata Banner */}
+                            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                                <div className="flex flex-wrap items-center gap-4 text-slate-500">
                                     <div>
-                                        <div className="text-[11px] text-slate-400">Số phát hành:</div>
-                                        <div className="font-bold text-indigo-700 text-sm">{selectedRecord.data?.sophathanhgcnmoi || '-'}</div>
+                                        Cán bộ nhập: <strong className="text-slate-800 font-bold">{selectedRecord.data?.nguoinhap || '-'}</strong>
                                     </div>
+                                    <div className="h-3 w-px bg-slate-200 hidden md:block"></div>
                                     <div>
-                                        <div className="text-[11px] text-slate-400">Số vào sổ:</div>
-                                        <div className="font-semibold text-slate-800">{selectedRecord.data?.sovaosomoi || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[11px] text-slate-400">Ngày cấp GCN:</div>
-                                        <div className="font-semibold text-slate-800">
-                                            {selectedRecord.data?.ngaycapgcnmoi || '-'}
-                                        </div>
+                                        Ngày nhập: <strong className="text-slate-800 font-semibold">{selectedRecord.data?.ngaynhap || '-'}</strong>
                                     </div>
                                 </div>
+                                {selectedRecord.data?.ghichu && (
+                                    <div className="bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 text-amber-800 font-medium text-xs">
+                                        <strong>Ghi chú:</strong> {selectedRecord.data.ghichu}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* 3. Khối Chủ sử dụng */}
-                            <div className="space-y-3.5 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                    <UserIcon size={14} /> Thông tin chủ sử dụng đất
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-150">
-                                    {/* Chủ sử dụng 1 */}
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-bold text-indigo-750">Chủ sử dụng 1 (Đại diện)</div>
-                                        <div>
-                                            <div className="text-[11px] text-slate-400">Họ tên:</div>
-                                            <div className="font-bold text-slate-800">{selectedRecord.data?.hoten1 || '-'}</div>
-                                        </div>
-                                        {selectedRecord.data?.namsinh1 && (
-                                            <div>
-                                                <div className="text-[11px] text-slate-400">Năm sinh:</div>
-                                                <div className="font-semibold text-slate-700">{selectedRecord.data.namsinh1}</div>
-                                            </div>
-                                        )}
-                                        {selectedRecord.data?.socccd && (
-                                            <div>
-                                                <div className="text-[11px] text-slate-400">CMND/CCCD ({selectedRecord.data.loaicccd1 || 'CCCD'}):</div>
-                                                <div className="font-mono text-slate-800">{selectedRecord.data.socccd}</div>
-                                            </div>
-                                        )}
-                                        {selectedRecord.data?.diachitt1 && (
-                                            <div>
-                                                <div className="text-[11px] text-slate-400">Địa chỉ thường trú:</div>
-                                                <div className="text-slate-700">{selectedRecord.data.diachitt1}</div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Chủ sử dụng 2 */}
-                                    <div className="space-y-2 md:pl-4 pt-3 md:pt-0">
-                                        <div className="text-xs font-bold text-indigo-750">Chủ sử dụng 2 (Đông sở hữu)</div>
-                                        <div>
-                                            <div className="text-[11px] text-slate-400">Họ tên:</div>
-                                            <div className="font-bold text-slate-800">{selectedRecord.data?.hoten2 || '-'}</div>
-                                        </div>
-                                        {selectedRecord.data?.namsinh2 && (
-                                            <div>
-                                                <div className="text-[11px] text-slate-400">Năm sinh:</div>
-                                                <div className="font-semibold text-slate-700">{selectedRecord.data.namsinh2}</div>
-                                            </div>
-                                        )}
-                                        {selectedRecord.data?.socccd2 && (
-                                            <div>
-                                                <div className="text-[11px] text-slate-400">CMND / Số CCCD:</div>
-                                                <div className="font-mono text-slate-800">{selectedRecord.data.socccd2}</div>
-                                            </div>
-                                        )}
-                                        {selectedRecord.data?.diachitt2 && (
-                                            <div>
-                                                <div className="text-[11px] text-slate-400">Địa chỉ thường trú:</div>
-                                                <div className="text-slate-700">{selectedRecord.data.diachitt2}</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 6. Cán bộ nhập, ngày nhập */}
-                            <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 pt-3 border-t border-slate-150">
-                                <div>
-                                    Cán bộ nhập: <strong className="text-slate-600 font-bold">{selectedRecord.data?.nguoinhap || '-'}</strong>
-                                </div>
-                                <div className="text-right">
-                                    Ngày nhập: <strong className="text-slate-600 font-semibold">{selectedRecord.data?.ngaynhap || '-'}</strong>
-                                </div>
-                            </div>
-
-                            {selectedRecord.data?.ghichu && (
-                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 text-xs text-amber-800">
-                                    <strong>Ghi chú:</strong> {selectedRecord.data.ghichu}
-                                </div>
-                            )}
                         </div>
 
-                        {/* Footer */}
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
+                        {/* Footer Buttons */}
+                        <div className="p-4 md:px-7 border-t border-slate-200 bg-white flex justify-end gap-3 shrink-0">
                             {currentUser.role === UserRole.ADMIN && (
                                 <button
                                     onClick={() => openEditModal(selectedRecord)}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shadow-sm"
+                                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
                                 >
                                     <Edit size={14} /> Chỉnh sửa hồ sơ
                                 </button>
                             )}
                             <button
                                 onClick={() => setIsDetailOpen(false)}
-                                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                className="px-5 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95"
                             >
                                 Đóng lại
                             </button>
@@ -1647,7 +1669,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
                     <form 
                         onSubmit={handleSaveEdit}
-                        className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up border border-slate-100"
+                        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up border border-slate-100"
                     >
                         {/* Header */}
                         <div className="flex justify-between items-center bg-blue-600 text-white p-5 shrink-0">

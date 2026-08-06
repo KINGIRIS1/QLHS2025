@@ -96,8 +96,9 @@ export const logError = (context: string, error: any) => {
          alert(`LỖI DỮ LIỆU: Có trường dữ liệu không đúng định dạng (Ví dụ: Diện tích phải là số).\nHệ thống đã cố gắng tự sửa nhưng vẫn thất bại.`);
     } else if (code === 'PGRST204') {
          console.error(`❌ Lỗi tại ${context}: Cột không tồn tại (Lỗi PGRST204).`);
-         // Cập nhật thông báo lỗi hướng dẫn cụ thể SQL
-         alert(`LỖI CẤU TRÚC DATABASE (Thiếu cột):\nDatabase trên Cloud đang thiếu các cột mới (Thanh lý hợp đồng).\n\nVui lòng vào SQL Editor trên Supabase và chạy lệnh sau:\n\nALTER TABLE contracts ADD COLUMN liquidation_area numeric;\nALTER TABLE contracts ADD COLUMN liquidation_amount numeric;`);
+         if (context.toLowerCase().includes('contract') || msg.toLowerCase().includes('contract') || msg.toLowerCase().includes('liquidation')) {
+             alert(`LỖI CẤU TRÚC DATABASE (Thiếu cột):\nDatabase trên Cloud đang thiếu các cột mới (Thanh lý hợp đồng).\n\nVui lòng vào SQL Editor trên Supabase và chạy lệnh sau:\n\nALTER TABLE contracts ADD COLUMN liquidation_area numeric;\nALTER TABLE contracts ADD COLUMN liquidation_amount numeric;`);
+         }
     } else if (code === '406') {
          console.warn(`⚠️ [Info] ${context}: Không tìm thấy dữ liệu (406).`);
     } else if (code === '22007' || code === '22008') {

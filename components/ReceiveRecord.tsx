@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Employee, User, Holiday, RecordStatus } from '../types';
+import { RecordFile, Employee, User, Holiday, RecordStatus, UserRole } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock, ClipboardCheck } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock, ClipboardCheck, Printer } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper, showToast } from '../utils/appHelpers';
 import { fetchArchiveRecords, saveArchiveRecord } from '../services/apiArchive';
 import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
+import ExportReceiptSection from './receive-record/ExportReceiptSection';
 
 
 const mapStatusToEnum = (s: string): RecordStatus => {
@@ -26,7 +27,7 @@ const mapStatusToEnum = (s: string): RecordStatus => {
 // Hàm map từ dữ liệu ArchiveRecord sang RecordFile dạng ảo dùng riêng cho Tiếp nhận hôm nay
 const mapArchiveToRecordFile = (ar: any): RecordFile => {
     const d = ar.data || {};
-    let rType = 'Sao lục hồ sơ';
+    let rType = d.loai_ho_so || 'Sao lục hồ sơ';
     if (ar.type === 'vaoso') rType = 'Vào sổ';
     else if (ar.type === 'dangky') rType = 'Đăng ký biến động';
     else if (ar.type === 'congvan') rType = 'Công văn';
@@ -41,12 +42,18 @@ const mapArchiveToRecordFile = (ar: any): RecordFile => {
         ward: d.xa_phuong || d.dia_danh || '',
         mapSheet: d.to_ban_do || d.so_to || '',
         landPlot: d.thua_dat || d.so_thua || '',
-        area: d.dien_tich || d.tong_dien_tich || 0,
-        phoneNumber: d.so_dien_thoai || d.so_dt || '',
+        area: d.dien_tich || d.tong_dien_tich || d.area || 0,
+        address: d.address || d.dia_chi || '',
+        phoneNumber: d.so_dien_thoai || d.so_dt || d.phoneNumber || '',
         cccd: d.cccd || '',
+        authorizedBy: d.authorizedBy || d.nguoi_uy_quyen || '',
+        authDocType: d.authDocType || d.loai_uy_quyen || '',
+        otherDocs: d.otherDocs || d.giay_to_kem_theo || '',
+        notes: d.notes || d.ghi_chu || '',
+        privateNotes: d.privateNotes || '',
         status: mapStatusToEnum(ar.status || 'draft'),
         recordType: rType,
-        createdBy: ar.created_by,
+        createdBy: ar.created_by || d.createdBy || d.nguoi_tiep_nhan || '',
         assignedTo: d.assigned_to || null,
         exportBatch: d.danh_sach || d.exportBatch || null,
         exportDate: d.ngay_hoan_thanh || d.exportDate || null,
@@ -116,7 +123,8 @@ const formatDateKey = (date: Date): string => {
 };
 
 const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onReturnResult, onUpdateReturnResult }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended' | 'returned_list'>('create');
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended' | 'returned_list' | 'export_receipt'>('create');
   const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   
   // State quản lý danh sách hồ sơ Sao lục lấy từ Archive
@@ -558,6 +566,14 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <button onClick={() => setViewMode('returned_list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'returned_list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <ClipboardCheck size={16} /> Danh sách đã trả kết quả
             </button>
+            {isAdmin && (
+                <button 
+                    onClick={() => setViewMode('export_receipt')} 
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all shrink-0 ${viewMode === 'export_receipt' ? 'bg-amber-600 text-white shadow-sm' : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'}`}
+                >
+                    <Printer size={16} /> Xuất biên nhận (Admin)
+                </button>
+            )}
         </div>
         
         {viewMode === 'create' && (
@@ -654,6 +670,22 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 currentUser={currentUser}
                 employees={employees}
                 onPreviewExcel={handlePreviewExcel}
+                onPrint={handlePreviewDocx}
+            />
+        )}
+
+        {viewMode === 'export_receipt' && (
+            <ExportReceiptSection 
+                records={[
+                    ...records,
+                    ...archiveSaoLucRecords,
+                    ...archiveVaoSoRecords,
+                    ...archiveDangKyRecords,
+                    ...archiveCongVanRecords
+                ]}
+                wards={wards}
+                currentUser={currentUser}
+                employees={employees}
                 onPrint={handlePreviewDocx}
             />
         )}

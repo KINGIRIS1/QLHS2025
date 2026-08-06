@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Holiday } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS } from '../constants';
-import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck } from 'lucide-react';
+import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, AlertTriangle } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 
 interface RecordModalProps {
@@ -23,7 +23,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     receivedDate: new Date().toISOString().split('T')[0], deadline: '', assignedTo: '',
     group: GROUPS[0], ward: '', landPlot: '', mapSheet: '', area: 0, address: '',
     recordType: EXTENDED_RECORD_TYPES[0], measurementNumber: '', excerptNumber: '',
-    privateNotes: '', authorizedBy: '', authDocType: '', receiptNumber: '', resultReturnedDate: ''
+    privateNotes: '', authorizedBy: '', authDocType: '', receiptNumber: '', resultReturnedDate: '',
+    isPriority: false, priorityNote: ''
   };
 
   const [formData, setFormData] = useState<Partial<RecordFile>>(defaultState);
@@ -132,7 +133,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         return newData;
     });
   };
-  const val = (v: any) => v === undefined || v === null ? '' : v;
+  const val = (v: any) => (v === undefined || v === null || Number.isNaN(v)) ? '' : v;
 
   const isOtherView = currentView?.startsWith('other_');
   const allowedRecordTypes = isOtherView 
@@ -217,8 +218,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         <div className="grid grid-cols-4 gap-2 md:col-span-4">
                             <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                             <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m2)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Số lượng thửa</label><input type="number" min="1" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-bold bg-amber-50" value={formData.plotCount || 1} onChange={(e) => handleChange('plotCount', parseInt(e.target.value) || 1)} /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m2)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right" value={Number.isNaN(formData.area) ? '' : (formData.area ?? 0)} onChange={(e) => { const v = parseFloat(e.target.value); handleChange('area', Number.isNaN(v) ? 0 : v); }} /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Số lượng thửa</label><input type="number" min="1" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-bold bg-amber-50" value={Number.isNaN(formData.plotCount) ? 1 : (formData.plotCount ?? 1)} onChange={(e) => { const v = parseInt(e.target.value); handleChange('plotCount', Number.isNaN(v) ? 1 : v); }} /></div>
                         </div>
                     </div>
                 </div>
@@ -239,7 +240,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         {/* QUAN TRỌNG: Hiển thị thông tin xuất đợt */}
                         {hasAdminRights && (
                             <div className="grid grid-cols-2 gap-4 bg-indigo-50 p-3 rounded border border-indigo-200">
-                                <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Đợt xuất (Batch)</label><input type="number" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', parseInt(e.target.value))} /></div>
+                                <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Đợt xuất (Batch)</label><input type="number" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportBatch)} onChange={(e) => { const v = parseInt(e.target.value); handleChange('exportBatch', Number.isNaN(v) ? null : v); }} /></div>
                                 <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Ngày xuất</label><input type="date" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', e.target.value)} /></div>
                             </div>
                         )}
@@ -253,6 +254,33 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 </div>
                             </div>
                         )}
+                        {/* HỒ SƠ CHÚ Ý / CẦN BÁO CÁO GẤP */}
+                        <div className={`p-3.5 rounded-lg border transition-all ${formData.isPriority ? 'bg-red-50 border-red-300 shadow-sm' : 'bg-gray-50 border-gray-200'}`}>
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-xs uppercase text-gray-800">
+                                <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500" 
+                                    checked={!!formData.isPriority} 
+                                    onChange={(e) => handleChange('isPriority', e.target.checked)} 
+                                />
+                                <span className="flex items-center gap-1 text-amber-700">
+                                    <AlertTriangle size={16} className="text-amber-500 fill-yellow-400" /> Hồ sơ cần chú ý / Báo cáo ngay khi ký
+                                </span>
+                            </label>
+                            {formData.isPriority && (
+                                <div className="mt-2 space-y-1">
+                                    <label className="block text-[10px] font-bold text-red-700 uppercase">Ghi chú lý do chú ý (Hồ sơ khiếu nại cần xử lý ngay...)</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full text-xs p-2 bg-white border border-red-200 rounded outline-none focus:ring-1 focus:ring-red-400 font-medium text-gray-800" 
+                                        placeholder="Ví dụ: Hồ sơ khiếu nại cần xử lý ngay..." 
+                                        value={val(formData.priorityNote)} 
+                                        onChange={(e) => handleChange('priorityNote', e.target.value)} 
+                                    />
+                                </div>
+                            )}
+                        </div>
+
                         {hasAdminRights && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                 <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>

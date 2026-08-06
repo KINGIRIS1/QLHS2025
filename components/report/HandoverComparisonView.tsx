@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
+import { getReceivingWard } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 import { 
   FileSpreadsheet, 
@@ -145,7 +146,7 @@ const HandoverComparisonView: React.FC<HandoverComparisonViewProps> = ({
       }
 
       // Ward filter
-      if (filterWard !== 'all' && r.ward !== filterWard) return;
+      if (filterWard !== 'all' && getReceivingWard(r) !== filterWard && r.ward !== filterWard) return;
 
       // Employee filter
       if (filterEmployeeId !== 'all') {

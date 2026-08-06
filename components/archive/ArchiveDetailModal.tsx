@@ -81,20 +81,70 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                     <div className="font-medium text-gray-700">{record.trich_yeu}</div>
                                 </div>
                                 {record.type === 'saoluc' && (
-                                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-200 mt-2">
-                                        <div>
-                                            <label className="text-xs text-gray-500 block">Xã/Phường</label>
-                                            <div className="font-medium">{record.data?.xa_phuong || '-'}</div>
+                                    <>
+                                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 mt-2">
+                                            {(record.data?.so_dien_thoai || record.data?.phoneNumber) && (
+                                                <div>
+                                                    <label className="text-xs text-gray-500 block">Số điện thoại</label>
+                                                    <div className="font-medium text-gray-800">{record.data?.so_dien_thoai || record.data?.phoneNumber}</div>
+                                                </div>
+                                            )}
+                                            {record.data?.cccd && (
+                                                <div>
+                                                    <label className="text-xs text-gray-500 block">Số CCCD / CMND</label>
+                                                    <div className="font-medium text-gray-800">{record.data?.cccd}</div>
+                                                </div>
+                                            )}
+                                            {(record.data?.address || record.data?.dia_chi) && (
+                                                <div className="col-span-2">
+                                                    <label className="text-xs text-gray-500 block">Địa chỉ chi tiết</label>
+                                                    <div className="font-medium text-gray-800">{record.data?.address || record.data?.dia_chi}</div>
+                                                </div>
+                                            )}
+                                            {(record.data?.nguoi_uy_quyen || record.data?.authorizedBy) && (
+                                                <div>
+                                                    <label className="text-xs text-gray-500 block">Người được ủy quyền</label>
+                                                    <div className="font-medium text-gray-800">{record.data?.nguoi_uy_quyen || record.data?.authorizedBy}</div>
+                                                </div>
+                                            )}
+                                            {(record.data?.loai_uy_quyen || record.data?.authDocType) && (
+                                                <div>
+                                                    <label className="text-xs text-gray-500 block">Loại văn bản UQ</label>
+                                                    <div className="font-medium text-gray-800">{record.data?.loai_uy_quyen || record.data?.authDocType}</div>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div>
-                                            <label className="text-xs text-gray-500 block">Tờ</label>
-                                            <div className="font-medium">{record.data?.to_ban_do || '-'}</div>
+                                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-200 mt-2">
+                                            <div>
+                                                <label className="text-xs text-gray-500 block">Xã/Phường</label>
+                                                <div className="font-medium">{record.data?.xa_phuong || '-'}</div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-500 block">Tờ</label>
+                                                <div className="font-medium">{record.data?.to_ban_do || '-'}</div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-500 block">Thửa</label>
+                                                <div className="font-medium">{record.data?.thua_dat || '-'}</div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-500 block">Diện tích (m²)</label>
+                                                <div className="font-medium">{record.data?.dien_tich || record.data?.area || '-'}</div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="text-xs text-gray-500 block">Thửa</label>
-                                            <div className="font-medium">{record.data?.thua_dat || '-'}</div>
-                                        </div>
-                                    </div>
+                                        {(record.data?.giay_to_kem_theo || record.data?.otherDocs) && (
+                                            <div className="pt-2 border-t border-gray-200 mt-2">
+                                                <label className="text-xs text-gray-500 block">Giấy tờ kèm theo</label>
+                                                <div className="font-medium text-gray-700">{record.data?.giay_to_kem_theo || record.data?.otherDocs}</div>
+                                            </div>
+                                        )}
+                                        {(record.data?.notes || record.data?.ghi_chu) && (
+                                            <div className="pt-2 border-t border-gray-200 mt-2">
+                                                <label className="text-xs text-gray-500 block">Ghi chú</label>
+                                                <div className="font-medium text-gray-700">{record.data?.notes || record.data?.ghi_chu}</div>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>

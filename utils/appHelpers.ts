@@ -257,8 +257,43 @@ export function getReceivingWardBySuffix(suffix: string, defaultWard: string = '
 }
 
 export function getReceivingWard(record: RecordFile): string {
-    if (!record || !record.code) return record?.ward || '';
+    if (!record) return '';
+    if (record.receivingWard) return record.receivingWard;
+    if (!record.code) return record?.ward || '';
     const suffix = getRecordSuffix(record.code);
     return getReceivingWardBySuffix(suffix, record.ward || '');
+}
+
+// --- TÍNH NĂNG CẢNH BÁO HỒ SƠ CẦN CHÚ Ý ĐÃ KÝ DUYỆT ---
+export function playPriorityAlertSound() {
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const now = ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + i * 0.12);
+            gain.gain.setValueAtTime(0.3, now + i * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.12);
+            osc.stop(now + i * 0.12 + 0.35);
+        });
+    } catch (e) {
+        console.error("Audio playback error:", e);
+    }
+}
+
+export function triggerPrioritySignedAlert(record: RecordFile, newStatus: RecordStatus) {
+    if (Boolean(record.isPriority) && (newStatus === RecordStatus.SIGNED || newStatus === RecordStatus.HANDOVER || newStatus === RecordStatus.RETURNED)) {
+        playPriorityAlertSound();
+        window.dispatchEvent(new CustomEvent('priority_signed_alert', {
+            detail: { record, newStatus }
+        }));
+    }
 }
 

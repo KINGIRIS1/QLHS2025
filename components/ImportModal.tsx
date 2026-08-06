@@ -348,7 +348,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             <div className="bg-white p-8 rounded-xl shadow-md border border-gray-150 w-full max-w-lg text-center space-y-6 animate-fade-in">
               {isSaving ? (
                 <div className="flex flex-col items-center">
-                  <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-2" />
+                  <div className="relative w-16 h-16 flex items-center justify-center mb-3">
+                    <img src="./logo.png" alt="Logo" className="w-10 h-10 object-contain animate-pulse" />
+                    <Loader2 className="w-16 h-16 animate-spin text-blue-600 absolute inset-0" />
+                  </div>
                   <h3 className="text-lg font-bold text-gray-800">Đang nhập dữ liệu vào hệ thống...</h3>
                 </div>
               ) : (
@@ -450,8 +453,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             {/* PREVIEW TABLE */}
             <div className="flex-1 overflow-auto p-0">
                 {loading ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                        <Loader2 className="w-10 h-10 animate-spin mb-2 text-blue-500" />
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500 py-12">
+                        <div className="relative w-14 h-14 flex items-center justify-center mb-3">
+                            <img src="./logo.png" alt="Logo" className="w-8 h-8 object-contain animate-pulse" />
+                            <Loader2 className="w-14 h-14 animate-spin text-blue-500 absolute inset-0" />
+                        </div>
                         <p>Đang xử lý dữ liệu...</p>
                     </div>
                 ) : previewData.length > 0 ? (

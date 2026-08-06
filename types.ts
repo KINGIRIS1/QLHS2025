@@ -74,6 +74,7 @@ export interface RecordFile {
 
   exportBatch?: number | null;   
   exportDate?: string | null;    
+  receivingWard?: string | null; // Địa bàn giao / nhận 1 cửa
   
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
@@ -99,6 +100,10 @@ export interface RecordFile {
   forwardDate?: string | null;
   forwardNotes?: string | null;
   forwardHistory?: string | null;
+
+  // Hồ sơ cần chú ý / Ưu tiên báo cáo ngay
+  isPriority?: boolean;           // Đánh dấu là hồ sơ chú ý / ưu tiên
+  priorityNote?: string | null;   // Ghi chú lý do cần chú ý (sếp dặn, cần báo gấp, ...)
 }
 
 // Interface cho Item tách thửa

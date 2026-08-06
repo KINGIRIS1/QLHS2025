@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
-import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX, AlertTriangle } from 'lucide-react';
 import { PaginationControls } from '../PaginationControls';
 
 interface DailyListProps {
@@ -609,7 +609,17 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                             paginatedRecords.map((r, index) => (
                                 <tr key={r.id} className="hover:bg-blue-50/20 group transition-colors">
                                     <td className="p-4 text-center text-gray-400 align-middle font-medium font-mono">{(currentPage - 1) * itemsPerPage + index + 1}</td> 
-                                    <td className="p-4 font-bold text-blue-600 truncate align-middle tracking-tight" title={r.code}>{r.code}</td> 
+                                    <td className="p-4 font-bold text-blue-600 truncate align-middle tracking-tight" title={r.code}>
+                                        <div className="flex flex-col items-start gap-1">
+                                            <span>{r.code}</span>
+                                            {r.isPriority && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-400 px-2 py-0.5 rounded-full shadow-sm animate-pulse" title={r.priorityNote || 'Hồ sơ cần chú ý / báo cáo ngay'}>
+                                                    <AlertTriangle size={11} className="text-amber-500 fill-yellow-400 shrink-0" />
+                                                    <span>Chú ý</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td> 
                                     <td className="p-4 font-bold text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
                                     <td className="p-4 text-gray-700 truncate align-middle font-semibold" title={getNormalizedWard(r.ward)}>
                                         {getNormalizedWard(r.ward)}

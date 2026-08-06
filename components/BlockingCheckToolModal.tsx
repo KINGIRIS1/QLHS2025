@@ -413,9 +413,10 @@ const BlockingCheckToolModal: React.FC<BlockingCheckToolModalProps> = ({ isOpen,
           {step === 'running' && (
             <div className="max-w-md mx-auto my-16 text-center space-y-6 bg-white border border-slate-100 p-8 rounded-2xl shadow-sm">
               <div className="relative inline-flex items-center justify-center">
-                <Loader2 size={56} className="animate-spin text-indigo-600 mx-auto" />
+                <img src="./logo.png" alt="Logo" className="w-10 h-10 object-contain animate-pulse" />
+                <Loader2 size={72} className="animate-spin text-indigo-600 absolute -inset-2" />
                 {progress.total > 0 && (
-                  <span className="absolute text-[11px] font-extrabold text-indigo-600">
+                  <span className="absolute -bottom-6 text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                     {Math.round((progress.current / progress.total) * 100)}%
                   </span>
                 )}

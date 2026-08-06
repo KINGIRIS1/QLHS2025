@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, Employee } from '../../types';
 import { RecordStatus } from '../../types';
 import { Search, MapPin, CheckCircle, ShieldCheck, HelpCircle, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, CalendarClock, Edit2 } from 'lucide-react';
-import { getShortRecordType } from '../../constants';
-import { showToast } from '../../utils/appHelpers';
+import { getShortRecordType, getNormalizedWard } from '../../constants';
+import { showToast, getReceivingWard } from '../../utils/appHelpers';
 
 interface RecordSearchViewProps {
   records: RecordFile[];
@@ -556,7 +556,12 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
                           )}
                           {r.exportBatch && (
                             <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">
-                              Đợt: <strong>{r.exportBatch}</strong>
+                              Đợt: <strong>{String(r.exportBatch).toLowerCase().includes('đợt') ? r.exportBatch : `Đợt ${r.exportBatch}`}</strong>
+                            </span>
+                          )}
+                          {getReceivingWard(r) && (
+                            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap block mt-0.5">
+                              {getNormalizedWard(getReceivingWard(r))}
                             </span>
                           )}
                         </div>

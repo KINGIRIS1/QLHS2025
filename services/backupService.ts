@@ -855,6 +855,7 @@ export interface GoogleDriveStatus {
     email?: string;
     name?: string;
     picture?: string;
+    redirectUri?: string;
     error?: string;
 }
 

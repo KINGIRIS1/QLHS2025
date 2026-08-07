@@ -47,6 +47,7 @@ const getGoogleGenAIClient = (req: Request) => {
 };
 
 const server = jsonServer.create();
+server.set('trust proxy', true);
 const dbFile = process.env.DB_PATH || path.join(__dirname, 'server/db.json');
 const router = jsonServer.router(dbFile);
 const middlewares = jsonServer.defaults();

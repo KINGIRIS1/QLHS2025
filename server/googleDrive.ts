@@ -11,7 +11,7 @@ const TOKENS_FILE = path.join(__dirname, 'google_drive_tokens.json');
 
 // Helper to construct dynamic OAuth redirect URI
 export function getRedirectUri(req: Request): string {
-  const host = req.get('host');
+  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
   const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
   return `${protocol}://${host}/api/oauth/google/callback`;
 }
@@ -143,9 +143,10 @@ export async function handleOAuthCallback(req: Request, res: Response) {
 
 export async function handleGetStatus(req: Request, res: Response) {
   try {
+    const redirectUri = getRedirectUri(req);
     const tokens = loadSavedTokens();
     if (!tokens || (!tokens.access_token && !tokens.refresh_token)) {
-      return res.json({ connected: false });
+      return res.json({ connected: false, redirectUri });
     }
 
     const oauth2Client = getOAuth2Client(req);
@@ -158,14 +159,16 @@ export async function handleGetStatus(req: Request, res: Response) {
         connected: true,
         email: userInfo.data.email,
         name: userInfo.data.name,
-        picture: userInfo.data.picture
+        picture: userInfo.data.picture,
+        redirectUri
       });
     } catch (e) {
       // Fallback
-      return res.json({ connected: true });
+      return res.json({ connected: true, redirectUri });
     }
   } catch (err: any) {
-    return res.json({ connected: false, error: err.message });
+    const redirectUri = getRedirectUri(req);
+    return res.json({ connected: false, redirectUri, error: err.message });
   }
 }
 

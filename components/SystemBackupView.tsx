@@ -482,10 +482,28 @@ export const SystemBackupView: React.FC<SystemBackupViewProps> = ({ currentUsern
                         </div>
                     </div>
                 ) : (
-                    <div className="p-4 bg-emerald-950/50 border border-emerald-500/20 rounded-2xl text-xs text-emerald-200 leading-relaxed space-y-2">
-                        <span className="font-bold text-white block">💡 Tại sao nên bật sao lưu Google Drive?</span>
+                    <div className="p-4 bg-emerald-950/50 border border-emerald-500/20 rounded-2xl text-xs text-emerald-200 leading-relaxed space-y-3">
+                        <span className="font-bold text-white block">💡 Hướng dẫn cấu hình Google Cloud OAuth Redirect URI:</span>
                         <p>
-                            Khi liên kết Google Drive, mỗi lần hệ thống thực hiện sao lưu tự động (hoặc khi bạn bấm tạo điểm khôi phục), tệp JSON sao lưu sẽ được đẩy trực tiếp vào thư mục riêng <strong>"Sao Luu Quan Ly Ho So"</strong> trên Google Drive của bạn.
+                            Khi kết nối Google Drive, nếu Google báo lỗi <strong>Lỗi 400: redirect_uri_mismatch</strong>, bạn chỉ cần vào <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-emerald-300 underline font-bold">Google Cloud Console -&gt; Credentials -&gt; OAuth 2.0 Client ID</a> và thêm URL bên dưới vào danh sách <strong>Authorized redirect URIs (URI chuyển hướng được ủy quyền)</strong>:
+                        </p>
+                        {gdriveStatus.redirectUri && (
+                            <div className="p-2.5 bg-slate-950/80 border border-emerald-400/30 rounded-xl flex items-center justify-between gap-2 font-mono text-[11px] text-emerald-300">
+                                <span className="truncate select-all">{gdriveStatus.redirectUri}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(gdriveStatus.redirectUri || '');
+                                        showToast('Đã sao chép Redirect URI vào bộ nhớ tạm!', 'success');
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-200 rounded-lg text-[10px] font-sans font-bold shrink-0 transition-all"
+                                >
+                                    Sao chép URI
+                                </button>
+                            </div>
+                        )}
+                        <p className="text-[11px] text-emerald-300/80">
+                            Sau khi dán URL trên và lưu lại trong Google Cloud Console, bấm lại nút <strong>"Kết nối Google Drive"</strong> ở trên.
                         </p>
                     </div>
                 )}

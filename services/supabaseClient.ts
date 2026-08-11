@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import { ActiveThemeState } from '../types';
 
 // =========================================================================
 // HƯỚNG DẪN CẤU HÌNH GÓI PRO (QUAN TRỌNG):
@@ -59,6 +60,11 @@ presenceChannel.on('broadcast', { event: 'force_update' }, (payload) => {
     window.dispatchEvent(new CustomEvent('system_update_available_broadcast', { detail: payload }));
 });
 
+presenceChannel.on('broadcast', { event: 'theme_instant_update' }, (payload) => {
+    console.log("⚡ [REALTIME BROADCAST] Nhận tín hiệu đổi giao diện toàn hệ thống:", payload);
+    window.dispatchEvent(new CustomEvent('global_theme_changed', { detail: payload?.payload || payload }));
+});
+
 // Register presence listener BEFORE subscribing
 presenceChannel.on('presence', { event: 'sync' }, () => {
     globalPresenceState = presenceChannel.presenceState();
@@ -95,6 +101,41 @@ if (typeof window !== 'undefined' && isConfigured) {
                         } catch (e) {
                             console.error("Lỗi parse weather_location realtime:", e);
                         }
+                    } else if (row.key === 'active_theme_override') {
+                        console.log("⚡ [REALTIME DB] active_theme_override changed in DB", row);
+                        try {
+                            let parsed: any = null;
+                            try {
+                                parsed = JSON.parse(row.value);
+                            } catch (_) {
+                                parsed = row.value;
+                            }
+
+                            let state: ActiveThemeState;
+                            if (typeof parsed === 'string') {
+                                const trimmed = parsed.trim();
+                                state = {
+                                    activeThemeId: trimmed || null,
+                                    overrideActive: Boolean(trimmed),
+                                    updatedAt: new Date().toISOString()
+                                };
+                            } else if (typeof parsed === 'object' && parsed !== null) {
+                                state = {
+                                    activeThemeId: parsed.activeThemeId ?? null,
+                                    overrideActive: parsed.overrideActive ?? Boolean(parsed.activeThemeId),
+                                    updatedAt: parsed.updatedAt ?? new Date().toISOString()
+                                };
+                            } else {
+                                state = { activeThemeId: null, overrideActive: false, updatedAt: new Date().toISOString() };
+                            }
+
+                            window.dispatchEvent(new CustomEvent('global_theme_changed', { detail: state }));
+                        } catch (e) {
+                            console.error("Lỗi parse active_theme_override:", e);
+                        }
+                    } else if (row.key === 'app_themes_library') {
+                        console.log("⚡ [REALTIME DB] app_themes_library changed in DB", row);
+                        window.dispatchEvent(new CustomEvent('theme_library_changed'));
                     }
                 }
             }

@@ -301,4 +301,74 @@ export interface AuditLog {
   ipAddress?: string;
 }
 
+// --- Theme & Customization Types ---
+export type CalendarType = 'SOLAR' | 'LUNAR';
+export type EffectType = 'NONE' | 'PEACH_BLOSSOM' | 'APRICOT_BLOSSOM' | 'RED_FLAGS' | 'SNOW' | 'LANTERNS' | 'FIREWORKS';
+export type EffectIntensity = 'MINIMAL_OFFICE' | 'STANDARD' | 'CELEBRATION';
+
+export interface ThemeSchedule {
+  enabled: boolean;
+  calendarType: CalendarType;
+  startMonth: number; // 1-12
+  startDay: number;   // 1-31
+  endMonth: number;   // 1-12
+  endDay: number;     // 1-31
+  yearSpecific?: number | null; // e.g. 2027 or null for yearly repeat
+}
+
+export interface ThemeColors {
+  primary: string;         // --app-primary
+  primaryHover: string;    // --app-primary-hover
+  headerBg: string;        // --app-header-bg
+  headerText: string;      // --app-header-text
+  sidebarBg: string;       // --app-sidebar-bg
+  sidebarText: string;     // --app-sidebar-text
+  accent: string;          // --app-accent
+  background: string;      // --app-bg
+  cardBg: string;          // --app-card-bg
+  textColor: string;       // --app-text-main
+  borderRadius: 'none' | 'sm' | 'md' | 'lg';
+}
+
+export interface ThemeBranding {
+  showEventBadge?: boolean;
+  eventBadgeText?: string;
+  greetingText?: string;
+  bannerUrl?: string;
+  headerLogoUrl?: string;
+}
+
+export interface ThemeEffectConfig {
+  type: EffectType;
+  intensity: EffectIntensity;
+  disableOnMobile?: boolean;
+}
+
+export interface ThemeConfig {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  isSystemDefault?: boolean;
+  priority: number;
+  
+  schedule: ThemeSchedule;
+  colors: ThemeColors;
+  branding: ThemeBranding;
+  effect: ThemeEffectConfig;
+
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface ActiveThemeState {
+  activeThemeId: string | null; // null means auto-select by date
+  overrideActive: boolean;
+  previewTheme?: ThemeConfig | null;
+  previewThemeId?: string | null;
+  previewDate?: string | null;
+  overrideExpireDate?: string | null;
+  updatedAt: string;
+}
+
 export type LandRecordFormData = Omit<LandRecord, 'id' | 'created_at'> & { id?: string };

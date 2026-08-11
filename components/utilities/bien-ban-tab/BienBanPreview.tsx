@@ -6,25 +6,96 @@ interface BienBanPreviewProps {
     generateContent: (isForWord: boolean) => string;
     isAreaMismatch: boolean;
     isAreaMismatchBDDC?: boolean;
+    actualDiffGCN?: number;
+    calculatedSumGCN?: number;
+    actualDiffBDDC?: number;
+    calculatedSumBDDC?: number;
 }
 
-const BienBanPreview: React.FC<BienBanPreviewProps> = ({ generateContent, isAreaMismatch, isAreaMismatchBDDC }) => {
+const BienBanPreview: React.FC<BienBanPreviewProps> = ({
+    generateContent,
+    isAreaMismatch,
+    isAreaMismatchBDDC,
+    actualDiffGCN = 0,
+    calculatedSumGCN = 0,
+    actualDiffBDDC = 0,
+    calculatedSumBDDC = 0,
+}) => {
+    const renderMismatchCard = (
+        title: string,
+        targetLabel: string,
+        actualDiff: number,
+        calculatedSum: number,
+        bgColorClass: string,
+        borderColorClass: string,
+        accentTextColorClass: string,
+        subBorderColorClass: string
+    ) => {
+        const diff = actualDiff - calculatedSum;
+        const mismatchAmount = Math.abs(diff);
+
+        const formatSigned = (val: number) => {
+            if (val > 0) return `+${val.toFixed(1)}`;
+            if (val < 0) return `-${Math.abs(val).toFixed(1)}`;
+            return `0.0`;
+        };
+
+        const formatDiffText = (val: number) => {
+            if (val > 0) return `Tăng ${val.toFixed(1)} m²`;
+            if (val < 0) return `Giảm ${Math.abs(val).toFixed(1)} m²`;
+            return `Không đổi`;
+        };
+
+        const evalWord = diff > 0 ? 'thiếu' : 'thừa';
+        const evalText = `Chi tiết tăng/giảm đang kê khai ${evalWord} ${mismatchAmount.toFixed(1)} m² so với thực tế biến động. Hãy kiểm tra lại.`;
+
+        return (
+            <div className={`${bgColorClass} border-2 ${borderColorClass} text-white rounded-xl p-4 shadow-2xl mb-4 w-[210mm] z-50 animate-pulse text-xs sm:text-sm font-medium`}>
+                <div className={`flex items-center gap-2 font-black ${accentTextColorClass} text-sm sm:text-base border-b ${subBorderColorClass} pb-2 mb-2 uppercase tracking-wide`}>
+                    <AlertCircle size={22} className="shrink-0 text-amber-300" />
+                    {title} (LỆCH {mismatchAmount.toFixed(1)} m²)
+                </div>
+                <div className="space-y-1.5 pl-2 sm:pl-7 text-white/95 leading-relaxed">
+                    <div>
+                        <strong>• Tổng chênh lệch thực tế (Mới - {targetLabel}):</strong>{' '}
+                        <span className={`font-bold ${accentTextColorClass}`}>{formatSigned(actualDiff)} m²</span> ({formatDiffText(actualDiff)})
+                    </div>
+                    <div>
+                        <strong>• Tổng chi tiết tăng/giảm đã nhập:</strong>{' '}
+                        <span className={`font-bold ${accentTextColorClass}`}>{formatSigned(calculatedSum)} m²</span>
+                    </div>
+                    <div className={`pt-1.5 ${accentTextColorClass} font-semibold border-t ${subBorderColorClass} mt-2`}>
+                        <strong>• Đánh giá:</strong> {evalText}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="flex-1 bg-slate-300 overflow-y-auto overflow-x-auto p-10 flex flex-col items-center custom-scrollbar shadow-inner relative min-w-0 min-h-0 h-full">
             {/* CẢNH BÁO LỆCH DIỆN TÍCH GCN */}
-            {isAreaMismatch && (
-                <div className="bg-red-600 text-white font-bold text-center p-2 mb-2 rounded-lg shadow-xl animate-pulse text-sm sticky top-0 z-50 flex items-center gap-2 uppercase tracking-wide border-2 border-white/20 backdrop-blur-md">
-                    <AlertCircle size={20} />
-                    (TỔNG TĂNG GIẢM GCN CHƯA KHỚP)
-                </div>
+            {isAreaMismatch && renderMismatchCard(
+                'CẢNH BÁO LỆCH DIỆN TÍCH GCN',
+                'GCN',
+                actualDiffGCN,
+                calculatedSumGCN,
+                'bg-red-700',
+                'border-red-400',
+                'text-amber-200',
+                'border-red-500/80'
             )}
 
             {/* CẢNH BÁO LỆCH DIỆN TÍCH BĐĐC */}
-            {isAreaMismatchBDDC && (
-                <div className="bg-orange-600 text-white font-bold text-center p-2 mb-4 rounded-lg shadow-xl animate-pulse text-sm sticky top-12 z-50 flex items-center gap-2 uppercase tracking-wide border-2 border-white/20 backdrop-blur-md">
-                    <AlertCircle size={20} />
-                    (TỔNG TĂNG GIẢM BĐĐC CHƯA KHỚP)
-                </div>
+            {isAreaMismatchBDDC && renderMismatchCard(
+                'CẢNH BÁO LỆCH DIỆN TÍCH BĐĐC 2024',
+                'BĐĐC 2024',
+                actualDiffBDDC,
+                calculatedSumBDDC,
+                'bg-orange-600',
+                'border-orange-300',
+                'text-yellow-200',
+                'border-orange-400/80'
             )}
 
             <div className="bg-white w-[210mm] min-h-[297mm] h-auto shadow-[0_0_80px_rgba(0,0,0,0.25)] p-[20mm_15mm_20mm_25mm] transition-all animate-fade-in-up relative ring-1 ring-slate-400 mb-24 flex flex-col shrink-0">

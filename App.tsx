@@ -31,9 +31,12 @@ import WelcomeModal from './components/WelcomeModal';
 import PrioritySignedModalAlert from './components/PrioritySignedModalAlert';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { offlineDb } from './utils/offlineDb';
+import { useThemeEngine } from './hooks/useThemeEngine';
+import { ThemeCanvasEffects } from './components/ThemeCanvasEffects';
 
 function App() {
   const isMobile = useIsMobile(768);
+  const { currentActiveTheme } = useThemeEngine();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -1315,6 +1318,11 @@ function App() {
         />
 
         <PrioritySignedModalAlert records={records} />
+
+        <ThemeCanvasEffects 
+            effectType={currentActiveTheme.effect.type} 
+            intensity={currentActiveTheme.effect.intensity} 
+        />
     </MainLayout>
   );
 }

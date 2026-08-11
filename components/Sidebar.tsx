@@ -139,13 +139,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      <div className={`
-        fixed md:static inset-y-0 left-0 z-50 
-        w-64 md:w-20 
-        shrink-0 bg-[#0f172a] text-white min-h-screen flex flex-col shadow-xl 
-        transition-all duration-300 ease-in-out overflow-visible
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
+      <div
+        className={`
+          fixed md:static inset-y-0 left-0 z-50 
+          w-64 md:w-20 
+          shrink-0 text-white min-h-screen flex flex-col shadow-xl 
+          transition-all duration-300 ease-in-out overflow-visible
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+        style={{ backgroundColor: 'var(--app-sidebar-bg, #0f172a)', color: 'var(--app-sidebar-text, #ffffff)' }}
+      >
         {/* BRAND HEADER */}
         <div className="h-14 flex items-center justify-center border-b border-slate-800 bg-slate-900/50 shrink-0 relative group">
              <div className="bg-blue-600 p-2 rounded-lg shadow-blue-500/20 shrink-0 cursor-pointer">

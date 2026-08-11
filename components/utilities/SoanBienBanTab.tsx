@@ -283,6 +283,22 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   const isAreaMismatch = checkAreaMismatch();
   const isAreaMismatchBDDC = checkAreaMismatchBDDC();
 
+  const dtCu = parseFloat(formData.DT_CU) || 0;
+  const dtMoi = parseFloat(formData.DT_MOI) || 0;
+  const dtBddc = parseFloat(formData.DT_BDDC_2024) || 0;
+
+  const actualDiffGCN = dtMoi - dtCu;
+  const calculatedSumGCN = boundaryChanges.reduce((sum, row) => {
+      const areaVal = parseFloat(row.area) || 0;
+      return row.type === 'tăng' ? sum + areaVal : sum - areaVal;
+  }, 0);
+
+  const actualDiffBDDC = dtMoi - dtBddc;
+  const calculatedSumBDDC = boundaryChangesBDDC.reduce((sum, row) => {
+      const areaVal = parseFloat(row.area) || 0;
+      return row.type === 'tăng' ? sum + areaVal : sum - areaVal;
+  }, 0);
+
   useEffect(() => {
     const total = parseFloat(formData.DT_CU) || 0;
     const odt = parseFloat(formData.DT_ODT) || 0;
@@ -797,6 +813,10 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
                             generateContent={generateContent}
                             isAreaMismatch={isAreaMismatch}
                             isAreaMismatchBDDC={isAreaMismatchBDDC}
+                            actualDiffGCN={actualDiffGCN}
+                            calculatedSumGCN={calculatedSumGCN}
+                            actualDiffBDDC={actualDiffBDDC}
+                            calculatedSumBDDC={calculatedSumBDDC}
                         />
                     </div>
                 </div>

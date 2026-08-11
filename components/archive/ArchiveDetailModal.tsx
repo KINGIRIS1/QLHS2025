@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { ArchiveRecord } from '../../services/apiArchive';
-import { X, Clock, User, FileText, Calendar, CheckCircle2, Paperclip } from 'lucide-react';
+import { X, Clock, User, FileText, Calendar, CheckCircle2, Paperclip, Camera, Check, Loader2 } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import { RecordStatus } from '../../types';
 
@@ -12,7 +12,55 @@ interface ArchiveDetailModalProps {
 }
 
 const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose, record, getEmployeeName }) => {
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [captureSuccess, setCaptureSuccess] = useState(false);
+    const detailModalRef = useRef<HTMLDivElement>(null);
+
     if (!isOpen || !record) return null;
+
+    const handleCaptureScreenshot = async () => {
+        if (!detailModalRef.current) return;
+        setIsCapturing(true);
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(detailModalRef.current, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+            
+            const fileName = `Chi_Tiet_Ho_So_${record.so_hieu || record.id}.png`;
+
+            // Tải ảnh xuống
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            link.click();
+
+            // Thử sao chép vào Clipboard
+            canvas.toBlob(async (blob) => {
+                if (blob && navigator.clipboard && window.ClipboardItem) {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                        ]);
+                    } catch {
+                        // Bỏ qua nếu clipboard bị giới hạn
+                    }
+                }
+            });
+
+            setCaptureSuccess(true);
+            setTimeout(() => setCaptureSuccess(false), 3000);
+        } catch (err) {
+            console.error('Lỗi khi chụp hình:', err);
+            alert('Có lỗi khi chụp hình chi tiết hồ sơ.');
+        } finally {
+            setIsCapturing(false);
+        }
+    };
 
     const history = record.data?.history || [];
 
@@ -37,7 +85,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-fade-in-up">
+            <div ref={detailModalRef} className="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-fade-in-up overflow-hidden">
                 {/* Header */}
                 <div className="flex justify-between items-center p-5 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -252,6 +300,45 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                             )}
                         </div>
                     </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between shrink-0">
+                    <button
+                        type="button"
+                        onClick={handleCaptureScreenshot}
+                        disabled={isCapturing}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 shadow-sm ${
+                            captureSuccess 
+                                ? 'bg-emerald-600 text-white' 
+                                : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white'
+                        }`}
+                        title="Chụp ảnh chi tiết hồ sơ để gửi cho người khác"
+                    >
+                        {isCapturing ? (
+                            <>
+                                <Loader2 size={15} className="animate-spin" />
+                                <span>Đang chụp ảnh...</span>
+                            </>
+                        ) : captureSuccess ? (
+                            <>
+                                <Check size={15} />
+                                <span>Đã tải ảnh chi tiết!</span>
+                            </>
+                        ) : (
+                            <>
+                                <Camera size={15} />
+                                <span>Chụp hình nhanh</span>
+                            </>
+                        )}
+                    </button>
+
+                    <button
+                        onClick={onClose}
+                        className="px-5 py-2 border border-gray-300 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold transition-all active:scale-95"
+                    >
+                        Đóng lại
+                    </button>
                 </div>
             </div>
         </div>

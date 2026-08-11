@@ -736,7 +736,14 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                         <Users size={16} className="text-gray-500"/>
                         <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
                             <option value="">Tất cả Nhân viên</option>
-                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                            {employees
+                                .filter(e => {
+                                    const dept = (e.department || '').toLowerCase();
+                                    const pos = (e.position || '').toLowerCase();
+                                    if (filterEmployee && e.id === filterEmployee) return true;
+                                    return dept.includes('lưu trữ') || pos.includes('lưu trữ');
+                                })
+                                .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                     </div>
                 </div>

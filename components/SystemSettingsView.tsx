@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu, HardDrive } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu, HardDrive, Palette } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
@@ -8,6 +8,7 @@ import { confirmAction, showToast } from '../utils/appHelpers';
 import { supabase, presenceChannel } from '../services/supabaseClient';
 import { ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 import SystemBackupView from './SystemBackupView';
+import { AdminThemeManager } from './AdminThemeManager';
 
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
@@ -18,7 +19,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onDeleteAllData,
   onHolidaysChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'devices' | 'backup' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'holidays' | 'devices' | 'backup' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
@@ -336,6 +337,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <Database size={16} /> Chung
             </button>
             <button 
+                onClick={() => setActiveTab('theme')}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'theme' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+                <Palette size={16} /> Giao diện & Lễ Tết
+            </button>
+            <button 
                 onClick={() => setActiveTab('holidays')}
                 className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
@@ -362,6 +369,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         </div>
 
         <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
+            {activeTab === 'theme' && <AdminThemeManager />}
+
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}

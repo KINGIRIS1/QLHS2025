@@ -159,11 +159,14 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       )}
 
       {/* Sidebar Container */}
-      <div className={`
-        fixed inset-y-0 left-0 z-40 w-[90px] bg-[#1e3a8a] text-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col pt-14 md:pt-0
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:relative md:translate-x-0
-      `}>
+      <div
+        className={`
+          fixed inset-y-0 left-0 z-40 w-[90px] text-white shadow-xl transform transition-all duration-300 ease-in-out flex flex-col pt-14 md:pt-0
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:relative md:translate-x-0
+        `}
+        style={{ backgroundColor: 'var(--app-sidebar-bg, var(--app-header-bg, #1e3a8a))', color: 'var(--app-sidebar-text, #ffffff)' }}
+      >
         
         {/* NAVIGATION */}
         <nav className="flex-1 overflow-y-auto py-2 px-1 space-y-1 custom-scrollbar">

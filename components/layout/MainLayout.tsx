@@ -93,7 +93,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             />
 
             {/* HEADER */}
-            <header className="h-14 bg-[#1e3a8a] text-white flex items-center justify-between px-4 shadow-md z-50 shrink-0 border-b border-blue-800">
+            <header
+                className="h-14 text-white flex items-center justify-between px-4 shadow-md z-50 shrink-0 border-b border-white/10 transition-colors duration-300"
+                style={{ backgroundColor: 'var(--app-header-bg, #1e3a8a)', color: 'var(--app-header-text, #ffffff)' }}
+            >
                 {/* LEFT: BRAND */}
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-transparent ring-1 ring-white/20 shadow-sm overflow-hidden">

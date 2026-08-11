@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, UserRole } from '../../types';
 import { ArchiveRecord, fetchWarehouseRecordsPaginated, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, initRealtimeArchive, importSingleWarehouseRecord, mapFromWarehouseRecord } from '../../services/apiArchive';
 import { supabase } from '../../services/supabaseClient';
-import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2, User as UserIcon, FileText, Upload } from 'lucide-react';
+import { Search, Plus, Trash2, Edit, Save, X, Eye, Calendar, FileSpreadsheet, Loader2, Download, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, BookOpen, Layers, Archive, HardDrive, CheckCircle2, User as UserIcon, FileText, Upload, Camera, Check } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -85,6 +85,55 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editFormData, setEditFormData] = useState<Partial<ArchiveRecord>>({});
+
+    // Chụp hình nhanh chi tiết hồ sơ
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [captureSuccess, setCaptureSuccess] = useState(false);
+    const detailModalRef = useRef<HTMLDivElement>(null);
+
+    const handleCaptureScreenshot = async () => {
+        if (!detailModalRef.current) return;
+        setIsCapturing(true);
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(detailModalRef.current, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+            
+            const fileName = `Ho_So_Kho_${selectedRecord?.data?.sophathanhgcnmoi || selectedRecord?.so_hieu || 'Chi_Tiet'}.png`;
+
+            // Tải ảnh xuống thiết bị
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            link.click();
+
+            // Thử sao chép ảnh vào Clipboard nếu trình duyệt hỗ trợ
+            canvas.toBlob(async (blob) => {
+                if (blob && navigator.clipboard && window.ClipboardItem) {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                        ]);
+                    } catch {
+                        // Bỏ qua nếu môi trường iframe hạn chế quyền clipboard
+                    }
+                }
+            });
+
+            setCaptureSuccess(true);
+            setTimeout(() => setCaptureSuccess(false), 3000);
+        } catch (err) {
+            console.error('Lỗi khi chụp hình:', err);
+            alert('Có lỗi khi chụp hình chi tiết hồ sơ.');
+        } finally {
+            setIsCapturing(false);
+        }
+    };
 
     // State cho quá trình import Excel nâng cao theo lô (batching) chống đơ RAM và API Timeout
     const [isImporting, setIsImporting] = useState(false);
@@ -1420,7 +1469,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
             {/* MODAL CHI TIẾT HỒ SƠ KHO */}
             {isDetailOpen && selectedRecord && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] p-3 md:p-6 animate-fade-in">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up border border-slate-200">
+                    <div ref={detailModalRef} className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up border border-slate-200">
                         {/* Header */}
                         <div className="flex justify-between items-center bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 text-white p-5 md:px-7 shrink-0 shadow-md">
                             <div className="flex items-center gap-3.5">
@@ -1644,21 +1693,54 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                         </div>
 
                         {/* Footer Buttons */}
-                        <div className="p-4 md:px-7 border-t border-slate-200 bg-white flex justify-end gap-3 shrink-0">
-                            {currentUser.role === UserRole.ADMIN && (
+                        <div className="p-4 md:px-7 border-t border-slate-200 bg-white flex flex-wrap items-center justify-between gap-3 shrink-0">
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => openEditModal(selectedRecord)}
-                                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+                                    type="button"
+                                    onClick={handleCaptureScreenshot}
+                                    disabled={isCapturing}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 shadow-sm ${
+                                        captureSuccess 
+                                            ? 'bg-emerald-600 text-white' 
+                                            : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white'
+                                    }`}
+                                    title="Chụp ảnh toàn bộ chi tiết hồ sơ kho để gửi cho người khác"
                                 >
-                                    <Edit size={14} /> Chỉnh sửa hồ sơ
+                                    {isCapturing ? (
+                                        <>
+                                            <Loader2 size={15} className="animate-spin" />
+                                            <span>Đang chụp ảnh...</span>
+                                        </>
+                                    ) : captureSuccess ? (
+                                        <>
+                                            <Check size={15} />
+                                            <span>Đã tải ảnh chi tiết!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Camera size={15} />
+                                            <span>Chụp hình nhanh</span>
+                                        </>
+                                    )}
                                 </button>
-                            )}
-                            <button
-                                onClick={() => setIsDetailOpen(false)}
-                                className="px-5 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95"
-                            >
-                                Đóng lại
-                            </button>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                {currentUser.role === UserRole.ADMIN && (
+                                    <button
+                                        onClick={() => openEditModal(selectedRecord)}
+                                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+                                    >
+                                        <Edit size={14} /> Chỉnh sửa hồ sơ
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setIsDetailOpen(false)}
+                                    className="px-5 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                >
+                                    Đóng lại
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

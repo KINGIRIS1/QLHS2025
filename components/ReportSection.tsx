@@ -12,6 +12,7 @@ import DailyStatsView from './report/DailyStatsView';
 import LateRecordsView from './report/LateRecordsView';
 import TeamWeeklyDetailsView from './report/TeamWeeklyDetailsView';
 import HandoverComparisonView from './report/HandoverComparisonView';
+import AiReportCardView from './report/AiReportCardView';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
 import { WorkSchedule } from '../types';
 
@@ -644,44 +645,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 )}
 
                 {activeTab === 'ai' && (
-                    <div className="h-full flex flex-col items-center p-4">
-                        {/* AI Toolbar */}
-                        <div className="w-full flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
-                            <div className="flex items-center gap-2">
-                                <div className="text-sm text-gray-600">
-                                    Sử dụng <strong>Gemini AI</strong> để viết báo cáo nhận xét tiến độ.
-                                    {reportType !== 'custom' && <span className="ml-2 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">Chế độ: {reportType === 'week' ? 'Báo cáo Tuần' : 'Báo cáo Tháng'}</span>}
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setIsKeyModalOpen(true)} className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm shadow-sm transition-all" title="Cài đặt API Key">
-                                    <Settings size={16} /> Cấu hình AI
-                                </button>
-                                <button onClick={handleGenerateClick} disabled={isGenerating} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold text-sm shadow-md transition-all disabled:opacity-50">
-                                    {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                                    Tạo báo cáo ngay
-                                </button>
-                                {reportContent && (
-                                    <button onClick={handlePrint} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm shadow-sm">
-                                        <Printer size={16} /> In
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Preview */}
-                        <div className="flex-1 w-full overflow-y-auto bg-slate-200 p-8 rounded-xl custom-scrollbar flex justify-center border border-slate-300 shadow-inner">
-                            {reportContent ? (
-                                <div className="bg-white shadow-2xl p-[20mm_15mm_20mm_25mm] w-[210mm] min-h-[297mm] animate-fade-in-up">
-                                    <div ref={previewRef} style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '13pt', lineHeight: 1.4 }} dangerouslySetInnerHTML={{ __html: reportContent }} />
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center text-slate-400 opacity-60">
-                                    <FileText size={64} className="mb-4" />
-                                    <p>Chưa có nội dung báo cáo.</p>
-                                </div>
-                            )}
-                        </div>
+                    <div className="h-full w-full overflow-y-auto custom-scrollbar">
+                        <AiReportCardView
+                            reportContent={reportContent}
+                            isGenerating={isGenerating}
+                            onGenerate={handleGenerateClick}
+                            onPrint={handlePrint}
+                            onOpenKeyModal={() => setIsKeyModalOpen(true)}
+                            records={activeRecords}
+                            reportType={reportType}
+                            fromDate={fromDate}
+                            toDate={toDate}
+                        />
                     </div>
                 )}
 

@@ -431,9 +431,29 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                                 <select value={props.filterEmployee} onChange={(e) => props.setFilterEmployee(e.target.value)} className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[120px]">
                                     <option value="all">Tất cả NV</option>
                                     <option value="unassigned">Chưa giao</option>
-                                    {employees.map(emp => (
-                                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                                    ))}
+                                    {(() => {
+                                        const isMeasurement = currentView === 'all_records';
+                                        let filteredEmps = employees;
+                                        if (isMeasurement) {
+                                            filteredEmps = employees.filter(emp => {
+                                                const dept = (emp.department || '').toLowerCase();
+                                                const pos = (emp.position || '').toLowerCase();
+                                                const surveyKeywords = ['đo đạc', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp', 'kỹ thuật', 'địa chính', 'bản đồ'];
+                                                const excludeKeywords = ['văn thư', 'kế toán', 'một cửa', 'tiếp nhận', 'hành chính', 'bảo vệ', 'tạp vụ', 'pháp chế', 'lưu trữ', 'thông tin lưu trữ'];
+                                                if (excludeKeywords.some(k => dept.includes(k) || pos.includes(k))) return false;
+                                                return surveyKeywords.some(k => dept.includes(k) || pos.includes(k));
+                                            });
+                                            if (props.filterEmployee && props.filterEmployee !== 'all' && props.filterEmployee !== 'unassigned') {
+                                                const selectedEmp = employees.find(e => e.id === props.filterEmployee);
+                                                if (selectedEmp && !filteredEmps.some(e => e.id === selectedEmp.id)) {
+                                                    filteredEmps = [...filteredEmps, selectedEmp];
+                                                }
+                                            }
+                                        }
+                                        return filteredEmps.map(emp => (
+                                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                        ));
+                                    })()}
                                 </select>
                             </div>
                          )}

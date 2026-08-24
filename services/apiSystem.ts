@@ -1,7 +1,73 @@
 
-import { supabase, isConfigured } from './supabaseClient';
+import { supabase, isConfigured, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabaseClient';
 import { Holiday } from '../types';
 import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
+
+export interface ServerHealthResult {
+    isOnline: boolean;
+    errorType?: 'OFFLINE' | 'SCHEMA_CACHE' | 'SERVER_ERROR' | 'NETWORK_ERROR' | 'MAINTENANCE';
+    message?: string;
+    responseTimeMs?: number;
+}
+
+export const checkServerHealth = async (timeoutMs: number = 4000): Promise<ServerHealthResult> => {
+    if (!isConfigured) {
+        return { isOnline: false, errorType: 'OFFLINE', message: 'Hệ thống chưa nhận diện được URL hoặc Key của máy chủ dữ liệu.' };
+    }
+    const startTime = Date.now();
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/system_settings?select=key&limit=1`, {
+            method: 'GET',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timer);
+        const responseTimeMs = Date.now() - startTime;
+
+        if (response.ok) {
+            return { isOnline: true, responseTimeMs };
+        }
+
+        const resText = await response.text().catch(() => '');
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+            return { 
+                isOnline: false, 
+                errorType: 'SERVER_ERROR', 
+                message: 'Máy chủ dữ liệu (Docker / Server) hiện chưa được bật hoặc đang bảo trì.',
+                responseTimeMs 
+            };
+        }
+        if (resText.includes('PGRST002') || resText.includes('schema cache')) {
+            return { 
+                isOnline: false, 
+                errorType: 'SCHEMA_CACHE', 
+                message: 'Máy chủ đang khởi động lại hoặc đang đồng bộ cấu hình cơ sở dữ liệu.',
+                responseTimeMs 
+            };
+        }
+        
+        return { 
+            isOnline: false, 
+            errorType: 'SERVER_ERROR', 
+            message: `Máy chủ phản hồi mã lỗi ${response.status}: ${resText.slice(0, 80)}`,
+            responseTimeMs 
+        };
+    } catch (e: any) {
+        const responseTimeMs = Date.now() - startTime;
+        return { 
+            isOnline: false, 
+            errorType: 'NETWORK_ERROR', 
+            message: 'Không thể kết nối đến máy chủ api.qlhsct.info.vn. Máy chủ có thể đang tắt hoặc máy bạn bị mất mạng.',
+            responseTimeMs 
+        };
+    }
+};
 
 export const testDatabaseConnection = async (): Promise<{ status: string, message: string }> => {
     if (!isConfigured) {

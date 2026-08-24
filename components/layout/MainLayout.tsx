@@ -1,11 +1,111 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings } from 'lucide-react';
+import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, Activity, Wifi, Server } from 'lucide-react';
 import { User, UserRole } from '../../types';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 import { supabase, isConfigured, presenceChannel, trackPresence } from '../../services/supabaseClient';
+import { checkServerHealth } from '../../services/apiSystem';
 import { APP_VERSION } from '../../constants';
+
+// Component Nhãn hiển thị trạng thái kết nối và ping thời gian thực
+const ServerStatusBadge: React.FC = () => {
+    const [status, setStatus] = useState<'online' | 'slow' | 'offline' | 'checking'>('checking');
+    const [ping, setPing] = useState<number | null>(null);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const measurePing = useCallback(async () => {
+        try {
+            const res = await checkServerHealth(3500);
+            if (res.isOnline && typeof res.responseTimeMs === 'number') {
+                setPing(res.responseTimeMs);
+                if (res.responseTimeMs < 200) {
+                    setStatus('online');
+                } else {
+                    setStatus('slow');
+                }
+            } else {
+                setStatus('offline');
+                setPing(null);
+            }
+        } catch {
+            setStatus('offline');
+            setPing(null);
+        }
+    }, []);
+
+    useEffect(() => {
+        measurePing();
+        intervalRef.current = setInterval(measurePing, 10000); // Đo lại mỗi 10s
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [measurePing]);
+
+    return (
+        <div 
+            title={
+                status === 'online' ? `Máy chủ hoạt động tốt (Độ trễ: ${ping}ms)` :
+                status === 'slow' ? `Máy chủ phản hồi chậm (Độ trễ: ${ping}ms)` :
+                status === 'offline' ? 'Không thể kết nối đến máy chủ api.qlhsct.info.vn' :
+                'Đang kiểm tra kết nối máy chủ...'
+            }
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-900/60 border border-blue-400/30 text-white select-none backdrop-blur-sm transition-all hover:bg-blue-900/80 cursor-default"
+        >
+            {/* Chấm tròn trạng thái có hiệu ứng nhấp nháy */}
+            <span className="relative flex h-2 w-2">
+                {status === 'online' && (
+                    <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </>
+                )}
+                {status === 'slow' && (
+                    <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </>
+                )}
+                {status === 'offline' && (
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                )}
+                {status === 'checking' && (
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-300 animate-pulse"></span>
+                )}
+            </span>
+
+            {/* Label Trạng thái & Ping */}
+            <div className="flex items-center gap-1 text-[11px] font-medium leading-none">
+                {status === 'online' && (
+                    <>
+                        <span className="text-emerald-300 font-bold hidden sm:inline">Online</span>
+                        {ping !== null && (
+                            <span className="font-mono text-emerald-200 text-[10px]">
+                                {ping}ms
+                            </span>
+                        )}
+                    </>
+                )}
+                {status === 'slow' && (
+                    <>
+                        <span className="text-amber-300 font-bold hidden sm:inline">Chậm</span>
+                        {ping !== null && (
+                            <span className="font-mono text-amber-200 text-[10px]">
+                                {ping}ms
+                            </span>
+                        )}
+                    </>
+                )}
+                {status === 'offline' && (
+                    <span className="text-rose-300 font-bold">Mất kết nối</span>
+                )}
+                {status === 'checking' && (
+                    <span className="text-blue-200 text-[10px]">Đang ping...</span>
+                )}
+            </div>
+        </div>
+    );
+};
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -106,23 +206,26 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO */}
-                <div className="relative">
-                    <button 
-                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                        className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
-                    >
-                        <div className="w-9 h-9 rounded-full bg-blue-700 flex items-center justify-center text-white ring-2 ring-blue-600/50 shadow-sm">
-                            <UserCircle size={20} />
-                        </div>
-                        <div className="hidden md:flex flex-col items-end text-right mr-1">
-                            <span className="text-sm font-bold leading-none">{currentUser.name}</span>
-                            <span className="text-[10px] text-blue-300 uppercase font-semibold tracking-wider mt-0.5">
-                                {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : currentUser.role === UserRole.RECEPTION_HANDOVER ? 'Tiếp nhận & Bàn giao' : 'Nhân viên'}
-                            </span>
-                        </div>
-                        <ChevronDown size={16} className={`text-blue-300 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-                    </button>
+                {/* RIGHT: USER INFO & CONNECTION STATUS */}
+                <div className="flex items-center gap-3">
+                    <ServerStatusBadge />
+
+                    <div className="relative">
+                        <button 
+                            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                            className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
+                        >
+                            <div className="w-9 h-9 rounded-full bg-blue-700 flex items-center justify-center text-white ring-2 ring-blue-600/50 shadow-sm">
+                                <UserCircle size={20} />
+                            </div>
+                            <div className="hidden md:flex flex-col items-end text-right mr-1">
+                                <span className="text-sm font-bold leading-none">{currentUser.name}</span>
+                                <span className="text-[10px] text-blue-300 uppercase font-semibold tracking-wider mt-0.5">
+                                    {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : currentUser.role === UserRole.RECEPTION_HANDOVER ? 'Tiếp nhận & Bàn giao' : 'Nhân viên'}
+                                </span>
+                            </div>
+                            <ChevronDown size={16} className={`text-blue-300 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                        </button>
 
                     {/* Dropdown Menu */}
                     {isUserMenuOpen && (
@@ -180,6 +283,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                             </div>
                         </>
                     )}
+                    </div>
                 </div>
             </header>
 

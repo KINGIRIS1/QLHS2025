@@ -29,6 +29,7 @@ import UpdateRequiredModal from './components/UpdateRequiredModal';
 import { PlotCountModal } from './components/PlotCountModal';
 import WelcomeModal from './components/WelcomeModal';
 import PrioritySignedModalAlert from './components/PrioritySignedModalAlert';
+import ServerConnectionLockModal from './components/ServerConnectionLockModal';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { offlineDb } from './utils/offlineDb';
 
@@ -276,6 +277,7 @@ function App() {
   // --- CUSTOM HOOKS ---
   const { 
       records, employees, users, wards, holidays, connectionStatus, 
+      isServerDisconnected, setIsServerDisconnected, serverDisconnectReason,
       isUpdateAvailable, latestVersion, updateUrl,
       setEmployees, setUsers, setRecords, setWards,
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
@@ -1216,6 +1218,14 @@ function App() {
             records={records}
             onSelectRecord={(r) => setViewingRecord(r)}
         />
+        <ServerConnectionLockModal 
+            isOpen={isServerDisconnected}
+            onReconnectSuccess={() => {
+                setIsServerDisconnected(false);
+                loadData();
+            }}
+            initialError={serverDisconnectReason}
+        />
       </MobileLayout>
       </>
     );
@@ -1404,6 +1414,15 @@ function App() {
         />
 
         <PrioritySignedModalAlert records={records} />
+
+        <ServerConnectionLockModal 
+            isOpen={isServerDisconnected}
+            onReconnectSuccess={() => {
+                setIsServerDisconnected(false);
+                loadData();
+            }}
+            initialError={serverDisconnectReason}
+        />
     </MainLayout>
   );
 }

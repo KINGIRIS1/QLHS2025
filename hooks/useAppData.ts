@@ -5,7 +5,7 @@ import {
     fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi,
-    initRealtimeRecords, initRealtimeHolidays
+    initRealtimeRecords, initRealtimeHolidays, checkServerHealth
 } from '../services/api';
 import { saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
 import { logUserActivity } from '../services/apiLogs';
@@ -18,6 +18,8 @@ export const useAppData = (currentUser: User | null) => {
     const [users, setUsers] = useState<User[]>([]);
     const [holidays, setHolidays] = useState<Holiday[]>([]); // State mới cho ngày nghỉ
     const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline'>('connected');
+    const [isServerDisconnected, setIsServerDisconnected] = useState(false);
+    const [serverDisconnectReason, setServerDisconnectReason] = useState<string>('');
     
     // Wards State
     const [wards, setWards] = useState<string[]>(() => {
@@ -32,8 +34,16 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
+            // Kiểm tra tình trạng kết nối máy chủ trước
+            const health = await checkServerHealth(4000);
+            if (!health.isOnline) {
+                setConnectionStatus('offline');
+                setIsServerDisconnected(true);
+                setServerDisconnectReason(health.message || 'Không thể kết nối đến máy chủ.');
+                return;
+            }
+
             // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
-            // Tăng timeout lên 30s để xử lý trường hợp mạng chậm hoặc DB bị sleep
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error("Timeout")), 30000)
             );
@@ -54,23 +64,24 @@ export const useAppData = (currentUser: User | null) => {
             setUsers(userData);
             setHolidays(holidayData); // Cập nhật state holidays
             setConnectionStatus('connected');
+            setIsServerDisconnected(false);
+            setServerDisconnectReason('');
 
             if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
                 setIsUpdateAvailable(true);
                 setLatestVersion(updateInfo.version);
                 setUpdateUrl(updateInfo.url);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
-            // Quan trọng: Khi lỗi, chuyển sang OFFLINE nhưng vẫn cho phép App hoạt động
-            // Dữ liệu sẽ được lấy từ Cache (đã xử lý trong apiCore)
             setConnectionStatus('offline');
+            setIsServerDisconnected(true);
+            setServerDisconnectReason(error?.message || 'Mất kết nối đến máy chủ dữ liệu.');
             
             // Nếu cache cũng rỗng (lần đầu chạy), khởi tạo mảng rỗng để không crash UI
             setRecords((prev) => prev.length > 0 ? prev : []);
             setEmployees((prev) => prev.length > 0 ? prev : []);
             setUsers((prev) => prev.length > 0 ? prev : []);
-            // Holidays sẽ tự lấy từ cache trong apiSystem nếu lỗi
         }
     }, []);
 
@@ -150,8 +161,34 @@ export const useAppData = (currentUser: User | null) => {
         window.addEventListener('holidays_realtime_update', handleHolidaysUpdate);
         window.addEventListener('system_update_available', handleSystemUpdate);
         
+        // Heartbeat check định kỳ để phát hiện máy chủ tắt / mất kết nối
+        const heartbeatInterval = setInterval(async () => {
+            try {
+                const health = await checkServerHealth(3500);
+                if (health.isOnline) {
+                    setIsServerDisconnected(prev => {
+                        if (prev) {
+                            // Nếu trước đó bị ngắt kết nối và vừa phục hồi, tải lại dữ liệu mới nhất
+                            loadData();
+                        }
+                        return false;
+                    });
+                    setConnectionStatus('connected');
+                    setServerDisconnectReason('');
+                } else {
+                    setIsServerDisconnected(true);
+                    setConnectionStatus('offline');
+                    setServerDisconnectReason(health.message || 'Mất kết nối đến máy chủ.');
+                }
+            } catch (e) {
+                setIsServerDisconnected(true);
+                setConnectionStatus('offline');
+            }
+        }, 10000); // 10 giây kiểm tra một lần
+
         return () => {
             clearInterval(updateInterval);
+            clearInterval(heartbeatInterval);
             window.removeEventListener('system_update_available_broadcast', handleBroadcast);
             window.removeEventListener('records_realtime_update', handleRecordsUpdate);
             window.removeEventListener('holidays_realtime_update', handleHolidaysUpdate);
@@ -558,6 +595,7 @@ export const useAppData = (currentUser: User | null) => {
 
     return {
         records, employees, users, wards, holidays, connectionStatus,
+        isServerDisconnected, setIsServerDisconnected, serverDisconnectReason,
         isUpdateAvailable, latestVersion, updateUrl,
         setWards, setEmployees, setUsers, setRecords,
         loadData,

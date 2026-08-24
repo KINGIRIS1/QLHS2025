@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2, Eye, EyeOff } from 'lucide-react';
-
+import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2, Eye, EyeOff, ServerOff, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import { checkServerHealth, ServerHealthResult } from '../services/apiSystem';
+import { fetchUsers } from '../services/apiPeople';
 import { APP_VERSION } from '../constants';
 
 interface LoginProps {
@@ -18,6 +19,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Server Offline Warning Modal state for Login
+  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
+  const [serverCheckResult, setServerCheckResult] = useState<ServerHealthResult | null>(null);
+  const [isCheckingServer, setIsCheckingServer] = useState(false);
+  const [currentUsersList, setCurrentUsersList] = useState<User[]>(users);
+
+  useEffect(() => {
+      setCurrentUsersList(users);
+  }, [users]);
+
   useEffect(() => {
       const savedUser = localStorage.getItem('saved_username');
       if (savedUser) {
@@ -25,6 +36,29 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           setRememberMe(true);
       }
   }, []);
+
+  const handleCheckServer = async () => {
+    setIsCheckingServer(true);
+    try {
+      const health = await checkServerHealth(4000);
+      setServerCheckResult(health);
+      if (health.isOnline) {
+        // Tải lại danh sách users mới nhất
+        const freshUsers = await fetchUsers();
+        if (freshUsers && freshUsers.length > 0) {
+          setCurrentUsersList(freshUsers);
+        }
+      }
+    } catch (e) {
+      setServerCheckResult({
+        isOnline: false,
+        errorType: 'NETWORK_ERROR',
+        message: 'Không thể kết nối đến máy chủ api.qlhsct.info.vn'
+      });
+    } finally {
+      setIsCheckingServer(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,16 +68,38 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     const cleanUsername = username.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    // 1. Tìm tài khoản trong danh sách users (được nạp từ Supabase / Offline Cache / Mock)
-    const matchedUser = users.find(u => 
+    // 1. Kiểm tra trong danh sách users hiện có
+    let matchedUser = currentUsersList.find(u => 
       u.username.trim().toLowerCase() === cleanUsername && 
       String(u.password).trim() === cleanPassword
     );
 
+    // Nếu chưa tìm thấy hoặc users rỗng, kiểm tra trạng thái máy chủ
     if (!matchedUser) {
-      setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
-      setIsLoading(false);
-      return;
+      const health = await checkServerHealth(3500);
+      setServerCheckResult(health);
+
+      if (!health.isOnline) {
+        setIsLoading(false);
+        setIsServerModalOpen(true);
+        return;
+      }
+
+      // Nếu server online, thử fetch lại users từ server một lần nữa
+      const freshUsers = await fetchUsers();
+      if (freshUsers && freshUsers.length > 0) {
+        setCurrentUsersList(freshUsers);
+        matchedUser = freshUsers.find(u => 
+          u.username.trim().toLowerCase() === cleanUsername && 
+          String(u.password).trim() === cleanPassword
+        );
+      }
+
+      if (!matchedUser) {
+        setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+        setIsLoading(false);
+        return;
+      }
     }
 
     // 2. Ghi nhớ tên đăng nhập nếu cán bộ tích chọn
@@ -250,6 +306,69 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             </div>
         </div>
       </div>
+
+      {/* POPUP CẢNH BÁO MÁY CHỦ CHƯA KHỞI ĐỘNG / MẤT KẾT NỐI KHI ĐĂNG NHẬP */}
+      {isServerModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-fade-in">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden text-slate-800 animate-scale-up">
+            <div className="h-2 w-full bg-gradient-to-r from-red-500 via-amber-500 to-red-500 animate-pulse" />
+            
+            <div className="p-6 text-center flex flex-col items-center">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 border-2 border-red-200 flex items-center justify-center text-red-600 mb-4 shadow-sm">
+                <ServerOff size={32} />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-black uppercase tracking-wider mb-2">
+                <AlertTriangle size={13} /> Máy chủ chưa sẵn sàng
+              </div>
+
+              <h3 className="text-xl font-extrabold text-slate-900 mb-2">
+                MÁY CHỦ CHƯA ĐƯỢC BẬT
+              </h3>
+
+              <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                Hệ thống máy chủ dữ liệu (<span className="font-mono font-bold text-slate-800">api.qlhsct.info.vn</span>) hiện chưa được Quản trị viên (Admin) khởi động hoặc đang bảo trì.
+              </p>
+
+              <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-3 text-left text-xs text-amber-900 space-y-1 mb-5">
+                <p className="font-bold text-amber-800 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-amber-600" /> Hướng dẫn xử lý:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 pl-1 text-slate-700">
+                  <li>Vui lòng liên hệ Admin để bật <strong>Docker Desktop / Server</strong>.</li>
+                  <li>Nếu bạn là Admin: Hãy kiểm tra các container Docker đã chạy chưa.</li>
+                </ul>
+              </div>
+
+              {serverCheckResult?.isOnline ? (
+                <div className="w-full p-3 bg-emerald-50 text-emerald-700 font-bold text-sm rounded-xl border border-emerald-200 mb-4 flex items-center justify-center gap-2">
+                  <CheckCircle2 size={18} />
+                  Máy chủ đã hoạt động trở lại! Bạn có thể đăng nhập ngay.
+                </div>
+              ) : null}
+
+              <div className="w-full flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCheckServer}
+                  disabled={isCheckingServer}
+                  className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                >
+                  <RefreshCw size={16} className={isCheckingServer ? 'animate-spin' : ''} />
+                  {isCheckingServer ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsServerModalOpen(false)}
+                  className="py-3 px-5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-colors"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

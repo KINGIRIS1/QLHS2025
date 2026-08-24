@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, UserRole } from '../../types';
 import { 
   LayoutDashboard, 
@@ -12,6 +12,65 @@ import {
   Plus,
   Send
 } from 'lucide-react';
+import { checkServerHealth } from '../../services/apiSystem';
+
+const MobileServerStatusBadge: React.FC = () => {
+    const [status, setStatus] = useState<'online' | 'slow' | 'offline' | 'checking'>('checking');
+    const [ping, setPing] = useState<number | null>(null);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const measurePing = useCallback(async () => {
+        try {
+            const res = await checkServerHealth(3500);
+            if (res.isOnline && typeof res.responseTimeMs === 'number') {
+                setPing(res.responseTimeMs);
+                setStatus(res.responseTimeMs < 200 ? 'online' : 'slow');
+            } else {
+                setStatus('offline');
+                setPing(null);
+            }
+        } catch {
+            setStatus('offline');
+            setPing(null);
+        }
+    }, []);
+
+    useEffect(() => {
+        measurePing();
+        intervalRef.current = setInterval(measurePing, 10000);
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [measurePing]);
+
+    return (
+        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-400/30 text-white text-[10px]">
+            <span className="relative flex h-1.5 w-1.5">
+                {status === 'online' && (
+                    <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </>
+                )}
+                {status === 'slow' && (
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                )}
+                {status === 'offline' && (
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                )}
+                {status === 'checking' && (
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-300 animate-pulse"></span>
+                )}
+            </span>
+            <span className="font-mono leading-none">
+                {status === 'online' && `${ping}ms`}
+                {status === 'slow' && `${ping}ms`}
+                {status === 'offline' && `Mất kết nối`}
+                {status === 'checking' && `...`}
+            </span>
+        </div>
+    );
+};
 
 interface MobileLayoutProps {
   currentUser: User;
@@ -56,7 +115,8 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
           </div>
           <h1 className="font-bold text-lg tracking-tight">QLHS Mobile</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <MobileServerStatusBadge />
           <button className="relative p-1.5 hover:bg-white/10 rounded-full transition-colors">
             <Bell size={20} />
             {activeRemindersCount > 0 && (

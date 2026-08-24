@@ -1,11 +1,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RecordFile, Employee, User, RecordStatus, Holiday } from '../types';
+import { RecordFile, Employee, User, RecordStatus, Holiday, UserRole } from '../types';
 import { 
     fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi,
-    initRealtimeRecords
+    initRealtimeRecords, initRealtimeHolidays
 } from '../services/api';
 import { saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
 import { logUserActivity } from '../services/apiLogs';
@@ -86,11 +86,21 @@ export const useAppData = (currentUser: User | null) => {
         
         // Bật realtime và lắng nghe thay đổi
         initRealtimeRecords();
+        initRealtimeHolidays();
         
         const handleRecordsUpdate = async () => {
             // Lấy trực tiếp từ cache (đã được update bởi Realtime) và gán luôn để UI phản hồi tức thì
             const freshRecords = await fetchRecords();
             setRecords(freshRecords);
+        };
+
+        const handleHolidaysUpdate = async (e?: any) => {
+            if (e && e.detail && Array.isArray(e.detail)) {
+                setHolidays(e.detail);
+            } else {
+                const freshHolidays = await fetchHolidays();
+                setHolidays(freshHolidays);
+            }
         };
         
         const handleSystemUpdate = async () => {
@@ -137,23 +147,36 @@ export const useAppData = (currentUser: User | null) => {
         
         window.addEventListener('system_update_available_broadcast', handleBroadcast);
         window.addEventListener('records_realtime_update', handleRecordsUpdate);
+        window.addEventListener('holidays_realtime_update', handleHolidaysUpdate);
         window.addEventListener('system_update_available', handleSystemUpdate);
         
         return () => {
             clearInterval(updateInterval);
             window.removeEventListener('system_update_available_broadcast', handleBroadcast);
             window.removeEventListener('records_realtime_update', handleRecordsUpdate);
+            window.removeEventListener('holidays_realtime_update', handleHolidaysUpdate);
             window.removeEventListener('system_update_available', handleSystemUpdate);
         };
     }, [loadData]);
 
     // --- Record Handlers ---
     const handleAddOrUpdateRecord = async (recordData: any) => {
-        const isSaoLuc = recordData.recordType === 'Sao lục hồ sơ' || recordData.recordType === 'Sao lục' || recordData._archiveType === 'saoluc';
-        const isEdit = recordData.id && (records.some(r => r.id === recordData.id) || recordData._isArchive);
+        const targetType = recordData.recordType || '';
+        const isArchiveTarget = ['Sao lục hồ sơ', 'Sao lục', 'Vào sổ', 'Đăng ký biến động', 'Công văn'].includes(targetType) || 
+            ['saoluc', 'vaoso', 'dangky', 'congvan'].includes(recordData._archiveType || '');
+        
+        let archiveBucket: 'saoluc' | 'vaoso' | 'dangky' | 'congvan' = 'saoluc';
+        if (targetType === 'Vào sổ' || recordData._archiveType === 'vaoso') archiveBucket = 'vaoso';
+        else if (targetType === 'Đăng ký biến động' || recordData._archiveType === 'dangky') archiveBucket = 'dangky';
+        else if (targetType === 'Công văn' || recordData._archiveType === 'congvan') archiveBucket = 'congvan';
 
-        if (isSaoLuc) {
-            const saoLucData = {
+        const oldId = recordData._oldId || recordData.id;
+        const wasInRecords = oldId && records.some(r => r.id === oldId);
+        const wasInArchive = Boolean(recordData._oldIsArchive || recordData._isArchive);
+
+        // TRƯỜNG HỢP 1: ĐÍCH ĐẾN LÀ HỒ SƠ LƯU TRỮ (Sao lục, Vào sổ, Đăng ký biến động, Công văn)
+        if (isArchiveTarget) {
+            const archivePayloadData = {
                 so_hieu: recordData.code || '',
                 chu_su_dung: recordData.customerName || '',
                 ten_chu_su_dung: recordData.customerName || '',
@@ -170,6 +193,7 @@ export const useAppData = (currentUser: User | null) => {
                 hen_tra: recordData.deadline || '',
                 noi_dung: recordData.content || '',
                 trich_yeu: recordData.content || '',
+                loai_bien_dong: recordData.content || '',
                 
                 // Bổ sung đầy đủ các trường nhập từ Tiếp Nhận
                 so_dien_thoai: recordData.phoneNumber || '',
@@ -186,7 +210,9 @@ export const useAppData = (currentUser: User | null) => {
                 address: recordData.address || '',
                 notes: recordData.notes || '',
                 privateNotes: recordData.privateNotes || '',
-                loai_ho_so: recordData.recordType || 'Sao lục hồ sơ',
+                isPriority: Boolean(recordData.isPriority),
+                priorityNote: recordData.priorityNote || '',
+                loai_ho_so: recordData.recordType || targetType || 'Sao lục hồ sơ',
                 nguoi_tiep_nhan: recordData.createdBy || (currentUser?.name || ''),
                 createdBy: recordData.createdBy || (currentUser?.name || ''),
                 
@@ -195,15 +221,57 @@ export const useAppData = (currentUser: User | null) => {
                 danh_sach: recordData.exportBatch || ''
             };
 
-            if (!isEdit) {
+            // Nếu hồ sơ trước đó nằm ở bảng records (Tiếp nhận/Đo đạc), XÓA HOÀN TOÀN khỏi bảng records
+            if (wasInRecords) {
+                try {
+                    await deleteRecordApi(oldId);
+                    setRecords(prev => prev.filter(r => r.id !== oldId && r.id !== recordData.id));
+                } catch (delErr) {
+                    console.error("Lỗi xóa hồ sơ cũ bên records khi chuyển sang archive:", delErr);
+                }
+            }
+
+            // Nếu hồ sơ trước đó ở danh mục lưu trữ khác (vd: Vào sổ -> Sao lục), xóa ở danh mục cũ
+            if (wasInArchive && recordData._oldArchiveType && recordData._oldArchiveType !== archiveBucket) {
+                try {
+                    await deleteArchiveRecord(oldId);
+                } catch (delArchErr) {
+                    console.error("Lỗi xóa hồ sơ lưu trữ cũ khi đổi bucket:", delArchErr);
+                }
+            }
+
+            // Kiểm tra xem đã có bản ghi trong archive_records chưa
+            let existingArchive = null;
+            if (wasInArchive && !wasInRecords) {
+                if (recordData._isArchive && recordData.id) {
+                    existingArchive = { id: recordData.id, status: recordData.status || 'draft' };
+                } else if (recordData.code) {
+                    existingArchive = await findArchiveRecordBySoHieu(archiveBucket, recordData.code);
+                }
+            }
+
+            if (existingArchive && !recordData._oldRecordType) {
+                // Cập nhật bản ghi lưu trữ hiện có
+                await saveArchiveRecord({
+                    id: existingArchive.id,
+                    type: archiveBucket,
+                    status: existingArchive.status || 'draft',
+                    so_hieu: recordData.code,
+                    trich_yeu: recordData.content || '',
+                    ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
+                    noi_nhan_gui: recordData.customerName || '',
+                    data: archivePayloadData,
+                });
+            } else {
+                // Tạo mới bản ghi lưu trữ
                 const arToSave = {
-                    type: 'saoluc' as 'saoluc',
+                    type: archiveBucket,
                     status: 'draft' as any,
                     so_hieu: recordData.code,
                     trich_yeu: recordData.content || '',
                     ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
                     noi_nhan_gui: recordData.customerName || '',
-                    data: saoLucData,
+                    data: archivePayloadData,
                     created_by: recordData.createdBy || (currentUser?.name || ''),
                     created_at: new Date().toISOString()
                 };
@@ -211,94 +279,134 @@ export const useAppData = (currentUser: User | null) => {
                 if (!archiveSuccess) {
                     return false;
                 }
-            } else {
-                try {
-                    let existingArchive = await findArchiveRecordBySoHieu('saoluc', recordData.code);
-                    if (existingArchive) {
-                        const archId = existingArchive.id;
-                        const archData = existingArchive.data || {};
-                        await saveArchiveRecord({
-                            id: archId,
-                            type: 'saoluc' as 'saoluc',
-                            status: existingArchive.status || 'draft',
-                            so_hieu: recordData.code,
-                            trich_yeu: recordData.content || existingArchive.trich_yeu || '',
-                            ngay_thang: recordData.receivedDate || existingArchive.ngay_thang || '',
-                            noi_nhan_gui: recordData.customerName || existingArchive.noi_nhan_gui || '',
-                            data: { ...archData, ...saoLucData },
-                        });
-                    } else if (recordData._isArchive && recordData.id) {
-                        await saveArchiveRecord({
-                            id: recordData.id,
-                            type: 'saoluc' as 'saoluc',
-                            status: recordData.status || 'draft',
-                            so_hieu: recordData.code,
-                            trich_yeu: recordData.content || '',
-                            ngay_thang: recordData.receivedDate || '',
-                            noi_nhan_gui: recordData.customerName || '',
-                            data: saoLucData,
-                        });
-                    } else {
-                        const arToSave = {
-                            type: 'saoluc' as 'saoluc',
-                            status: 'draft' as any,
-                            so_hieu: recordData.code,
-                            trich_yeu: recordData.content || '',
-                            ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
-                            noi_nhan_gui: recordData.customerName || '',
-                            data: saoLucData,
-                            created_by: recordData.createdBy || (currentUser?.name || ''),
-                            created_at: new Date().toISOString()
-                        };
-                        await saveArchiveRecord(arToSave);
-                    }
-                } catch (e) {
-                    console.error("Lỗi cập nhật archive_record khi edit:", e);
-                }
             }
-            // Chỉ lưu vào archive_records, KHÔNG thêm vào bảng tiếp nhận chung (records)
+
+            // Bắn event để các view Lưu trữ và Tiếp nhận cập nhật lại tức thì
+            window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: archiveBucket } }));
+            logUserActivity({
+                action: wasInRecords ? 'UPDATE' : 'CREATE',
+                targetType: 'ARCHIVE',
+                targetId: recordData.code,
+                targetCode: recordData.code,
+                details: wasInRecords 
+                    ? `Chuyển hoàn toàn hồ sơ ${recordData._oldCode || oldId} sang loại lưu trữ ${recordData.recordType} (Mã mới: ${recordData.code})`
+                    : `Lưu hồ sơ lưu trữ ${recordData.code} (${recordData.customerName || 'N/A'})`,
+                user: currentUser,
+                newData: recordData
+            });
             return true;
         }
 
-        if (isEdit) {
-            const oldRecord = records.find(r => r.id === recordData.id);
-            const updated = await updateRecordApi(recordData);
+        // TRƯỜNG HỢP 2: ĐÍCH ĐẾN LÀ HỒ SƠ TIẾP NHẬN BÌNH THƯỜNG (Trích lục, Đo đạc, Thuế chính quy, ...)
+        // Nếu chuyển từ Lưu trữ sang Tiếp nhận bình thường: Xóa khỏi Lưu trữ
+        if (wasInArchive) {
+            try {
+                await deleteArchiveRecord(oldId);
+                window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: recordData._oldArchiveType || 'saoluc' } }));
+            } catch (delArchErr) {
+                console.error("Lỗi xóa hồ sơ lưu trữ cũ khi chuyển về tiếp nhận:", delArchErr);
+            }
+            const cleanRecordData = { ...recordData };
+            delete cleanRecordData._isArchive;
+            delete cleanRecordData._archiveType;
+            delete cleanRecordData._oldIsArchive;
+            delete cleanRecordData._oldArchiveType;
+            delete cleanRecordData._oldId;
+            delete cleanRecordData._oldRecordType;
+
+            const newRecord = await createRecordApi({ 
+                ...cleanRecordData, 
+                id: Math.random().toString(36).substr(2, 9),
+                status: cleanRecordData.status || RecordStatus.RECEIVED
+            });
+            if (newRecord) {
+                setRecords(prev => [newRecord, ...prev]);
+                triggerPrioritySignedAlert(newRecord, newRecord.status);
+                logUserActivity({
+                    action: 'UPDATE',
+                    targetType: 'RECORD',
+                    targetId: newRecord.id,
+                    targetCode: newRecord.code,
+                    details: `Chuyển đổi hồ sơ từ lưu trữ sang hồ sơ tiếp nhận ${newRecord.code} (${newRecord.recordType})`,
+                    user: currentUser,
+                    newData: newRecord
+                });
+                return true;
+            }
+            return false;
+        }
+
+        // Nếu là cập nhật hồ sơ trong bảng records
+        if (wasInRecords || (recordData.id && records.some(r => r.id === recordData.id))) {
+            const currentOldId = oldId || recordData.id;
+            const oldRecord = records.find(r => r.id === currentOldId);
+            
+            const cleanRecordData = { ...recordData };
+            delete cleanRecordData._oldId;
+            delete cleanRecordData._oldCode;
+            delete cleanRecordData._oldRecordType;
+            delete cleanRecordData._oldIsArchive;
+            delete cleanRecordData._oldArchiveType;
+
+            // Đảm bảo ID được giữ nguyên để update
+            cleanRecordData.id = currentOldId;
+
+            const updated = await updateRecordApi(cleanRecordData);
             if (updated) {
-                setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+                setRecords(prev => prev.map(r => r.id === currentOldId ? updated : r));
                 triggerPrioritySignedAlert(updated, updated.status);
                 logUserActivity({
                     action: 'UPDATE',
                     targetType: 'RECORD',
                     targetId: updated.id,
                     targetCode: updated.code,
-                    details: `Cập nhật thông tin hồ sơ ${updated.code} (${updated.customerName || 'N/A'})`,
+                    details: `Cập nhật thông tin hồ sơ ${updated.code} (Loại: ${updated.recordType || 'N/A'})`,
                     user: currentUser,
                     oldData: oldRecord,
                     newData: updated
                 });
                 return true;
             }
-        } else {
-            const newRecord = await createRecordApi({ ...recordData, id: Math.random().toString(36).substr(2, 9) });
-            if (newRecord) {
-                setRecords(prev => [newRecord, ...prev]);
-                triggerPrioritySignedAlert(newRecord, newRecord.status);
-                logUserActivity({
-                    action: 'CREATE',
-                    targetType: 'RECORD',
-                    targetId: newRecord.id,
-                    targetCode: newRecord.code,
-                    details: `Tạo mới hồ sơ ${newRecord.code} - ${newRecord.customerName || 'N/A'} (Loại: ${newRecord.recordType || 'N/A'})`,
-                    user: currentUser,
-                    newData: newRecord
-                });
-                return true;
-            }
+            return false;
+        }
+
+        // Tạo mới hoàn toàn hồ sơ tiếp nhận
+        const cleanNewData = { ...recordData };
+        delete cleanNewData._oldId;
+        delete cleanNewData._oldCode;
+        delete cleanNewData._oldRecordType;
+        delete cleanNewData._oldIsArchive;
+        delete cleanNewData._oldArchiveType;
+
+        const newRecord = await createRecordApi({ 
+            ...cleanNewData, 
+            id: cleanNewData.id || Math.random().toString(36).substr(2, 9),
+            status: cleanNewData.status || RecordStatus.RECEIVED
+        });
+        if (newRecord) {
+            setRecords(prev => [newRecord, ...prev]);
+            triggerPrioritySignedAlert(newRecord, newRecord.status);
+            logUserActivity({
+                action: 'CREATE',
+                targetType: 'RECORD',
+                targetId: newRecord.id,
+                targetCode: newRecord.code,
+                details: `Tạo mới hồ sơ ${newRecord.code} - ${newRecord.customerName || 'N/A'} (Loại: ${newRecord.recordType || 'N/A'})`,
+                user: currentUser,
+                newData: newRecord
+            });
+            return true;
         }
         return false;
     };
 
     const handleDeleteRecord = async (id: string) => {
+        if (currentUser?.role !== UserRole.ADMIN) {
+            window.dispatchEvent(new CustomEvent('app_toast', {
+                detail: { type: 'error', message: 'Chỉ Quản trị viên (Admin) mới có quyền xóa hồ sơ!' }
+            }));
+            return false;
+        }
         const deletedRecord = records.find(r => r.id === id);
         const hasInRecords = records.some(r => r.id === id);
         if (hasInRecords) {

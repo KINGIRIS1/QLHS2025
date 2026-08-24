@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { User, FileText, MapPin, Hash, Calendar, Building2 } from 'lucide-react';
+import { User, FileText, MapPin, Hash, Calendar, Building2, Phone } from 'lucide-react';
 
 interface VPHCFormProps {
     formData: any;
@@ -76,6 +76,13 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                         <div className="relative">
                             <MapPin size={16} className={iconClass} />
                             <input className={inputClass} value={formData.NOIO} onChange={e => handleChange('NOIO', e.target.value)} />
+                        </div>
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className={labelClass}>Số điện thoại</label>
+                        <div className="relative">
+                            <Phone size={16} className={iconClass} />
+                            <input className={inputClass} placeholder="Nhập số điện thoại..." value={formData.SDT || ''} onChange={e => handleChange('SDT', e.target.value)} />
                         </div>
                     </div>
                 </div>

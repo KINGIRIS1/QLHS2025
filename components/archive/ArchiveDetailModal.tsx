@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ArchiveRecord } from '../../services/apiArchive';
-import { X, Clock, User, FileText, Calendar, CheckCircle2, Paperclip, Camera, Check, Loader2 } from 'lucide-react';
+import { X, Clock, User, FileText, Calendar, CheckCircle2, Paperclip, Camera, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
 import { RecordStatus } from '../../types';
 
@@ -105,6 +105,20 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                 <div className="flex-1 overflow-y-auto p-6 flex gap-8">
                     {/* Left: Info */}
                     <div className="flex-1 space-y-6">
+                        {record.data?.isPriority && (
+                            <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3.5 flex items-start gap-3 animate-pulse shadow-sm">
+                                <AlertTriangle className="text-red-600 fill-yellow-400 shrink-0 mt-0.5" size={22} />
+                                <div>
+                                    <div className="font-extrabold text-red-800 text-sm uppercase tracking-wide">HỒ SƠ CẦN CHÚ Ý / BÁO CÁO NGAY KHI KÝ</div>
+                                    {record.data?.priorityNote && (
+                                        <div className="text-xs text-red-700 font-bold mt-1 bg-white/70 px-2.5 py-1 rounded-md border border-red-200">
+                                            {record.data.priorityNote}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <h4 className="text-sm font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
                                 <FileText size={16}/> Thông tin chung

@@ -4,8 +4,8 @@ import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive } from '../../services/apiArchive';
 import { supabase, isConfigured } from '../../services/supabaseClient';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet, AlertTriangle, Paperclip, Loader2 } from 'lucide-react';
-import { confirmAction, toTitleCase } from '../../utils/appHelpers';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet, AlertTriangle, Paperclip, Loader2, ChevronDown } from 'lucide-react';
+import { confirmAction, toTitleCase, showToast } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -26,7 +26,7 @@ interface CongVanViewProps {
 }
 
 const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
-    const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'executed' | 'sign' | 'signed' | 'result'>('all');
+    const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'executed' | 'sign' | 'signed' | 'result' | 'priority'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -73,6 +73,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     // Delete All Modal State
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -96,6 +97,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleDeleteAll = async () => {
+        if (currentUser.role !== 'ADMIN') { showToast('Chỉ Quản trị viên (Admin) mới có quyền xóa tất cả!', 'error'); return; }
         await deleteAllArchiveRecordsByType('congvan');
         loadData();
     };
@@ -104,6 +106,10 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         const data = await fetchEmployees();
         setEmployees(data);
     };
+
+    const priorityCount = useMemo(() => {
+        return records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority)).length;
+    }, [records]);
 
     const filteredRecords = useMemo(() => {
         let list = records;
@@ -114,6 +120,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         if (subTab === 'sign') list = list.filter(r => r.status === 'pending_sign');
         if (subTab === 'signed') list = list.filter(r => r.status === 'signed');
         if (subTab === 'result') list = list.filter(r => r.status === 'completed');
+        if (subTab === 'priority') list = list.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority));
         // 'all' shows everything
 
         // Filter by Date
@@ -707,144 +714,244 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        Quản lý Công văn
-                    </h2>
-                    <div className="relative flex-1 sm:w-64 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                            placeholder="Tìm công văn..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                        />
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Calendar size={16} className="text-gray-500"/>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-                        <span className="text-gray-400">-</span>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Users size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
-                            <option value="">Tất cả Nhân viên</option>
-                            {employees
-                                .filter(e => {
-                                    const dept = (e.department || '').toLowerCase();
-                                    const pos = (e.position || '').toLowerCase();
-                                    if (filterEmployee && e.id === filterEmployee) return true;
-                                    return dept.includes('lưu trữ') || pos.includes('lưu trữ');
-                                })
-                                .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
-                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+            <div className="p-3 border-b border-gray-100 flex flex-col gap-2.5 bg-slate-50/50">
+                {/* SINGLE/TWO-ROW CLEAN TOOLBAR WITH DISTINCT BORDERED REGIONS */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 shadow-xs relative">
+                    
+                    {/* REGION 1: STATUS TABS (VÙNG PHÂN LOẠI TAB) */}
+                    <div className="flex flex-wrap items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 overflow-x-auto max-w-full">
                         <button 
                             onClick={() => setSubTab('all')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'all' ? 'bg-gray-100 text-gray-800 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'all' ? 'bg-white text-gray-900 shadow-xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80'}`}
                         >
-                            <LayoutGrid size={16}/> Tất cả
+                            <LayoutGrid size={14}/> Tất cả
                         </button>
                         <button 
                             onClick={() => setSubTab('draft')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'draft' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'draft' ? 'bg-orange-500 text-white shadow-xs' : 'text-gray-600 hover:text-orange-700 hover:bg-orange-50'}`}
                         >
-                            <ListChecks size={16}/> Chưa giao việc
+                            <ListChecks size={14}/> Chưa giao việc
                         </button>
                         <button 
                             onClick={() => setSubTab('assigned')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'assigned' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'assigned' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-600 hover:text-blue-700 hover:bg-blue-50'}`}
                         >
-                            <Users size={16}/> Đang thực hiện
+                            <Users size={14}/> Đang thực hiện
                         </button>
                         <button 
                             onClick={() => setSubTab('executed')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'executed' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'executed' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600 hover:text-indigo-700 hover:bg-indigo-50'}`}
                         >
-                            <CheckCircle size={16}/> Đã thực hiện
+                            <CheckCircle size={14}/> Đã thực hiện
                         </button>
                         <button 
                             onClick={() => setSubTab('sign')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'sign' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'sign' ? 'bg-purple-600 text-white shadow-xs' : 'text-gray-600 hover:text-purple-700 hover:bg-purple-50'}`}
                         >
-                            <Send size={16}/> Trình ký
+                            <Send size={14}/> Trình ký
                         </button>
                         <button 
                             onClick={() => setSubTab('signed')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'signed' ? 'bg-teal-100 text-teal-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'signed' ? 'bg-teal-600 text-white shadow-xs' : 'text-gray-600 hover:text-teal-700 hover:bg-teal-50'}`}
                         >
-                            <PenTool size={16}/> Ký duyệt
+                            <PenTool size={14}/> Ký duyệt
                         </button>
                         <button 
                             onClick={() => setSubTab('result')} 
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${subTab === 'result' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'result' ? 'bg-green-600 text-white shadow-xs' : 'text-gray-600 hover:text-green-700 hover:bg-green-50'}`}
                         >
-                            <FileCheck size={16}/> Đã giao 1 cửa
+                            <FileCheck size={14}/> Đã giao 1 cửa
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('priority')} 
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${subTab === 'priority' ? 'bg-amber-500 text-white shadow-xs ring-2 ring-amber-300' : 'text-amber-800 bg-amber-50/80 hover:bg-amber-100'}`}
+                        >
+                            <AlertTriangle size={14} className={subTab === 'priority' ? 'text-white' : 'text-amber-600'}/> 
+                            <span>Hồ sơ chú ý</span>
+                            {priorityCount > 0 && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${subTab === 'priority' ? 'bg-white text-amber-600' : 'bg-red-600 text-white'}`}>
+                                    {priorityCount}
+                                </span>
+                            )}
                         </button>
                     </div>
 
-                    <div className="ml-auto flex gap-2">
+                    {/* REGION 2: SEARCH & FILTER BOX (VÙNG TÌM KIẾM & BỘ LỌC) */}
+                    <div className="flex-1 flex flex-wrap items-center gap-1.5 bg-gray-50 p-1.5 rounded-xl border border-gray-200 min-w-[280px]">
+                        {/* Search Input */}
+                        <div className="flex items-center bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all pl-2.5 pr-2 py-1 relative flex-1 min-w-[160px] shadow-2xs">
+                            <Search className="text-gray-400 shrink-0 mr-1.5" size={14} />
+                            <input 
+                                className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none" 
+                                placeholder="Tìm công văn..." 
+                                value={searchTerm} 
+                                onChange={e => setSearchTerm(e.target.value)} 
+                            />
+                            {searchTerm && (
+                                <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-600 p-0.5">
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Date filter */}
+                        <div className="flex items-center gap-1 bg-white px-2 py-1 border border-gray-200 rounded-lg text-xs shrink-0 shadow-2xs h-7">
+                            <Calendar size={13} className="text-gray-400 shrink-0" />
+                            <input 
+                                type="date" 
+                                className="bg-transparent text-xs text-gray-700 outline-none cursor-pointer" 
+                                value={fromDate} 
+                                onChange={e => setFromDate(e.target.value)} 
+                                title="Từ ngày" 
+                            />
+                            <span className="text-gray-300">-</span>
+                            <input 
+                                type="date" 
+                                className="bg-transparent text-xs text-gray-700 outline-none cursor-pointer" 
+                                value={toDate} 
+                                onChange={e => setToDate(e.target.value)} 
+                                title="Đến ngày" 
+                            />
+                            {(fromDate || toDate) && (
+                                <button onClick={() => { setFromDate(''); setToDate(''); }} className="text-gray-400 hover:text-red-500 p-0.5 ml-0.5">
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Employee filter */}
+                        <div className="flex items-center bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs shrink-0 shadow-2xs h-7">
+                            <Users size={13} className="text-gray-400 mr-1 shrink-0"/>
+                            <select 
+                                className="bg-transparent text-xs text-gray-700 font-medium cursor-pointer border-none focus:outline-none" 
+                                value={filterEmployee} 
+                                onChange={e => setFilterEmployee(e.target.value)}
+                            >
+                                <option value="">Tất cả Nhân viên</option>
+                                {employees
+                                    .filter(e => {
+                                        const dept = (e.department || '').toLowerCase();
+                                        const pos = (e.position || '').toLowerCase();
+                                        if (filterEmployee && e.id === filterEmployee) return true;
+                                        return dept.includes('lưu trữ') || pos.includes('lưu trữ');
+                                    })
+                                    .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Reset filters button if any filter is active */}
+                        {(searchTerm || fromDate || toDate || filterEmployee) && (
+                            <button
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setFromDate('');
+                                    setToDate('');
+                                    setFilterEmployee('');
+                                }}
+                                title="Đặt lại bộ lọc"
+                                className="p-1 text-gray-600 hover:text-red-600 bg-white rounded-lg border border-gray-200 hover:bg-red-50 transition-colors shrink-0 flex items-center gap-1 text-[11px] font-semibold px-2 shadow-2xs h-7"
+                            >
+                                <X size={12} />
+                                <span>Đặt lại</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* REGION 3: ACTION BUTTONS (VÙNG THAO TÁC) */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 p-1.5 rounded-xl border border-gray-200 ml-auto flex-wrap shrink-0">
+                        {/* Dynamic batch action buttons when items are selected */}
                         {subTab === 'assigned' && isManager && selectedIds.size > 0 && (
-                            <button onClick={() => handleBatchStatusChange('executed')} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
-                                <CheckCircle size={16}/> Đã thực hiện ({selectedIds.size})
+                            <button onClick={() => handleBatchStatusChange('executed')} className="flex items-center gap-1.5 bg-indigo-600 text-white px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-xs transition-colors">
+                                <CheckCircle size={13}/> Đã thực hiện ({selectedIds.size})
                             </button>
                         )}
                         {subTab === 'executed' && isManager && selectedIds.size > 0 && (
-                            <button onClick={() => handleBatchStatusChange('pending_sign')} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-purple-700 shadow-sm animate-pulse">
-                                <Send size={16}/> Trình ký ({selectedIds.size})
+                            <button onClick={() => handleBatchStatusChange('pending_sign')} className="flex items-center gap-1.5 bg-purple-600 text-white px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-purple-700 shadow-xs transition-colors">
+                                <Send size={13}/> Trình ký ({selectedIds.size})
                             </button>
                         )}
                         {subTab === 'sign' && isManager && selectedIds.size > 0 && (
-                            <button onClick={() => handleBatchStatusChange('signed')} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm animate-pulse">
-                                <PenTool size={16}/> Ký duyệt ({selectedIds.size})
+                            <button onClick={() => handleBatchStatusChange('signed')} className="flex items-center gap-1.5 bg-teal-600 text-white px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-teal-700 shadow-xs transition-colors">
+                                <PenTool size={13}/> Ký duyệt ({selectedIds.size})
                             </button>
                         )}
                         {subTab === 'signed' && isManager && selectedIds.size > 0 && (
-                            <button onClick={() => setShowHandoverModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm animate-pulse">
-                                <FileCheck size={16}/> Đã giao 1 cửa ({selectedIds.size})
+                            <button onClick={() => setShowHandoverModal(true)} className="flex items-center gap-1.5 bg-green-600 text-white px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-green-700 shadow-xs transition-colors">
+                                <FileCheck size={13}/> Đã giao 1 cửa ({selectedIds.size})
                             </button>
                         )}
-                        {(subTab === 'draft' || subTab === 'all') && isManager && (
-                            <>
-                                {selectedIds.size > 0 && (
-                                    <button onClick={handleAssign} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
-                                        <Users size={16}/> Giao việc ({selectedIds.size})
-                                    </button>
-                                )}
-                                <label className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm cursor-pointer">
-                                    <FileSpreadsheet size={16}/> Import Excel
-                                    <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
-                                </label>
-                                <button onClick={() => { setIsFormOpen(true); setEditingId(null); setPendingFiles([]); setDeletedFilePaths([]); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: '', attached_files: []}); }} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm">
-                                    <Plus size={16}/> Tạo mới
-                                </button>
-                                {currentUser.role === 'ADMIN' && (
-                                    <button onClick={() => setShowDeleteAllModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-red-700 shadow-sm">
-                                        <Trash2 size={16}/> Xóa dữ liệu
-                                    </button>
-                                )}
-                            </>
-                        )}
-                        {subTab === 'result' ? (
-                            <button onClick={() => setShowExportReturnedModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm">
-                                <FileDown size={16}/> Xuất DS Trả Kết Quả
-                            </button>
-                        ) : (
-                            <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
-                                <FileDown size={16}/> Xuất Bàn Giao
+                        {(subTab === 'draft' || subTab === 'all') && isManager && selectedIds.size > 0 && (
+                            <button onClick={handleAssign} className="flex items-center gap-1.5 bg-indigo-600 text-white px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-xs transition-colors">
+                                <Users size={13}/> Giao việc ({selectedIds.size})
                             </button>
                         )}
+
+                        {/* Primary Add New button */}
+                        {isManager && (
+                            <button 
+                                onClick={() => { setIsFormOpen(true); setEditingId(null); setPendingFiles([]); setDeletedFilePaths([]); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString().split('T')[0], noi_nhan_gui: '', attached_files: []}); }} 
+                                className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:bg-orange-700 shadow-xs transition-colors"
+                            >
+                                <Plus size={14}/> Tạo mới
+                            </button>
+                        )}
+
+                        {/* Actions Dropdown Menu for secondary tools */}
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowActionsMenu(!showActionsMenu)} 
+                                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${showActionsMenu ? 'bg-slate-800 text-white border-slate-800 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 shadow-2xs'}`}
+                            >
+                                <span>Thao tác</span>
+                                <ChevronDown size={13} className={`transition-transform duration-200 ${showActionsMenu ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showActionsMenu && (
+                                <div 
+                                    className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-fade-in text-xs"
+                                    onClick={() => setShowActionsMenu(false)}
+                                >
+                                    {subTab === 'result' ? (
+                                        <button 
+                                            onClick={() => setShowExportReturnedModal(true)} 
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 transition-colors text-left"
+                                        >
+                                            <FileDown size={14} className="text-emerald-600" />
+                                            <span>Xuất DS Trả Kết Quả</span>
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => setShowExportModal(true)} 
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-green-50 text-gray-700 hover:text-green-700 transition-colors text-left"
+                                        >
+                                            <FileDown size={14} className="text-green-600" />
+                                            <span>Xuất Bàn Giao</span>
+                                        </button>
+                                    )}
+
+                                    {isManager && (
+                                        <label className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-700 transition-colors cursor-pointer text-left">
+                                            <FileSpreadsheet size={14} className="text-blue-600" />
+                                            <span>Import từ Excel</span>
+                                            <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
+                                        </label>
+                                    )}
+
+                                    {currentUser.role === 'ADMIN' && (
+                                        <>
+                                            <div className="my-1 border-t border-gray-100" />
+                                            <button 
+                                                onClick={() => setShowDeleteAllModal(true)} 
+                                                className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-red-50 text-red-600 transition-colors text-left font-medium"
+                                            >
+                                                <Trash2 size={14} className="text-red-500" />
+                                                <span>Xóa toàn bộ dữ liệu</span>
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -893,11 +1000,15 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     selectedRecords={records.filter(r => selectedIds.has(r.id)).map(r => ({
                         id: r.id,
                         code: r.so_hieu,
-                        customerName: r.noi_nhan_gui,
+                        customerName: r.noi_nhan_gui || (r.data as any)?.trich_yeu || '',
                         ward: '',
+                        content: (r.data as any)?.trich_yeu || '',
+                        recordType: (r.data as any)?.loai_cong_van || 'Công văn',
+                        deadline: (r.data as any)?.han_xu_ly || '',
                         status: RecordStatus.RECEIVED
                     } as RecordFile))}
                     filterDepartment="Thông tin lưu trữ"
+                    currentUser={currentUser}
                 />
 
                 {isFormOpen && (
@@ -963,6 +1074,50 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                         placeholder="Đơn vị gửi và nhận..." 
                                         required
                                     />
+                                </div>
+
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                                    <label className="flex items-center gap-2 text-sm font-bold text-amber-900 cursor-pointer">
+                                        <input 
+                                            type="checkbox"
+                                            checked={Boolean(formData.data?.isPriority) || Boolean(formData.isPriority)}
+                                            onChange={e => {
+                                                const checked = e.target.checked;
+                                                setFormData({
+                                                    ...formData,
+                                                    isPriority: checked,
+                                                    data: {
+                                                        ...(formData.data || {}),
+                                                        isPriority: checked
+                                                    }
+                                                });
+                                            }}
+                                            className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+                                        />
+                                        <AlertTriangle size={16} className="text-amber-600 fill-yellow-400" />
+                                        <span>Đánh dấu "Hồ sơ cần chú ý / Báo cáo ưu tiên"</span>
+                                    </label>
+                                    {(Boolean(formData.data?.isPriority) || Boolean(formData.isPriority)) && (
+                                        <div>
+                                            <label className="text-xs font-bold text-amber-800 uppercase mb-1 block">Nội dung ghi chú chú ý</label>
+                                            <input 
+                                                className="w-full border border-amber-300 rounded px-3 py-1.5 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 bg-white"
+                                                value={formData.data?.priorityNote || formData.priorityNote || ''}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    setFormData({
+                                                        ...formData,
+                                                        priorityNote: val,
+                                                        data: {
+                                                            ...(formData.data || {}),
+                                                            priorityNote: val
+                                                        }
+                                                    });
+                                                }}
+                                                placeholder="Nhập lý do cần chú ý..."
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 {formData.status === 'completed' && (
@@ -1115,7 +1270,17 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                         <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                     </td>
                                     <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                                    <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
+                                    <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span>{r.so_hieu}</span>
+                                            {(Boolean(r.data?.isPriority) || Boolean(r.isPriority)) && (
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-950 bg-amber-100 border border-amber-400 px-2 py-0.5 rounded-full shadow-xs animate-pulse" title={r.data?.priorityNote || r.priorityNote || 'Hồ sơ cần chú ý'}>
+                                                    <AlertTriangle size={12} className="text-amber-500 fill-yellow-400 shrink-0" />
+                                                    <span>Chú ý</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="p-3 text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
                                     <td className="p-3 text-gray-800">
                                         <div className="flex items-start gap-2">
@@ -1183,7 +1348,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                             {isManager && (
                                                 <>
                                                     <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
-                                                    <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>
+                                                    {currentUser.role === 'ADMIN' && <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>}
                                                 </>
                                             )}
                                         </div>

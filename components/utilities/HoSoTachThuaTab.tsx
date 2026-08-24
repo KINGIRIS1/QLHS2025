@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserType, RecordFile, NotifyFunction } from '../../types';
+import { User as UserType, RecordFile, NotifyFunction, UserRole } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { TachThuaRecord, fetchTachThuaRecords, saveTachThuaRecord, deleteTachThuaRecord } from '../../services/apiUtilities';
 import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, Layers, CheckSquare, Square, ArrowRight, FolderCheck, RotateCcw, AlertTriangle, CheckCircle2, X, Grid } from 'lucide-react';
@@ -336,6 +336,10 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
     };
 
     const handleDeleteGroup = async (soHD: string) => {
+        if (currentUser?.role !== UserRole.ADMIN) {
+            notify("Chỉ Quản trị viên (Admin) mới có quyền xóa nhóm hồ sơ!", 'error');
+            return;
+        }
         const groupRecords = savedList.filter(r => r.data.SO_HD === soHD);
         if (await confirmAction(`Xóa toàn bộ ${groupRecords.length} dòng thuộc hợp đồng ${soHD}?`)) {
             for (const rec of groupRecords) {

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 import { APP_VERSION } from '../constants';
 
@@ -13,6 +13,7 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,25 +26,57 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    setTimeout(() => {
-        const user = users.find(u => u.username === username && u.password === password);
-        if (user) {
-          if (rememberMe) {
-              localStorage.setItem('saved_username', username);
-          } else {
-              localStorage.removeItem('saved_username');
-          }
-          
-          onLogin(user);
-        } else {
-          setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
-          setIsLoading(false);
+    setError('');
+
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    // 1. Tìm tài khoản trong danh sách users (được nạp từ Supabase / Offline Cache / Mock)
+    const matchedUser = users.find(u => 
+      u.username.trim().toLowerCase() === cleanUsername && 
+      String(u.password).trim() === cleanPassword
+    );
+
+    if (!matchedUser) {
+      setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. Ghi nhớ tên đăng nhập nếu cán bộ tích chọn
+    if (rememberMe) {
+      localStorage.setItem('saved_username', username.trim());
+    } else {
+      localStorage.removeItem('saved_username');
+    }
+
+    // 3. Gọi server để cấp Token JWT cho phiên làm việc
+    try {
+      const res = await fetch('/custom/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: matchedUser.username, 
+          password: cleanPassword,
+          user: matchedUser 
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem('auth_token', data.token);
         }
-    }, 600);
+      }
+    } catch (err) {
+      console.warn("Không thể lấy Token từ server, tiếp tục đăng nhập trực tiếp:", err);
+    }
+
+    onLogin(matchedUser);
+    setIsLoading(false);
   };
 
   return (
@@ -152,13 +185,21 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                                 <Lock size={20} className="text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                             </div>
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 required
-                                className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all bg-slate-50 group-hover:bg-white focus:bg-white font-medium text-slate-800 placeholder-slate-400"
+                                className="w-full pl-12 pr-12 py-3.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all bg-slate-50 group-hover:bg-white focus:bg-white font-medium text-slate-800 placeholder-slate-400"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors z-10 focus:outline-none"
+                                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
                         </div>
                     </div>
 

@@ -17,6 +17,8 @@ export interface ArchiveRecord {
     data: any; // Các trường mở rộng khác
     so_gcn?: number | null;
     so_trang_sao_luc?: number | null;
+    isPriority?: boolean;
+    priorityNote?: string;
 }
 
 // Mock Data Stores

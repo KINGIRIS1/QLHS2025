@@ -244,10 +244,19 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                         <div className="mt-auto pt-3 border-t border-gray-50">
                                             <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Khu vực phụ trách</p>
                                             <div className="flex flex-wrap gap-1.5">
-                                                {emp.managedWards.length > 0 ? emp.managedWards.slice(0, 3).map(w => (
-                                                    <span key={w} className="text-xs font-semibold px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">{w}</span>
-                                                )) : <span className="text-xs font-medium text-gray-400 italic">Chưa phân công</span>}
-                                                {emp.managedWards.length > 3 && <span className="text-xs font-semibold px-2 py-1 text-gray-500 bg-gray-50 rounded-lg border border-gray-100">+{emp.managedWards.length - 3}</span>}
+                                                {(() => {
+                                                    const wardsList = Array.isArray(emp.managedWards) 
+                                                        ? emp.managedWards 
+                                                        : (typeof emp.managedWards === 'string' ? (emp.managedWards as string).replace(/[[\]"{}]/g, '').split(',').map(s => s.trim()).filter(Boolean) : []);
+                                                    return (
+                                                        <>
+                                                            {wardsList.length > 0 ? wardsList.slice(0, 3).map(w => (
+                                                                <span key={w} className="text-xs font-semibold px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">{w}</span>
+                                                            )) : <span className="text-xs font-medium text-gray-400 italic">Chưa phân công</span>}
+                                                            {wardsList.length > 3 && <span className="text-xs font-semibold px-2 py-1 text-gray-500 bg-gray-50 rounded-lg border border-gray-100">+{wardsList.length - 3}</span>}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     </div>

@@ -63,11 +63,19 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
         const newData = { ...prev, [field]: value };
-        if (field === 'recordType' || field === 'receivedDate') {
+        if (field === 'recordType' || field === 'receivedDate' || field === 'ward') {
             const rType = field === 'recordType' ? value : prev.recordType;
             const rDate = field === 'receivedDate' ? value : prev.receivedDate;
+            const rWard = field === 'ward' ? value : prev.ward;
             if (rType && rDate) {
                 newData.deadline = calculateDeadline(rType, rDate);
+                if (initialData) {
+                    if (rType !== initialData.recordType) {
+                        newData.code = generateCode(rWard || processingWard, rDate, [], rType);
+                    } else {
+                        newData.code = initialData.code;
+                    }
+                }
             }
         }
         return newData;
@@ -82,16 +90,36 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         return; 
     }
     setLoading(true);
+    
+    const isTypeChanged = Boolean(initialData && formData.recordType !== initialData.recordType);
     const recordToSave: RecordFile = { 
         ...formData, 
-        id: formData.id || Math.random().toString(36).substr(2, 9), 
-        status: formData.status || RecordStatus.RECEIVED,
-        createdBy: formData.createdBy || currentUser.name
-    } as RecordFile;
+        id: formData.id || initialData?.id || Math.random().toString(36).substr(2, 9), 
+        status: isTypeChanged ? RecordStatus.RECEIVED : (formData.status || RecordStatus.RECEIVED),
+        createdBy: formData.createdBy || currentUser.name,
+        _oldId: initialData?.id,
+        _oldCode: initialData?.code,
+        _oldRecordType: initialData?.recordType,
+        _oldIsArchive: (initialData as any)?._isArchive,
+        _oldArchiveType: (initialData as any)?._archiveType,
+    } as any;
+
+    if (isTypeChanged) {
+        delete (recordToSave as any)._isArchive;
+        delete (recordToSave as any)._archiveType;
+        // Tự động sinh mã mới đúng định dạng của loại hồ sơ đích
+        recordToSave.code = formData.code || generateCode(formData.ward || processingWard, formData.receivedDate || '', [], formData.recordType || '');
+    }
+
     const success = await onSave(recordToSave);
     setLoading(false);
     if (success) {
-        setNotification({ type: 'success', message: initialData ? `Cập nhật thành công: ${recordToSave.code}` : `Đã tiếp nhận mới: ${recordToSave.code}` });
+        setNotification({ 
+            type: 'success', 
+            message: isTypeChanged 
+                ? `Đã chuyển đổi hoàn toàn sang ${recordToSave.recordType} (Mã mới: ${recordToSave.code})` 
+                : (initialData ? `Cập nhật thành công: ${recordToSave.code}` : `Đã tiếp nhận mới: ${recordToSave.code}`) 
+        });
         if (initialData && onCancelEdit) onCancelEdit(); else handleReset(true);
     } else {
         setNotification({ type: 'error', message: "Lỗi khi lưu hồ sơ." });

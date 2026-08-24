@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User as UserType, NotifyFunction } from '../../types';
+import { User as UserType, NotifyFunction, UserRole } from '../../types';
 import saveAs from 'file-saver';
 import { Settings, List, PlusCircle, Save } from 'lucide-react';
 import VPHCForm from './vphc-tab/VPHCForm';
@@ -26,7 +26,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     const [editingId, setEditingId] = useState<string | null>(null); // ID nếu đang sửa bản ghi cũ
 
     const [formData, setFormData] = useState({
-        NGUOI: '', GIOITINH: 'Nam', NGAYSINH: '', NOIO: '', 
+        NGUOI: '', GIOITINH: 'Nam', NGAYSINH: '', NOIO: '', SDT: '', 
         CCCD: '', NGAYCAP: '', NOICAP: '',
         THUA: '', TO: '', DT: '', DC_THUA: '', XA_PHUONG: 'phường Minh Hưng',
         SPH: '', SVS: '', NGAYCAPGCN: '', COQUANCAP: 'Sở Tài nguyên và Môi trường tỉnh Bình Phước',
@@ -175,6 +175,10 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     };
 
     const handleDeleteRecord = async (id: string) => {
+        if (currentUser?.role !== UserRole.ADMIN) {
+            notify("Chỉ Quản trị viên (Admin) mới có quyền xóa biên bản!", 'error');
+            return;
+        }
         const success = await deleteVphcRecord(id);
         if (success) {
             setSavedRecords(prev => prev.filter(r => r.id !== id));
@@ -189,7 +193,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     const handleResetForm = () => {
         setEditingId(null);
         const resetData = {
-            NGUOI: '', GIOITINH: 'Nam', NGAYSINH: '', NOIO: '', 
+            NGUOI: '', GIOITINH: 'Nam', NGAYSINH: '', NOIO: '', SDT: '', 
             CCCD: '', NGAYCAP: '', NOICAP: '',
             THUA: '', TO: '', DT: '', DC_THUA: '', XA_PHUONG: 'phường Minh Hưng',
             SPH: '', SVS: '', NGAYCAPGCN: '', COQUANCAP: 'Sở Tài nguyên và Môi trường tỉnh Bình Phước',
@@ -292,6 +296,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 <p style="margin-left: 20px;">Ngày, tháng, năm sinh: ${data.NGAYSINH} - Quốc tịch: Việt Nam</p>
                 <p style="margin-left: 20px;">Nghề nghiệp: Lao động tự do</p>
                 <p style="margin-left: 20px;">Nơi ở hiện tại: ${data.NOIO}</p>
+                <p style="margin-left: 20px;">Số điện thoại: ${data.SDT || '................................'}</p>
                 <p style="margin-left: 20px;">Số định danh cá nhân/CMND/Hộ chiếu: ${data.CCCD}; ngày cấp: ${data.NGAYCAP}; nơi cấp: ${data.NOICAP}</p>
                 
                 <div style="margin-left: 20px; margin-bottom: 10px; color: #666; font-size: 13pt;">
@@ -460,6 +465,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                     <p>Ngày, tháng, năm sinh: ${data.NGAYSINH} Quốc tịch: Việt Nam</p>
                     <p>Nghề nghiệp: Lao động tự do</p>
                     <p>Nơi ở hiện tại: ${data.NOIO}</p>
+                    <p>Số điện thoại: ${data.SDT || '................................'}</p>
                     <p>Số định danh cá nhân/CMND/Hộ chiếu: ${data.CCCD}; ngày cấp: ${data.NGAYCAP}; nơi cấp: ${data.NOICAP}</p>
                 </div>
 

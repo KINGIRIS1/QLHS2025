@@ -234,13 +234,35 @@ export const mapEmployeeToDb = (e: Employee) => ({
     managed_wards: e.managedWards // Map camel to snake case for DB
 });
 
-export const mapEmployeeFromDb = (e: any): Employee => ({
-    id: e.id,
-    name: e.name,
-    department: e.department,
-    position: e.position,
-    managedWards: e.managed_wards || e.managedWards || []
-});
+export const mapEmployeeFromDb = (e: any): Employee => {
+    let wards: string[] = [];
+    const rawWards = e.managed_wards !== undefined ? e.managed_wards : e.managedWards;
+    if (Array.isArray(rawWards)) {
+        wards = rawWards.filter((w: any) => typeof w === 'string' && w.trim());
+    } else if (typeof rawWards === 'string' && rawWards.trim()) {
+        const trimmed = rawWards.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) wards = parsed.filter(w => typeof w === 'string' && w.trim());
+            } catch {
+                wards = trimmed.replace(/[[\]"]/g, '').split(',').map(s => s.trim()).filter(Boolean);
+            }
+        } else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            wards = trimmed.slice(1, -1).split(',').map(s => s.trim().replace(/^"|"$/g, '')).filter(Boolean);
+        } else {
+            wards = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+        }
+    }
+
+    return {
+        id: e.id,
+        name: e.name,
+        department: e.department,
+        position: e.position,
+        managedWards: wards
+    };
+};
 
 export const mapPriceFromDb = (item: any): PriceItem => ({
     id: item.id,

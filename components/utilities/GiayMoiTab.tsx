@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, List, Save, Sparkles, RotateCcw } from 'lucide-react';
 import saveAs from 'file-saver';
-import { User as UserType, NotifyFunction } from '../../types';
+import { User as UserType, NotifyFunction, UserRole } from '../../types';
 import { GiayMoiRecord, fetchGiayMoiRecords, saveGiayMoiRecord, deleteGiayMoiRecord } from '../../services/apiUtilities';
 import { GiayMoiData, generateGiayMoiDocx, getLastNameWord, formatThoiGianFull } from '../../utils/exportGiayMoiDocx';
 import GiayMoiForm from './giay-moi-tab/GiayMoiForm';
@@ -270,6 +270,10 @@ const GiayMoiTab: React.FC<GiayMoiTabProps> = ({ currentUser, notify }) => {
     };
 
     const handleDeleteRecord = async (id: string) => {
+        if (currentUser?.role !== UserRole.ADMIN) {
+            notify("Chỉ Quản trị viên (Admin) mới có quyền xóa giấy mời!", 'error');
+            return;
+        }
         if (window.confirm("Bạn có chắc chắn muốn xóa Giấy mời này?")) {
             const success = await deleteGiayMoiRecord(id);
             if (success) {

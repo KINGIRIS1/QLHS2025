@@ -2,9 +2,10 @@
 import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './types';
 
 // CẤU HÌNH KẾT NỐI
-// QUAN TRỌNG: Để dùng Cloud (Supabase), hãy dán URL dự án vào đây.
-// Nếu dùng Mạng LAN (Local), đổi lại thành 'http://localhost:3005'
-export const API_BASE_URL = 'https://dajjhubrhybodggbqapt.supabase.co'; 
+// Mặc định sử dụng Server máy chủ cá nhân thông qua Cloudflare Tunnel:
+export const API_BASE_URL = typeof window !== 'undefined' && localStorage.getItem('CUSTOM_SUPABASE_URL') 
+  ? localStorage.getItem('CUSTOM_SUPABASE_URL')! 
+  : 'https://api.qlhsct.info.vn'; 
 
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
 export const APP_VERSION = '2.1.0';

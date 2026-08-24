@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { User as UserType, NotifyFunction } from '../../types';
+import { User as UserType, NotifyFunction, UserRole } from '../../types';
 import saveAs from 'file-saver';
-import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings, Trash2, X, Plus } from 'lucide-react';
+import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings, Trash2, X, Plus, FileText, ClipboardList } from 'lucide-react';
 import BienBanForm from './bien-ban-tab/BienBanForm';
 import BienBanPreview from './bien-ban-tab/BienBanPreview';
 import BienBanList from './bien-ban-tab/BienBanList';
@@ -24,6 +24,37 @@ interface SoanBienBanTabProps {
     isActive: boolean;
     notify: NotifyFunction;
 }
+
+export interface BoundaryLineItem {
+  id: string;
+  fromPoint: string;
+  toPoint: string;
+  boundaryType: string;
+}
+
+export const DEFAULT_BOUNDARY_LINES: BoundaryLineItem[] = [
+  { id: '1', fromPoint: '', toPoint: '', boundaryType: 'Cọc bê tông' },
+  { id: '2', fromPoint: '', toPoint: '', boundaryType: 'Cọc bê tông' },
+  { id: '3', fromPoint: '', toPoint: '', boundaryType: 'Cọc bê tông' },
+  { id: '4', fromPoint: '', toPoint: '', boundaryType: 'Cọc bê tông' },
+  { id: '5', fromPoint: '', toPoint: '', boundaryType: 'Cọc bê tông' },
+];
+
+export const BOUNDARY_TYPE_OPTIONS = [
+  "Cọc bê tông",
+  "Cọc gỗ",
+  "Cọc sắt",
+  "Tường gạch",
+  "Tường nhà",
+  "Hàng rào kẽm gai",
+  "Hàng rào lưới B40",
+  "Bờ đất",
+  "Rãnh nước",
+  "Mương nước",
+  "Trụ điện",
+  "Để trống (................................)",
+  "Tự nhập khác"
+];
 
 const DEFAULT_BDDC_CAUSE = "Khi đo đạc lập bản đồ địa chính không có sự chỉ ranh của chủ sử dụng đất và các chủ sử dụng giáp ranh dẫn đến ranh giới mốc giới chưa được các bên xác định chính xác";
 
@@ -55,6 +86,12 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   const [tempAuthorities, setTempAuthorities] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
+    DOC_TYPE: 'BIEN_BAN', // 'BIEN_BAN' | 'BAN_MO_TA'
+    MO_TA_LINES: DEFAULT_BOUNDARY_LINES,
+    MO_TA_SIGN_ROWS: 7,
+    MO_TA_COMMON_TYPE: 'Cọc bê tông',
+    NGUOI_DAN_DAC: '',
+    CAN_BO_DO_DAC: '',
     GIO_LAP: '',
     PHUT_LAP: '',
     NGAY_LAP: '',
@@ -99,10 +136,14 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
               if (savedForm) {
                   const parsedForm = JSON.parse(savedForm);
-                  // Migration: Nếu form cũ chưa có mảng OWNERS, ta khởi tạo nó từ trường lẻ
-                  if (!parsedForm.OWNERS) {
-                      parsedForm.OWNERS = []; // Form component sẽ tự handle việc tạo default nếu rỗng
+                  // Migration: Nếu form cũ chưa có mảng OWNERS hoặc bản mô tả
+                  if (!parsedForm.OWNERS) parsedForm.OWNERS = [];
+                  if (!parsedForm.DOC_TYPE) parsedForm.DOC_TYPE = 'BIEN_BAN';
+                  if (!parsedForm.MO_TA_LINES || parsedForm.MO_TA_LINES.length === 0) {
+                      parsedForm.MO_TA_LINES = DEFAULT_BOUNDARY_LINES;
                   }
+                  if (!parsedForm.MO_TA_SIGN_ROWS) parsedForm.MO_TA_SIGN_ROWS = 7;
+                  if (!parsedForm.MO_TA_COMMON_TYPE) parsedForm.MO_TA_COMMON_TYPE = 'Cọc bê tông';
                   setFormData(parsedForm);
               }
               if (savedBoundary) setBoundaryChanges(JSON.parse(savedBoundary));
@@ -125,6 +166,12 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   const handleResetForm = () => {
       setEditingId(null);
       setFormData({
+        DOC_TYPE: 'BIEN_BAN',
+        MO_TA_LINES: DEFAULT_BOUNDARY_LINES,
+        MO_TA_SIGN_ROWS: 7,
+        MO_TA_COMMON_TYPE: 'Cọc bê tông',
+        NGUOI_DAN_DAC: '',
+        CAN_BO_DO_DAC: '',
         GIO_LAP: '', PHUT_LAP: '', NGAY_LAP: '', THANG_LAP: '', NAM_LAP: '',
         HO: 'Ông', TEN_CHU: '', DIA_CHI_CHU: '',
         OWNERS: [],
@@ -164,7 +211,8 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
       const success = await saveBienBanRecord(recordToSave);
       if (success) {
           await loadRecords();
-          if (!silent) notify(editingId ? "Đã cập nhật biên bản!" : "Đã lưu biên bản mới!", 'success');
+          const docLabel = formData.DOC_TYPE === 'BAN_MO_TA' ? "bản mô tả" : "biên bản";
+          if (!silent) notify(editingId ? `Đã cập nhật ${docLabel}!` : `Đã lưu ${docLabel} mới!`, 'success');
       } else {
           if (!silent) notify("Lỗi khi lưu dữ liệu.", 'error');
       }
@@ -177,6 +225,12 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
       const loadedData = item.data.formData;
       // Migration khi load từ DB cũ
       if (!loadedData.OWNERS) loadedData.OWNERS = [];
+      if (!loadedData.DOC_TYPE) loadedData.DOC_TYPE = 'BIEN_BAN';
+      if (!loadedData.MO_TA_LINES || loadedData.MO_TA_LINES.length === 0) {
+          loadedData.MO_TA_LINES = DEFAULT_BOUNDARY_LINES;
+      }
+      if (!loadedData.MO_TA_SIGN_ROWS) loadedData.MO_TA_SIGN_ROWS = 7;
+      if (!loadedData.MO_TA_COMMON_TYPE) loadedData.MO_TA_COMMON_TYPE = 'Cọc bê tông';
       
       setFormData(loadedData);
       setBoundaryChanges(item.data.boundaryChanges || []);
@@ -185,6 +239,10 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   };
 
   const handleDeleteRecord = async (id: string) => {
+      if (currentUser?.role !== UserRole.ADMIN) {
+          notify("Chỉ Quản trị viên (Admin) mới có quyền xóa biên bản!", 'error');
+          return;
+      }
       const success = await deleteBienBanRecord(id);
       if (success) {
           setSavedRecords(prev => prev.filter(r => r.id !== id));
@@ -528,7 +586,7 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
                         <div>
                             ${formData.HIEN_THI_CAU_LUU_Y ? `
                             <p style="text-align: center; font-weight: bold; font-size: 11pt; line-height: 1.3; margin: 0 0 10pt 0;">
-                                (Việc thể hiện biến động giữa GCNQSD đất và hiện trạng sử dụng đất chỉ mang tính chất tham khảo, do GCNQSD đất được đo đạc và cấp theo phương pháp đo đạc độc lập, không theo hệ tọa độ hiện hành)
+                                (Kết quả lồng ghép ranh giới, thể hiện diện tích biến động giữa GCN QSDĐ và hiện trạng sử dụng đất chỉ mang độ chính xác tương đối, do bản đồ địa chính phường Minh Long (Nay là phường Minh Hưng) đo đạc năm 1999 được đo đạc theo phương pháp đo đạc độc lập, không theo hệ tọa độ hiện tại)
                             </p>
                             ` : ''}
                         </div>
@@ -572,6 +630,49 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         </table>
     `;
 
+    let ownerNamesFormatted = '';
+    if (formData.OWNERS && formData.OWNERS.length > 0) {
+        ownerNamesFormatted = formData.OWNERS.map((o: any) => {
+            let names = toTitleCase(o.name);
+            if (o.hasSpouse && o.spouseName) {
+                names += `<br/>${toTitleCase(o.spouseName)}`;
+            }
+            return names;
+        }).filter(Boolean).join('<br/>');
+    } else if (formData.TEN_CHU) {
+        ownerNamesFormatted = toTitleCase(formData.TEN_CHU);
+    }
+
+    const signatureTableBanMoTa = `
+        <table border="0" cellspacing="0" cellpadding="0" style="width: 100%; border-collapse: collapse; border: none; margin-top: 25px; text-align: center; font-size: 13pt; page-break-inside: avoid;">
+            <thead>
+                <tr style="font-weight: bold; vertical-align: top;">
+                    <th style="width: 33.33%; text-align: center; vertical-align: top; font-weight: bold; border: none; font-size: 13pt; padding-bottom: 5px;">
+                        Chủ sử dụng
+                    </th>
+                    <th style="width: 33.33%; text-align: center; vertical-align: top; font-weight: bold; border: none; font-size: 13pt; padding-bottom: 5px;">
+                        Người dẫn đạc
+                    </th>
+                    <th style="width: 33.33%; text-align: center; vertical-align: top; font-weight: bold; border: none; font-size: 13pt; padding-bottom: 5px;">
+                        Cán bộ đo đạc
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="height: ${isForWord ? '75pt' : '90px'};">
+                    <td style="border: none;"></td>
+                    <td style="border: none;"></td>
+                    <td style="border: none;"></td>
+                </tr>
+                <tr style="font-weight: bold; text-align: center;">
+                    <td style="border: none; vertical-align: bottom;">${ownerNamesFormatted}</td>
+                    <td style="border: none; vertical-align: bottom;">${(formData as any).NGUOI_DAN_DAC || ''}</td>
+                    <td style="border: none; vertical-align: bottom;">${(formData as any).CAN_BO_DO_DAC || toTitleCase(currentUser.name) || ''}</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
     const lineMottoHtml = `
         <table style="width: 185px; margin: 0 auto; border-collapse: collapse; border: none;">
             <tr><td style="border-bottom: 1px solid black; height: 1px;"></td></tr>
@@ -598,6 +699,8 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     }
     // ------------------------------------------
 
+    const isBanMoTa = formData.DOC_TYPE === 'BAN_MO_TA';
+
     const dienTichHienThi = formData.HIEN_THI_BIEN_DONG_BDDC ? formData.DT_BDDC_2024 : formData.DT_MOI;
     const textDienTich = `, diện tích: <b>${dienTichHienThi} m²</b>`;
 
@@ -610,9 +713,75 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
          canCuBanDoHtml += `<p style="${indentStyle} margin-bottom: 8px;">${textCV106}</p>`;
     }
 
-    return `
-      <div style="font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.3; color: black; text-align: justify; width: 100%;">
-        
+    // Header content for BIEN BAN vs BAN MO TA
+    let headerContentHtml = '';
+
+    if (isBanMoTa) {
+        // Mode BẢN MÔ TẢ:
+        const moTaLines = (formData.MO_TA_LINES && formData.MO_TA_LINES.length > 0)
+            ? formData.MO_TA_LINES
+            : DEFAULT_BOUNDARY_LINES;
+
+        const moTaLinesHtml = moTaLines.map((line: any) => {
+            const fromP = line.fromPoint ? line.fromPoint : '....';
+            const toP = line.toPoint ? line.toPoint : '.....';
+            const type = (line.boundaryType && line.boundaryType.trim() !== '' && line.boundaryType !== 'Để trống (................................)')
+                ? line.boundaryType
+                : '...................................................................';
+            return `<p style="margin-bottom: 6px; line-height: 1.4;">- Từ điểm <b>${fromP}</b> đến điểm <b>${toP}</b>: Ranh giới được xác định theo ${type}</p>`;
+        }).join('');
+
+        const signRowsCount = parseInt((formData.MO_TA_SIGN_ROWS as any), 10) || 7;
+        let tableRowsHtml = '';
+        for (let i = 1; i <= signRowsCount; i++) {
+            tableRowsHtml += `
+            <tr style="height: ${isForWord ? '28pt' : '38px'};">
+                <td style="border: 1pt solid black; text-align: center; vertical-align: middle; font-weight: normal; font-size: 11pt;">${i}</td>
+                <td style="border: 1pt solid black; padding: 4px;"></td>
+                <td style="border: 1pt solid black; padding: 4px;"></td>
+                <td style="border: 1pt solid black; padding: 4px;"></td>
+                <td style="border: 1pt solid black; padding: 4px;"></td>
+            </tr>
+            `;
+        }
+
+        const tableSignAdjacentHtml = `
+        <p style="font-weight: bold; margin: 12px 0 8px 0; font-size: 13pt;">
+            Người sử dụng đất hoặc chủ quản lý đất liền kề xác nhận ranh giới, mốc giới sử dụng đất :
+        </p>
+        <table border="1" cellspacing="0" cellpadding="4" style="width: 100%; border-collapse: collapse; border: 1pt solid black; margin-bottom: 12px; text-align: center;">
+            <thead>
+                <tr style="font-weight: bold; vertical-align: middle;">
+                    <th rowspan="2" style="width: 7%; border: 1pt solid black; padding: 6px 2px; text-align: center; vertical-align: middle; font-size: 11.5pt;">STT</th>
+                    <th rowspan="2" style="width: 38%; border: 1pt solid black; padding: 6px; text-align: center; vertical-align: middle; font-size: 11.5pt;">Tên người sử dụng đất,<br/>Chủ quản lý đất liền kề</th>
+                    <th rowspan="2" style="width: 17%; border: 1pt solid black; padding: 6px; text-align: center; vertical-align: middle; font-size: 11.5pt;">Đồng ý<br/>(Ký tên)</th>
+                    <th colspan="2" style="width: 38%; border: 1pt solid black; padding: 6px; text-align: center; vertical-align: middle; font-size: 11.5pt;">Không đồng ý</th>
+                </tr>
+                <tr style="font-weight: bold; vertical-align: middle;">
+                    <th style="width: 23%; border: 1pt solid black; padding: 4px; text-align: center; vertical-align: middle; font-style: italic; font-weight: normal; font-size: 11pt;">Lý do không đồng ý</th>
+                    <th style="width: 15%; border: 1pt solid black; padding: 4px; text-align: center; vertical-align: middle; font-style: italic; font-weight: normal; font-size: 11pt;">Ký tên</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRowsHtml}
+            </tbody>
+        </table>
+        `;
+
+        headerContentHtml = `
+        <div style="text-align: center; font-weight: bold; margin: 0 0 16px 0; font-size: 14pt;">
+            MÔ TẢ CHI TIẾT MỐC GIỚI, RANH GIỚI THỬA ĐẤT
+        </div>
+
+        <div style="margin-bottom: 10px;">
+            ${moTaLinesHtml}
+        </div>
+
+        ${tableSignAdjacentHtml}
+        `;
+    } else {
+        // Mode BIÊN BẢN LÀM VIỆC (chuẩn):
+        headerContentHtml = `
         <div style="text-align: center; font-weight: bold; margin-bottom: 0px; font-size: 11pt;">
             <p style="margin: 0;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
             <p style="margin: 0;">Độc lập - Tự do - Hạnh phúc</p>
@@ -644,6 +813,15 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         <p style="margin-bottom: 15px;">${formData.HO_GIAP_RANH}</p>
 
         <p style="margin-bottom: 8px;"><b>B. NỘI DUNG:</b></p>
+        `;
+    }
+
+    const docEndText = isBanMoTa ? 'Bản mô tả kết thúc vào lúc' : 'Biên bản kết thúc vào lúc';
+
+    return `
+      <div style="font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.3; color: black; text-align: justify; width: 100%;">
+        ${headerContentHtml}
+
         <p style="${indentStyle} margin-bottom: 8px;">Tiến hành đo đạc, kiểm tra, xác minh ranh giới, mốc giới thửa đất ngoài thực địa đối với khu đất:</p>
         <p style="${indentStyle} margin-bottom: 8px;">Thửa đất số <b>${formData.SO_THUA_MOI || '...'}</b>, tờ bản đồ số <b>${toBanDoMoTa}</b>, tọa lạc tại ${formData.DIA_CHI_THUA}, ${formData.PHUONG}, thành phố Đồng Nai.</p>
 
@@ -670,7 +848,6 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
         <p style="${indentStyle} margin-bottom: 8px;">${textKetLuanRanhGioi}</p>
         <p style="${indentStyle} margin-bottom: 8px;">Tại thời điểm kiểm tra ranh giới, mốc giới sử dụng ổn định, không tranh chấp.</p>
         <p style="${indentStyle} margin-bottom: 8px;">Thửa đất không thuộc trường hợp ngăn chặn, tranh chấp.</p>
-        <p style="${indentStyle} margin-bottom: 12px;">Ranh giới thửa đất không thay đổi so với ranh tại thời điểm cấp Giấy nhận quyền sử dụng đất (việc thay đổi diện tích, kích thước các cạnh không phải do nhận chuyển quyền, do lấn chiếm,...).</p>
 
         <p style="${indentStyle} margin-bottom: 5px;"><b>Ý kiến của chủ sử dụng đất:</b></p>
         <p style="${indentStyle} margin-bottom: 5px;">Ranh giới mốc giới thửa đất của gia đình tôi sử dụng ổn định, không tranh chấp với các hộ giáp ranh. Đề nghị điều chỉnh GCNQSD đất của gia đình theo đúng hiện trạng sử dụng đất, không có khiếu nại, khiếu kiện có liên quan đến thửa đất nói trên.</p>
@@ -681,11 +858,11 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
 
         ${yKienPhongKTText}
 
-        <p style="${indentStyle} margin-top: 15px;">Biên bản kết thúc vào lúc ${endGio} giờ ${endPhut} phút cùng ngày và được lập thành 02 bản, có nội dung như nhau./.</p>
+        <p style="${indentStyle} margin-top: 15px;">${docEndText} ${endGio} giờ ${endPhut} phút cùng ngày và được lập thành 02 bản, có nội dung như nhau./.</p>
 
-        ${signatureTable}
+        ${isBanMoTa ? signatureTableBanMoTa : signatureTable}
 
-        ${soHoaSection}
+        ${isBanMoTa ? '' : soHoaSection}
       </div>
     `;
   };
@@ -698,7 +875,8 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
     
     const cleanName = formData.TEN_CHU.replace(/\s+/g, '_') || 'Chua_Ten';
     const toHienThi = formData.SO_TO_106 || formData.SO_TO_MOI || '...';
-    const fileName = `BB_${cleanName}_${toHienThi}_${formData.SO_THUA_MOI || 'Chua_Thua'}.doc`;
+    const prefix = formData.DOC_TYPE === 'BAN_MO_TA' ? 'BanMoTa' : 'BB';
+    const fileName = `${prefix}_${cleanName}_${toHienThi}_${formData.SO_THUA_MOI || 'Chua_Thua'}.doc`;
 
     const header = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -751,26 +929,46 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
   return (
     <div className="flex flex-col h-full bg-[#f1f5f9] overflow-hidden">
         {/* SUB-HEADER TABS */}
-        <div className="flex items-center gap-2 px-4 pt-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-20">
-            <button 
-                onClick={() => { setMode('create'); handleResetForm(); }}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'create' && !editingId ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            >
-                <PlusCircle size={16} /> Soạn biên bản mới
-            </button>
-            <button 
-                onClick={() => { setMode('list'); handleResetForm(); loadRecords(); }}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'list' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            >
-                <List size={16} /> Danh sách đã lưu ({savedRecords.length})
-            </button>
-            {editingId && (
+        <div className="flex items-center justify-between px-4 pt-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-20">
+            <div className="flex items-center gap-2">
                 <button 
-                    onClick={() => {}} 
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 border-orange-500 text-orange-600 bg-orange-50/50 transition-colors animate-pulse"
+                    onClick={() => { setMode('create'); handleResetForm(); }}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'create' && !editingId ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <Settings size={16} /> Đang chỉnh sửa
+                    <PlusCircle size={16} /> Soạn mẫu mới
                 </button>
+                <button 
+                    onClick={() => { setMode('list'); handleResetForm(); loadRecords(); }}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'list' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <List size={16} /> Danh sách đã lưu ({savedRecords.length})
+                </button>
+                {editingId && (
+                    <button 
+                        onClick={() => {}} 
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 border-orange-500 text-orange-600 bg-orange-50/50 transition-colors animate-pulse"
+                    >
+                        <Settings size={16} /> Đang chỉnh sửa
+                    </button>
+                )}
+            </div>
+
+            {/* QUICK TOGGLE MODE SWITCH */}
+            {mode === 'create' && (
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                        onClick={() => { setFormData(prev => ({ ...prev, DOC_TYPE: 'BIEN_BAN' })); resetFile(); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${formData.DOC_TYPE !== 'BAN_MO_TA' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'}`}
+                    >
+                        <FileText size={14} /> Biên bản làm việc
+                    </button>
+                    <button
+                        onClick={() => { setFormData(prev => ({ ...prev, DOC_TYPE: 'BAN_MO_TA' })); resetFile(); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${formData.DOC_TYPE === 'BAN_MO_TA' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'}`}
+                    >
+                        <ClipboardList size={14} /> Bản mô tả mốc giới
+                    </button>
+                </div>
             )}
         </div>
 

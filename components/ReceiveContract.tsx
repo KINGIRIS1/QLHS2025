@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Contract, PriceItem, SplitItem, User } from '../types';
+import { RecordFile, Contract, PriceItem, SplitItem, User, UserRole } from '../types';
 import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts } from '../services/api';
-import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList } from 'lucide-react';
+import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, UserCheck } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
+import ContractSignerConfigModal from './ContractSignerConfigModal';
+import { fetchContractSignerSettingsCached, getContractSignerInfo, ContractSignerSettings, DEFAULT_CONTRACT_SIGNER_SETTINGS } from '../services/apiSystem';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
@@ -67,6 +69,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isSignerConfigOpen, setIsSignerConfigOpen] = useState(false);
+  const [signerSettings, setSignerSettings] = useState<ContractSignerSettings>(DEFAULT_CONTRACT_SIGNER_SETTINGS);
   
   // Không dùng Modal Preview nữa, nhưng vẫn giữ state để tránh lỗi biên dịch nếu cần
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -77,9 +81,23 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
   
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined);
 
+  const loadSignerSettings = async () => {
+      const settings = await fetchContractSignerSettingsCached();
+      setSignerSettings(settings);
+  };
+
   useEffect(() => { 
       loadPrices(); 
       loadContracts();
+      loadSignerSettings();
+
+      const handleCacheUpdate = () => {
+          loadSignerSettings();
+      };
+      window.addEventListener('contract_signer_settings_cache_updated', handleCacheUpdate);
+      return () => {
+          window.removeEventListener('contract_signer_settings_cache_updated', handleCacheUpdate);
+      };
   }, []);
 
   const loadPrices = async () => { const prices = await fetchPriceList(); setPriceList(prices); };
@@ -199,6 +217,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
   };
 
   const handleDelete = async (id: string) => { 
+      if (currentUser?.role !== UserRole.ADMIN) {
+          showToast("Chỉ Quản trị viên (Admin) mới có quyền xóa hợp đồng!", "error");
+          return;
+      }
       if(await confirmAction("Bạn có chắc chắn muốn xóa hợp đồng này không?")) {
           await deleteContractApi(id);
           loadContracts(); // Reload list
@@ -283,16 +305,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       if (normWard.includes('nha bich')) unitPrefix = 'Xã';
       else if (normWard.includes('minh hung') || normWard.includes('chon thanh') || normWard.includes('hung long') || normWard.includes('thanh tam')) unitPrefix = 'Phường';
 
-      let signerName = 'PHẠM VĂN NAM'; 
-      let signerPosition = 'PHÓ GIÁM ĐỐC';
-      
-      if (normWard.includes('nha bich')) {
-          signerName = 'LƯƠNG NGỌC DINH';
-          signerPosition = 'GIÁM ĐỐC';
-      } else if (normWard.includes('minh hung')) {
-          signerName = 'TRỊNH QUANG HƯNG';
-          signerPosition = 'PHÓ GIÁM ĐỐC';
-      }
+      // TỰ ĐỘNG LẤY TÊN VÀ CHỨC VỤ NGƯỜI KÝ BÊN B THEO CẤU HÌNH XÃ/PHƯỜNG (LƯU TẠI SUPABASE)
+      const signerInfo = getContractSignerInfo(signerSettings, rawWard);
+      const signerName = signerInfo.name;
+      const signerPosition = signerInfo.position;
 
       let sdtLienHe = ""; 
       if (normWard.includes("minh hung")) {
@@ -471,6 +487,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
             <div><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
             
             <div className="flex gap-2">
+                <button onClick={() => setIsSignerConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 px-3 font-bold text-xs" title="Cấu hình Người ký Hợp đồng Bên B theo Xã/Phường">
+                    <UserCheck size={18} className="text-purple-600" />
+                    <span className="hidden sm:inline">Người ký Bên B</span>
+                </button>
                 <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
                     <Settings2 size={20} />
                 </button>
@@ -540,7 +560,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
             {activeModule === 'list' && (
                 <ContractList 
                     onEdit={handleEdit} // Chỉnh sửa hợp đồng
-                    onDelete={handleDelete}
+                    onDelete={currentUser?.role === UserRole.ADMIN ? handleDelete : undefined}
                     onPrint={handlePreviewDocx} 
                     onCreateLiquidation={handleCreateLiquidation} // Nút tạo thanh lý từ danh sách
                     viewMode='contract'
@@ -550,7 +570,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
             {activeModule === 'liquidation_list' && (
                 <ContractList 
                     onEdit={handleCreateLiquidation} // Edit thanh lý thì mở form thanh lý
-                    onDelete={handleDelete}
+                    onDelete={currentUser?.role === UserRole.ADMIN ? handleDelete : undefined}
                     onPrint={handlePreviewDocx} 
                     onCreateLiquidation={handleCreateLiquidation}
                     viewMode='liquidation'
@@ -560,6 +580,12 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       </div>
 
       {/* Modals */}
+      <ContractSignerConfigModal 
+          isOpen={isSignerConfigOpen} 
+          onClose={() => setIsSignerConfigOpen(false)} 
+          wards={wards} 
+          onUpdate={loadSignerSettings} 
+      />
       <PriceConfigModal 
           isOpen={isPriceConfigOpen} 
           onClose={() => setIsPriceConfigOpen(false)} 

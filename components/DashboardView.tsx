@@ -242,9 +242,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
 
     // 4. Tính toán thống kê chung
     const total = filteredRecords.length;
-    const completed = filteredRecords.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED).length;
-    const withdrawn = filteredRecords.filter(r => r.status === RecordStatus.WITHDRAWN).length;
-    const processing = total - completed - withdrawn;
+    const completed = filteredRecords.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN).length;
+    const processing = total - completed;
 
     // --- Data cho Biểu đồ Địa bàn (Xã/Phường) ---
     const wardData = useMemo(() => {
@@ -493,7 +492,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             </div>
 
             {/* CARDS: THỐNG KÊ CHI TIẾT */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
                     <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:opacity-20 transition-all duration-300 transform rotate-12 z-0">
                         <FileText size={80} className="text-blue-600" />
@@ -537,20 +536,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
                     </div>
                     <div className="relative z-10 bg-green-50 p-3 rounded-xl text-green-600 shadow-sm border border-green-100">
                         <CheckCircle size={24} />
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
-                    <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:opacity-20 transition-all duration-300 transform rotate-12 z-0">
-                        <ArchiveX size={80} className="text-slate-600" />
-                    </div>
-                    <div className="relative z-10">
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Đã rút / Trả lại</p>
-                        <h3 className="text-4xl font-black text-slate-600 mt-2">{withdrawn}</h3>
-                        <p className="text-[10px] text-slate-500 font-medium mt-1">Hồ sơ</p>
-                    </div>
-                    <div className="relative z-10 bg-slate-100 p-3 rounded-xl text-slate-600 shadow-sm border border-slate-200">
-                        <ArchiveX size={24} />
                     </div>
                 </div>
             </div>

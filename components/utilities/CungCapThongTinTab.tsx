@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { PhieuInfoData, generatePreviewData, PLANNING_PRESETS, PlanningConfig, parseNumber } from '../../services/phieuInfoService';
 import { Settings, X, Plus, Trash2, RotateCcw, RefreshCw, Download, List, PlusCircle, Save } from 'lucide-react';
 import saveAs from 'file-saver';
-import { User as UserType, NotifyFunction } from '../../types';
+import { User as UserType, NotifyFunction, UserRole } from '../../types';
 import InfoForm from './info-tab/InfoForm';
 import InfoPreview from './info-tab/InfoPreview';
 import InfoList from './info-tab/InfoList';
@@ -148,6 +148,10 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
     };
 
     const handleDeleteRecord = async (id: string) => {
+        if (currentUser?.role !== UserRole.ADMIN) {
+            notify("Chỉ Quản trị viên (Admin) mới có quyền xóa phiếu!", 'error');
+            return;
+        }
         const success = await deleteThongTinRecord(id);
         if (success) {
             setSavedRecords(prev => prev.filter(r => r.id !== id));

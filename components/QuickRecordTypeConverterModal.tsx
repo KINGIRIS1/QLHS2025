@@ -1,8 +1,91 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { RecordFile } from '../types';
+import { RecordFile, RecordStatus } from '../types';
 import { getNormalizedWard } from '../constants';
 import { X, ArrowRight, ToggleLeft, CheckSquare, Square, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
-import { updateBulkRecordTypeApi } from '../services/apiRecords';
+import { createRecordApi, updateRecordApi, deleteRecordApi } from '../services/apiRecords';
+import { saveArchiveRecord } from '../services/apiArchive';
+
+const getShortCode = (ward: string) => {
+    const normalized = ward.toLowerCase().trim();
+    const cleanName = normalized
+        .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
+        .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
+
+    if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
+    if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
+    if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
+    if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
+    if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
+    if (cleanName.includes('quang minh') || cleanName.includes('quangminh')) return 'QM';
+    if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
+    if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
+    
+    return 'CT';
+};
+
+const calculateNextCodeForConvert = (
+    wardName: string, 
+    dateStr: string, 
+    allRecords: RecordFile[], 
+    tempCodes: string[], 
+    recordType: string
+) => {
+    if (!wardName || !dateStr) return '';
+
+    const d = new Date(dateStr);
+    const yy = d.getFullYear().toString().slice(-2);
+    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+    const dd = ('0' + d.getDate()).slice(-2);
+    const datePrefix = `${yy}${mm}${dd}`;
+    
+    const suffix = getShortCode(wardName);
+    
+    let targetPrefixType = '';
+    if (recordType === 'Sao lục hồ sơ' || recordType === 'Sao lục') {
+        targetPrefixType = 'SLHS';
+    } else if (recordType === 'Thuế chính quy') {
+        targetPrefixType = 'TCQ';
+    } else if (recordType === 'Thu hồi Giấy chứng nhận') {
+        targetPrefixType = 'THG';
+    }
+
+    let maxSeq = 0;
+
+    const checkAndExtractSeq = (codeStr: string | null | undefined) => {
+        if (!codeStr) return;
+        const cleanCode = codeStr.trim().toUpperCase();
+        const parts = cleanCode.split('-');
+        
+        if (targetPrefixType) {
+            if (parts.length === 4) {
+                const [rType, rDate, rSeq, rSuffix] = parts;
+                if (rType === targetPrefixType && rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
+                    const seqNum = parseInt(rSeq, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                }
+            }
+        } else {
+            if (parts.length === 3) {
+                const [rDate, rSeq, rSuffix] = parts;
+                if (rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
+                    const seqNum = parseInt(rSeq, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                }
+            }
+        }
+    };
+
+    allRecords.forEach(r => checkAndExtractSeq(r.code));
+    tempCodes.forEach(code => checkAndExtractSeq(code));
+
+    const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
+    
+    if (targetPrefixType) {
+        return `${targetPrefixType}-${datePrefix}-${nextSeq}-${suffix}`;
+    } else {
+        return `${datePrefix}-${nextSeq}-${suffix}`;
+    }
+};
 
 interface QuickRecordTypeConverterModalProps {
     isOpen: boolean;
@@ -143,25 +226,127 @@ const QuickRecordTypeConverterModal: React.FC<QuickRecordTypeConverterModalProps
         setUpdateProgress({ current: 0, total });
 
         try {
-            const BATCH_SIZE = 40; // Chia nhỏ mỗi đợt khoảng 40 hồ sơ để tối ưu hóa và tránh lỗi quá tải
             let processed = 0;
+            const tempCodes: string[] = [];
 
-            for (let i = 0; i < total; i += BATCH_SIZE) {
-                const chunk = idsArray.slice(i, i + BATCH_SIZE);
-                const success = await updateBulkRecordTypeApi(chunk, finalTargetType);
-                
-                if (!success) {
-                    throw new Error(`Gặp lỗi tại đợt cập nhật số ${Math.floor(i / BATCH_SIZE) + 1} (từ hồ sơ số ${i + 1} đến ${Math.min(i + BATCH_SIZE, total)}). Các đợt trước đó đã được cập nhật thành công.`);
+            for (const id of idsArray) {
+                const originalRecord = records.find(r => r.id === id);
+                if (!originalRecord) {
+                    processed++;
+                    setUpdateProgress({ current: processed, total });
+                    continue;
                 }
+
+                // 1. Generate code for the target type
+                const newCode = calculateNextCodeForConvert(
+                    originalRecord.ward || 'Chơn Thành',
+                    originalRecord.receivedDate || new Date().toISOString().split('T')[0],
+                    records,
+                    tempCodes,
+                    finalTargetType
+                );
                 
-                processed += chunk.length;
+                if (newCode) {
+                    tempCodes.push(newCode);
+                }
+
+                // 2. Clone the record
+                const clonedRecord: RecordFile = {
+                    ...originalRecord,
+                    id: Math.random().toString(36).substr(2, 9),
+                    code: newCode || originalRecord.code,
+                    recordType: finalTargetType,
+                    status: RecordStatus.RECEIVED,
+                };
+
+                const isSaoLuc = finalTargetType === 'Sao lục hồ sơ' || finalTargetType === 'Sao lục';
+                const isVaoSo = finalTargetType === 'Vào sổ';
+                const isDangKy = finalTargetType === 'Đăng ký biến động';
+                const isCongVan = finalTargetType === 'Công văn';
+
+                if (isSaoLuc || isVaoSo || isDangKy || isCongVan) {
+                    // Save as archive_record
+                    const archiveType = isVaoSo ? 'vaoso' : isDangKy ? 'dangky' : isCongVan ? 'congvan' : 'saoluc';
+                    const saoLucData = {
+                        xa_phuong: clonedRecord.ward || '',
+                        dia_danh: clonedRecord.ward || '',
+                        to_ban_do: clonedRecord.mapSheet || '',
+                        so_to: clonedRecord.mapSheet || '',
+                        thua_dat: clonedRecord.landPlot || '',
+                        so_thua: clonedRecord.landPlot || '',
+                        dien_tich: clonedRecord.area || 0,
+                        tong_dien_tich: clonedRecord.area || 0,
+                        area: clonedRecord.area || 0,
+                        ngay_nhan: clonedRecord.receivedDate || '',
+                        hen_tra: clonedRecord.deadline || '',
+                        noi_dung: clonedRecord.content || '',
+                        trich_yeu: clonedRecord.content || '',
+                        so_dien_thoai: clonedRecord.phoneNumber || '',
+                        so_dt: clonedRecord.phoneNumber || '',
+                        phoneNumber: clonedRecord.phoneNumber || '',
+                        cccd: clonedRecord.cccd || '',
+                        nguoi_uy_quyen: clonedRecord.authorizedBy || '',
+                        authorizedBy: clonedRecord.authorizedBy || '',
+                        loai_uy_quyen: clonedRecord.authDocType || '',
+                        authDocType: clonedRecord.authDocType || '',
+                        giay_to_kem_theo: clonedRecord.otherDocs || '',
+                        otherDocs: clonedRecord.otherDocs || '',
+                        dia_chi: clonedRecord.address || '',
+                        address: clonedRecord.address || '',
+                        notes: clonedRecord.notes || '',
+                        privateNotes: clonedRecord.privateNotes || '',
+                        isPriority: Boolean(clonedRecord.isPriority),
+                        priorityNote: clonedRecord.priorityNote || '',
+                        loai_ho_so: clonedRecord.recordType || finalTargetType,
+                        nguoi_tiep_nhan: clonedRecord.createdBy || '',
+                        createdBy: clonedRecord.createdBy || '',
+                        status: 'draft',
+                        ngay_hoan_thanh: clonedRecord.exportDate || clonedRecord.workCompletedDate || '',
+                        danh_sach: clonedRecord.exportBatch || ''
+                    };
+                    const arToSave = {
+                        type: archiveType as any,
+                        status: 'draft' as any,
+                        so_hieu: clonedRecord.code,
+                        trich_yeu: clonedRecord.content || '',
+                        ngay_thang: clonedRecord.receivedDate || new Date().toISOString().split('T')[0],
+                        noi_nhan_gui: clonedRecord.customerName || '',
+                        data: saoLucData,
+                        created_by: clonedRecord.createdBy || '',
+                        created_at: new Date().toISOString()
+                    };
+                    const success = await saveArchiveRecord(arToSave);
+                    if (!success) {
+                        throw new Error(`Gặp lỗi khi lưu hồ sơ lưu trữ ${clonedRecord.code}`);
+                    }
+                    // Xóa hoàn toàn hồ sơ cũ khỏi bảng records để chuyển hoàn toàn sang lưu trữ
+                    try {
+                        await deleteRecordApi(originalRecord.id);
+                    } catch (delErr) {
+                        console.error('Lỗi khi xóa hồ sơ cũ bên tiếp nhận:', delErr);
+                    }
+                    window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type: archiveType } }));
+                } else {
+                    // Update the existing record in-place to the new record type and new code
+                    const success = await updateRecordApi({
+                        ...originalRecord,
+                        recordType: finalTargetType,
+                        code: newCode || originalRecord.code,
+                        status: RecordStatus.RECEIVED
+                    });
+                    if (!success) {
+                        throw new Error(`Gặp lỗi khi cập nhật loại hồ sơ ${clonedRecord.code}`);
+                    }
+                }
+
+                processed++;
                 setUpdateProgress({ current: processed, total });
                 
-                // Đợi một khoảng ngắn (ví dụ: 100ms) giữa các đợt để giảm tải cho hệ thống và giúp UI mượt mà hơn
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Chờ ngắn để UI mượt mà
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
 
-            setSuccessMessage(`Đã chuyển đổi thành công tất cả ${total} hồ sơ từ "${sourceType}" sang "${finalTargetType}" theo từng đợt an toàn!`);
+            setSuccessMessage(`Đã chuyển đổi hoàn toàn ${total} hồ sơ sang "${finalTargetType}" với mã mới tương ứng (hồ sơ cũ đã được chuyển loại thành công)!`);
             setSelectedIds(new Set());
             onSuccess(); // Tải lại dữ liệu hệ thống
         } catch (error: any) {

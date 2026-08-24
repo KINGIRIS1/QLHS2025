@@ -51,6 +51,8 @@ const mapArchiveToRecordFile = (ar: any): RecordFile => {
         otherDocs: d.otherDocs || d.giay_to_kem_theo || '',
         notes: d.notes || d.ghi_chu || '',
         privateNotes: d.privateNotes || '',
+        isPriority: Boolean(d.isPriority),
+        priorityNote: d.priorityNote || '',
         status: mapStatusToEnum(ar.status || 'draft'),
         recordType: rType,
         createdBy: ar.created_by || d.createdBy || d.nguoi_tiep_nhan || '',
@@ -536,6 +538,10 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   };
 
   const handleDeleteFromList = async (record: RecordFile) => {
+      if (currentUser?.role !== UserRole.ADMIN) {
+          showToast('Chỉ Quản trị viên (Admin) mới có quyền xóa hồ sơ!', 'error');
+          return;
+      }
       if (await confirmAction(`Bạn có chắc muốn xóa hồ sơ ${record.code}?`)) {
           await onDelete(record.id);
       }

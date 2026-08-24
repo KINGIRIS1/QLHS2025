@@ -482,7 +482,7 @@ const InternalChat: React.FC<InternalChatProps> = ({ currentUser, wards = [], em
   const visibleWards = useMemo(() => {
       if (isAdmin) return wards;
       const currentEmp = employees.find(e => e.id === currentUser.employeeId);
-      if (!currentEmp || !currentEmp.managedWards) return [];
+      if (!currentEmp || !Array.isArray(currentEmp.managedWards)) return [];
       const empWardsNormalized = currentEmp.managedWards.map(normalizeStr);
       return wards.filter(w => empWardsNormalized.includes(normalizeStr(w)));
   }, [wards, currentUser, employees, isAdmin]);

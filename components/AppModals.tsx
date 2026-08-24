@@ -1,5 +1,5 @@
 import React from 'react';
-import { RecordFile, Employee, User, RecordStatus, Holiday } from '../types';
+import { RecordFile, Employee, User, RecordStatus, Holiday, UserRole } from '../types';
 import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
@@ -118,6 +118,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees} 
                 selectedRecords={props.assignTargetRecords} 
                 currentView={props.currentView}
+                currentUser={props.currentUser}
             />
             
             {isMobile ? (
@@ -128,7 +129,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     currentUser={props.currentUser} 
                     onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onDelete={props.currentUser?.role === UserRole.ADMIN ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
                 />
             ) : (
@@ -139,7 +140,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     currentUser={props.currentUser} 
                     onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onDelete={props.currentUser?.role === UserRole.ADMIN ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
                 />
             )}

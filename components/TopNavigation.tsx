@@ -35,32 +35,76 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isTeamLeader = currentUser.role === UserRole.TEAM_LEADER;
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
+  const isReceptionHandover = currentUser.role === UserRole.RECEPTION_HANDOVER;
 
   // Cập nhật danh sách các view được phép
   const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'receive_group', 'reports', 'tools_group', 'management_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records', 'records_group', 'tools_group', 'management_group'];
   
-  let employeeAllowedViews: string[] = [];
   const normalizedDept = (currentDepartment || '').trim().toLowerCase();
-  const isDoDacUser = normalizedDept.includes('đo đạc') || isAdmin || isSubadmin;
+  const isDoDacUser = normalizedDept.includes('đo đạc') || normalizedDept.includes('do dac') || normalizedDept.includes('kỹ thuật') || normalizedDept.includes('ky thuat') || isAdmin || isSubadmin;
 
-  if (normalizedDept.includes('đo đạc')) {
-    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records', 'blocking_records', 'send_measurement_files'];
-    if (!teamLeaderAllowedViews.includes('blocking_records')) {
-      teamLeaderAllowedViews.push('blocking_records');
-    }
-    if (!teamLeaderAllowedViews.includes('send_measurement_files')) {
-      teamLeaderAllowedViews.push('send_measurement_files');
-    }
-  } else if (normalizedDept.includes('lưu trữ')) {
-    employeeAllowedViews = ['dashboard', 'archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
-  } else if (normalizedDept.includes('đăng ký')) {
-    employeeAllowedViews = ['dashboard', 'dangky_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
-  } else if (!normalizedDept) {
-    // If department is not loaded yet or empty, show minimal views
-    employeeAllowedViews = ['dashboard', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  const hasDoDacDept = normalizedDept.includes('đo đạc') || normalizedDept.includes('do dac') || normalizedDept.includes('kỹ thuật') || normalizedDept.includes('ky thuat');
+  const hasDangKyDept = normalizedDept.includes('đăng ký') || normalizedDept.includes('dang ky');
+  const hasLuuTruDept = normalizedDept.includes('lưu trữ') || normalizedDept.includes('luu tru');
+
+  // Phân quyền cho Nhóm trưởng (Team Leader) dựa theo Tổ
+  let teamLeaderAllowedViews: string[] = [
+    'dashboard', 'personal_profile', 'reports', 'account_settings',
+    'internal_chat', 'utilities', 'work_schedule', 'warehouse_records',
+    'records_group', 'tools_group', 'management_group'
+  ];
+
+  if (hasDoDacDept) {
+    teamLeaderAllowedViews.push('all_records', 'other_records', 'send_measurement_files', 'blocking_records', 'excerpt_management');
+  }
+  if (hasDangKyDept) {
+    teamLeaderAllowedViews.push('dangky_records');
+  }
+  if (hasLuuTruDept) {
+    teamLeaderAllowedViews.push('archive_records');
+  }
+
+  // Nếu không thuộc các tổ trên hoặc chưa thiết lập tổ, cho phép truy cập mặc định tất cả
+  if (!hasDoDacDept && !hasDangKyDept && !hasLuuTruDept) {
+    teamLeaderAllowedViews.push(
+      'all_records', 'other_records', 'dangky_records', 'archive_records',
+      'send_measurement_files', 'blocking_records', 'excerpt_management'
+    );
+  }
+
+  let employeeAllowedViews: string[] = [];
+
+  let receptionHandoverAllowedViews: string[] = [];
+  if (hasDoDacDept) {
+    receptionHandoverAllowedViews = [
+      'dashboard', 'all_records', 'other_records', 'check_list', 'other_check_list', 'handover_list', 'other_handover_list', 'blocking_records', 'excerpt_management',
+      'utilities', 'work_schedule', 'reports', 'personal_profile', 'account_settings',
+      'internal_chat', 'records_group', 'tools_group', 'management_group', 'warehouse_records', 'send_measurement_files'
+    ];
+  } else if (hasLuuTruDept) {
+    receptionHandoverAllowedViews = [
+      'dashboard', 'archive_records', 'reports', 'personal_profile', 'account_settings',
+      'internal_chat', 'records_group', 'tools_group', 'management_group', 'warehouse_records', 'utilities'
+    ];
+  } else if (hasDangKyDept) {
+    receptionHandoverAllowedViews = [
+      'dashboard', 'dangky_records', 'reports', 'personal_profile', 'account_settings',
+      'internal_chat', 'records_group', 'tools_group', 'management_group', 'utilities'
+    ];
   } else {
-    // Fallback for other departments
+    receptionHandoverAllowedViews = [
+      'dashboard', 'all_records', 'check_list', 'other_check_list', 'handover_list', 'other_handover_list', 'reports', 'personal_profile', 'account_settings',
+      'internal_chat', 'records_group', 'tools_group', 'management_group', 'utilities'
+    ];
+  }
+
+  if (hasDoDacDept) {
+    employeeAllowedViews = ['dashboard', 'all_records', 'other_records', 'work_schedule', 'personal_profile', 'excerpt_management', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records', 'blocking_records', 'send_measurement_files', 'reports'];
+  } else if (hasLuuTruDept) {
+    employeeAllowedViews = ['dashboard', 'archive_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  } else if (hasDangKyDept) {
+    employeeAllowedViews = ['dashboard', 'dangky_records', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
+  } else {
     employeeAllowedViews = ['dashboard', 'personal_profile', 'utilities', 'records_group', 'management_group', 'tools_group', 'warehouse_records'];
   }
 
@@ -74,7 +118,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       id: 'receive_group',
       label: 'Tiếp nhận',
       icon: FolderInput,
-      visible: !isTeamLeader && !isEmployee,
+      visible: !isTeamLeader && !isEmployee && !isReceptionHandover,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
@@ -109,7 +153,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin || ((isSubadmin || isTeamLeader || isEmployee) && normalizedDept.includes('đo đạc')) },
+        { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin || ((isSubadmin || isTeamLeader || isEmployee || isReceptionHandover) && normalizedDept.includes('đo đạc')) },
         { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: true },
         { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
         { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: true },
@@ -159,14 +203,11 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       )}
 
       {/* Sidebar Container */}
-      <div
-        className={`
-          fixed inset-y-0 left-0 z-40 w-[90px] text-white shadow-xl transform transition-all duration-300 ease-in-out flex flex-col pt-14 md:pt-0
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:relative md:translate-x-0
-        `}
-        style={{ backgroundColor: 'var(--app-sidebar-bg, var(--app-header-bg, #1e3a8a))', color: 'var(--app-sidebar-text, #ffffff)' }}
-      >
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-[90px] bg-[#1e3a8a] text-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col pt-14 md:pt-0
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:relative md:translate-x-0
+      `}>
         
         {/* NAVIGATION */}
         <nav className="flex-1 overflow-y-auto py-2 px-1 space-y-1 custom-scrollbar">
@@ -175,6 +216,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             if (isOneDoor && !oneDoorAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
             if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
             if (isEmployee && !employeeAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
+            if (isReceptionHandover && !receptionHandoverAllowedViews.includes(item.id) && !item.isDropdown && !(item as any).isTabGroup) return null;
             if (!item.visible) return null;
 
             // Check if any sub-item is active
@@ -188,6 +230,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                  if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return false;
                  if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return false;
                  if (isEmployee && !employeeAllowedViews.includes(sub.id)) return false;
+                 if (isReceptionHandover && !receptionHandoverAllowedViews.includes(sub.id)) return false;
                  return sub.visible;
               });
               
@@ -203,6 +246,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                        if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
                        if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
                        if (isEmployee && !employeeAllowedViews.includes(sub.id)) return null;
+                       if (isReceptionHandover && !receptionHandoverAllowedViews.includes(sub.id)) return null;
                        if (!sub.visible) return null;
     
                        const isSubActive = currentView === sub.id;
@@ -253,6 +297,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                       {item.subItems?.map(sub => {
                          if (isOneDoor && !oneDoorAllowedViews.includes(sub.id)) return null;
                          if (isTeamLeader && !teamLeaderAllowedViews.includes(sub.id)) return null;
+                         if (isReceptionHandover && !receptionHandoverAllowedViews.includes(sub.id)) return null;
                          if (!sub.visible) return null;
   
                          return (

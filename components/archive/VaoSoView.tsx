@@ -4,7 +4,7 @@ import { supabase } from '../../services/supabaseClient';
 import { User } from '../../types';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Download, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction } from '../../utils/appHelpers';
+import { confirmAction, showToast } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
 import { exportSoDiaChinh, generateSoDiaChinhBlob } from '../../utils/exportSoDiaChinh';
 import { exportSoMucKe } from '../../utils/exportSoMucKe';
@@ -39,7 +39,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned' | 'cong-cu-vao-so'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned' | 'cong-cu-vao-so' | 'priority'>('all');
+
+    const priorityCount = useMemo(() => {
+        return records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority)).length;
+    }, [records]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -89,7 +93,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     // Export So Muc Ke State
     const [showExportSoMucKeModal, setShowExportSoMucKeModal] = useState(false);
-    const [exportSoMucKeParams, setExportSoMucKeParams] = useState({ ward: '', fromDate: '', toDate: '' });
+    const [exportSoMucKeParams, setExportSoMucKeParams] = useState<{ ward: string; fromDate: string; toDate: string; targetType: 'new_owner' | 'old_owner' }>({ 
+        ward: '', 
+        fromDate: '', 
+        toDate: '',
+        targetType: 'new_owner'
+    });
 
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -171,6 +180,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         } else if (activeTab === 'scanned') {
             // Đã chuyển Scan: Đã có đợt scan
             filtered = records.filter(r => r.data?.is_scanned);
+        } else if (activeTab === 'priority') {
+            filtered = records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority));
         }
 
         // Filter by Date (Ngày nhận)
@@ -243,6 +254,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleDelete = async (id: string) => {
+        if (currentUser.role !== 'ADMIN') { showToast('Chỉ Quản trị viên (Admin) mới có quyền xóa hồ sơ!', 'error'); return; }
         if (await confirmAction("Bạn có chắc chắn muốn xóa hồ sơ này?")) {
             await deleteArchiveRecord(id);
             loadData();
@@ -250,6 +262,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleDeleteAll = async () => {
+        if (currentUser.role !== 'ADMIN') { showToast('Chỉ Quản trị viên (Admin) mới có quyền xóa tất cả!', 'error'); return; }
         await deleteAllArchiveRecordsByType('vaoso');
         loadData();
     };
@@ -1424,6 +1437,19 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         >
                             Công cụ Vào số GCN
                         </button>
+                        <button 
+                            onClick={() => {
+                                setActiveTab('priority');
+                                setSelectedIds(new Set());
+                            }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-bold transition-colors ${activeTab === 'priority' ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            <AlertTriangle size={16} className="text-amber-500 fill-yellow-400 shrink-0"/> 
+                            <span>Hồ sơ chú ý</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${priorityCount > 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-100 text-gray-600'}`}>
+                                {priorityCount}
+                            </span>
+                        </button>
                     </div>
 
                     <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
@@ -1753,6 +1779,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                         </button>
                                                     </>
                                                 )}
+                                                {currentUser.role === 'ADMIN' && (
                                                 <button 
                                                     onClick={() => handleDelete(r.id)} 
                                                     className="p-2 text-gray-500 bg-white border border-gray-200 hover:text-red-600 hover:bg-red-50 hover:border-red-300 rounded-lg transition-colors shadow-sm" 
@@ -1760,6 +1787,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                 >
                                                     <Trash2 size={18}/>
                                                 </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -1833,6 +1861,41 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Đối tượng xuất Sổ mục kê</label>
+                                <div className="grid grid-cols-1 gap-2">
+                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${exportSoMucKeParams.targetType === 'new_owner' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="soMucKeTargetType" 
+                                            value="new_owner" 
+                                            checked={exportSoMucKeParams.targetType === 'new_owner'}
+                                            onChange={() => setExportSoMucKeParams(prev => ({ ...prev, targetType: 'new_owner' }))}
+                                            className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <div className="ml-3">
+                                            <span className="block text-sm font-medium text-gray-900">1. Xuất cho chủ mới (Chủ sử dụng)</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">Tên người sử dụng là Chủ mới; Cột ghi chú để trống</span>
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${exportSoMucKeParams.targetType === 'old_owner' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="soMucKeTargetType" 
+                                            value="old_owner" 
+                                            checked={exportSoMucKeParams.targetType === 'old_owner'}
+                                            onChange={() => setExportSoMucKeParams(prev => ({ ...prev, targetType: 'old_owner' }))}
+                                            className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <div className="ml-3">
+                                            <span className="block text-sm font-medium text-gray-900">2. Xuất cho chủ cũ (Chủ chuyển quyền)</span>
+                                            <span className="block text-xs text-indigo-600 font-medium mt-0.5">Ghi chú tự động: "Đã [Loại hồ sơ] ngày [Ngày ký GCN]"</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div>
                                 <label className="block text-sm font-semibold text-gray-600 mb-1">Xã/Phường</label>
                                 <select 
                                     className="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
@@ -1904,7 +1967,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         return;
                                     }
 
-                                    exportSoMucKe(recordsToExport, exportSoMucKeParams.ward, exportSoMucKeParams.fromDate, exportSoMucKeParams.toDate);
+                                    exportSoMucKe(recordsToExport, exportSoMucKeParams.ward, exportSoMucKeParams.fromDate, exportSoMucKeParams.toDate, exportSoMucKeParams.targetType);
                                     setShowExportSoMucKeModal(false);
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"

@@ -11,7 +11,8 @@ import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import MaMauQuyHoachTab from './utilities/MaMauQuyHoachTab';
 import GiayMoiTab from './utilities/GiayMoiTab';
-import { Mail } from 'lucide-react';
+import KiemTraKyThuatTab from './utilities/KiemTraKyThuatTab';
+import { Mail, FileCheck } from 'lucide-react';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -20,7 +21,7 @@ interface UtilitiesViewProps {
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecordForCorrection }) => {
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'mamau' | 'giaymoi'>(
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'mamau' | 'giaymoi' | 'kiemtra'>(
       currentUser.role === UserRole.ONEDOOR ? 'vphc' : 'bienban'
   );
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -137,6 +138,12 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
                       >
                           <Calculator size={16} /> Tính sai số
                       </button>
+                      <button 
+                          onClick={() => setActiveTab('kiemtra')}
+                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'kiemtra' ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <FileCheck size={16} /> Kiểm tra kỹ thuật
+                      </button>
                   </>
               )}
               <button 
@@ -161,7 +168,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
               )}
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'mamau' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'mamau' && activeTab !== 'kiemtra' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -225,6 +232,11 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({ currentUser, initialRecor
           {/* TAB 9: GIẤY MỜI */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'giaymoi' ? 'block' : 'hidden'}`}>
               <GiayMoiTab currentUser={currentUser} notify={notify} />
+          </div>
+
+          {/* TAB 10: KIỂM TRA KỸ THUẬT */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'kiemtra' ? 'block' : 'hidden'}`}>
+              <KiemTraKyThuatTab notify={notify} />
           </div>
       </div>
     </div>

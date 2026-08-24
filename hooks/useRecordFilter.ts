@@ -40,6 +40,13 @@ export const useRecordFilter = (
         setAdvWard('');
         setAdvPhone('');
         setAdvRecordType('all');
+        setFilterSpecificDate('');
+        setFilterFromDate('');
+        setFilterToDate('');
+        setFilterWard('all');
+        setFilterStatus('all');
+        setFilterEmployee('all');
+        setFilterRecordType('all');
     };
 
     const [filterDate, setFilterDate] = useState(''); 
@@ -87,7 +94,7 @@ export const useRecordFilter = (
             const leaderEmp = employees.find(e => e.id === currentUser.employeeId);
             if (!leaderEmp) return false; 
             const isMyTask = r.assignedTo === currentUser.employeeId;
-            const isMyWard = leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
+            const isMyWard = Array.isArray(leaderEmp.managedWards) && leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
             return isMyTask || isMyWard;
         }
         return false; 
@@ -167,31 +174,29 @@ export const useRecordFilter = (
         }
 
         // Advanced Search Filters (Mã hồ sơ, tờ, thửa, xã phường, số điện thoại, loại hồ sơ)
-        if (showAdvancedSearch) {
-            if (advCode) {
-                const lowerSearch = removeVietnameseTones(advCode);
-                result = result.filter(r => removeVietnameseTones(r.code || '').includes(lowerSearch));
-            }
-            if (advMapSheet) {
-                const lowerSearch = removeVietnameseTones(advMapSheet);
-                result = result.filter(r => removeVietnameseTones(r.mapSheet || '').includes(lowerSearch));
-            }
-            if (advLandPlot) {
-                const lowerSearch = removeVietnameseTones(advLandPlot);
-                result = result.filter(r => removeVietnameseTones(r.landPlot || '').includes(lowerSearch));
-            }
-            if (advWard) {
-                const lowerSearch = removeVietnameseTones(advWard);
-                result = result.filter(r => removeVietnameseTones(r.ward || '').includes(lowerSearch));
-            }
-            if (advPhone) {
-                const lowerSearch = advPhone.trim();
-                result = result.filter(r => r.phoneNumber && r.phoneNumber.includes(lowerSearch));
-            }
-            if (advRecordType && advRecordType !== 'all') {
-                const lowerSearch = removeVietnameseTones(advRecordType);
-                result = result.filter(r => removeVietnameseTones(r.recordType || '').includes(lowerSearch));
-            }
+        if (advCode) {
+            const lowerSearch = removeVietnameseTones(advCode);
+            result = result.filter(r => removeVietnameseTones(r.code || '').includes(lowerSearch));
+        }
+        if (advMapSheet) {
+            const lowerSearch = removeVietnameseTones(advMapSheet);
+            result = result.filter(r => removeVietnameseTones(r.mapSheet || '').includes(lowerSearch));
+        }
+        if (advLandPlot) {
+            const lowerSearch = removeVietnameseTones(advLandPlot);
+            result = result.filter(r => removeVietnameseTones(r.landPlot || '').includes(lowerSearch));
+        }
+        if (advWard) {
+            const lowerSearch = removeVietnameseTones(advWard);
+            result = result.filter(r => removeVietnameseTones(r.ward || '').includes(lowerSearch));
+        }
+        if (advPhone) {
+            const lowerSearch = advPhone.trim();
+            result = result.filter(r => r.phoneNumber && r.phoneNumber.includes(lowerSearch));
+        }
+        if (advRecordType && advRecordType !== 'all') {
+            const lowerSearch = removeVietnameseTones(advRecordType);
+            result = result.filter(r => removeVietnameseTones(r.recordType || '').includes(lowerSearch));
         }
 
         // Ward, Status, Employee Filters

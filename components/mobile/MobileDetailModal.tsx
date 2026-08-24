@@ -344,7 +344,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               <Pencil size={20} />
             </button>
           )}
-          {canPerformAction && onDelete && (
+          {isAdmin && onDelete && (
             <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-400 active:text-red-600">
               <Trash2 size={20} />
             </button>

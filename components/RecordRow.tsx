@@ -15,7 +15,7 @@ interface RecordRowProps {
   onToggleSelect: (id: string) => void;
   onView: (record: RecordFile) => void;
   onEdit: (record: RecordFile) => void;
-  onDelete: (record: RecordFile) => void;
+  onDelete?: (record: RecordFile) => void;
   onAdvanceStatus: (record: RecordFile) => void;
   onQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
   onReturnResult?: (record: RecordFile) => void;
@@ -273,7 +273,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
               <button onClick={() => onAdvanceStatus(record)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Chuyển bước"><ArrowRight size={16} /></button>
             )}
             <button onClick={() => onEdit(record)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa"><Pencil size={16} /></button>
-            <button onClick={() => onDelete(record)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa"><Trash2 size={16} /></button>
+            {onDelete && (
+              <button onClick={() => onDelete(record)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa"><Trash2 size={16} /></button>
+            )}
           </div>
         </td>
       )}

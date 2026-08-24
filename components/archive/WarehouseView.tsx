@@ -1384,7 +1384,7 @@ const WarehouseView: React.FC<WarehouseViewProps> = ({ currentUser }) => {
                                                     {currentUser.role === UserRole.ADMIN && (
                                                         <button
                                                             disabled={isSubmitting}
-                                                            onClick={() => handleDelete(r.id, r.so_hieu)}
+                                                            onClick={() => handleDelete(r.id, r.so_hieu)} hidden={currentUser.role !== 'ADMIN'}
                                                             className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all"
                                                             title="Xóa hồ sơ"
                                                         >

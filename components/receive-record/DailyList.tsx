@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
-import { RecordFile, Employee } from '../../types';
+import { RecordFile, Employee, UserRole } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
 import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX, AlertTriangle } from 'lucide-react';
 import { PaginationControls } from '../PaginationControls';
@@ -56,6 +56,7 @@ const normalizeWardName = (w: string) => {
 };
 
 const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], wards, currentUser, employees = [], onPreviewExcel, onEdit, onDelete, onPrint }) => {
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
   // Bộ lọc bên ngoài
   const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [filterWard, setFilterWard] = useState<string>('all');
@@ -66,7 +67,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   // - 'outside': Hồ sơ đo đạc phi địa giới
   // - 'archive': Hồ sơ lưu trữ (Sao lục)
   // - 'tax': Hồ sơ thuế chính quy
-  const [subTab, setSubTab] = useState<'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw'>('inside');
+  const [subTab, setSubTab] = useState<'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw' | 'priority'>('inside');
 
   // Lấy địa bàn quản lý của cán bộ hiện tại
   const normalizedMyWards = useMemo(() => {
@@ -299,6 +300,38 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       });
   }, [records, filterDate, filterWard, searchTerm]);
 
+  // Bộ lọc hồ sơ Cần chú ý / Ưu tiên
+  const filteredPriorityRecords = useMemo(() => {
+      const searchLower = searchTerm.toLowerCase();
+      const allCombined = [...records, ...(archiveRecords || [])];
+      const map = new Map<string, RecordFile>();
+      allCombined.forEach(r => {
+          if (r.id) map.set(r.id, r);
+      });
+      const uniqueList = Array.from(map.values());
+
+      const list = uniqueList.filter(r => {
+          const isPrio = Boolean(r.isPriority) || Boolean((r as any).data?.isPriority);
+          if (!isPrio) return false;
+          if (filterDate && r.receivedDate && r.receivedDate !== filterDate) return false;
+          if (filterWard !== 'all') {
+              const targetSuffix = getShortCode(filterWard);
+              const recordSuffix = getRecordSuffix(r.code || '');
+              const normWard = normalizeWardName(r.ward || '');
+              const normTargetWard = normalizeWardName(filterWard);
+              if (recordSuffix !== targetSuffix && normWard !== normTargetWard) return false;
+          }
+          if (searchTerm) {
+              const nameMatch = r.customerName?.toLowerCase().includes(searchLower);
+              const codeMatch = r.code?.toLowerCase().includes(searchLower);
+              if (!nameMatch && !codeMatch) return false;
+          }
+          return true;
+      });
+
+      return list.sort((a, b) => (b.receivedDate || '').localeCompare(a.receivedDate || ''));
+  }, [records, archiveRecords, filterDate, filterWard, searchTerm]);
+
   // Danh sách hiển thị theo Tab hiện tại ở ngoài giao diện
   const currentTabRecords = useMemo(() => {
       if (subTab === 'inside') return filteredInsideRecords;
@@ -306,8 +339,9 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       if (subTab === 'tax') return filteredTaxRecords;
       if (subTab === 'info') return filteredInfoRecords;
       if (subTab === 'withdraw') return filteredWithdrawRecords;
+      if (subTab === 'priority') return filteredPriorityRecords;
       return filteredArchiveRecords;
-  }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredTaxRecords, filteredInfoRecords, filteredWithdrawRecords, filteredArchiveRecords]);
+  }, [subTab, filteredInsideRecords, filteredOutsideRecords, filteredTaxRecords, filteredInfoRecords, filteredWithdrawRecords, filteredPriorityRecords, filteredArchiveRecords]);
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -324,12 +358,13 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   }, [currentTabRecords, currentPage, itemsPerPage]);
 
   // Hàm hỗ trợ in Excel: Trả về tiêu đề hiển thị tương ứng với Tab hiện tại
-  const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw') => {
+  const getTabTitleInVietnamese = (tab: 'inside' | 'outside' | 'archive' | 'tax' | 'info' | 'withdraw' | 'priority') => {
       if (tab === 'inside') return 'Hồ sơ đo đạc trong địa giới';
       if (tab === 'outside') return 'Hồ sơ đo đạc phi địa giới';
       if (tab === 'tax') return 'Hồ sơ thuế chính quy';
       if (tab === 'info') return 'Hồ sơ cung cấp thông tin';
       if (tab === 'withdraw') return 'Hồ sơ thu hồi GCN';
+      if (tab === 'priority') return 'Hồ sơ cần chú ý / Báo cáo ưu tiên';
       return 'Hồ sơ lưu trữ (Sao lục)';
   };
 
@@ -571,7 +606,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                 onClick={() => setSubTab('withdraw')}
                 className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
                     subTab === 'withdraw'
-                        ? 'border-rose-600 text-rose-700 bg-rose-50/30 rounded-tr-xl'
+                        ? 'border-rose-600 text-rose-700 bg-rose-50/30'
                         : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
                 }`}
             >
@@ -581,6 +616,25 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                     subTab === 'withdraw' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-600'
                 }`}>
                     {filteredWithdrawRecords.length}
+                </span>
+            </button>
+
+            <button
+                onClick={() => setSubTab('priority')}
+                className={`flex items-center gap-2.5 px-6 py-4 border-b-2 font-bold text-sm transition-all outline-none ${
+                    subTab === 'priority'
+                        ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-tr-xl'
+                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
+                }`}
+            >
+                <AlertTriangle size={16} className={`shrink-0 ${subTab === 'priority' ? 'text-amber-600 fill-yellow-400' : 'text-amber-500 fill-yellow-400'}`} />
+                <span>Hồ sơ chú ý</span>
+                <span className={`ml-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full ${
+                    filteredPriorityRecords.length > 0 
+                        ? 'bg-red-600 text-white animate-pulse' 
+                        : 'bg-gray-100 text-gray-600'
+                }`}>
+                    {filteredPriorityRecords.length}
                 </span>
             </button>
         </div>
@@ -654,9 +708,11 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                                             <button onClick={() => onPrint(r)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors" title="In biên nhận">
                                                 <Printer size={15} />
                                             </button>
-                                            <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title="Xóa">
-                                                <Trash2 size={15} />
-                                            </button>
+                                            {isAdmin && (
+                                                <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title="Xóa">
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

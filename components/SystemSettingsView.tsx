@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu, HardDrive, Palette } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Users, Send, RefreshCw, PhoneCall, Cpu, HardDrive, UserCheck } from 'lucide-react';
 import { Holiday } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo } from '../services/api';
 import { APP_VERSION } from '../constants';
@@ -8,7 +8,7 @@ import { confirmAction, showToast } from '../utils/appHelpers';
 import { supabase, presenceChannel } from '../services/supabaseClient';
 import { ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 import SystemBackupView from './SystemBackupView';
-import { AdminThemeManager } from './AdminThemeManager';
+import ContractSignerConfigModal from './ContractSignerConfigModal';
 
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
@@ -19,7 +19,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onDeleteAllData,
   onHolidaysChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'holidays' | 'devices' | 'backup' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'devices' | 'backup' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
@@ -55,6 +55,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   // Contact settings state
   const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   const [isSavingContacts, setIsSavingContacts] = useState(false);
+  const [isSignerModalOpen, setIsSignerModalOpen] = useState(false);
 
   const loadContactSettings = async () => {
       try {
@@ -337,12 +338,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <Database size={16} /> Chung
             </button>
             <button 
-                onClick={() => setActiveTab('theme')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'theme' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <Palette size={16} /> Giao diện & Lễ Tết
-            </button>
-            <button 
                 onClick={() => setActiveTab('holidays')}
                 className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
@@ -369,8 +364,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         </div>
 
         <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
-            {activeTab === 'theme' && <AdminThemeManager />}
-
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}
@@ -518,6 +511,25 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </div>
                     </div>
 
+                    {/* Cấu hình Người ký Hợp đồng Bên B */}
+                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-sm">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h3 className="font-black text-purple-900 flex items-center gap-2 tracking-tight">
+                                    <UserCheck size={20} className="text-purple-600" /> Cấu hình Người Ký Hợp Đồng & Thanh Lý (Bên B)
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1 font-medium">
+                                    Admin thiết lập Tên và Chức vụ người ký bên B theo từng Xã/Phường. Dữ liệu được lưu lên Supabase và áp dụng cho toàn hệ thống.
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setIsSignerModalOpen(true)}
+                                className="w-full md:w-auto bg-purple-700 hover:bg-purple-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-purple-200 transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
+                            >
+                                <UserCheck size={16} /> Quản lý Người Ký Bên B
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Manual Update Config */}
                     <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
@@ -835,6 +847,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 </div>
             )}
         </div>
+
+        <ContractSignerConfigModal 
+          isOpen={isSignerModalOpen}
+          onClose={() => setIsSignerModalOpen(false)}
+        />
     </div>
   );
 };

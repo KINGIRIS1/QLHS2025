@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, FileCheck2 } from 'lucide-react';
-import { RecordFile, RecordStatus, Employee } from '../types';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, FileCheck2, ClipboardCheck } from 'lucide-react';
+import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { getNormalizedWard, STATUS_LABELS } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, showToast } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
@@ -10,7 +10,8 @@ import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
 import LateRecordsView from './report/LateRecordsView';
-import TeamWeeklyDetailsView from './report/TeamWeeklyDetailsView';
+import QuantityReportView from './report/QuantityReportView';
+import ExecutionReportView from './report/ExecutionReportView';
 import HandoverComparisonView from './report/HandoverComparisonView';
 import AiReportCardView from './report/AiReportCardView';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
@@ -24,9 +25,17 @@ interface ReportSectionProps {
     records: RecordFile[];
     wards: string[]; 
     employees: Employee[];
+    currentUser?: User;
 }
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees }) => {
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser }) => {
+    const isAdmin = currentUser?.role === UserRole.ADMIN;
+    const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
+    const isOneDoor = currentUser?.role === UserRole.ONEDOOR;
+    const isReceptionHandover = currentUser?.role === UserRole.RECEPTION_HANDOVER;
+
+    // So sánh hạn trả 1 cửa chỉ mở cho Admin, Subadmin, Một cửa, Tiếp nhận bàn giao (ngoại trừ các user tổ đo đạc thông thường)
+    const canViewHandoverControl = isAdmin || isSubadmin || isOneDoor || isReceptionHandover;
     const [fromDate, setFromDate] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -44,7 +53,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Report Type State
     const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records' | 'team_weekly' | 'handover_control'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records' | 'quantity_report' | 'execution_report' | 'handover_control'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -476,10 +485,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <UserCheck size={16}/> Thống kê nhân viên
                 </button>
                 <button 
-                    onClick={() => setActiveTab('team_weekly')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'team_weekly' ? 'border-amber-600 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => setActiveTab('quantity_report')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'quantity_report' ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <ListFilter size={16}/> Báo cáo chi tiết
+                    <ListFilter size={16}/> Báo cáo số lượng
+                </button>
+                <button 
+                    onClick={() => setActiveTab('execution_report')}
+                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'execution_report' ? 'border-amber-600 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <ClipboardCheck size={16}/> Báo cáo HS thực hiện
                 </button>
                 <button 
                     onClick={() => setActiveTab('daily_stats')}
@@ -493,12 +508,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 >
                     <AlertTriangle size={16}/> Hồ sơ trễ hạn
                 </button>
-                <button 
-                    onClick={() => setActiveTab('handover_control')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'handover_control' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <FileCheck2 size={16}/> So sánh hạn trả 1 cửa
-                </button>
+                {canViewHandoverControl && (
+                    <button 
+                        onClick={() => setActiveTab('handover_control')}
+                        className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'handover_control' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <FileCheck2 size={16}/> So sánh hạn trả 1 cửa
+                    </button>
+                )}
                 <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -634,7 +651,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     />
                 )}
 
-                {activeTab === 'handover_control' && (
+                {activeTab === 'handover_control' && canViewHandoverControl && (
                     <HandoverComparisonView
                         records={activeRecords}
                         employees={employees}
@@ -660,8 +677,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 )}
 
-                {activeTab === 'team_weekly' && (
-                    <TeamWeeklyDetailsView
+                {activeTab === 'quantity_report' && (
+                    <QuantityReportView
+                        records={activeRecords}
+                        employees={activeEmployees}
+                        schedules={schedules}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                    />
+                )}
+
+                {activeTab === 'execution_report' && (
+                    <ExecutionReportView
                         records={activeRecords}
                         employees={activeEmployees}
                         schedules={schedules}

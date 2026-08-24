@@ -9,6 +9,7 @@ interface SidebarProps {
   setCurrentView: (view: string) => void;
   onOpenSettings: () => void; // Deprecated
   currentUser: User;
+  currentDepartment?: string;
   onLogout: () => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
@@ -24,6 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setCurrentView, 
   onOpenSettings, 
   currentUser, 
+  currentDepartment,
   onLogout,
   mobileOpen,
   setMobileOpen,
@@ -38,22 +40,39 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isTeamLeader = currentUser.role === UserRole.TEAM_LEADER;
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
+  const isReceptionHandover = currentUser.role === UserRole.RECEPTION_HANDOVER;
   const hasManagerRights = isAdmin || isSubadmin || isTeamLeader;
+
+  const normalizedDept = (currentDepartment || '').trim().toLowerCase();
 
   // Cập nhật danh sách các view được phép
   const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'personal_profile', 'account_settings', 'utilities', 'handover_list'];
   const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records'];
-  const employeeAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records'];
+  const isMeasurementDept = normalizedDept.includes('đo đạc') || normalizedDept.includes('kỹ thuật');
+  const employeeAllowedViews = [
+    'dashboard', 'personal_profile', 'all_records', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'dangky_records', 'warehouse_records',
+    ...(isMeasurementDept ? ['reports', 'blocking_records', 'send_measurement_files'] : [])
+  ];
+  const receptionHandoverAllowedViews = [
+    'dashboard', 'personal_profile', 'account_settings', 'internal_chat', 'reports', 'check_list', 'other_check_list', 'handover_list', 'other_handover_list',
+    ...(normalizedDept.includes('đo đạc')
+      ? ['all_records', 'other_records', 'blocking_records', 'excerpt_management', 'utilities', 'work_schedule', 'warehouse_records']
+      : normalizedDept.includes('lưu trữ')
+      ? ['archive_records', 'warehouse_records']
+      : normalizedDept.includes('đăng ký')
+      ? ['dangky_records']
+      : ['all_records'])
+  ];
 
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
     { id: 'internal_chat', label: 'Chat nội bộ', icon: MessageSquare, visible: false, badge: unreadMessagesCount, badgeColor: 'bg-blue-500' },
-    { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin },
+    { id: 'blocking_records', label: 'Ngăn chặn', icon: ShieldAlert, visible: isAdmin || (isReceptionHandover && normalizedDept.includes('đo đạc')) },
     { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true }, 
     { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: Briefcase, visible: true }, 
     { id: 'warehouse_records', label: 'Kho Lưu trữ', icon: HardDrive, visible: true },
-    { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee },
-    { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee },
+    { id: 'receive_record', label: 'Tiếp nhận hồ sơ', icon: FolderInput, visible: !isTeamLeader && !isEmployee && !isReceptionHandover },
+    { id: 'receive_contract', label: 'Tiếp nhận hợp đồng', icon: FileSignature, visible: !isTeamLeader && !isEmployee && !isReceptionHandover },
     // Đổi tên thành "Hồ sơ đo đạc"
     { id: 'all_records', label: 'Hồ sơ đo đạc', icon: FileText, visible: true, badge: !isOneDoor ? warningRecordsCount : 0, badgeColor: 'bg-red-600' },
     { id: 'dangky_records', label: 'Đăng ký', icon: ClipboardSignature, visible: true },
@@ -139,16 +158,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      <div
-        className={`
-          fixed md:static inset-y-0 left-0 z-50 
-          w-64 md:w-20 
-          shrink-0 text-white min-h-screen flex flex-col shadow-xl 
-          transition-all duration-300 ease-in-out overflow-visible
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}
-        style={{ backgroundColor: 'var(--app-sidebar-bg, #0f172a)', color: 'var(--app-sidebar-text, #ffffff)' }}
-      >
+      <div className={`
+        fixed md:static inset-y-0 left-0 z-50 
+        w-64 md:w-20 
+        shrink-0 bg-[#0f172a] text-white min-h-screen flex flex-col shadow-xl 
+        transition-all duration-300 ease-in-out overflow-visible
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         {/* BRAND HEADER */}
         <div className="h-14 flex items-center justify-center border-b border-slate-800 bg-slate-900/50 shrink-0 relative group">
              <div className="bg-blue-600 p-2 rounded-lg shadow-blue-500/20 shrink-0 cursor-pointer">
@@ -171,7 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="absolute left-full top-2 ml-2 bg-slate-800 text-white px-3 py-2 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 border border-slate-700">
                   <p className="text-sm font-bold">{currentUser.name}</p>
                   <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">
-                      {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
+                      {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : currentUser.role === UserRole.RECEPTION_HANDOVER ? 'Tiếp nhận & Bàn giao' : 'Nhân viên'}
                   </p>
               </div>
         </div>
@@ -182,6 +198,7 @@ const Sidebar: React.FC<SidebarProps> = ({
              if (isOneDoor && !oneDoorAllowedViews.includes(item.id)) return false;
              if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
              if (isEmployee && !employeeAllowedViews.includes(item.id)) return false;
+             if (isReceptionHandover && !receptionHandoverAllowedViews.includes(item.id)) return false;
              return item.visible;
           }).map((item) => {
             // Logic Active

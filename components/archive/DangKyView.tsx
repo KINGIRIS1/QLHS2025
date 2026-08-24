@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, Employee, UserRole } from '../../types';
+import { User, Employee, UserRole, RecordFile, RecordStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords, deleteAllArchiveRecordsByType, initRealtimeArchive, rawUpsertArchiveRecords } from '../../services/apiArchive';
 import { fetchEmployees, fetchUsers } from '../../services/apiPeople';
-import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload, Building } from 'lucide-react';
-import { confirmAction, toTitleCase, removeVietnameseTones } from '../../utils/appHelpers';
+import { Search, Plus, Trash2, Edit, Save, X, Calendar, MapPin, Users, Send, CheckCircle2, FileSpreadsheet, Download, LayoutGrid, FileText, ClipboardList, FileSignature, CheckCircle, Upload, Building, AlertTriangle } from 'lucide-react';
+import { confirmAction, toTitleCase, removeVietnameseTones, showToast } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 import DeleteAllModal from './DeleteAllModal';
 import AssignModal from '../AssignModal';
@@ -38,7 +38,7 @@ interface DangKyFormData {
 
 const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     const [subView, setSubView] = useState<'record_dangky' | 'igate'>('igate');
-    const [activeTab, setActiveTab] = useState<'all' | 'xu_ly' | 'thue' | 'gcn'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'xu_ly' | 'thue' | 'gcn' | 'priority'>('all');
     const [thueSubTab, setThueSubTab] = useState<'tham_tra_thue' | 'chuyen_thue' | 'dong_thue'>('tham_tra_thue');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -107,7 +107,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         let allowedWards: string[] | undefined = undefined;
         if (currentUser?.role === 'EMPLOYEE') {
             const emp = emps.find(e => e.id === currentUser.employeeId);
-            if (emp && emp.managedWards && emp.managedWards.length > 0) {
+            if (emp && Array.isArray(emp.managedWards) && emp.managedWards.length > 0) {
                 allowedWards = emp.managedWards;
             } else {
                 allowedWards = ['___NONE___']; // Rỗng thì không thấy gì
@@ -119,6 +119,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleDeleteAll = async () => {
+        if (currentUser.role !== 'ADMIN') { showToast('Chỉ Quản trị viên (Admin) mới có quyền xóa tất cả!', 'error'); return; }
         await deleteAllArchiveRecordsByType('dangky');
         loadAllData();
     };
@@ -135,6 +136,10 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         return employees;
     }, [employees, assignTargetStatus]);
 
+    const priorityCount = useMemo(() => {
+        return records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority)).length;
+    }, [records]);
+
     const filteredRecords = useMemo(() => {
         let list = records;
         
@@ -146,7 +151,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             // Restrict EMPLOYEE to see only records from their assigned wards
             if (currentUser?.role === UserRole.EMPLOYEE) {
                 const emp = employees.find(e => e.id === currentUser.employeeId);
-                if (emp && emp.managedWards && emp.managedWards.length > 0) {
+                if (emp && Array.isArray(emp.managedWards) && emp.managedWards.length > 0) {
                     const normalizeWard = (w: string) => {
                         let str = removeVietnameseTones(w).toLowerCase();
                         // Loại bỏ các từ khóa phổ biến để so sánh chính xác cốt lõi
@@ -171,6 +176,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
             list = list.filter(r => r.status === thueSubTab);
         } else if (activeTab === 'gcn') {
             list = list.filter(r => r.status === 'ky_gcn');
+        } else if (activeTab === 'priority') {
+            list = list.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority));
         }
 
         // Filter by Date
@@ -793,6 +800,16 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                                 >
                                     <FileSignature size={16}/> GCN
                                 </button>
+                                <button 
+                                    onClick={() => setActiveTab('priority')} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-bold transition-colors ${activeTab === 'priority' ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    <AlertTriangle size={16} className="text-amber-500 fill-yellow-400 shrink-0"/> 
+                                    <span>Hồ sơ chú ý</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-black ${priorityCount > 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-100 text-gray-600'}`}>
+                                        {priorityCount}
+                                    </span>
+                                </button>
                             </div>
 
                     {activeTab === 'thue' && (
@@ -944,7 +961,17 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                                         <td className="p-3 text-center">
                                             <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelect(r.id)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                         </td>
-                                        <td className="p-3 font-medium text-gray-800">{r.so_hieu}</td>
+                                        <td className="p-3 font-medium text-gray-800">
+                                            <div className="flex flex-col items-start gap-1">
+                                                <span>{r.so_hieu}</span>
+                                                {(Boolean(r.data?.isPriority) || Boolean(r.isPriority)) && (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-950 bg-amber-100 border border-amber-400 px-2 py-0.5 rounded-full shadow-xs animate-pulse" title={r.data?.priorityNote || r.priorityNote || 'Hồ sơ cần chú ý'}>
+                                                        <AlertTriangle size={12} className="text-amber-500 fill-yellow-400 shrink-0" />
+                                                        <span>Chú ý</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="p-3 text-gray-600">{r.noi_nhan_gui}</td>
                                         <td className="p-3 text-gray-600">{r.data?.cccd}</td>
                                         <td className="p-3 text-gray-600">{r.trich_yeu}</td>
@@ -957,7 +984,7 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                                                 {activeTab === 'all' && (
                                                     <>
                                                         <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
-                                                        <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>
+                                                        {currentUser.role === 'ADMIN' && <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>}
                                                     </>
                                                 )}
                                             </div>
@@ -1127,9 +1154,23 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
                 onClose={() => setShowAssignModal(false)}
                 onConfirm={handleConfirmAssign}
                 employees={filteredEmployeesForAssign}
-                selectedRecords={[]}
+                selectedRecords={records.filter(r => selectedIds.has(r.id)).map(r => {
+                    const d = r.data || {};
+                    return {
+                        id: r.id,
+                        code: r.so_hieu || (d as any).so_vao_so || (d as any).so_hieu || '',
+                        customerName: (d as any).chu_su_dung || (d as any).chuyen_quyen || '',
+                        ward: (d as any).dia_danh || (d as any).xa_phuong || '',
+                        landPlot: (d as any).so_thua || (d as any).thua_dat || '',
+                        mapSheet: (d as any).so_to || (d as any).to_ban_do || '',
+                        recordType: (d as any).loai_bien_dong || (d as any).loai_ho_so || 'Đăng ký biến động',
+                        deadline: (d as any).ngay_tra_kq || (d as any).ngay_hen_tra || '',
+                        status: RecordStatus.RECEIVED
+                    } as RecordFile;
+                })}
                 filterDepartment={assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue' ? 'Ban Giám đốc' : assignTargetStatus === 'tham_tra_thue' ? 'Tổ trưởng/Tổ phó' : undefined}
                 forceAllRecommended={assignTargetStatus === 'ky_gcn' || assignTargetStatus === 'chuyen_thue' || assignTargetStatus === 'tham_tra_thue'}
+                currentUser={currentUser}
             />
 
             <RecordDetailModal

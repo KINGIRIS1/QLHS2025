@@ -9,7 +9,7 @@ import { PaginationControls } from '../PaginationControls';
 
 interface ContractListProps {
   onEdit: (c: Contract) => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   onPrint: (c: Contract, type: 'contract' | 'liquidation') => void;
   onCreateLiquidation: (c: Contract) => void;
   viewMode: 'contract' | 'liquidation'; // Prop mới
@@ -270,7 +270,9 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                                             </>
                                         )}
                                         
-                                        <button onClick={async () => { if(await confirmAction('Xóa hợp đồng này?')) { onDelete(c.id); } }} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                                        {onDelete && (
+                                            <button onClick={async () => { if(await confirmAction('Xóa hợp đồng này?')) { onDelete(c.id); } }} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

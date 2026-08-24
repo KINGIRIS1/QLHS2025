@@ -5,11 +5,12 @@ import jsonServer from 'json-server';
 import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
-import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import jwt from 'jsonwebtoken';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const rootDir = process.cwd();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'he-thong-quan-ly-ho-so-chon-thanh-secret-key-2026';
 
 const getGoogleGenAIClient = (req: Request) => {
   let apiKey = (req.headers['x-gemini-key'] as string) || '';
@@ -38,15 +39,15 @@ const getGoogleGenAIClient = (req: Request) => {
 };
 
 const server = jsonServer.create();
-const dbFile = process.env.DB_PATH || path.join(__dirname, 'server/db.json');
+const dbFile = process.env.DB_PATH || path.join(rootDir, 'server/db.json');
 const router = jsonServer.router(dbFile);
 const middlewares = jsonServer.defaults();
 
 // --- TỐI ƯU HÓA TỐC ĐỘ CẬP NHẬT ---
-let releaseDir = path.join(__dirname, 'release');
+let releaseDir = path.join(rootDir, 'release');
 if (!fs.existsSync(releaseDir)) {
     // Thử tìm ở thư mục gốc project (khi chạy dev)
-    releaseDir = path.join(__dirname, 'release');
+    releaseDir = path.join(rootDir, 'release');
 }
 console.log(`Update Server path: ${releaseDir}`);
 server.use('/updates', express.static(releaseDir));
@@ -101,8 +102,21 @@ if (!fs.existsSync(dbFile)) {
 }
 
 // Use default middlewares (logger, static, cors and no-cache)
+server.use(cors());
 server.use(middlewares);
-server.use(jsonServer.bodyParser);
+server.use(express.json({ limit: '100mb' }));
+server.use(express.urlencoded({ limit: '100mb', extended: true }));
+// Do NOT use jsonServer.bodyParser because we already use express.json and express.urlencoded which handle parsing with larger limits
+// jsonServer.bodyParser is redundant and causes "stream is not readable" conflicts with express.json.
+
+// Xử lý lỗi từ body-parser (ví dụ: Payload quá lớn)
+server.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+        res.status(413).jsonp({ error: "Kích thước tệp tin tải lên quá lớn. Vui lòng giảm dung lượng hình ảnh hoặc tệp PDF." });
+    } else {
+        next(err);
+    }
+});
 
 // Middleware hiển thị log (Chỉ log các request API, không log file tĩnh nữa do đã khai báo static ở trên)
 server.use((req: Request, res: Response, next: NextFunction) => {
@@ -110,6 +124,131 @@ server.use((req: Request, res: Response, next: NextFunction) => {
         console.log(`${new Date().toLocaleTimeString()} - ${req.method} request received`);
     }
     next();
+});
+
+// --- API LOGIN PUBLIC ENDPOINT ---
+server.post('/custom/login', (req: Request, res: Response) => {
+    try {
+        const { username, password, user: providedUser } = req.body || {};
+        if (!username || !password) {
+            return res.status(400).jsonp({ error: "Vui lòng nhập tên đăng nhập và mật khẩu." });
+        }
+        const db = router.db;
+        const localUsers = db.get('users').value() || [];
+        
+        let authenticatedUser = localUsers.find((u: any) => 
+            u.username && u.username.toLowerCase().trim() === String(username).toLowerCase().trim() && 
+            String(u.password) === String(password)
+        );
+
+        if (!authenticatedUser && providedUser && 
+            providedUser.username?.toLowerCase().trim() === String(username).toLowerCase().trim() && 
+            String(providedUser.password) === String(password)) {
+            authenticatedUser = providedUser;
+        }
+
+        if (!authenticatedUser) {
+            return res.status(401).jsonp({ error: "Tên đăng nhập hoặc mật khẩu không chính xác." });
+        }
+
+        const token = jwt.sign(
+            { 
+                username: authenticatedUser.username, 
+                role: authenticatedUser.role, 
+                name: authenticatedUser.name, 
+                id: authenticatedUser.id || authenticatedUser.username 
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+        const { password: _, ...userWithoutPassword } = authenticatedUser;
+        return res.jsonp({ success: true, token, user: userWithoutPassword });
+    } catch (error: any) {
+        console.error("Lỗi khi xử lý đăng nhập:", error);
+        return res.status(500).jsonp({ error: "Lỗi máy chủ khi xác thực đăng nhập." });
+    }
+});
+
+// --- MIDDLEWARE NÂNG CAO BẢO MẬT API (AUTHENTICATION & AUTHORIZATION) ---
+// Danh sách các tài nguyên dữ liệu / API cần bảo vệ nghiêm ngặt bằng JWT Token:
+const PROTECTED_COLLECTIONS = [
+    '/records',
+    '/employees',
+    '/users',
+    '/contracts',
+    '/holidays',
+    '/audit_logs',
+    '/settings',
+    '/chat_messages',
+    '/archive_records',
+    '/custom/bulk',
+    '/custom/batch_update',
+    '/system/reset',
+    '/api/gemini/compare-documents'
+];
+
+server.use((req: Request, res: Response, next: NextFunction) => {
+    // 0. Bỏ qua các yêu cầu OPTIONS (CORS preflight) hoặc HEAD
+    if (req.method === 'OPTIONS' || req.method === 'HEAD') {
+        return next();
+    }
+
+    // 1. Cho phép các yêu cầu truy cập công khai (Public):
+    const isExplicitPublic = req.path === '/custom/login' || 
+                             req.path === '/api/health' || 
+                             req.path.startsWith('/updates');
+
+    if (isExplicitPublic) {
+        return next();
+    }
+
+    // 2. Kiểm tra xem yêu cầu hiện tại có phải là truy vấn API / Dữ liệu cần bảo vệ hay không
+    const isProtectedApi = PROTECTED_COLLECTIONS.some(endpoint => 
+        req.path === endpoint || req.path.startsWith(endpoint + '/')
+    ) || req.path.startsWith('/api/');
+
+    // 3. Nếu là yêu cầu tải mã nguồn giao diện (Frontend/Vite/Assets/GET HTML/JS/CSS/TSX/Node modules) và không phải API:
+    // Cho phép đi tiếp để Vite/Express phục vụ giao diện bình thường
+    if (!isProtectedApi && req.method === 'GET') {
+        return next();
+    }
+
+    // 4. Đối với các truy vấn Dữ liệu (API) hoặc thao tác ghi/sửa/xóa: BẮT BUỘC có Token xác thực
+    const authHeader = req.headers['authorization'] || req.headers['x-access-token'];
+    let token = '';
+
+    if (authHeader && typeof authHeader === 'string') {
+        if (authHeader.startsWith('Bearer ')) {
+            token = authHeader.substring(7).trim();
+        } else {
+            token = authHeader.trim();
+        }
+    }
+
+    // Nếu không có Token -> Trả về lỗi 401 Unauthorized
+    if (!token) {
+        return res.status(401).jsonp({ 
+            error: "Yêu cầu bị từ chối: Thiếu Token xác thực. Vui lòng đăng nhập để truy cập dữ liệu." 
+        });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        (req as any).user = decoded;
+
+        // Phân quyền cho thao tác nhạy cảm: Reset hệ thống bắt buộc phải là ADMIN
+        if (req.path === '/system/reset' && decoded.role !== 'ADMIN') {
+            return res.status(403).jsonp({ 
+                error: "Quyền hạn không đủ. Chỉ Quản trị viên (ADMIN) mới có thể thực hiện thao tác khôi phục hệ thống." 
+            });
+        }
+
+        return next();
+    } catch (err: any) {
+        return res.status(401).jsonp({ 
+            error: "Xác thực không hợp lệ hoặc đã hết hạn phiên làm việc. Vui lòng đăng nhập lại." 
+        });
+    }
 });
 
 // Custom Routes
@@ -297,6 +436,136 @@ Hãy trả về kết quả dưới định dạng JSON khớp hoàn hảo với
     }
 });
 
+server.post('/custom/compare-docs', async (req: Request, res: Response) => {
+    try {
+        const { gcnBase64, gcnMime, trichLucBase64, trichLucMime } = req.body;
+        if (!gcnBase64 || !trichLucBase64) {
+            return res.status(400).jsonp({ error: "Thiếu dữ liệu file Giấy chứng nhận (GCN) hoặc file Trích lục / Trích đo." });
+        }
+
+        const ai = getGoogleGenAIClient(req);
+
+        // Chuẩn hóa base64 data
+        const cleanBase64 = (base64Str: string) => {
+            const match = base64Str.match(/^data:(.+);base64,(.+)$/);
+            return match ? match[2] : base64Str;
+        };
+
+        const gcnCleanData = cleanBase64(gcnBase64);
+        const trichLucCleanData = cleanBase64(trichLucBase64);
+
+        const gcnPart = {
+            inlineData: {
+                data: gcnCleanData,
+                mimeType: gcnMime || 'application/pdf'
+            }
+        };
+
+        const trichLucPart = {
+            inlineData: {
+                data: trichLucCleanData,
+                mimeType: trichLucMime || 'application/pdf'
+            }
+        };
+
+        const responseSchema = {
+            type: Type.OBJECT,
+            properties: {
+                summary: {
+                    type: Type.STRING,
+                    description: "Tóm tắt tổng quan về việc so sánh đối chiếu giữa 2 tài liệu."
+                },
+                comparisons: {
+                    type: Type.ARRAY,
+                    description: "Danh sách các hạng mục đối chiếu chi tiết.",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            field: {
+                                type: Type.STRING,
+                                description: "Tên trường thông tin đối chiếu (Ví dụ: Chủ sử dụng đất, Thửa đất số, Tờ bản đồ số, Diện tích, Mục đích sử dụng, Địa chỉ thửa đất, Số hiệu GCN, Cơ quan ký duyệt, Kích thước ranh giới)."
+                            },
+                            gcnValue: {
+                                type: Type.STRING,
+                                description: "Giá trị đọc được trên tài liệu GCN (Giấy chứng nhận)."
+                            },
+                            trichLucValue: {
+                                type: Type.STRING,
+                                description: "Giá trị đọc được trên tài liệu Trích lục / Trích đo."
+                            },
+                            status: {
+                                type: Type.STRING,
+                                description: "Trạng thái đối chiếu: 'match' (khớp hoàn toàn), 'warning' (lệch số liệu đo đạc/có giải trình hoặc thay đổi hành chính hợp lệ), 'error' (lệch nghiêm trọng/sai lỗi kỹ thuật/copy-paste nhầm)."
+                            },
+                            notes: {
+                                type: Type.STRING,
+                                description: "Giải thích chi tiết về sự trùng khớp hoặc sai lệch."
+                            }
+                        },
+                        required: ["field", "gcnValue", "trichLucValue", "status", "notes"]
+                    }
+                },
+                technicalErrors: {
+                    type: Type.ARRAY,
+                    description: "Các lỗi kỹ thuật hoặc hành chính cụ thể phát hiện được trên bản vẽ hoặc nội dung trích lục.",
+                    items: {
+                        type: Type.STRING
+                    }
+                },
+                suggestions: {
+                    type: Type.ARRAY,
+                    description: "Các kiến nghị hoặc đề xuất khắc phục cho cán bộ thẩm định.",
+                    items: {
+                        type: Type.STRING
+                    }
+                }
+            },
+            required: ["summary", "comparisons", "technicalErrors", "suggestions"]
+        };
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: [
+                gcnPart,
+                trichLucPart,
+                {
+                    text: `Bạn là một Cán bộ kiểm tra kỹ thuật bản vẽ và thẩm định hồ sơ đất đai chuyên nghiệp tại Chi nhánh Văn phòng Đăng ký Đất đai.
+Hãy đối chiếu chi tiết giữa tài liệu thứ nhất (Giấy chứng nhận quyền sử dụng đất - GCN) và tài liệu thứ hai (Bản vẽ Trích lục / Trích đo bản đồ địa chính).
+
+Các nội dung cần đối chiếu và thẩm định gồm:
+1. Thông tin Chủ sử dụng đất (Họ tên, năm sinh, CCCD/CMND nếu có). Lưu ý kiểm tra trang bổ sung biến động ở trang 4 của GCN để xem có cập nhật chuyển nhượng/tặng cho hay không.
+2. Thửa đất số, Tờ bản đồ số.
+3. Diện tích thửa đất (kiểm tra xem có giảm/tăng diện tích không, nếu có thì xem Trích lục có ghi lý do biến động ranh giới do sai số hai lần đo không).
+4. Cơ cấu mục đích sử dụng đất (ví dụ: Đất ở ONT/ODT, Đất trồng cây lâu năm CLN).
+5. Địa chỉ thửa đất (Khu phố, Ấp, Xã, Phường, Thị xã, Tỉnh). Lưu ý lỗi copy-paste template từ các tỉnh khác như 'Đồng Nai' thay vì 'Bình Phước'.
+6. Số hiệu Giấy chứng nhận (GCN) và ngày cấp.
+7. Cơ quan ký duyệt / Ban hành trích lục.
+8. Kích thước các cạnh ranh giới thửa đất (so sánh kích thước ranh giới trên bản vẽ GCN và Trích lục).
+
+Hãy trả về kết quả dưới định dạng JSON khớp hoàn hảo với responseSchema yêu cầu. Toàn bộ nội dung trả về bằng tiếng Việt chuyên nghiệp, khách quan.`
+                }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+                temperature: 0.1,
+            }
+        });
+
+        const textOutput = response.text;
+        if (!textOutput) {
+            throw new Error("Không nhận được dữ liệu phản hồi so sánh từ Gemini.");
+        }
+
+        const resultJson = JSON.parse(textOutput.trim());
+        res.jsonp({ success: true, result: resultJson });
+
+    } catch (error: any) {
+        console.error("Lỗi khi gọi Gemini đối chiếu tài liệu:", error);
+        res.status(500).jsonp({ error: error.message || "Lỗi xử lý đối chiếu tài liệu từ Gemini AI." });
+    }
+});
+
 // Vite middleware setup
 const startServer = async () => {
     if (process.env.NODE_ENV !== 'production') {
@@ -307,7 +576,7 @@ const startServer = async () => {
         });
         server.use(vite.middlewares);
     } else {
-        const distPath = path.join(__dirname, 'dist');
+        const distPath = path.join(rootDir, 'dist');
         server.use(express.static(distPath));
     }
 
@@ -317,8 +586,8 @@ const startServer = async () => {
     server.use(router);
 
     if (process.env.NODE_ENV === 'production') {
-        const distPath = path.join(__dirname, 'dist');
-        server.get('*', (req, res) => {
+        const distPath = path.join(rootDir, 'dist');
+        server.get('*all', (req, res) => {
             res.sendFile(path.join(distPath, 'index.html'));
         });
     }

@@ -1,171 +1,453 @@
-import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, AlignmentType, VerticalAlign, BorderStyle } from "docx";
+import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import { ArchiveRecord } from "../services/apiArchive";
 
-export const exportSoMucKe = async (records: ArchiveRecord[], wardName: string, fromDate: string, toDate: string) => {
+export type SoMucKeTargetType = 'new_owner' | 'old_owner';
+
+// Helper format số thập phân kiểu Việt Nam (ví dụ: 200,0 hoặc 1635,1)
+const formatVNArea = (val: number | string | undefined | null): string => {
+    if (val === undefined || val === null || val === '') return '';
+    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.'));
+    if (isNaN(num) || num <= 0) return '';
+    return num.toFixed(1).replace('.', ',');
+};
+
+// Helper format ngày Việt Nam (DD/MM/YYYY)
+const formatVNDate = (dateStr?: string | null): string => {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) {
+            const parts = dateStr.split(/[-/]/);
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+                }
+                return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+            }
+            return dateStr;
+        }
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    } catch {
+        return dateStr || '';
+    }
+};
+
+// Helper tách tên nhiều chủ đất thành danh sách từng người (mỗi người 1 dòng)
+const splitOwnerNames = (rawName: string): string[] => {
+    if (!rawName) return [""];
+    const str = String(rawName).trim();
+    if (!str) return [""];
+
+    // 1. Trường hợp chuỗi chứa dấu xuống dòng (\n hoặc \r\n)
+    if (str.includes('\n')) {
+        const lines = str.split('\n').map(s => s.trim()).filter(Boolean);
+        return lines.length > 0 ? lines : [str];
+    }
+
+    // 2. Trường hợp chứa từ nối " và "
+    if (/\s+và\s+/i.test(str)) {
+        const parts = str.split(/\s+và\s+/i).map(s => s.trim()).filter(Boolean);
+        if (parts.length > 1) {
+            return parts.map((p, idx) => {
+                if (idx > 0 && !p.toLowerCase().startsWith('và')) {
+                    return `Và: ${p}`;
+                }
+                return p;
+            });
+        }
+    }
+
+    // 3. Trường hợp chứa dấu phẩy "," phân cách 2 tên chủ
+    if (str.includes(',')) {
+        const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+        if (parts.length > 1) {
+            return parts.map((p, idx) => {
+                if (idx > 0 && !p.toLowerCase().startsWith('và')) {
+                    return `Và: ${p}`;
+                }
+                return p;
+            });
+        }
+    }
+
+    return [str];
+};
+
+export const exportSoMucKe = async (
+    records: ArchiveRecord[], 
+    wardName: string, 
+    fromDate: string, 
+    toDate: string,
+    targetType: SoMucKeTargetType = 'new_owner'
+) => {
     if (!records || records.length === 0) return;
 
-    // Helper to create a cell
-    const createCell = (text: string, width: number, bold = false, align: any = AlignmentType.CENTER, colSpan = 1, rowSpan = 1) => {
-        const lines = text.split('\n');
-        return new TableCell({
-            width: { size: width, type: WidthType.PERCENTAGE },
-            columnSpan: colSpan,
-            rowSpan: rowSpan,
-            verticalAlign: VerticalAlign.CENTER,
-            children: lines.map(line => new Paragraph({
-                alignment: align,
-                children: [new TextRun({ text: line, bold, size: 22, font: "Times New Roman" })], // Size 22 = 11pt
-            })),
-            margins: { top: 100, bottom: 100, left: 100, right: 100 },
-        });
-    };
-
-    // Group records by so_to
+    // Group records by tờ bản đồ
     const recordsByTo: Record<string, ArchiveRecord[]> = {};
     records.forEach(record => {
-        const soTo = record.data?.so_to || "KhongXacDinh";
+        const data = record.data || {};
+        const soTo = String(data.to_ban_do || data.so_to || data.to || "ChuaXacDinh").trim();
         if (!recordsByTo[soTo]) {
             recordsByTo[soTo] = [];
         }
         recordsByTo[soTo].push(record);
     });
 
-    const zip = new JSZip();
+    if (Object.keys(recordsByTo).length === 0) {
+        recordsByTo["1"] = [];
+    }
 
-    for (const soTo of Object.keys(recordsByTo)) {
-        // Sort by so_thua numerically
+    const zip = new JSZip();
+    const toKeys = Object.keys(recordsByTo).sort((a, b) => {
+        const numA = parseInt(a) || 0;
+        const numB = parseInt(b) || 0;
+        return numA - numB;
+    });
+
+    const ROWS_PER_PAGE = 56; // 56 dòng nội dung mỗi trang Excel chuẩn A3
+
+    const FONT_FAMILY = "Times New Roman";
+    
+    // Header Style (Font size 10pt, Bold, Centered, Thin solid borders)
+    const headerStyle = {
+        font: { name: FONT_FAMILY, sz: 10, bold: true },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+        }
+    };
+
+    // Sub Header Row (1), (2)... (Font size 10pt, Centered, Thin solid borders)
+    const subHeaderStyle = {
+        font: { name: FONT_FAMILY, sz: 10, italic: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+        }
+    };
+
+    // Content Cell Style (Font size 12pt, Light Dotted bottom border #CCCCCC, Thin side borders)
+    const createContentStyle = (align: "center" | "left" | "right" = "center", isLastRowOfPage = false) => ({
+        font: { name: FONT_FAMILY, sz: 12 },
+        alignment: { horizontal: align, vertical: "center", wrapText: true },
+        border: {
+            top: { style: "none" },
+            bottom: isLastRowOfPage 
+                ? { style: "thin", color: { rgb: "000000" } } 
+                : { style: "dotted", color: { rgb: "CCCCCC" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+        }
+    });
+
+    // Style cho 2 dòng trống đệm ở cuối trang (không có viền bảng)
+    const emptySpacerStyle = {
+        font: { name: FONT_FAMILY, sz: 12 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+            top: { style: "none" },
+            bottom: { style: "none" },
+            left: { style: "none" },
+            right: { style: "none" }
+        }
+    };
+
+    for (const soTo of toKeys) {
         const toRecords = recordsByTo[soTo].sort((a, b) => {
-            const thuaA = parseInt(a.data?.so_thua || "0") || 0;
-            const thuaB = parseInt(b.data?.so_thua || "0") || 0;
+            const dataA = a.data || {};
+            const dataB = b.data || {};
+            const thuaA = parseInt(String(dataA.thua_dat || dataA.so_thua || dataA.thua || "0")) || 0;
+            const thuaB = parseInt(String(dataB.thua_dat || dataB.so_thua || dataB.thua || "0")) || 0;
             return thuaA - thuaB;
         });
 
-        const dataRows = toRecords.map(record => {
+        // Xây dựng toàn bộ các dòng nội dung thửa đất với cơ chế phân trang thông minh (Smart Pagination)
+        const contentRowsData: any[][] = [];
+        let currentLinesOnPage = 0; // Đếm số dòng nội dung đang có trên trang hiện tại
+
+        toRecords.forEach((record) => {
             const data = record.data || {};
-            const soThua = data.so_thua || "";
-            const tenChuSuDung = data.ten_chu_su_dung || "";
-            const maDoiTuong = "GDC"; // Default as per image
+            const soThua = String(data.thua_dat || data.so_thua || data.thua || "").trim();
 
-            const tongDienTich = parseFloat(data.tong_dien_tich || "0");
-            const dienTichThoCu = parseFloat(data.dien_tich_tho_cu || "0");
-            const dienTichCLN = tongDienTich - dienTichThoCu;
-
-            let loaiDat = data.loai_dat || "";
-            if (!loaiDat) {
-                if (dienTichThoCu > 0 && dienTichCLN > 0) {
-                    loaiDat = "ODT+CLN";
-                } else if (dienTichThoCu > 0) {
-                    loaiDat = "ODT";
-                } else {
-                    loaiDat = "CLN";
+            let rawOwnerName = "";
+            if (targetType === 'old_owner') {
+                rawOwnerName = String(data.chu_chuyen_quyen || data.ten_chuyen_quyen || data.chu_cu || "").trim();
+                if (!rawOwnerName) {
+                    rawOwnerName = String(data.chu_su_dung || data.ten_chu_su_dung || data.customer_name || "").trim();
                 }
+            } else {
+                rawOwnerName = String(data.chu_su_dung || data.ten_chu_su_dung || data.customer_name || "").trim();
             }
 
-            const loaiBienDong = data.loai_bien_dong ? data.loai_bien_dong.toLowerCase() : "chuyển nhượng";
-            const tenChuyenQuyen = data.ten_chuyen_quyen || "";
-            const ghiChu = `Thửa đất số ${soThua} Nhận ${loaiBienDong} quyền sử dụng đất của ${tenChuyenQuyen}`;
+            // Tách các chủ đất thành từng dòng riêng biệt
+            const owners = splitOwnerNames(rawOwnerName);
+            const maDoiTuong = "GDC";
 
-            return new TableRow({
-                children: [
-                    createCell(soTo, 5),
-                    createCell(soThua, 5),
-                    createCell(tenChuSuDung, 20, false, AlignmentType.LEFT),
-                    createCell(maDoiTuong, 10),
-                    createCell("", 10), // Hiện trạng - Diện tích
-                    createCell("", 10), // Hiện trạng - Loại đất
-                    createCell(tongDienTich > 0 ? tongDienTich.toString() : "", 10), // Pháp lý - Diện tích
-                    createCell(loaiDat, 10), // Pháp lý - Loại đất
-                    createCell(ghiChu, 20, false, AlignmentType.LEFT),
-                ],
-                height: { value: 600, rule: "atLeast" }
+            let ghiChu = "";
+            if (targetType === 'old_owner') {
+                const loaiHoSo = (data.loai_ho_so || data.loai_bien_dong || "chuyển nhượng").trim();
+                const ngayKyStr = formatVNDate(data.ngay_ky_gcn || record.ngay_thang);
+                if (ngayKyStr) {
+                    ghiChu = `Đã ${loaiHoSo} ngày ${ngayKyStr}`;
+                } else {
+                    ghiChu = `Đã ${loaiHoSo}`;
+                }
+            } else {
+                ghiChu = String(data.ghi_chu || "").trim();
+            }
+
+            const tongDienTich = parseFloat(String(data.dien_tich || data.tong_dien_tich || "0").replace(',', '.'));
+            const dtO = parseFloat(String(data.dien_tich_ont || data.dien_tich_odt || data.dien_tich_tho_cu || "0").replace(',', '.'));
+            let dtNN = parseFloat(String(data.dien_tich_cln || data.dien_tich_hnk || data.dien_tich_khac || "0").replace(',', '.'));
+            
+            if (dtNN <= 0 && tongDienTich > dtO && dtO > 0) {
+                dtNN = tongDienTich - dtO;
+            }
+
+            const rawLoaiDat = String(data.loai_dat || data.muc_dich_su_dung || "").toUpperCase().trim();
+            let loaiDatO = "ONT*";
+            if (rawLoaiDat.includes("ODT")) loaiDatO = "ODT*";
+
+            let loaiDatNN = "CLN*";
+            if (rawLoaiDat.includes("HNK")) loaiDatNN = "HNK*";
+            else if (rawLoaiDat.includes("LUC") || rawLoaiDat.includes("LUA")) loaiDatNN = "LUC*";
+            else if (rawLoaiDat.includes("BHK")) loaiDatNN = "BHK*";
+
+            const hasMultiLandTypes = dtO > 0 && dtNN > 0;
+
+            const landDetails: { loaiDat: string; dienTich: string }[] = [];
+            if (hasMultiLandTypes) {
+                landDetails.push({ loaiDat: "", dienTich: formatVNArea(tongDienTich) });
+                landDetails.push({ loaiDat: loaiDatO, dienTich: formatVNArea(dtO) });
+                landDetails.push({ loaiDat: loaiDatNN, dienTich: formatVNArea(dtNN) });
+            } else {
+                let displayLoaiDat = rawLoaiDat ? (rawLoaiDat.endsWith('*') ? rawLoaiDat : `${rawLoaiDat}*`) : (dtO > 0 ? "ONT*" : "CLN*");
+                const displayArea = formatVNArea(tongDienTich > 0 ? tongDienTich : (dtO > 0 ? dtO : dtNN));
+                landDetails.push({ loaiDat: displayLoaiDat, dienTich: displayArea });
+            }
+
+            // Số dòng nội dung cần thiết cho 1 thửa đất này
+            const recordRowCount = Math.max(owners.length, landDetails.length);
+
+            // THÔNG MINH: Nếu thửa đất không vừa số dòng còn lại trên trang hiện tại, đẩy nguyên thửa sang trang mới
+            const remainingOnPage = ROWS_PER_PAGE - currentLinesOnPage;
+            if (recordRowCount <= ROWS_PER_PAGE && recordRowCount > remainingOnPage && currentLinesOnPage > 0) {
+                for (let b = 0; b < remainingOnPage; b++) {
+                    contentRowsData.push(["", "", "", "", "", "", "", "", ""]);
+                }
+                currentLinesOnPage = 0; // Bắt đầu trang mới
+            }
+
+            for (let k = 0; k < recordRowCount; k++) {
+                contentRowsData.push([
+                    k === 0 ? soTo : "",
+                    k === 0 ? soThua : "",
+                    owners[k] || "",
+                    k === 0 ? maDoiTuong : "",
+                    "",
+                    "",
+                    landDetails[k] ? landDetails[k].loaiDat : "",
+                    landDetails[k] ? landDetails[k].dienTich : "",
+                    k === 0 ? ghiChu : ""
+                ]);
+
+                currentLinesOnPage++;
+                if (currentLinesOnPage === ROWS_PER_PAGE) {
+                    currentLinesOnPage = 0;
+                }
+            }
+        });
+
+        // Bổ sung các dòng trống cho tròn trang cuối cùng (mỗi trang đúng 56 dòng nội dung)
+        if (currentLinesOnPage > 0) {
+            const remainingOnLastPage = ROWS_PER_PAGE - currentLinesOnPage;
+            for (let i = 0; i < remainingOnLastPage; i++) {
+                contentRowsData.push(["", "", "", "", "", "", "", "", ""]);
+            }
+        } else if (contentRowsData.length === 0) {
+            for (let i = 0; i < ROWS_PER_PAGE; i++) {
+                contentRowsData.push(["", "", "", "", "", "", "", "", ""]);
+            }
+        }
+
+        // Tính toán tổng số trang
+        const totalPages = Math.max(1, Math.ceil(contentRowsData.length / ROWS_PER_PAGE));
+
+        // Tạo Worksheet Excel và chia từng trang có tiêu đề lặp lại (62 dòng/trang: 4 header + 56 nội dung + 2 dòng trống đệm)
+        const ws: XLSX.WorkSheet = {};
+        const merges: XLSX.Range[] = [];
+        const rowHeights: XLSX.RowInfo[] = [];
+        const pageBreakRows: { r: number; flag: number }[] = [];
+
+        for (let p = 0; p < totalPages; p++) {
+            const r_base = p * 62; // Mỗi trang gồm 4 dòng header + 56 dòng nội dung + 2 dòng trống đệm = 62 dòng
+
+            // Thêm ngắt trang sau 62 dòng (sau 2 dòng trống đệm của trang p)
+            if (p < totalPages - 1) {
+                pageBreakRows.push({ r: r_base + 62, flag: 1 });
+            }
+
+            // Các ô gộp cho tiêu đề trang p
+            merges.push(
+                { s: { r: r_base + 0, c: 8 }, e: { r: r_base + 0, c: 8 } }, // Trang số
+                { s: { r: r_base + 1, c: 0 }, e: { r: r_base + 2, c: 0 } }, // A2:A3 Tờ bản đồ
+                { s: { r: r_base + 1, c: 1 }, e: { r: r_base + 2, c: 1 } }, // B2:B3 Thửa đất
+                { s: { r: r_base + 1, c: 2 }, e: { r: r_base + 2, c: 2 } }, // C2:C3 Tên người sử dụng
+                { s: { r: r_base + 1, c: 3 }, e: { r: r_base + 2, c: 3 } }, // D2:D3 Mã đối tượng
+                { s: { r: r_base + 1, c: 4 }, e: { r: r_base + 1, c: 5 } }, // E2:F2 Hiện trạng
+                { s: { r: r_base + 1, c: 6 }, e: { r: r_base + 1, c: 7 } }, // G2:H2 Giấy tờ pháp lý
+                { s: { r: r_base + 1, c: 8 }, e: { r: r_base + 2, c: 8 } }  // I2:I3 Ghi chú
+            );
+
+            // Dòng 1 của trang p: Header top (Trang số) - Chiều cao 18pt
+            ws[XLSX.utils.encode_cell({ r: r_base + 0, c: 8 })] = {
+                v: `Trang số: ${p + 1}`,
+                s: {
+                    font: { name: FONT_FAMILY, sz: 10, bold: true, italic: true },
+                    alignment: { horizontal: "right", vertical: "center" }
+                }
+            };
+
+            // Dòng 2 của trang p: Table Header row 1 (Cỡ chữ 10pt) - Chiều cao 30pt
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 0 })] = { v: "Tờ bản\nđồ số", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 1 })] = { v: "Thửa\nđất số", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 2 })] = { v: "Tên người sử dụng, quản lý đất", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 3 })] = { v: "Mã đối tượng\nsử dụng, đối\ntượng được\ngiao quản lý\nđất", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 4 })] = { v: "Theo hiện trạng sử\ndụng đất", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 5 })] = { v: "", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 6 })] = { v: "Theo giấy tờ pháp lý\nvề quyền sử dụng đất", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 7 })] = { v: "", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 1, c: 8 })] = { v: "Ghi chú", s: headerStyle };
+
+            // Dòng 3 của trang p: Sub Headers (Cỡ chữ 10pt) - Chiều cao 37.5pt
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 0 })] = { v: "", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 1 })] = { v: "", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 2 })] = { v: "", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 3 })] = { v: "", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 4 })] = { v: "Loại đất", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 5 })] = { v: "Diện tích\n(m2)", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 6 })] = { v: "Loại đất", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 7 })] = { v: "Diện tích\n(m2)", s: headerStyle };
+            ws[XLSX.utils.encode_cell({ r: r_base + 2, c: 8 })] = { v: "", s: headerStyle };
+
+            // Dòng 4 của trang p: Column Indices (1) đến (9) - Chiều cao 18pt
+            const colIndices = ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)", "(9)"];
+            colIndices.forEach((val, idx) => {
+                const cellRef = XLSX.utils.encode_cell({ r: r_base + 3, c: idx });
+                ws[cellRef] = { v: val, s: subHeaderStyle };
             });
-        });
 
-        const doc = new Document({
-            sections: [{
-                properties: {
-                    page: {
-                        size: {
-                            width: 23811, // A3 width in twips (420mm)
-                            height: 16838, // A3 height in twips (297mm)
-                            orientation: "landscape",
-                        },
-                        margin: {
-                            top: 1134, // 2cm
-                            bottom: 1134, // 2cm
-                            left: 1134, // 2cm
-                            right: 1134, // 2cm
-                        },
-                    },
-                },
-                children: [
-                    new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        children: [
-                            new TextRun({ text: "(Mẫu các trang nội dung sổ mục kê đất đai)", size: 24, font: "Times New Roman", bold: true }),
-                        ],
-                        spacing: { after: 200 }
-                    }),
-                    new Paragraph({
-                        alignment: AlignmentType.RIGHT,
-                        children: [
-                            new TextRun({ text: "Trang số......", size: 24, font: "Times New Roman", bold: true }),
-                        ],
-                        spacing: { after: 200 }
-                    }),
-                    new Table({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        rows: [
-                            // Header Row 1
-                            new TableRow({
-                                children: [
-                                    createCell("Tờ\nbản\nđồ số", 5, true, AlignmentType.CENTER, 1, 2),
-                                    createCell("Thửa\nđất số", 5, true, AlignmentType.CENTER, 1, 2),
-                                    createCell("Tên người sử\ndụng, quản lý\nđất", 20, true, AlignmentType.CENTER, 1, 2),
-                                    createCell("Mã đối\ntượng\nsử dụng,\nquản lý\nđất", 10, true, AlignmentType.CENTER, 1, 2),
-                                    createCell("Hiện trạng sử\ndụng đất", 20, true, AlignmentType.CENTER, 2, 1),
-                                    createCell("Giấy tờ pháp lý\nvề QSDĐ", 20, true, AlignmentType.CENTER, 2, 1),
-                                    createCell("Ghi chú", 20, true, AlignmentType.CENTER, 1, 2),
-                                ],
-                            }),
-                            // Header Row 2
-                            new TableRow({
-                                children: [
-                                    createCell("Diện\ntích\n(m2)", 10, true),
-                                    createCell("Loại\nđất", 10, true),
-                                    createCell("Diện\ntích\n(m2)", 10, true),
-                                    createCell("Loại\nđất", 10, true),
-                                ],
-                            }),
-                            // Header Row 3 (Numbers)
-                            new TableRow({
-                                children: [
-                                    createCell("(1)", 5),
-                                    createCell("(2)", 5),
-                                    createCell("(3)", 20),
-                                    createCell("(4)", 10),
-                                    createCell("(5)", 10),
-                                    createCell("(6)", 10),
-                                    createCell("(7)", 10),
-                                    createCell("(8)", 10),
-                                    createCell("(9)", 20),
-                                ],
-                            }),
-                            // Data Rows
-                            ...dataRows
-                        ],
-                    }),
-                ],
-            }]
-        });
+            // Chiều cao chuẩn khớp file mẫu
+            rowHeights[r_base + 0] = { hpt: 18, hpx: 18 };
+            rowHeights[r_base + 1] = { hpt: 30, hpx: 30 };
+            rowHeights[r_base + 2] = { hpt: 37.5, hpx: 37.5 };
+            rowHeights[r_base + 3] = { hpt: 18, hpx: 18 };
 
-        const blob = await Packer.toBlob(doc);
-        zip.file(`SoMucKe_To_${soTo}.docx`, blob);
+            // Render 56 dòng nội dung của trang p
+            const pageRows = contentRowsData.slice(p * ROWS_PER_PAGE, (p + 1) * ROWS_PER_PAGE);
+            pageRows.forEach((rowValues, rowIdx) => {
+                const r = r_base + 4 + rowIdx;
+                const isLastRowOfPage = (rowIdx === ROWS_PER_PAGE - 1);
+
+                rowValues.forEach((val, c) => {
+                    let align: "left" | "center" | "right" = "center";
+                    if (c === 2 || c === 8) align = "left";
+                    if (c === 5 || c === 7) align = "right";
+
+                    const cellRef = XLSX.utils.encode_cell({ r, c });
+                    ws[cellRef] = {
+                        v: val,
+                        t: 's',
+                        s: createContentStyle(align, isLastRowOfPage)
+                    };
+                });
+
+                rowHeights[r] = { hpt: 18, hpx: 18 };
+            });
+
+            // Render 2 dòng trống đệm ở cuối trang p (không có viền bảng)
+            const spacer1Row = r_base + 4 + ROWS_PER_PAGE;     // r_base + 60
+            const spacer2Row = r_base + 4 + ROWS_PER_PAGE + 1; // r_base + 61
+
+            for (let c = 0; c < 9; c++) {
+                ws[XLSX.utils.encode_cell({ r: spacer1Row, c })] = { v: "", s: emptySpacerStyle };
+                ws[XLSX.utils.encode_cell({ r: spacer2Row, c })] = { v: "", s: emptySpacerStyle };
+            }
+            rowHeights[spacer1Row] = { hpt: 18, hpx: 18 };
+            rowHeights[spacer2Row] = { hpt: 18, hpx: 18 };
+        }
+
+        const totalSheetRows = totalPages * 62;
+        ws['!ref'] = `A1:I${totalSheetRows}`;
+        ws['!merges'] = merges;
+        
+        // Độ rộng cột khớp chuẩn file mẫu SMK_Q1.xls
+        ws['!cols'] = [
+            { wch: 10.57 }, // A: Tờ bản đồ số
+            { wch: 11.43 }, // B: Thửa đất số
+            { wch: 26.86 }, // C: Tên người sử dụng
+            { wch: 11.71 }, // D: Mã đối tượng
+            { wch: 9.86 },  // E: HT Loại đất
+            { wch: 10.14 }, // F: HT Diện tích
+            { wch: 8.43 },  // G: PL Loại đất
+            { wch: 12.86 }, // H: PL Diện tích
+            { wch: 24.14 }  // I: Ghi chú
+        ];
+        ws['!rows'] = rowHeights;
+
+        // Cài đặt dấu Ngắt Trang Cứng (Explicit Page Breaks) chính xác sau 2 dòng trống đệm
+        if (pageBreakRows.length > 0) {
+            ws['!pagebreaks'] = { row: pageBreakRows };
+        }
+
+        // Cài đặt Header/Footer hệ thống Excel (Native Header/Footer) để khi in luôn hiện Trang số: [Trang]
+        ws['!headerFooter'] = {
+            oddHeader: "&R&B&ITrang số: &P",
+            evenHeader: "&R&B&ITrang số: &P"
+        };
+
+        // Cấu hình lề trang in khớp chuẩn file mẫu SMK_Q1.xls
+        ws['!margins'] = {
+            left: 0.5,
+            right: 0.5,
+            top: 0.5,
+            bottom: 0.5,
+            header: 0.3,
+            footer: 0.3
+        };
+
+        // Cấu hình trang in A3 ngang khớp chuẩn file mẫu SMK_Q1.xls
+        ws['!pageSetup'] = {
+            orientation: 'landscape',
+            paperSize: 8, // Khổ A3 (297mm x 420mm) trong Excel
+            fitToWidth: 1,
+            fitToHeight: 0
+        };
+
+        // Tạo workbook Excel
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "SMK");
+
+        // Ghi workbook ra binary ArrayBuffer
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+        const targetSuffix = targetType === 'old_owner' ? 'ChuCu' : 'ChuMoi';
+        zip.file(`SoMucKe_To_${soTo}_${targetSuffix}.xlsx`, wbout);
     }
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
     const safeWardName = wardName ? wardName.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'all';
-    saveAs(zipBlob, `SoMucKe_${safeWardName}_${fromDate}_to_${toDate}.zip`);
+    const targetSuffix = targetType === 'old_owner' ? 'ChuCu_ChuyenQuyen' : 'ChuMoi_SuDung';
+    saveAs(zipBlob, `SoMucKe_${safeWardName}_${targetSuffix}_${fromDate || 'all'}_den_${toDate || 'all'}.zip`);
 };

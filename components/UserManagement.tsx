@@ -148,11 +148,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
            // Xử lý Role
            let roleStr = String(normalizedRow['ROLE'] || normalizedRow['VAI TRÒ'] || 'EMPLOYEE').toUpperCase().trim();
            let role: UserRole = UserRole.EMPLOYEE;
-           
            if (roleStr === 'ADMIN') role = UserRole.ADMIN;
            else if (roleStr === 'SUBADMIN') role = UserRole.SUBADMIN;
-           else if (roleStr === 'TEAM_LEADER' || roleStr === 'NHÓM TRƯỞNG') role = UserRole.TEAM_LEADER;
-           else if (roleStr === 'ONEDOOR' || roleStr === 'MỘT CỬA') role = UserRole.ONEDOOR;
+           else if (roleStr === 'TEAM_LEADER' || roleStr.includes('NHÓM')) role = UserRole.TEAM_LEADER;
+           else if (roleStr === 'ONEDOOR' || roleStr.includes('MỘT CỬA')) role = UserRole.ONEDOOR;
+           else if (roleStr === 'RECEPTION_HANDOVER' || roleStr.includes('TIẾP NHẬN') || roleStr.includes('BÀN GIAO')) role = UserRole.RECEPTION_HANDOVER;
 
            const employeeId = String(normalizedRow['EMPLOYEE_ID'] || normalizedRow['MÃ NV'] || '').trim();
 
@@ -263,9 +263,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                             user.role === UserRole.SUBADMIN ? 'bg-orange-50 text-orange-700 border-orange-200' :
                                             user.role === UserRole.TEAM_LEADER ? 'bg-purple-50 text-purple-700 border-purple-200' :
                                             user.role === UserRole.ONEDOOR ? 'bg-green-50 text-green-700 border-green-200' :
+                                            user.role === UserRole.RECEPTION_HANDOVER ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                             'bg-blue-50 text-blue-700 border-blue-200'
                                         }`}>
-                                            {user.role}
+                                            {user.role === UserRole.RECEPTION_HANDOVER ? 'Tiếp nhận & Bàn giao' : user.role}
                                         </span>
                                     </td>
                                     <td className="p-4 text-gray-600">
@@ -424,6 +425,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                 onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
                             >
                                 <option value={UserRole.EMPLOYEE}>Nhân viên (Employee)</option>
+                                <option value={UserRole.RECEPTION_HANDOVER}>Tiếp nhận & Bàn giao (Reception & Handover)</option>
                                 <option value={UserRole.TEAM_LEADER}>Nhóm trưởng (Team Leader)</option>
                                 <option value={UserRole.ONEDOOR}>Một cửa (One Door)</option>
                                 <option value={UserRole.SUBADMIN}>Phó quản trị (Sub Admin)</option>

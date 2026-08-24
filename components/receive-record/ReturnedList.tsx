@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
-import { Search, Eye, FileSpreadsheet, MapPin, Calendar, ClipboardCheck, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, MapPin, Calendar, ClipboardCheck, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 interface ReturnedListProps {
   records: RecordFile[];
@@ -92,6 +92,7 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
   const [filterWard, setFilterWard] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortByDate, setSortByDate] = useState<'desc' | 'asc'>('desc');
+  const [onlyPriority, setOnlyPriority] = useState<boolean>(false);
   
   // States cho phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -100,7 +101,7 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
   // Reset trang về 1 khi bất kỳ bộ lọc nào thay đổi
   useEffect(() => {
     setCurrentPage(1);
-  }, [fromDate, toDate, filterWard, searchTerm, sortByDate, itemsPerPage]);
+  }, [fromDate, toDate, filterWard, searchTerm, sortByDate, onlyPriority, itemsPerPage]);
 
   // Gom tất cả các nguồn hồ sơ đã trả kết quả
   const allReturnedRecords = useMemo(() => {
@@ -120,9 +121,18 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
     });
   }, [records, archiveSaoLucRecords, archiveVaoSoRecords, archiveDangKyRecords, archiveCongVanRecords]);
 
+  const priorityReturnedCount = useMemo(() => {
+    return allReturnedRecords.filter(r => Boolean(r.isPriority) || Boolean((r as any).data?.isPriority)).length;
+  }, [allReturnedRecords]);
+
   // Lọc và sắp xếp danh sách hiển thị
   const filteredRecords = useMemo(() => {
     let result = allReturnedRecords.filter(r => {
+        // Lọc hồ sơ chú ý
+        if (onlyPriority && !(Boolean(r.isPriority) || Boolean((r as any).data?.isPriority))) {
+            return false;
+        }
+
         // 1. Lọc theo khoảng ngày (Ưu tiên resultReturnedDate, sau đó là exportDate hoặc completedDate làm fallback)
         const retDate = r.resultReturnedDate || r.exportDate || r.completedDate || '';
         if (!retDate) return false;
@@ -172,7 +182,7 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
             return dateA.localeCompare(dateB);
         }
     });
-  }, [allReturnedRecords, fromDate, toDate, filterWard, searchTerm, sortByDate]);
+  }, [allReturnedRecords, fromDate, toDate, filterWard, searchTerm, sortByDate, onlyPriority]);
 
   // Phân trang dữ liệu hiển thị trên bảng
   const paginatedRecords = useMemo(() => {
@@ -413,7 +423,25 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
             </div>
 
             {/* Nút hành động */}
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => setOnlyPriority(!onlyPriority)}
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-sm font-bold transition-all shrink-0 shadow-sm ${
+                        onlyPriority 
+                            ? 'bg-red-600 text-white border-red-600 shadow-md animate-pulse' 
+                            : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                    }`}
+                >
+                    <AlertTriangle size={16} className={onlyPriority ? 'text-yellow-300 fill-yellow-300' : 'text-amber-500 fill-yellow-400'} />
+                    <span>Hồ sơ chú ý</span>
+                    {priorityReturnedCount > 0 && (
+                        <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-black ${onlyPriority ? 'bg-white text-red-700' : 'bg-red-600 text-white'}`}>
+                            {priorityReturnedCount}
+                        </span>
+                    )}
+                </button>
+
                 <button
                     onClick={handlePreviewExcel}
                     className="flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl hover:bg-emerald-100/70 text-sm font-bold transition-all shrink-0 shadow-sm"
@@ -478,7 +506,17 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
                                 return (
                                     <tr key={r.id} className="hover:bg-emerald-50/10 group transition-colors">
                                         <td className="p-4 text-center text-slate-400 align-middle font-medium">{stt}</td>
-                                        <td className="p-4 font-bold text-slate-800 truncate align-middle tracking-tight">{r.code || '-'}</td>
+                                        <td className="p-4 font-bold text-slate-800 align-middle tracking-tight">
+                                            <div className="flex flex-col items-start gap-1">
+                                                <span className="truncate">{r.code || '-'}</span>
+                                                {(Boolean(r.isPriority) || Boolean((r as any).data?.isPriority)) && (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-950 bg-amber-100 border border-amber-400 px-2 py-0.5 rounded-full shadow-xs animate-pulse" title={r.priorityNote || (r as any).data?.priorityNote || 'Hồ sơ cần chú ý'}>
+                                                        <AlertTriangle size={12} className="text-amber-500 fill-yellow-400 shrink-0" />
+                                                        <span>Chú ý</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="p-4 font-bold text-slate-800 truncate align-middle" title={r.customerName}>{r.customerName || '-'}</td>
                                         <td className="p-4 text-slate-700 truncate align-middle font-semibold">{getNormalizedWard(r.ward)}</td>
                                         <td className="p-4 text-center font-mono align-middle font-semibold text-slate-600">{r.mapSheet || '-'}</td>

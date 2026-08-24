@@ -182,5 +182,101 @@ export const exportTeamWeeklyReportToWord = async (
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `Bao_Cao_Chi_Tiet_${new Date().toISOString().split("T")[0]}.docx`);
+  saveAs(blob, `Bao_Cao_So_Luong_${new Date().toISOString().split("T")[0]}.docx`);
 };
+
+export const exportExecutionReportToWord = async (
+  reportData: any,
+  fromDate: string,
+  toDate: string
+) => {
+  const children: any[] = [];
+
+  const addText = (text: string, bold: boolean = false, indent: number = 0) => {
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text, bold, font: "Times New Roman", size: 28 })],
+        indent: { left: indent },
+      })
+    );
+  };
+
+  const addTitle = (text: string) => {
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, font: "Times New Roman", size: 36 })],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+      })
+    );
+  };
+
+  addTitle("THỐNG KÊ SỐ LƯỢNG HỒ SƠ ĐÃ THỰC HIỆN TẠI TỔ ĐO ĐẠC");
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: `(Từ ngày ${new Date(fromDate).toLocaleDateString("vi-VN")} đến ngày ${new Date(toDate).toLocaleDateString("vi-VN")})`,
+          italics: true,
+          font: "Times New Roman",
+          size: 28,
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 },
+    })
+  );
+
+  addText("I. TỔNG HỢP TIẾN TRÌNH THỰC HIỆN", true);
+  addText(`- Đã thực hiện: ${reportData.completedWork} hồ sơ`, false, 360);
+  addText(`- Đang trình ký: ${reportData.pendingSign} hồ sơ`, false, 360);
+  addText(`- Đã ký duyệt (chờ Một Cửa): ${reportData.signed} hồ sơ`, false, 360);
+  addText(`- Đã chuyển 1 cửa: ${reportData.handover} hồ sơ`, false, 360);
+  addText(`- Tổng số thửa đất: ${reportData.plots} thửa`, true, 360);
+  addText(`- Tổng lượt lịch công tác: ${reportData.schedulesCount} lượt`, true, 360);
+
+  children.push(new Paragraph({ spacing: { before: 300 } }));
+  addText("II. PHÂN BỔ THEO ĐỊA BÀN XÃ / PHƯỜNG", true);
+  reportData.wardStats.forEach((w: any) => {
+    addText(
+      `• ${w.ward}: Đã thực hiện: ${w.completedWork} | Trình ký: ${w.pendingSign} | Đã ký duyệt: ${w.signed} | Chuyển 1 cửa: ${w.handover} | Số thửa: ${w.plots}`,
+      false,
+      360
+    );
+  });
+
+  children.push(new Paragraph({ spacing: { before: 300 } }));
+  addText("III. ĐÓNG GÓP NGHIỆP VỤ CỦA NHÂN VIÊN", true);
+  reportData.employeeStats.forEach((e: any, index: number) => {
+    addText(
+      `${index + 1}. ${e.employee.name} (${e.employee.department}): Đã thực hiện: ${e.completedWork} | Trình ký: ${e.pendingSign} | Đã ký: ${e.signed} | Chuyển 1 cửa: ${e.handover} | Thửa: ${e.plots} | Lịch CT: ${e.schedules}`,
+      false,
+      360
+    );
+  });
+
+  if (reportData.schedulesList && reportData.schedulesList.length > 0) {
+    children.push(new Paragraph({ spacing: { before: 300 } }));
+    addText("IV. CHI TIẾT LỊCH TRÌNH CÔNG TÁC", true);
+    reportData.schedulesList.forEach((s: any) => {
+      const partnerStr = s.partner ? ` (${s.partner})` : '';
+      addText(
+        `- Ngày ${new Date(s.date).toLocaleDateString("vi-VN")}: ${s.executors || ''} - Địa bàn: ${s.location || 'Khác'} - Nội dung: ${s.content}${partnerStr}`,
+        false,
+        360
+      );
+    });
+  }
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: children,
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, `Bao_Cao_HS_Thuc_Hien_${new Date().toISOString().split("T")[0]}.docx`);
+};
+

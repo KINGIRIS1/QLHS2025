@@ -1,18 +1,31 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { ActiveThemeState } from '../types';
 
 // =========================================================================
-// HƯỚNG DẪN CẤU HÌNH GÓI PRO (QUAN TRỌNG):
-// 1. Vào trang https://supabase.com/dashboard/project/_/settings/api
-// 2. Copy "Project URL" và dán vào biến SUPABASE_URL bên dưới.
-// 3. Copy "anon public" Key và dán vào biến SUPABASE_ANON_KEY bên dưới.
-// LƯU Ý: Nếu bạn vừa tạo Project mới cho gói Pro, BẮT BUỘC phải thay đổi 2 dòng này.
+// CẤU HÌNH MÁY CHỦ RIÊNG (SELF-HOSTED / CLOUDFLARE TUNNEL):
+// Mặc định kết nối tới máy chủ cá nhân: https://api.qlhsct.info.vn
 // =========================================================================
 
-// --- CẤU HÌNH KẾT NỐI CLOUD ---
-const SUPABASE_URL: string = 'https://dajjhubrhybodggbqapt.supabase.co'; 
-const SUPABASE_ANON_KEY: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhampodWJyaHlib2RnZ2JxYXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NzM3MDUsImV4cCI6MjA4MDM0OTcwNX0.Te4JGaR7DnSiejugyZHV0_uQSWsG_TS_xTmRgxgM5-4';
+// Cho phép nạp cấu hình tùy chỉnh từ localStorage (nếu có) hoặc dùng mặc định
+const getSavedUrl = () => {
+    if (typeof window !== 'undefined') {
+        const customUrl = localStorage.getItem('CUSTOM_SUPABASE_URL');
+        if (customUrl && customUrl.trim()) return customUrl.trim();
+    }
+    return 'https://api.qlhsct.info.vn';
+};
+
+const getSavedKey = () => {
+    if (typeof window !== 'undefined') {
+        const customKey = localStorage.getItem('CUSTOM_SUPABASE_KEY');
+        if (customKey && customKey.trim()) return customKey.trim();
+    }
+    return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
+};
+
+// --- CẤU HÌNH KẾT NỐI SERVER ---
+export const SUPABASE_URL: string = getSavedUrl(); 
+export const SUPABASE_ANON_KEY: string = getSavedKey();
 
 // Kiểm tra kỹ điều kiện cấu hình
 const isEmpty = !SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.trim() === '' || SUPABASE_ANON_KEY.trim() === '';
@@ -60,11 +73,6 @@ presenceChannel.on('broadcast', { event: 'force_update' }, (payload) => {
     window.dispatchEvent(new CustomEvent('system_update_available_broadcast', { detail: payload }));
 });
 
-presenceChannel.on('broadcast', { event: 'theme_instant_update' }, (payload) => {
-    console.log("⚡ [REALTIME BROADCAST] Nhận tín hiệu đổi giao diện toàn hệ thống:", payload);
-    window.dispatchEvent(new CustomEvent('global_theme_changed', { detail: payload?.payload || payload }));
-});
-
 // Register presence listener BEFORE subscribing
 presenceChannel.on('presence', { event: 'sync' }, () => {
     globalPresenceState = presenceChannel.presenceState();
@@ -94,6 +102,9 @@ if (typeof window !== 'undefined' && isConfigured) {
                     } else if (row.key === 'contact_settings_v2') {
                         console.log("[DEBUG] contact_settings_v2 changed in DB", row);
                         window.dispatchEvent(new CustomEvent('contact_settings_changed', { detail: row.value }));
+                    } else if (row.key === 'contract_signer_settings_v1') {
+                        console.log("[DEBUG] contract_signer_settings_v1 changed in DB", row);
+                        window.dispatchEvent(new CustomEvent('contract_signer_settings_changed', { detail: row.value }));
                     } else if (row.key === 'weather_location') {
                         console.log("[DEBUG] weather_location changed in DB", row);
                         try {
@@ -101,41 +112,6 @@ if (typeof window !== 'undefined' && isConfigured) {
                         } catch (e) {
                             console.error("Lỗi parse weather_location realtime:", e);
                         }
-                    } else if (row.key === 'active_theme_override') {
-                        console.log("⚡ [REALTIME DB] active_theme_override changed in DB", row);
-                        try {
-                            let parsed: any = null;
-                            try {
-                                parsed = JSON.parse(row.value);
-                            } catch (_) {
-                                parsed = row.value;
-                            }
-
-                            let state: ActiveThemeState;
-                            if (typeof parsed === 'string') {
-                                const trimmed = parsed.trim();
-                                state = {
-                                    activeThemeId: trimmed || null,
-                                    overrideActive: Boolean(trimmed),
-                                    updatedAt: new Date().toISOString()
-                                };
-                            } else if (typeof parsed === 'object' && parsed !== null) {
-                                state = {
-                                    activeThemeId: parsed.activeThemeId ?? null,
-                                    overrideActive: parsed.overrideActive ?? Boolean(parsed.activeThemeId),
-                                    updatedAt: parsed.updatedAt ?? new Date().toISOString()
-                                };
-                            } else {
-                                state = { activeThemeId: null, overrideActive: false, updatedAt: new Date().toISOString() };
-                            }
-
-                            window.dispatchEvent(new CustomEvent('global_theme_changed', { detail: state }));
-                        } catch (e) {
-                            console.error("Lỗi parse active_theme_override:", e);
-                        }
-                    } else if (row.key === 'app_themes_library') {
-                        console.log("⚡ [REALTIME DB] app_themes_library changed in DB", row);
-                        window.dispatchEvent(new CustomEvent('theme_library_changed'));
                     }
                 }
             }

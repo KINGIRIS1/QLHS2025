@@ -24,8 +24,126 @@ const safeSaveOfflineRecords = (key: string, data: any[]) => {
 };
 
 const stripAccents = (str: string) => {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd');
 };
+
+const normalizeSearchText = (str: any): string => {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd');
+};
+
+const extractOwnersList = (owners: any): string[] => {
+  if (!owners) return [];
+  if (Array.isArray(owners)) {
+    return owners.flatMap(o => {
+      if (typeof o === 'string') {
+        return o.split(/[,;\n\r]+/).map(s => s.trim()).filter(Boolean);
+      }
+      return o ? [String(o)] : [];
+    });
+  }
+  if (typeof owners === 'string') {
+    return owners.split(/[,;\n\r]+/).map(s => s.trim()).filter(Boolean);
+  }
+  return [String(owners)];
+};
+
+const checkOwnerMatch = (recordOwners: any, searchOwner: string): boolean => {
+  if (!searchOwner || !searchOwner.trim()) return true;
+  const searchRaw = searchOwner.trim().toLowerCase();
+  const searchNorm = normalizeSearchText(searchOwner);
+  const ownersList = extractOwnersList(recordOwners);
+  
+  if (ownersList.length === 0) return false;
+
+  const combinedRaw = ownersList.join(' ').toLowerCase();
+  const combinedNorm = normalizeSearchText(combinedRaw);
+
+  // 1. Khớp chuỗi trực tiếp (không phân biệt hoa thường)
+  if (combinedRaw.includes(searchRaw)) return true;
+
+  // 2. Khớp chuỗi không dấu (accent-insensitive)
+  if (combinedNorm.includes(searchNorm)) return true;
+
+  // 3. Khớp trên từng chủ riêng lẻ trong danh sách
+  for (const owner of ownersList) {
+    const ownerRaw = owner.toLowerCase();
+    const ownerNorm = normalizeSearchText(owner);
+    if (ownerRaw.includes(searchRaw) || ownerNorm.includes(searchNorm)) {
+      return true;
+    }
+  }
+
+  // 4. Khớp theo từng từ khóa (token)
+  const searchTokens = searchNorm.split(/\s+/).filter(Boolean);
+  if (searchTokens.length > 0 && searchTokens.every(token => combinedNorm.includes(token))) {
+    return true;
+  }
+
+  return false;
+};
+
+const checkPlotMatch = (plots: any[], filters: { oldPlotNumber?: string; oldMapSheetNumber?: string; newPlotNumber?: string; newMapSheetNumber?: string }): boolean => {
+  if (!filters.oldPlotNumber && !filters.oldMapSheetNumber && !filters.newPlotNumber && !filters.newMapSheetNumber) {
+    return true;
+  }
+  if (!plots || !Array.isArray(plots) || plots.length === 0) return false;
+
+  const targetOldPlot = normalizeSearchText(filters.oldPlotNumber);
+  const targetOldMap = normalizeSearchText(filters.oldMapSheetNumber);
+  const targetNewPlot = normalizeSearchText(filters.newPlotNumber);
+  const targetNewMap = normalizeSearchText(filters.newMapSheetNumber);
+
+  return plots.some(p => {
+    const pOldPlot = normalizeSearchText(p.oldPlotNumber || (p as any).plotNumber);
+    const pOldMap = normalizeSearchText(p.oldMapSheetNumber);
+    const pNewPlot = normalizeSearchText(p.newPlotNumber);
+    const pNewMap = normalizeSearchText(p.newMapSheetNumber);
+
+    const mOThua = !targetOldPlot || pOldPlot.includes(targetOldPlot);
+    const mOTo = !targetOldMap || pOldMap.includes(targetOldMap);
+    const mNThua = !targetNewPlot || pNewPlot.includes(targetNewPlot);
+    const mNTo = !targetNewMap || pNewMap.includes(targetNewMap);
+
+    return mOThua && mOTo && mNThua && mNTo;
+  });
+};
+
+const checkDocMatch = (blockingDocuments: any[], searchDoc: string): boolean => {
+  if (!searchDoc || !searchDoc.trim()) return true;
+  if (!blockingDocuments || !Array.isArray(blockingDocuments) || blockingDocuments.length === 0) return false;
+
+  const searchNorm = normalizeSearchText(searchDoc);
+  return blockingDocuments.some(d => {
+    const docNumNorm = normalizeSearchText(d.docNumber);
+    const docNoteNorm = normalizeSearchText(d.note);
+    const docAgencyNorm = normalizeSearchText(d.agency);
+    return docNumNorm.includes(searchNorm) || docNoteNorm.includes(searchNorm) || docAgencyNorm.includes(searchNorm);
+  });
+};
+
+const PREDEFINED_OLD_COMMUNES = [
+  'Hưng Long',
+  'Minh Thành',
+  'Thành Tâm',
+  'Nha Bích',
+  'Minh Lập',
+  'Minh Thắng',
+  'Minh Hưng',
+  'Minh Long'
+];
+
+const PREDEFINED_NEW_COMMUNES = [
+  'Chơn Thành',
+  'Minh Hưng',
+  'Nha Bích'
+];
 
 interface Props {
   currentUser: User;
@@ -71,11 +189,15 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
   const [editingRecord, setEditingRecord] = useState<LandRecord | undefined>();
 
   const oldCommunes = useMemo(() => {
-    return Array.from(new Set(records.map(r => r.oldCommune).filter(Boolean))).sort();
+    const fromRecords = records.map(r => r.oldCommune).filter(Boolean);
+    const combined = Array.from(new Set([...PREDEFINED_OLD_COMMUNES, ...fromRecords]));
+    return combined.sort((a, b) => a.localeCompare(b, 'vi'));
   }, [records]);
 
   const newCommunes = useMemo(() => {
-    return Array.from(new Set(records.map(r => r.newCommune).filter(Boolean))).sort();
+    const fromRecords = records.map(r => r.newCommune).filter(Boolean);
+    const combined = Array.from(new Set([...PREDEFINED_NEW_COMMUNES, ...fromRecords]));
+    return combined.sort((a, b) => a.localeCompare(b, 'vi'));
   }, [records]);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -290,7 +412,6 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
   };
 
   const fetchBlockingRecords = async (filters = appliedFilters) => {
-    if (!isConfigured) return;
     setLoading(true);
     try {
       const hasFilter = Object.values(filters).some(v => v !== '');
@@ -301,91 +422,75 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
         return;
       }
       
-      const buildQuery = () => {
-        let q = supabase.from('blocking_records').select('*');
-        if (filters.issueNumber) {
-          q = q.ilike('issueNumber', `%${filters.issueNumber}%`);
-        }
-        if (filters.certNumber) {
-          q = q.ilike('certNumber', `%${filters.certNumber}%`);
-        }
-        if (filters.oldCommune) {
-          q = q.ilike('oldCommune', `%${filters.oldCommune}%`);
-        }
-        if (filters.newCommune) {
-          q = q.ilike('newCommune', `%${filters.newCommune}%`);
-        }
-        if (filters.unblockDoc) {
-          q = q.ilike('unblockDoc', `%${filters.unblockDoc}%`);
-        }
-        if (filters.oldPlotNumber) {
-          q = q.or(`plots.cs.[{"oldPlotNumber":"${filters.oldPlotNumber}"}]`);
-        }
-        if (filters.newPlotNumber) {
-          q = q.or(`plots.cs.[{"newPlotNumber":"${filters.newPlotNumber}"}]`);
-        }
-        
-        // Bổ sung lọc trực tiếp ở DB
-        if (filters.owner) {
-          const term = filters.owner.trim();
-          const variations = [
-            term,
-            term.toLowerCase(),
-            term.toUpperCase(),
-            stripAccents(term),
-            stripAccents(term).toLowerCase(),
-            stripAccents(term).toUpperCase()
-          ];
-          const uniqueVariations = Array.from(new Set(variations));
-          const orConditions = uniqueVariations.map(v => `owners.cs.["${v}"]`).join(',');
-          q = q.or(orConditions);
-        }
-        if (filters.docNumber) {
-          const term = filters.docNumber.trim();
-          const variations = [term, term.toUpperCase(), term.toLowerCase()];
-          const uniqueVariations = Array.from(new Set(variations));
-          const orConditions = uniqueVariations.map(v => `blockingDocuments.cs.[{"docNumber":"${v}"}]`).join(',');
-          q = q.or(orConditions);
-        }
-        if (filters.oldMapSheetNumber) {
-          q = q.or(`plots.cs.[{"oldMapSheetNumber":"${filters.oldMapSheetNumber}"}]`);
-        }
-        if (filters.newMapSheetNumber) {
-          q = q.or(`plots.cs.[{"newMapSheetNumber":"${filters.newMapSheetNumber}"}]`);
-        }
-        return q;
-      };
-
       let allRecords: LandRecord[] = [];
-      let from = 0;
-      let limit = 1000;
-      let hasMore = true;
-      // Tránh việc tải 30k+ bản ghi cùng lúc nếu không lọc để tối ưu hiệu năng và tránh bị giới hạn 10k
-      const maxRows = hasFilter ? 10000 : 3000; 
-      
-      while (hasMore && from < maxRows) {
-        const { data, error } = await buildQuery()
-          .range(from, from + limit - 1)
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allRecords = [...allRecords, ...(data as LandRecord[])];
-          if (data.length < limit) {
-            hasMore = false;
-          } else {
-            from += limit;
+
+      if (isConfigured && navigator.onLine) {
+        const buildQuery = () => {
+          let q = supabase.from('blocking_records').select('*');
+          if (filters.issueNumber) {
+            q = q.ilike('issueNumber', `%${filters.issueNumber.trim()}%`);
           }
-        } else {
-          hasMore = false;
+          if (filters.certNumber) {
+            q = q.ilike('certNumber', `%${filters.certNumber.trim()}%`);
+          }
+          if (filters.oldCommune) {
+            q = q.ilike('oldCommune', `%${filters.oldCommune.trim()}%`);
+          }
+          if (filters.newCommune) {
+            q = q.ilike('newCommune', `%${filters.newCommune.trim()}%`);
+          }
+          if (filters.unblockDoc) {
+            q = q.ilike('unblockDoc', `%${filters.unblockDoc.trim()}%`);
+          }
+          return q;
+        };
+
+        let from = 0;
+        let limit = 1000;
+        let hasMore = true;
+        const maxRows = 10000;
+        
+        while (hasMore && from < maxRows) {
+          const { data, error } = await buildQuery()
+            .range(from, from + limit - 1)
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allRecords = [...allRecords, ...(data as LandRecord[])];
+            if (data.length < limit) {
+              hasMore = false;
+            } else {
+              from += limit;
+            }
+          } else {
+            hasMore = false;
+          }
         }
+      }
+
+      // Nếu không lấy được từ Supabase (offline hoặc chưa cấu hình), fallback sang IndexedDB
+      if (allRecords.length === 0) {
+        const offlineRecords = await offlineDb.getRecords('blocking_records');
+        if (offlineRecords && offlineRecords.length > 0) {
+          allRecords = offlineRecords;
+        }
+      } else {
+        // Lưu toàn bộ dữ liệu tải được vào IndexedDB
+        await offlineDb.saveRecords('blocking_records', allRecords);
       }
       
       setRecords(allRecords);
-      // Lưu toàn bộ dữ liệu tải được vào IndexedDB
-      await offlineDb.saveRecords('blocking_records', allRecords);
     } catch (error) {
       console.error('Lỗi khi tải danh sách ngăn chặn:', error);
+      try {
+        const offlineRecords = await offlineDb.getRecords('blocking_records');
+        if (offlineRecords && offlineRecords.length > 0) {
+          setRecords(offlineRecords);
+        }
+      } catch (err) {
+        console.error('Lỗi khi đọc offline fallback:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -427,6 +532,10 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
   };
 
   const handleDelete = async (id: string) => {
+    if (currentUser?.role !== 'ADMIN') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền xóa hồ sơ ngăn chặn!', 'error');
+      return;
+    }
     if (!window.confirm('Bạn có chắc chắn muốn xóa hồ sơ ngăn chặn này và tất cả các tệp đính kèm liên quan?')) return;
     try {
       const record = records.find(r => r.id === id);
@@ -503,27 +612,27 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
     }
   };
 
-  const filteredRecords = records.filter(r => {
-    const matchIssueNum = !appliedFilters.issueNumber || r.issueNumber?.toLowerCase().includes(appliedFilters.issueNumber.toLowerCase());
-    const matchCertNum = !appliedFilters.certNumber || r.certNumber?.toLowerCase().includes(appliedFilters.certNumber.toLowerCase());
-    const matchOldCommune = !appliedFilters.oldCommune || r.oldCommune?.toLowerCase().includes(appliedFilters.oldCommune.toLowerCase());
-    const matchNewCommune = !appliedFilters.newCommune || r.newCommune?.toLowerCase().includes(appliedFilters.newCommune.toLowerCase());
-    const matchOwner = !appliedFilters.owner || r.owners?.some(o => o.toLowerCase().includes(appliedFilters.owner.toLowerCase()));
-    const matchUnblockDoc = !appliedFilters.unblockDoc || r.unblockDoc?.toLowerCase().includes(appliedFilters.unblockDoc.toLowerCase());
-    
-    // Plot match logic
-    const plotMatch = r.plots?.some(p => {
-         const mOThua = !appliedFilters.oldPlotNumber || p.oldPlotNumber?.toLowerCase().includes(appliedFilters.oldPlotNumber.toLowerCase());
-         const mOTo = !appliedFilters.oldMapSheetNumber || p.oldMapSheetNumber?.toLowerCase().includes(appliedFilters.oldMapSheetNumber.toLowerCase());
-         const mNThua = !appliedFilters.newPlotNumber || p.newPlotNumber?.toLowerCase().includes(appliedFilters.newPlotNumber.toLowerCase());
-         const mNTo = !appliedFilters.newMapSheetNumber || p.newMapSheetNumber?.toLowerCase().includes(appliedFilters.newMapSheetNumber.toLowerCase());
-         return mOThua && mOTo && mNThua && mNTo;
-    }) ?? false;
+  const filteredRecords = useMemo(() => {
+    return records.filter(r => {
+      const matchIssueNum = !appliedFilters.issueNumber || normalizeSearchText(r.issueNumber).includes(normalizeSearchText(appliedFilters.issueNumber));
+      const matchCertNum = !appliedFilters.certNumber || normalizeSearchText(r.certNumber).includes(normalizeSearchText(appliedFilters.certNumber));
+      const matchOldCommune = !appliedFilters.oldCommune || normalizeSearchText(r.oldCommune).includes(normalizeSearchText(appliedFilters.oldCommune));
+      const matchNewCommune = !appliedFilters.newCommune || normalizeSearchText(r.newCommune).includes(normalizeSearchText(appliedFilters.newCommune));
+      const matchOwner = checkOwnerMatch(r.owners, appliedFilters.owner);
+      const matchUnblockDoc = !appliedFilters.unblockDoc || normalizeSearchText(r.unblockDoc).includes(normalizeSearchText(appliedFilters.unblockDoc));
+      
+      const plotMatch = checkPlotMatch(r.plots || [], {
+        oldPlotNumber: appliedFilters.oldPlotNumber,
+        oldMapSheetNumber: appliedFilters.oldMapSheetNumber,
+        newPlotNumber: appliedFilters.newPlotNumber,
+        newMapSheetNumber: appliedFilters.newMapSheetNumber,
+      });
 
-    const docMatch = !appliedFilters.docNumber || r.blockingDocuments?.some(d => d.docNumber?.toLowerCase().includes(appliedFilters.docNumber.toLowerCase()));
+      const docMatch = checkDocMatch(r.blockingDocuments || [], appliedFilters.docNumber);
 
-    return matchIssueNum && matchCertNum && matchOldCommune && matchNewCommune && matchOwner && matchUnblockDoc && (!r.plots || r.plots.length === 0 || plotMatch) && docMatch;
-  });
+      return matchIssueNum && matchCertNum && matchOldCommune && matchNewCommune && matchOwner && matchUnblockDoc && plotMatch && docMatch;
+    });
+  }, [records, appliedFilters]);
 
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -648,7 +757,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                  </h4>
                  <div className="flex flex-col gap-1">
                      <label className="text-xs font-bold text-gray-600">Chủ sử dụng</label>
-                     <input type="text" placeholder="Tên chủ sử dụng..." value={searchFilters.owner} onChange={e => setSearchFilters({...searchFilters, owner: e.target.value})} className="border border-gray-200 rounded p-2 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-medium bg-white" />
+                     <input type="text" placeholder="Tên chủ sử dụng..." value={searchFilters.owner} onChange={e => setSearchFilters({...searchFilters, owner: e.target.value})} onKeyDown={e => { if (e.key === 'Enter') handleSearchSubmit(); }} className="border border-gray-200 rounded p-2 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-medium bg-white" />
                  </div>
                  <div className="flex flex-col gap-1">
                      <label className="text-xs font-bold text-gray-600">Số phát hành GCN</label>
@@ -950,7 +1059,7 @@ const BlockingRecordsView: React.FC<Props> = ({ currentUser }) => {
                           >
                             {isReadOnly ? <Eye size={16} /> : <Edit size={16} />}
                           </button>
-                          {!isReadOnly && (
+                          {currentUser?.role === 'ADMIN' && !isReadOnly && (
                             <button 
                               onClick={() => handleDelete(record.id)} 
                               className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 border border-transparent hover:border-red-100 rounded-sm transition-all"

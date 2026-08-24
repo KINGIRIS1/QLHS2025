@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Holiday } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, AlertTriangle } from 'lucide-react';
-import { calculateDeadlineHelper } from '../utils/appHelpers';
+import { calculateDeadlineHelper, generateNextRecordCode } from '../utils/appHelpers';
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -116,6 +116,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         cleanData.exportDate = null;
     }
 
+    if (initialData) {
+        cleanData._oldId = initialData.id;
+        cleanData._oldCode = initialData.code;
+        cleanData._oldRecordType = initialData.recordType;
+        cleanData._oldIsArchive = (initialData as any)._isArchive;
+        cleanData._oldArchiveType = (initialData as any)._archiveType;
+    }
+
     onSubmit(cleanData as any);
     onClose();
   };
@@ -123,11 +131,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleChange = (field: keyof RecordFile, value: any) => {
       setFormData(prev => {
         const newData = { ...prev, [field]: value };
-        if (field === 'recordType' || field === 'receivedDate') {
+        if (field === 'recordType' || field === 'receivedDate' || field === 'ward') {
             const rType = field === 'recordType' ? value : prev.recordType;
             const rDate = field === 'receivedDate' ? value : prev.receivedDate;
+            const rWard = field === 'ward' ? value : prev.ward;
             if (rType && rDate) {
                 newData.deadline = calculateDeadlineHelper(rType, rDate, holidays);
+                if (initialData && rType !== initialData.recordType) {
+                    const newCalculatedCode = generateNextRecordCode(rWard || 'Chơn Thành', rDate, [], [], rType);
+                    if (newCalculatedCode) {
+                        newData.code = newCalculatedCode;
+                    }
+                }
             }
         }
         return newData;

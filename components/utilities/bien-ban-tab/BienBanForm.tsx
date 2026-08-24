@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Settings2, CheckSquare, Square, Plus, Trash2, MoveHorizontal, Quote, LandPlot, ClipboardList, User as UserIcon, AlertTriangle, Users, Heart, MapPin, Settings } from 'lucide-react';
+import { User, Settings2, CheckSquare, Square, Plus, Trash2, MoveHorizontal, Quote, LandPlot, ClipboardList, User as UserIcon, AlertTriangle, Users, Heart, MapPin, Settings, FileText, Sparkles, Check, Hash, ArrowRight, Layers, RefreshCw } from 'lucide-react';
+import { BoundaryLineItem, DEFAULT_BOUNDARY_LINES, BOUNDARY_TYPE_OPTIONS } from '../SoanBienBanTab';
 
 interface BoundaryChange {
   id: string;
@@ -227,6 +228,91 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
         onResetFile();
     };
 
+    // --- LOGIC CHO BẢN MÔ TẢ MỐC GIỚI ---
+    const moTaLines: BoundaryLineItem[] = formData.MO_TA_LINES && formData.MO_TA_LINES.length > 0 
+        ? formData.MO_TA_LINES 
+        : DEFAULT_BOUNDARY_LINES;
+
+    const addMoTaLine = () => {
+        const nextFrom = moTaLines.length > 0 ? (parseInt(moTaLines[moTaLines.length - 1].toPoint, 10) || '') : '';
+        const nextTo = typeof nextFrom === 'number' ? nextFrom + 1 : '';
+        const newLine: BoundaryLineItem = {
+            id: Math.random().toString(36).substr(2, 9),
+            fromPoint: nextFrom ? `${nextFrom}` : '',
+            toPoint: nextTo ? `${nextTo}` : '',
+            boundaryType: formData.MO_TA_COMMON_TYPE || 'Cọc bê tông'
+        };
+        const updated = [...moTaLines, newLine];
+        setFormData((prev: any) => ({ ...prev, MO_TA_LINES: updated }));
+        onResetFile();
+    };
+
+    const removeMoTaLine = (id: string) => {
+        const updated = moTaLines.filter(line => line.id !== id);
+        setFormData((prev: any) => ({ ...prev, MO_TA_LINES: updated.length > 0 ? updated : DEFAULT_BOUNDARY_LINES }));
+        onResetFile();
+    };
+
+    const updateMoTaLine = (id: string, field: keyof BoundaryLineItem, value: any) => {
+        const updated = moTaLines.map(line => line.id === id ? { ...line, [field]: value } : line);
+        setFormData((prev: any) => ({ ...prev, MO_TA_LINES: updated }));
+        onResetFile();
+    };
+
+    const applyBulkBoundaryType = (type: string) => {
+        const updated = moTaLines.map(line => ({ ...line, boundaryType: type }));
+        setFormData((prev: any) => ({
+            ...prev,
+            MO_TA_COMMON_TYPE: type,
+            MO_TA_LINES: updated
+        }));
+        onResetFile();
+    };
+
+    const handleSetLineCount = (targetCount: number) => {
+        if (isNaN(targetCount) || targetCount < 1) return;
+        const count = Math.min(Math.max(1, targetCount), 50);
+        const currentLines = [...moTaLines];
+        if (count > currentLines.length) {
+            const added: BoundaryLineItem[] = [];
+            for (let i = currentLines.length; i < count; i++) {
+                const prevTo = (currentLines[i - 1] || added[added.length - 1])?.toPoint;
+                const fromP = prevTo && !isNaN(parseInt(prevTo, 10)) ? prevTo : `${i + 1}`;
+                const toP = `${parseInt(fromP, 10) ? parseInt(fromP, 10) + 1 : i + 2}`;
+                added.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    fromPoint: fromP,
+                    toPoint: toP,
+                    boundaryType: formData.MO_TA_COMMON_TYPE || 'Cọc bê tông'
+                });
+            }
+            const updated = [...currentLines, ...added];
+            setFormData((prev: any) => ({ ...prev, MO_TA_LINES: updated }));
+        } else if (count < currentLines.length) {
+            const updated = currentLines.slice(0, count);
+            setFormData((prev: any) => ({ ...prev, MO_TA_LINES: updated }));
+        }
+        onResetFile();
+    };
+
+    const generatePresetBoundaryPoints = (numPoints: number) => {
+        if (isNaN(numPoints) || numPoints < 1) return;
+        const count = Math.min(Math.max(1, numPoints), 50);
+        const newLines: BoundaryLineItem[] = [];
+        for (let i = 1; i <= count; i++) {
+            const fromP = `${i}`;
+            const toP = i === count ? '1' : `${i + 1}`;
+            newLines.push({
+                id: Math.random().toString(36).substr(2, 9),
+                fromPoint: fromP,
+                toPoint: toP,
+                boundaryType: formData.MO_TA_COMMON_TYPE || 'Cọc bê tông'
+            });
+        }
+        setFormData((prev: any) => ({ ...prev, MO_TA_LINES: newLines }));
+        onResetFile();
+    };
+
     const renderGCNCauseInput = (isEmbedded: boolean) => (
         <div className={isEmbedded ? "mt-4 pt-4 border-t border-purple-100" : "space-y-3"}>
             {isEmbedded && (
@@ -251,6 +337,265 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
     return (
         <div className="w-[500px] bg-[#f8fafc] border-r border-slate-300 overflow-y-auto p-5 custom-scrollbar shadow-inner z-10">
             <div className="space-y-6 pb-32">
+            
+            {/* LỰA CHỌN LOẠI VĂN BẢN (BIÊN BẢN / BẢN MÔ TẢ) */}
+            <section className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm ring-1 ring-slate-100">
+                <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                    <span className="text-[12px] font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                        <Layers size={16} className="text-blue-600" /> Loại văn bản xuất ra
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${formData.DOC_TYPE === 'BAN_MO_TA' ? 'bg-teal-100 text-teal-800' : 'bg-blue-100 text-blue-800'}`}>
+                        {formData.DOC_TYPE === 'BAN_MO_TA' ? 'Bản mô tả' : 'Biên bản'}
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => handleChange('DOC_TYPE', 'BIEN_BAN')}
+                        className={`p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 ${
+                            formData.DOC_TYPE !== 'BAN_MO_TA'
+                                ? 'bg-blue-50/80 border-blue-500 shadow-sm'
+                                : 'bg-white border-slate-200 hover:border-slate-300 opacity-80'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5">
+                                <FileText size={16} className={formData.DOC_TYPE !== 'BAN_MO_TA' ? "text-blue-600" : "text-slate-400"} />
+                                Biên bản
+                            </span>
+                            {formData.DOC_TYPE !== 'BAN_MO_TA' && <Check size={16} className="text-blue-600 stroke-[3]" />}
+                        </div>
+                        <span className="text-[11px] text-slate-500 leading-tight">
+                            Quốc hiệu, Thành phần A, Nội dung xác minh
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleChange('DOC_TYPE', 'BAN_MO_TA')}
+                        className={`p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 ${
+                            formData.DOC_TYPE === 'BAN_MO_TA'
+                                ? 'bg-teal-50/80 border-teal-500 shadow-sm'
+                                : 'bg-white border-slate-200 hover:border-slate-300 opacity-80'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5">
+                                <ClipboardList size={16} className={formData.DOC_TYPE === 'BAN_MO_TA' ? "text-teal-600" : "text-slate-400"} />
+                                Bản mô tả
+                            </span>
+                            {formData.DOC_TYPE === 'BAN_MO_TA' && <Check size={16} className="text-teal-600 stroke-[3]" />}
+                        </div>
+                        <span className="text-[11px] text-slate-500 leading-tight">
+                            Mô tả mốc ranh, Bảng ký giáp ranh N dòng
+                        </span>
+                    </button>
+                </div>
+            </section>
+
+            {/* CẤU HÌNH DÀNH RIÊNG CHO BẢN MÔ TẢ MỐC GIỚI */}
+            {formData.DOC_TYPE === 'BAN_MO_TA' && (
+                <section className="bg-white p-5 rounded-2xl border-2 border-teal-400 shadow-md ring-2 ring-teal-100 animate-fade-in">
+                    <div className="flex justify-between items-center mb-4 border-b border-teal-100 pb-2.5">
+                        <h3 className="text-[13px] font-black text-teal-800 uppercase tracking-widest flex items-center gap-2">
+                            <ClipboardList size={18} className="text-teal-600" /> Cấu hình Bản mô tả mốc giới
+                        </h3>
+                    </div>
+
+                    {/* 1. ÁP DỤNG LOẠI MỐC CHUNG CHO TOÀN BỘ CÁC HÀNG */}
+                    <div className="mb-5 bg-teal-50/70 p-3.5 rounded-xl border border-teal-200">
+                        <label className="text-[11px] font-black text-teal-900 uppercase block mb-1.5 flex items-center gap-1.5">
+                            <Sparkles size={14} className="text-teal-600" /> 1. Loại cọc / mốc chung:
+                        </label>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                                <select 
+                                    className="flex-1 border border-teal-300 rounded-lg px-2.5 py-1.5 text-[13px] font-bold bg-white text-teal-950 outline-none focus:ring-2 focus:ring-teal-500"
+                                    value={BOUNDARY_TYPE_OPTIONS.includes(formData.MO_TA_COMMON_TYPE) ? formData.MO_TA_COMMON_TYPE : 'Tự nhập khác'}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val !== 'Tự nhập khác') {
+                                            applyBulkBoundaryType(val);
+                                        }
+                                    }}
+                                >
+                                    {BOUNDARY_TYPE_OPTIONS.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => applyBulkBoundaryType(formData.MO_TA_COMMON_TYPE || 'Cọc bê tông')}
+                                    className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm shrink-0 flex items-center gap-1"
+                                    title="Áp dụng loại mốc này cho toàn bộ các dòng hiện có"
+                                >
+                                    <RefreshCw size={12} /> Áp dụng hết
+                                </button>
+                            </div>
+
+                            {/* Ô nhập tùy chỉnh nếu người dùng muốn gõ loại mốc riêng */}
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Hoặc tự nhập loại cọc/mốc khác..."
+                                    className="w-full border border-teal-200 rounded-lg px-2.5 py-1 text-[12px] bg-white outline-none focus:border-teal-500 text-slate-800"
+                                    value={formData.MO_TA_COMMON_TYPE || ''}
+                                    onChange={(e) => handleChange('MO_TA_COMMON_TYPE', e.target.value)}
+                                />
+                            </div>
+
+                            {/* Nút bấm nhanh các loại mốc phổ biến */}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                                {["Cọc bê tông", "Cọc gỗ", "Cọc sắt", "Tường gạch", "Bờ đất", "Rãnh nước"].map(tag => (
+                                    <button
+                                        key={tag}
+                                        type="button"
+                                        onClick={() => applyBulkBoundaryType(tag)}
+                                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition-all border ${
+                                            formData.MO_TA_COMMON_TYPE === tag
+                                                ? 'bg-teal-700 text-white border-teal-700'
+                                                : 'bg-white text-teal-800 border-teal-200 hover:bg-teal-100'
+                                        }`}
+                                    >
+                                        {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. DANH SÁCH CÁC CẶP ĐIỂM RANH GIỚI VÀ LOẠI CỌC TỪNG DÒNG */}
+                    <div className="mb-5">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-[11px] font-black text-slate-700 uppercase flex items-center gap-1">
+                                <ArrowRight size={14} className="text-teal-600" /> 2. Chi tiết từng đoạn ranh giới:
+                            </label>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-slate-500 font-bold uppercase">Số dòng:</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    className="w-13 border border-teal-400 rounded-lg px-2 py-0.5 text-center text-[12px] font-black text-teal-800 bg-white outline-none focus:ring-1 focus:ring-teal-500"
+                                    value={moTaLines.length}
+                                    onChange={(e) => handleSetLineCount(parseInt(e.target.value, 10))}
+                                    title="Nhập số dòng ranh giới mong muốn"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={addMoTaLine}
+                                    className="text-[11px] font-black bg-teal-600 hover:bg-teal-700 text-white px-2.5 py-0.5 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
+                                    title="Thêm 1 dòng ranh giới mới"
+                                >
+                                    <Plus size={12} /> Thêm
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Nút hỗ trợ đánh số chu trình khép kín 1->N->1 theo số dòng */}
+                        <div className="flex items-center justify-between bg-slate-100/80 px-2.5 py-1.5 rounded-lg mb-2 text-[11px]">
+                            <span className="text-slate-600 font-medium">Đang có <b className="text-teal-800">{moTaLines.length}</b> dòng mốc</span>
+                            <button
+                                type="button"
+                                onClick={() => generatePresetBoundaryPoints(moTaLines.length)}
+                                className="text-[10px] bg-white border border-slate-300 hover:border-teal-400 text-teal-800 px-2 py-0.5 rounded font-bold transition-all shadow-2xs flex items-center gap-1"
+                                title="Tự động điền số điểm khép kín từ 1 đến N (1-2, 2-3, ... N-1)"
+                            >
+                                <Sparkles size={11} className="text-teal-600" /> Tự đánh số khép kín (1 ➔ {moTaLines.length} ➔ 1)
+                            </button>
+                        </div>
+
+                        <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                            {moTaLines.map((line, idx) => (
+                                <div key={line.id} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl relative group hover:border-teal-300 transition-colors">
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <div className="flex items-center gap-1 text-[12px] font-bold text-slate-700">
+                                            <span className="w-5 h-5 bg-teal-100 text-teal-800 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">
+                                                {idx + 1}
+                                            </span>
+                                            <span>Từ điểm</span>
+                                            <input 
+                                                type="text" 
+                                                className="w-12 border border-slate-300 focus:border-teal-500 rounded px-1.5 py-0.5 text-center font-black text-teal-800 bg-white outline-none text-[12px]" 
+                                                placeholder="...." 
+                                                value={line.fromPoint} 
+                                                onChange={e => updateMoTaLine(line.id, 'fromPoint', e.target.value)} 
+                                            />
+                                            <span>đến</span>
+                                            <input 
+                                                type="text" 
+                                                className="w-12 border border-slate-300 focus:border-teal-500 rounded px-1.5 py-0.5 text-center font-black text-teal-800 bg-white outline-none text-[12px]" 
+                                                placeholder="....." 
+                                                value={line.toPoint} 
+                                                onChange={e => updateMoTaLine(line.id, 'toPoint', e.target.value)} 
+                                            />
+                                        </div>
+
+                                        <button 
+                                            type="button"
+                                            onClick={() => removeMoTaLine(line.id)} 
+                                            className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors"
+                                            title="Xóa dòng này"
+                                        >
+                                            <Trash2 size={13}/>
+                                        </button>
+                                    </div>
+
+                                    {/* Loại mốc cho dòng này */}
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] text-slate-500 shrink-0">Ranh theo:</span>
+                                        <input
+                                            type="text"
+                                            className="w-full border border-slate-300 focus:border-teal-500 rounded px-2 py-0.5 text-[12px] bg-white outline-none text-slate-800 font-medium"
+                                            placeholder="Nhập hoặc chọn cọc bê tông, cọc sắt..."
+                                            value={line.boundaryType}
+                                            onChange={e => updateMoTaLine(line.id, 'boundaryType', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 3. BẢNG KÝ XÁC NHẬN GIÁP RANH (TÙY CHỌN SỐ HÀNG KÝ) */}
+                    <div className="pt-3 border-t border-teal-100">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <label className="text-[11px] font-black text-slate-800 uppercase block">
+                                    3. Số hàng bảng ký giáp ranh:
+                                </label>
+                                <span className="text-[10px] text-slate-500">Người sử dụng đất liền kề ký tên</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                {[3, 5, 7, 10].map(cnt => (
+                                    <button
+                                        key={cnt}
+                                        type="button"
+                                        onClick={() => handleChange('MO_TA_SIGN_ROWS', cnt)}
+                                        className={`px-2.5 py-1 text-[11px] font-black rounded-lg transition-all border ${
+                                            parseInt(formData.MO_TA_SIGN_ROWS, 10) === cnt
+                                                ? 'bg-teal-600 text-white border-teal-600'
+                                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {cnt} hàng
+                                    </button>
+                                ))}
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="30"
+                                    className="w-14 border border-teal-300 rounded-lg px-2 py-1 text-center text-[12px] font-black text-teal-800 bg-white outline-none"
+                                    value={formData.MO_TA_SIGN_ROWS || 7}
+                                    onChange={e => handleChange('MO_TA_SIGN_ROWS', e.target.value)}
+                                    title="Nhập số hàng ký tùy chọn"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
             
             {/* PHẦN TÍCH CHỌN CẤU HÌNH */}
             <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm ring-1 ring-slate-100">
@@ -294,10 +639,12 @@ const BienBanForm: React.FC<BienBanFormProps> = ({
                         <div className={`p-1 rounded-lg ${formData.HIEN_THI_Y_KIEN_GIAP_RANH ? 'bg-blue-600 text-white' : 'text-slate-300 group-hover:text-slate-400'}`}>{formData.HIEN_THI_Y_KIEN_GIAP_RANH ? <CheckSquare size={24} /> : <Square size={24} />}</div>
                     </button>
 
-                    <button onClick={() => handleChange('HIEN_THI_CAU_LUU_Y', !formData.HIEN_THI_CAU_LUU_Y)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-200 group ${formData.HIEN_THI_CAU_LUU_Y ? 'bg-amber-50 border-amber-500 shadow-amber-100 shadow-lg' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
-                        <div className="flex flex-col items-start"><span className={`text-[13px] font-black uppercase ${formData.HIEN_THI_CAU_LUU_Y ? 'text-amber-900' : 'text-slate-600'}`}>Lưu ý trong Sơ họa</span><span className="text-[11px] text-slate-400 font-medium">Hiện văn bản lưu ý bên trong khung vẽ</span></div>
-                        <div className={`p-1 rounded-lg ${formData.HIEN_THI_CAU_LUU_Y ? 'bg-amber-600 text-white' : 'text-slate-300 group-hover:text-slate-400'}`}>{formData.HIEN_THI_CAU_LUU_Y ? <CheckSquare size={24} /> : <Square size={24} />}</div>
-                    </button>
+                    {formData.DOC_TYPE !== 'BAN_MO_TA' && (
+                        <button onClick={() => handleChange('HIEN_THI_CAU_LUU_Y', !formData.HIEN_THI_CAU_LUU_Y)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-200 group ${formData.HIEN_THI_CAU_LUU_Y ? 'bg-amber-50 border-amber-500 shadow-amber-100 shadow-lg' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
+                            <div className="flex flex-col items-start"><span className={`text-[13px] font-black uppercase ${formData.HIEN_THI_CAU_LUU_Y ? 'text-amber-900' : 'text-slate-600'}`}>Lưu ý trong Sơ họa</span><span className="text-[11px] text-slate-400 font-medium">Hiện văn bản lưu ý bên trong khung vẽ</span></div>
+                            <div className={`p-1 rounded-lg ${formData.HIEN_THI_CAU_LUU_Y ? 'bg-amber-600 text-white' : 'text-slate-300 group-hover:text-slate-400'}`}>{formData.HIEN_THI_CAU_LUU_Y ? <CheckSquare size={24} /> : <Square size={24} />}</div>
+                        </button>
+                    )}
 
                     <button onClick={() => handleChange('HIEN_THI_BIEN_DONG_BDDC', !formData.HIEN_THI_BIEN_DONG_BDDC)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-200 group ${formData.HIEN_THI_BIEN_DONG_BDDC ? 'bg-rose-50 border-rose-500 shadow-rose-100 shadow-lg' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
                         <div className="flex flex-col items-start"><span className={`text-[13px] font-black uppercase ${formData.HIEN_THI_BIEN_DONG_BDDC ? 'text-rose-800' : 'text-slate-600'}`}>Biến động bản đồ địa chính</span><span className="text-[11px] text-slate-400 font-medium">Thêm mục biến động, nguyên nhân BĐĐC</span></div>

@@ -31,13 +31,17 @@ import WelcomeModal from './components/WelcomeModal';
 import PrioritySignedModalAlert from './components/PrioritySignedModalAlert';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { offlineDb } from './utils/offlineDb';
-import { useThemeEngine } from './hooks/useThemeEngine';
-import { ThemeCanvasEffects } from './components/ThemeCanvasEffects';
 
 function App() {
   const isMobile = useIsMobile(768);
-  const { currentActiveTheme } = useThemeEngine();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+      try {
+          const stored = localStorage.getItem('currentUser');
+          return stored ? JSON.parse(stored) : null;
+      } catch (e) {
+          return null;
+      }
+  });
   const [currentView, setCurrentView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -182,47 +186,71 @@ function App() {
               let fromActive = 0;
               const limit = 1000;
               let hasMoreActive = true;
-              while (hasMoreActive) {
-                  const { data, error } = await supabase
-                      .from('blocking_records')
-                      .select('*')
-                      .range(fromActive, fromActive + limit - 1);
-                  if (error) throw error;
-                  if (data && data.length > 0) {
-                      activeData = [...activeData, ...data];
-                      if (data.length < limit) {
-                          hasMoreActive = false;
-                      } else {
-                          fromActive += limit;
+              try {
+                  while (hasMoreActive) {
+                      const { data, error } = await supabase
+                          .from('blocking_records')
+                          .select('*')
+                          .range(fromActive, fromActive + limit - 1);
+                      if (error) {
+                          if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
+                              console.warn('⚠️ Bảng blocking_records chưa được khởi tạo trong Database.');
+                              break;
+                          }
+                          throw error;
                       }
-                  } else {
-                      hasMoreActive = false;
+                      if (data && data.length > 0) {
+                          activeData = [...activeData, ...data];
+                          if (data.length < limit) {
+                              hasMoreActive = false;
+                          } else {
+                              fromActive += limit;
+                          }
+                      } else {
+                          hasMoreActive = false;
+                      }
                   }
+                  if (activeData.length > 0) {
+                      await offlineDb.saveRecords('blocking_records', activeData);
+                  }
+              } catch (err) {
+                  console.warn('⚠️ Lỗi khi đồng bộ bảng blocking_records:', err);
               }
-              await offlineDb.saveRecords('blocking_records', activeData);
 
               // 2. Fetch archive blocking records theo trang
               let archiveData: any[] = [];
               let fromArchive = 0;
               let hasMoreArchive = true;
-              while (hasMoreArchive) {
-                  const { data, error } = await supabase
-                      .from('archive_blocking_records')
-                      .select('*')
-                      .range(fromArchive, fromArchive + limit - 1);
-                  if (error) throw error;
-                  if (data && data.length > 0) {
-                      archiveData = [...archiveData, ...data];
-                      if (data.length < limit) {
-                          hasMoreArchive = false;
-                      } else {
-                          fromArchive += limit;
+              try {
+                  while (hasMoreArchive) {
+                      const { data, error } = await supabase
+                          .from('archive_blocking_records')
+                          .select('*')
+                          .range(fromArchive, fromArchive + limit - 1);
+                      if (error) {
+                          if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
+                              console.warn('⚠️ Bảng archive_blocking_records chưa được khởi tạo trong Database.');
+                              break;
+                          }
+                          throw error;
                       }
-                  } else {
-                      hasMoreArchive = false;
+                      if (data && data.length > 0) {
+                          archiveData = [...archiveData, ...data];
+                          if (data.length < limit) {
+                              hasMoreArchive = false;
+                          } else {
+                              fromArchive += limit;
+                          }
+                      } else {
+                          hasMoreArchive = false;
+                      }
                   }
+                  if (archiveData.length > 0) {
+                      await offlineDb.saveRecords('archive_blocking_records', archiveData);
+                  }
+              } catch (err) {
+                  console.warn('⚠️ Lỗi khi đồng bộ bảng archive_blocking_records:', err);
               }
-              await offlineDb.saveRecords('archive_blocking_records', archiveData);
 
               localStorage.setItem('last_blocking_records_sync_time', now.toString());
               console.log(`✅ Đã đồng bộ dữ liệu ngăn chặn từ Cloud vào bộ nhớ IndexedDB (${activeData.length} bản ghi active, ${archiveData.length} bản ghi archive).`);
@@ -352,6 +380,9 @@ function App() {
       }
       setUsers(prev => prev.map(u => u.username === currentUser.username ? savedUser : u));
       setCurrentUser(savedUser);
+      try {
+          localStorage.setItem('currentUser', JSON.stringify(savedUser));
+      } catch (e) {}
       loadData();
       return true;
   };
@@ -964,16 +995,57 @@ function App() {
 
   const handleConfirmSignBatch = async () => {
       if (!canPerformAction) return;
-      const pendingSign = recordFilterProps.filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
-      if (pendingSign.length === 0) { setToast({ type: 'error', message: "Không có hồ sơ nào đang chờ ký." }); return; }
-      if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ sang "Đã ký"?`)) {
+      let pendingSign = recordFilterProps.filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
+      if (selectedRecordIds.size > 0) {
+          pendingSign = pendingSign.filter(r => selectedRecordIds.has(r.id));
+      }
+      if (pendingSign.length === 0) {
+          setToast({ 
+              type: 'error', 
+              message: selectedRecordIds.size > 0 
+                  ? "Không có hồ sơ nào đang chờ ký trong số các hồ sơ được chọn." 
+                  : "Không có hồ sơ nào đang chờ ký." 
+          }); 
+          return; 
+      }
+      const confirmMsg = selectedRecordIds.size > 0 
+          ? `Xác nhận chuyển ${pendingSign.length} hồ sơ đã chọn sang "Đã ký"?`
+          : `Xác nhận chuyển tất cả ${pendingSign.length} hồ sơ sang "Đã ký"?`;
+
+      if (await confirmAction(confirmMsg)) {
           const todayStr = new Date().toISOString().split('T')[0];
           const updates = { status: RecordStatus.SIGNED, approvalDate: todayStr, completedDate: null };
           const updatedList = pendingSign.map(r => ({ ...r, ...updates }));
           setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, ...updates } : r));
           await Promise.all(updatedList.map(r => updateRecordApi(r)));
           updatedList.forEach(r => triggerPrioritySignedAlert(r, RecordStatus.SIGNED));
+          setSelectedRecordIds(new Set());
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
+      }
+  };
+
+  const handleWithdrawSelectedRecords = async () => {
+      if (selectedRecordIds.size === 0 || !currentUser) return;
+      const canWithdraw = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.RECEPTION_HANDOVER;
+      if (!canWithdraw) return;
+
+      if (await confirmAction(`Xác nhận rút ${selectedRecordIds.size} hồ sơ đã chọn sang trạng thái "CSD rút hồ sơ"?`)) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const targets = records.filter(r => selectedRecordIds.has(r.id));
+          const updatesToApply = targets.map(r => ({
+              ...r,
+              status: RecordStatus.WITHDRAWN,
+              completedDate: r.completedDate || todayStr,
+          }));
+
+          setRecords(prev => prev.map(r => {
+              const updated = updatesToApply.find(u => u.id === r.id);
+              return updated ? updated : r;
+          }));
+
+          await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã chuyển ${updatesToApply.length} hồ sơ sang trạng thái "CSD rút hồ sơ".` });
       }
   };
 
@@ -984,6 +1056,9 @@ function App() {
 
   const handleLogin = (user: User) => {
       setCurrentUser(user);
+      try {
+          localStorage.setItem('currentUser', JSON.stringify(user));
+      } catch (e) {}
       setWelcomeUser(user);
       setIsWelcomeModalOpen(true);
       logUserActivity({
@@ -1003,6 +1078,12 @@ function App() {
       } else {
           setCurrentView('dashboard');
       }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
   };
 
   if (!currentUser) {
@@ -1038,7 +1119,7 @@ function App() {
           currentUser={currentUser}
           currentView={currentView}
           setCurrentView={setCurrentView}
-          onLogout={() => setCurrentUser(null)}
+          onLogout={handleLogout}
           unreadMessages={unreadMessages}
           activeRemindersCount={activeRemindersCount}
           currentDepartment={currentDepartment}
@@ -1063,7 +1144,7 @@ function App() {
           notificationEnabled={notificationEnabled}
           setNotificationEnabled={setNotificationEnabled}
           setUnreadMessages={setUnreadMessages}
-          onLogout={() => setCurrentUser(null)}
+          onLogout={handleLogout}
           onAddUser={(u) => { saveUserApi(u, false).then(res => { if(res) { setUsers(prev => [...prev, res]); loadData(); } }); }}
           onUpdateUser={(u) => handleUpdateUser(u, true)}
           onDeleteUser={handleDeleteUser}
@@ -1132,6 +1213,8 @@ function App() {
             onClose={() => setIsWelcomeModalOpen(false)}
             user={welcomeUser || currentUser}
             employees={employees}
+            records={records}
+            onSelectRecord={(r) => setViewingRecord(r)}
         />
       </MobileLayout>
       </>
@@ -1144,7 +1227,7 @@ function App() {
         currentDepartment={currentDepartment}
         currentView={currentView}
         setCurrentView={setCurrentView}
-        onLogout={() => setCurrentUser(null)}
+        onLogout={handleLogout}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         isGeneratingReport={isGeneratingReport}
@@ -1216,6 +1299,7 @@ function App() {
             setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
             handleExportReturnedList={handleExportReturnedList}
             handleConfirmSignBatch={handleConfirmSignBatch}
+            handleWithdrawSelectedRecords={handleWithdrawSelectedRecords}
             setAssignTargetRecords={setAssignTargetRecords}
             setIsAssignModalOpen={setIsAssignModalOpen}
             setExportModalType={setExportModalType}
@@ -1315,14 +1399,11 @@ function App() {
             onClose={() => setIsWelcomeModalOpen(false)}
             user={welcomeUser || currentUser}
             employees={employees}
+            records={records}
+            onSelectRecord={(r) => setViewingRecord(r)}
         />
 
         <PrioritySignedModalAlert records={records} />
-
-        <ThemeCanvasEffects 
-            effectType={currentActiveTheme.effect.type} 
-            intensity={currentActiveTheme.effect.intensity} 
-        />
     </MainLayout>
   );
 }

@@ -131,12 +131,12 @@ export const fetchHolidays = async (): Promise<Holiday[]> => {
         const { data, error } = await supabase.from('holidays').select('*');
         if (error) throw error;
         
-        const mapped = data.map((h: any) => ({
-            id: h.id,
-            name: h.name,
-            day: h.day,
-            month: h.month,
-            isLunar: h.is_lunar // Map từ snake_case (DB) sang camelCase (App)
+        const mapped: Holiday[] = (data || []).map((h: any) => ({
+            id: String(h.id),
+            name: h.name || '',
+            day: Number(h.day) || 1,
+            month: Number(h.month) || 1,
+            isLunar: Boolean(h.isLunar !== undefined ? h.isLunar : (h.is_lunar !== undefined ? h.is_lunar : false))
         }));
         saveToCache(CACHE_KEYS.HOLIDAYS, mapped);
         return mapped;
@@ -147,28 +147,91 @@ export const fetchHolidays = async (): Promise<Holiday[]> => {
 };
 
 export const saveHolidays = async (holidays: Holiday[]): Promise<boolean> => {
-    if (!isConfigured) return true;
+    // Luôn lưu ngay vào cache và localStorage để thiết bị hiện tại & chế độ offline nhận dữ liệu mới tức thì
+    saveToCache(CACHE_KEYS.HOLIDAYS, holidays);
+
+    if (!isConfigured) {
+        window.dispatchEvent(new CustomEvent('holidays_realtime_update', { detail: holidays }));
+        return true;
+    }
+
     try {
-        // Xóa hết dữ liệu cũ trước khi insert mới
-        // Lưu ý: Cần chắc chắn bảng holidays có ít nhất 1 dòng dummy với id='0' nếu dùng .neq('id', '0')
-        // Hoặc xóa toàn bộ nếu không có dòng nào cần giữ. Ở đây ta xóa hết để sync chính xác.
-        await supabase.from('holidays').delete().neq('id', 'dummy_id_prevent_error'); 
+        // Xóa hết dữ liệu cũ trước khi insert mới để sync chính xác
+        await supabase.from('holidays').delete().neq('id', 'dummy_id_never_match_xyz'); 
         
-        const dbHolidays = holidays.map(h => ({
-            id: h.id,
-            name: h.name,
-            day: h.day,
-            month: h.month,
-            is_lunar: h.isLunar // Map từ camelCase (App) sang snake_case (DB)
-        }));
-        
-        const { error } = await supabase.from('holidays').insert(dbHolidays);
-        if (error) throw error;
+        if (holidays.length > 0) {
+            // Chuẩn bị dữ liệu insert hỗ trợ cả schema 'isLunar' và 'is_lunar'
+            const holidaysData = holidays.map(h => ({
+                id: String(h.id || (Date.now() + '_' + Math.random().toString(36).substring(2, 7))),
+                name: h.name || '',
+                day: Number(h.day) || 1,
+                month: Number(h.month) || 1,
+                isLunar: Boolean(h.isLunar)
+            }));
+            
+            let { error: insertError } = await supabase.from('holidays').insert(holidaysData);
+            
+            // Fallback nếu schema trong DB dùng snake_case 'is_lunar'
+            if (insertError) {
+                console.warn("Thử lại insert holidays với is_lunar (snake_case):", insertError);
+                const snakeHolidaysData = holidays.map(h => ({
+                    id: String(h.id || (Date.now() + '_' + Math.random().toString(36).substring(2, 7))),
+                    name: h.name || '',
+                    day: Number(h.day) || 1,
+                    month: Number(h.month) || 1,
+                    is_lunar: Boolean(h.isLunar)
+                }));
+                const retryRes = await supabase.from('holidays').insert(snakeHolidaysData);
+                if (retryRes.error) throw retryRes.error;
+            }
+        }
+
+        // Phát tín hiệu Broadcast cho toàn bộ bản EXE và Web đang chạy của các cán bộ khác
+        try {
+            const channel = supabase.channel('system_broadcast');
+            await channel.send({
+                type: 'broadcast',
+                event: 'holidays_updated',
+                payload: { holidays, timestamp: Date.now() }
+            });
+        } catch (bErr) {
+            console.warn("Không thể gửi realtime broadcast ngày nghỉ lễ:", bErr);
+        }
+
+        // Phát event cập nhật cục bộ cho máy này
+        window.dispatchEvent(new CustomEvent('holidays_realtime_update', { detail: holidays }));
         return true;
     } catch (error) {
         logError("saveHolidays", error);
         return false;
     }
+};
+
+export const initRealtimeHolidays = () => {
+    if (!isConfigured) return;
+
+    // 1. Lắng nghe thay đổi trực tiếp từ bảng holidays (postgres_changes)
+    supabase.channel('public:holidays')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'holidays' }, async () => {
+            console.log("[REALTIME] Phát hiện thay đổi ngày nghỉ lễ từ Cloud, đang đồng bộ...");
+            const freshHolidays = await fetchHolidays();
+            window.dispatchEvent(new CustomEvent('holidays_realtime_update', { detail: freshHolidays }));
+        })
+        .subscribe();
+
+    // 2. Lắng nghe qua kênh broadcast (dành cho client EXE / Web tức thì)
+    supabase.channel('system_broadcast')
+        .on('broadcast', { event: 'holidays_updated' }, async (event: any) => {
+            console.log("[BROADCAST] Nhận thông báo cập nhật ngày nghỉ lễ, đang nạp lại...", event);
+            if (event?.payload?.holidays && Array.isArray(event.payload.holidays)) {
+                saveToCache(CACHE_KEYS.HOLIDAYS, event.payload.holidays);
+                window.dispatchEvent(new CustomEvent('holidays_realtime_update', { detail: event.payload.holidays }));
+            } else {
+                const freshHolidays = await fetchHolidays();
+                window.dispatchEvent(new CustomEvent('holidays_realtime_update', { detail: freshHolidays }));
+            }
+        })
+        .subscribe();
 };
 
 export const deleteAllDataApi = async (): Promise<boolean> => {
@@ -320,4 +383,147 @@ export const getContactInfo = (settings: ContactSettings, ward: string, type: st
     
     return "";
 };
+
+// ==========================================
+// CẤU HÌNH NGƯỜI KÝ HỢP ĐỒNG BÊN B THEO XÃ/PHƯỜNG
+// ==========================================
+
+export interface WardSignerConfig {
+  id: string;
+  wardName: string;      // Tên hoặc từ khóa xã/phường (VD: "Phường Minh Hưng", "Xã Nha Bích", "Phường Chơn Thành")
+  signerName: string;    // Họ và tên người ký (VD: "TRỊNH QUANG HƯNG")
+  signerPosition: string;// Chức vụ người ký (VD: "PHÓ GIÁM ĐỐC")
+}
+
+export interface ContractSignerSettings {
+  defaultSignerName: string;     // VD: "PHẠM VĂN NAM"
+  defaultSignerPosition: string; // VD: "PHÓ GIÁM ĐỐC"
+  wardSigners: WardSignerConfig[];
+}
+
+export const DEFAULT_CONTRACT_SIGNER_SETTINGS: ContractSignerSettings = {
+  defaultSignerName: "PHẠM VĂN NAM",
+  defaultSignerPosition: "PHÓ GIÁM ĐỐC",
+  wardSigners: [
+    {
+      id: "1",
+      wardName: "Phường Minh Hưng",
+      signerName: "TRỊNH QUANG HƯNG",
+      signerPosition: "PHÓ GIÁM ĐỐC"
+    },
+    {
+      id: "2",
+      wardName: "Xã Nha Bích",
+      signerName: "LƯƠNG NGỌC DINH",
+      signerPosition: "GIÁM ĐỐC"
+    },
+    {
+      id: "3",
+      wardName: "Phường Chơn Thành",
+      signerName: "PHẠM VĂN NAM",
+      signerPosition: "PHÓ GIÁM ĐỐC"
+    }
+  ]
+};
+
+let cachedContractSignerSettings: ContractSignerSettings | null = null;
+
+function normalizeString(s: string): string {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('contract_signer_settings_changed', (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail) {
+            try {
+                const parsed = typeof detail === 'string' ? JSON.parse(detail) : detail;
+                cachedContractSignerSettings = {
+                    ...DEFAULT_CONTRACT_SIGNER_SETTINGS,
+                    ...parsed
+                };
+                localStorage.setItem('contract_signer_settings_v1', typeof detail === 'string' ? detail : JSON.stringify(detail));
+                window.dispatchEvent(new CustomEvent('contract_signer_settings_cache_updated'));
+                console.log("[DEBUG] Realtime updated contract signer settings cache", cachedContractSignerSettings);
+            } catch (err) {
+                console.error("Error updating contract signer settings cache via realtime", err);
+            }
+        }
+    });
+}
+
+export const fetchContractSignerSettingsCached = async (): Promise<ContractSignerSettings> => {
+    if (cachedContractSignerSettings) return cachedContractSignerSettings;
+    const settings = await fetchContractSignerSettings();
+    cachedContractSignerSettings = settings;
+    return settings;
+};
+
+export const fetchContractSignerSettings = async (): Promise<ContractSignerSettings> => {
+    try {
+        const value = await getSystemSetting('contract_signer_settings_v1');
+        if (value) {
+            const parsed = JSON.parse(value);
+            return {
+                ...DEFAULT_CONTRACT_SIGNER_SETTINGS,
+                ...parsed
+            };
+        }
+    } catch (e) {
+        logError("fetchContractSignerSettings", e);
+    }
+    // Fallback to local storage
+    try {
+        const local = localStorage.getItem('contract_signer_settings_v1');
+        if (local) {
+            return {
+                ...DEFAULT_CONTRACT_SIGNER_SETTINGS,
+                ...JSON.parse(local)
+            };
+        }
+    } catch (_) {}
+    return DEFAULT_CONTRACT_SIGNER_SETTINGS;
+};
+
+export const saveContractSignerSettings = async (settings: ContractSignerSettings): Promise<boolean> => {
+    cachedContractSignerSettings = settings;
+    const value = JSON.stringify(settings);
+    try {
+        localStorage.setItem('contract_signer_settings_v1', value);
+    } catch (_) {}
+    
+    if (!isConfigured) return true;
+    return await saveSystemSetting('contract_signer_settings_v1', value);
+};
+
+export const getContractSignerInfo = (
+  settings: ContractSignerSettings,
+  ward: string
+): { name: string; position: string } => {
+    const defaultName = settings.defaultSignerName || DEFAULT_CONTRACT_SIGNER_SETTINGS.defaultSignerName;
+    const defaultPosition = settings.defaultSignerPosition || DEFAULT_CONTRACT_SIGNER_SETTINGS.defaultSignerPosition;
+
+    if (!ward) {
+        return { name: defaultName, position: defaultPosition };
+    }
+
+    const normWard = normalizeString(ward);
+    if (!normWard) return { name: defaultName, position: defaultPosition };
+
+    const wardList = settings.wardSigners || DEFAULT_CONTRACT_SIGNER_SETTINGS.wardSigners;
+    
+    for (const item of wardList) {
+        if (!item.wardName) continue;
+        const normItemWard = normalizeString(item.wardName);
+        if (normItemWard && (normWard.includes(normItemWard) || normItemWard.includes(normWard))) {
+            return {
+                name: item.signerName || defaultName,
+                position: item.signerPosition || defaultPosition
+            };
+        }
+    }
+
+    return { name: defaultName, position: defaultPosition };
+};
+
 

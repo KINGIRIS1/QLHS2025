@@ -119,43 +119,24 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-// --- 3. DYNAMIC IMPORT & RENDER APP ---
-// Dùng import() để đảm bảo App chỉ được tải SAU KHI các polyfill bên trên đã chạy xong
-const mountApp = async () => {
-  try {
-    const rootElement = document.getElementById('root');
-    if (!rootElement) throw new Error("Không tìm thấy phần tử root");
+// --- 3. RENDER APP ---
+import App from './App';
 
-    // Dynamic import App component
-    const { default: App } = await import('./App');
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
 
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(
-      <React.StrictMode>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </React.StrictMode>
-    );
-
-    // Ẩn loader khi render thành công
-    const loader = document.getElementById('initial-loader');
-    if (loader) {
-      setTimeout(() => {
-        loader.style.opacity = '0';
-        setTimeout(() => loader.remove(), 500);
-      }, 500);
-    }
-
-  } catch (err) {
-    console.error("Failed to mount application:", err);
-    document.body.innerHTML = `<div style="color:red; padding:40px; text-align:center; font-family:sans-serif;">
-      <h1>Critical Error</h1>
-      <p>Không thể khởi động ứng dụng.</p>
-      <pre>${err}</pre>
-    </div>`;
+  // Ẩn loader khi render
+  const loader = document.getElementById('initial-loader');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => loader.remove(), 300);
   }
-};
-
-// Khởi chạy
-mountApp();
+}

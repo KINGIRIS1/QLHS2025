@@ -231,7 +231,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             </div>
                                         </div>
                                         
-                                        {emp.managedWards.length > 0 && (
+                                        {Array.isArray(emp.managedWards) && emp.managedWards.length > 0 && (
                                             <div className="mt-3 pt-3 border-t border-gray-100">
                                                 <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Phụ trách:</p>
                                                 <div className="flex flex-wrap gap-1">

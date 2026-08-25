@@ -22,11 +22,12 @@ html, body, #root {
 
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: #040b17; /* Cyber Dark Blue */
+  background-color: #0f172a; /* Đặt nền tối mặc định để khớp với Login */
   color: #1e293b;
 }
 
 /* --- CUSTOM SCROLLBAR (GIỐNG ELECTRON APP) --- */
+/* Áp dụng cho toàn bộ các thành phần có scroll */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -37,28 +38,31 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #cbd5e1; /* slate-300 - Màu xám nhẹ */
   border-radius: 10px;
   transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #94a3b8; /* slate-400 - Đậm hơn khi hover */
 }
 
+/* Firefox scrollbar */
 * {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
 
+/* Class tiện ích để ẩn scrollbar nhưng vẫn cuộn được */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
+/* Class tiện ích cho scrollbar tùy chỉnh trong các vùng nội dung */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -83,10 +87,6 @@ body {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes scaleUp {
-  from { opacity: 0; transform: scale(0.92); }
-  to { opacity: 1; transform: scale(1); }
-}
 @keyframes wave {
   0% { transform: rotate(0.0deg) }
   10% { transform: rotate(14.0deg) }
@@ -103,33 +103,11 @@ body {
   to { transform: translateX(0); }
 }
 
-@keyframes cyberPathDraw {
-  0% {
-    stroke-dashoffset: 2000;
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 0.8;
-  }
-  100% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-}
-
-.map-path-northern, .map-path-central {
-  stroke-dasharray: 2000;
-  animation: cyberPathDraw 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out;
 }
 .animate-fade-in-up {
   animation: fadeInUp 0.5s ease-out;
-}
-.animate-scale-up {
-  animation: scaleUp 0.3s ease-out;
 }
 .animate-slide-in-right {
   animation: slideInFromRight 0.3s ease-out;
@@ -139,3 +117,63 @@ body {
   transform-origin: 70% 70%;
   display: inline-block;
 }
+
+/* Hiệu ứng Bản đồ Việt Nam & Tỉnh Đồng Nai */
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mapGlowPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4)) drop-shadow(0 0 20px rgba(59, 130, 246, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.8)) drop-shadow(0 0 35px rgba(59, 130, 246, 0.5));
+  }
+}
+
+@keyframes dongNaiPulse {
+  0% {
+    transform: scale(0.95);
+    filter: drop-shadow(0 0 5px #f59e0b) drop-shadow(0 0 12px #ef4444);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 15px #fbbf24) drop-shadow(0 0 30px #f59e0b) drop-shadow(0 0 45px #38bdf8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    filter: drop-shadow(0 0 5px #f59e0b) drop-shadow(0 0 12px #ef4444);
+    opacity: 0.8;
+  }
+}
+
+@keyframes rippleExpand {
+  0% {
+    r: 6;
+    opacity: 1;
+    stroke-width: 2.5;
+  }
+  100% {
+    r: 48;
+    opacity: 0;
+    stroke-width: 0.5;
+  }
+}
+
+.animate-dongnai-pulse {
+  animation: dongNaiPulse 2s infinite ease-in-out;
+  transform-origin: center;
+}
+
+.animate-map-glow {
+  animation: mapGlowPulse 4s infinite ease-in-out;
+}
+

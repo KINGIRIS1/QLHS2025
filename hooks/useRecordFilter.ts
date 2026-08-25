@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, getReceivingWard } from '../utils/appHelpers';
+import { OTHER_RECORD_TYPES } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -156,9 +157,9 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'check_list', 'handover_list', 'completed_work_list'].includes(currentView);
         
         if (isOtherView) {
-            result = result.filter(r => ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(r.recordType || ''));
+            result = result.filter(r => (OTHER_RECORD_TYPES as readonly string[]).includes(r.recordType || ''));
         } else if (isMeasurementView) {
-            result = result.filter(r => !['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(r.recordType || ''));
+            result = result.filter(r => !(OTHER_RECORD_TYPES as readonly string[]).includes(r.recordType || ''));
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)

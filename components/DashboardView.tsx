@@ -308,13 +308,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
 
         const events: ActivityItem[] = [];
 
-        records.forEach(r => {
+        records.forEach((r, idx) => {
             const code = r.code || 'Hồ sơ';
             const name = r.customerName || 'Chưa rõ tên';
+            const prefix = r.id ? `${r.id}-${idx}` : `rec-${idx}`;
 
             if (r.completedDate) {
                 events.push({
-                    id: `${r.id}-completed`,
+                    id: `${prefix}-completed`,
                     time: r.completedDate,
                     type: 'completed',
                     title: 'Đã trả kết quả',
@@ -324,7 +325,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             }
             if (r.approvalDate) {
                 events.push({
-                    id: `${r.id}-approved`,
+                    id: `${prefix}-approved`,
                     time: r.approvalDate,
                     type: 'approved',
                     title: 'Đã phê duyệt',
@@ -334,7 +335,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             }
             if (r.submissionDate) {
                 events.push({
-                    id: `${r.id}-submitted`,
+                    id: `${prefix}-submitted`,
                     time: r.submissionDate,
                     type: 'submitted',
                     title: 'Đã trình ký',
@@ -344,7 +345,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             }
             if (r.workCompletedDate) {
                 events.push({
-                    id: `${r.id}-work_completed`,
+                    id: `${prefix}-work_completed`,
                     time: r.workCompletedDate,
                     type: 'work_completed',
                     title: 'Đo đạc xong',
@@ -354,7 +355,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             }
             if (r.assignedDate) {
                 events.push({
-                    id: `${r.id}-assigned`,
+                    id: `${prefix}-assigned`,
                     time: r.assignedDate,
                     type: 'assigned',
                     title: 'Đã giao việc',
@@ -364,7 +365,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser }) =
             }
             if (r.receivedDate) {
                 events.push({
-                    id: `${r.id}-received`,
+                    id: `${prefix}-received`,
                     time: r.receivedDate,
                     type: 'received',
                     title: 'Đã tiếp nhận',

@@ -2,6 +2,23 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache } from './apiCore';
 
+// Helper sinh UUID v4 chuẩn chống lỗi not-null constraint trên DB
+const generateUUID = (): string => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+};
+
+const isValidUUID = (id: any): boolean => {
+    if (typeof id !== 'string') return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 // --- TYPES ---
 export interface ArchiveRecord {
     id: string;
@@ -276,11 +293,11 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             
             return data as ArchiveRecord;
         } else {
-            // Khi Insert: KHÔNG tự sinh ID bằng Math.random() vì DB dùng UUID.
-            // Để Supabase/Postgres tự sinh ID.
-            delete payload.id; 
+            // Khi Insert: Luôn đảm bảo có UUID hợp lệ để không bị lỗi not-null constraint nếu DB chưa set default gen_random_uuid
+            const recordId = (payload.id && isValidUUID(payload.id)) ? payload.id : generateUUID();
             
             const insertPayload: any = {
+                id: recordId,
                 type: payload.type,
                 status: payload.status,
                 so_hieu: payload.so_hieu,
@@ -423,7 +440,7 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
         if (warehouseRecords.length > 0) {
             const wPayloads = warehouseRecords.map(r => {
                 const mapped = mapToWarehousePayload(r);
-                delete mapped.id; // Để DB tự sinh UUID
+                mapped.id = (mapped.id && isValidUUID(mapped.id)) ? mapped.id : generateUUID();
                 return mapped;
             });
 
@@ -438,7 +455,7 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
             // Chuẩn hóa dữ liệu trước khi insert vào archive_records gốc
             const payload = normalRecords.map(r => {
                 const p: any = { ...r };
-                delete p.id; // Để DB tự sinh UUID
+                p.id = (p.id && isValidUUID(p.id)) ? p.id : generateUUID();
                 if (p.ngay_thang === '' || !p.ngay_thang) {
                     p.ngay_thang = null;
                 } else {

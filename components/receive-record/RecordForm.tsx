@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
 import { RECORD_TYPES } from '../../constants';
-import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, AlertTriangle } from 'lucide-react';
+import { resolveUniqueRecordCode, getWardShortCode } from '../../utils/codeGenerator';
+import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, AlertTriangle, RefreshCw, Building } from 'lucide-react';
 
 interface RecordFormProps {
   onSave: (record: RecordFile) => Promise<boolean>;
@@ -23,15 +24,25 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
+  const linkedEmp = employees.find(e => e.id === currentUser.employeeId);
+  const userReceivingWard = linkedEmp?.managedWards?.[0] || 'Chơn Thành';
+
   const [formData, setFormData] = useState<Partial<RecordFile>>({
     code: '', customerName: '', phoneNumber: '', cccd: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '',
-    receivedDate: new Date().toISOString().split('T')[0], deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0,
+    receivedDate: new Date().toISOString().split('T')[0], deadline: '', 
+    receivingWard: userReceivingWard,
+    ward: '', landPlot: '', mapSheet: '', area: 0,
     address: '', recordType: '', status: RecordStatus.RECEIVED, isPriority: false, priorityNote: ''
   });
 
+  const effectiveReceivingWard = formData.receivingWard || userReceivingWard;
+
   useEffect(() => {
       if (initialData) {
-          setFormData(initialData);
+          setFormData({
+              ...initialData,
+              receivingWard: initialData.receivingWard || userReceivingWard
+          });
           setNotification(null);
       } else {
           handleReset(false);
@@ -48,52 +59,65 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       }
   }, [notification]);
 
-  const linkedEmp = employees.find(e => e.id === currentUser.employeeId);
-  const processingWard = linkedEmp?.managedWards?.[0] || 'Chơn Thành';
-
   useEffect(() => {
     if (!initialData) {
-        const newCode = generateCode(processingWard, formData.receivedDate || '', [], formData.recordType || '');
-        if (formData.code !== newCode) {
-            setFormData(prev => ({ ...prev, code: newCode }));
+        const newCode = generateCode(effectiveReceivingWard, formData.receivedDate || '', [], formData.recordType || '');
+        if (newCode && formData.code !== newCode) {
+            setFormData(prev => ({ ...prev, code: newCode, receivingWard: effectiveReceivingWard }));
         }
     }
-  }, [processingWard, formData.receivedDate, formData.recordType, records, initialData]);
+  }, [effectiveReceivingWard, formData.receivedDate, formData.recordType, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
         const newData = { ...prev, [field]: value };
-        if (field === 'recordType' || field === 'receivedDate' || field === 'ward') {
+        if (field === 'recordType' || field === 'receivedDate' || field === 'receivingWard') {
             const rType = field === 'recordType' ? value : prev.recordType;
             const rDate = field === 'receivedDate' ? value : prev.receivedDate;
-            const rWard = field === 'ward' ? value : prev.ward;
+            const rReceivingWard = field === 'receivingWard' ? value : (prev.receivingWard || userReceivingWard);
             if (rType && rDate) {
                 newData.deadline = calculateDeadline(rType, rDate);
-                if (initialData) {
-                    if (rType !== initialData.recordType) {
-                        newData.code = generateCode(rWard || processingWard, rDate, [], rType);
-                    } else {
-                        newData.code = initialData.code;
-                    }
-                }
+            }
+            if (!initialData || (initialData && rType !== initialData.recordType) || field === 'receivingWard') {
+                newData.code = generateCode(rReceivingWard, rDate || '', [], rType || '');
             }
         }
         return newData;
     });
   };
 
+  const handleRefreshCode = () => {
+      const refreshed = generateCode(effectiveReceivingWard, formData.receivedDate || '', [], formData.recordType || '');
+      if (refreshed) {
+          setFormData(prev => ({ ...prev, code: refreshed }));
+      }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotification(null);
-    if (!formData.code || !formData.customerName || !formData.deadline || !formData.recordType) { 
+    if (!formData.customerName || !formData.deadline || !formData.recordType) { 
         setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
         return; 
     }
     setLoading(true);
     
+    // Tự động kiểm tra và đảm bảo mã chống trùng tuyệt đối theo Đơn vị tiếp nhận
+    const candidateCode = formData.code || generateCode(effectiveReceivingWard, formData.receivedDate || '', [], formData.recordType || '');
+    const finalCode = resolveUniqueRecordCode(
+        candidateCode,
+        effectiveReceivingWard,
+        formData.receivedDate || '',
+        formData.recordType || '',
+        records
+    );
+
     const isTypeChanged = Boolean(initialData && formData.recordType !== initialData.recordType);
     const recordToSave: RecordFile = { 
         ...formData, 
+        receivingWard: effectiveReceivingWard,
+        ward: formData.ward || effectiveReceivingWard,
+        code: finalCode,
         id: formData.id || initialData?.id || Math.random().toString(36).substr(2, 9), 
         status: isTypeChanged ? RecordStatus.RECEIVED : (formData.status || RecordStatus.RECEIVED),
         createdBy: formData.createdBy || currentUser.name,
@@ -107,8 +131,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
     if (isTypeChanged) {
         delete (recordToSave as any)._isArchive;
         delete (recordToSave as any)._archiveType;
-        // Tự động sinh mã mới đúng định dạng của loại hồ sơ đích
-        recordToSave.code = formData.code || generateCode(formData.ward || processingWard, formData.receivedDate || '', [], formData.recordType || '');
     }
 
     const success = await onSave(recordToSave);
@@ -127,7 +149,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   };
 
   const handleReset = (keepNotification = false) => {
-      setFormData({ code: '', customerName: '', phoneNumber: '', cccd: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '', receivedDate: new Date().toISOString().split('T')[0], deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0, address: '', recordType: '', status: RecordStatus.RECEIVED, isPriority: false, priorityNote: '' });
+      setFormData({ 
+          code: '', customerName: '', phoneNumber: '', cccd: '', authorizedBy: '', authDocType: '', otherDocs: '', 
+          content: '', receivedDate: new Date().toISOString().split('T')[0], deadline: '', 
+          receivingWard: userReceivingWard,
+          ward: '', landPlot: '', mapSheet: '', area: 0, 
+          address: '', recordType: '', status: RecordStatus.RECEIVED, isPriority: false, priorityNote: '' 
+      });
       if (!keepNotification) setNotification(null);
       if (onCancelEdit && initialData) onCancelEdit();
   };
@@ -175,11 +203,61 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
                     <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2"><span className="p-1.5 bg-purple-100 text-purple-600 rounded-lg"><Calendar size={16} /></span> Thời gian & Mã</h3>
                     <div className="space-y-4">
+                        {/* ĐƠN VỊ TIẾP NHẬN (PHI ĐỊA GIỚI) */}
+                        <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-100">
+                            <label className="flex items-center justify-between text-[11px] font-bold text-blue-900 uppercase tracking-wide mb-2">
+                                <span className="flex items-center gap-1.5"><Building size={14} className="text-blue-600" /> Đơn vị tiếp nhận (Nơi nhận HS)</span>
+                                <span className="font-mono bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[10px]">Mã: {getWardShortCode(effectiveReceivingWard)}</span>
+                            </label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {wards.map(w => {
+                                    const isSelected = effectiveReceivingWard.toLowerCase() === w.toLowerCase();
+                                    return (
+                                        <button
+                                            type="button"
+                                            key={w}
+                                            onClick={() => handleChange('receivingWard', w)}
+                                            className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-all text-center truncate ${
+                                                isSelected 
+                                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-100/50'
+                                            }`}
+                                        >
+                                            {w}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <span className="text-[10px] text-blue-700/80 mt-1.5 block">
+                                Căn cứ cán bộ nhận: <strong className="font-semibold text-blue-900">{userReceivingWard}</strong>
+                            </span>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="relative"><label className={labelClass}>Ngày nhận</label><Calendar size={16} className={iconWrapperClass} /><input type="date" required className={inputClass} value={formData.receivedDate || ''} onChange={(e) => handleChange('receivedDate', e.target.value)} /></div>
                             <div className="relative"><label className={`${labelClass} text-purple-600`}>Hẹn trả <span className="text-red-500">*</span></label><Clock size={16} className={`${iconWrapperClass} text-purple-400`} /><input type="date" required className={`${inputClass} bg-purple-50 border-purple-200 text-purple-700 font-bold`} value={formData.deadline || ''} onChange={(e) => handleChange('deadline', e.target.value)} /></div>
                         </div>
-                        <div className="relative"><label className={labelClass}>Mã hồ sơ</label><Hash size={16} className={iconWrapperClass} /><input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} /></div>
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-1.5 ml-1">
+                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Mã hồ sơ</label>
+                                <button
+                                    type="button"
+                                    onClick={handleRefreshCode}
+                                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline cursor-pointer"
+                                    title="Lấy số thứ tự mới nhất theo đơn vị tiếp nhận"
+                                >
+                                    <RefreshCw size={12} /> Cấp lại mã
+                                </button>
+                            </div>
+                            <Hash size={16} className="absolute left-3 top-[34px] text-slate-400 pointer-events-none" />
+                            <input 
+                                type="text" 
+                                readOnly={!initialData} 
+                                className={`${inputClass} font-mono font-bold text-blue-700 tracking-wide ${initialData ? 'bg-white border-blue-300' : 'bg-slate-50'}`} 
+                                value={formData.code || ''} 
+                                onChange={(e) => initialData && handleChange('code', e.target.value)} 
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -221,6 +299,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                     className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500" 
                                     checked={!!formData.isPriority} 
                                     onChange={(e) => handleChange('isPriority', e.target.checked)} 
+                                
                                 />
                                 <span className="flex items-center gap-1.5 text-amber-700">
                                     <AlertTriangle size={16} className="text-amber-500 fill-yellow-400" /> Hồ sơ cần chú ý / Báo cáo ngay khi ký
@@ -253,3 +332,4 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 };
 
 export default RecordForm;
+

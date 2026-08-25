@@ -1,9 +1,13 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, FileCheck2, ClipboardCheck } from 'lucide-react';
+import { 
+    BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, 
+    Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, 
+    Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, 
+    PieChart, CheckCircle, Ruler, FolderArchive, FileCheck2, ClipboardCheck, Search
+} from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { getNormalizedWard, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, showToast } from '../utils/appHelpers';
+import { getNormalizedWard, STATUS_LABELS, MEASUREMENT_RECORD_TYPES } from '../constants';
+import { isRecordOverdue, removeVietnameseTones, showToast } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
@@ -13,7 +17,7 @@ import LateRecordsView from './report/LateRecordsView';
 import QuantityReportView from './report/QuantityReportView';
 import ExecutionReportView from './report/ExecutionReportView';
 import HandoverComparisonView from './report/HandoverComparisonView';
-import AiReportCardView from './report/AiReportCardView';
+import { AiReportCardView } from './report/AiReportCardView';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
 import { WorkSchedule } from '../types';
 
@@ -28,30 +32,26 @@ interface ReportSectionProps {
     currentUser?: User;
 }
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser }) => {
+const ReportSection: React.FC<ReportSectionProps> = ({ 
+    reportContent, 
+    isGenerating, 
+    onGenerate, 
+    onExportExcel, 
+    records, 
+    wards, 
+    employees, 
+    currentUser 
+}) => {
     const isAdmin = currentUser?.role === UserRole.ADMIN;
     const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
     const isOneDoor = currentUser?.role === UserRole.ONEDOOR;
     const isReceptionHandover = currentUser?.role === UserRole.RECEPTION_HANDOVER;
 
-    // So sánh hạn trả 1 cửa chỉ mở cho Admin, Subadmin, Một cửa, Tiếp nhận bàn giao (ngoại trừ các user tổ đo đạc thông thường)
+    // So sánh hạn trả 1 cửa chỉ mở cho Admin, Subadmin, Một cửa, Tiếp nhận bàn giao
     const canViewHandoverControl = isAdmin || isSubadmin || isOneDoor || isReceptionHandover;
-    const [fromDate, setFromDate] = useState(() => {
-        const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    });
-    const [toDate, setToDate] = useState(() => {
-        return new Date().toISOString().split('T')[0];
-    });
-    
-    // State chọn xã phường
-    const [selectedWard, setSelectedWard] = useState<string>('all');
     
     // State chọn nhân viên (Lifting state up)
     const [selectedEmpId, setSelectedEmpId] = useState<string>('');
-
-    // Report Type State
-    const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
 
     const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'late_records' | 'quantity_report' | 'execution_report' | 'handover_control'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
@@ -59,11 +59,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
     const [apiKey, setApiKey] = useState('');
 
-    // Pagination States
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(20);
-
-    const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
     const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
 
     useEffect(() => {
@@ -184,72 +179,120 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         showToast("Đã lưu API Key thành công!", "success");
     };
 
-    // --- LOGIC TÍNH TOÁN DỮ LIỆU CHUNG (Theo ngày & xã) ---
-    const filteredData = useMemo(() => {
-        const start = new Date(fromDate); start.setHours(0,0,0,0);
-        const end = new Date(toDate); end.setHours(23,59,59,999);
+    // ==========================================
+    // --- INDEPENDENT FILTER STATE FOR TAB 1 (LIST VIEW) ---
+    // ==========================================
+    const [listDateMode, setListDateMode] = useState<'all' | 'week' | 'month' | 'custom'>('month');
+    const [listFromDate, setListFromDate] = useState<string>(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    });
+    const [listToDate, setListToDate] = useState<string>(() => {
+        return new Date().toISOString().split('T')[0];
+    });
+    const [listSelectedWard, setListSelectedWard] = useState<string>('all');
+    const [listRecordTypeFilter, setListRecordTypeFilter] = useState<string>('all');
+    const [listSearchQuery, setListSearchQuery] = useState<string>('');
+    const [listStatusFilter, setListStatusFilter] = useState<string>('all');
+
+    // Pagination for list tab
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+
+    const handleListQuickDate = (mode: 'week' | 'month' | 'all') => {
+        setListDateMode(mode);
+        const now = new Date();
+        if (mode === 'week') {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const start = new Date(now.setDate(diff));
+            setListFromDate(start.toISOString().split('T')[0]);
+            setListToDate(new Date().toISOString().split('T')[0]);
+        } else if (mode === 'month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            setListFromDate(start.toISOString().split('T')[0]);
+            setListToDate(new Date().toISOString().split('T')[0]);
+        }
+    };
+
+    const listFilteredData = useMemo(() => {
+        const start = new Date(listFromDate); start.setHours(0,0,0,0);
+        const end = new Date(listToDate); end.setHours(23,59,59,999);
 
         return activeRecords.filter(r => {
-            if (!r.receivedDate) return false;
-            const rDate = new Date(r.receivedDate);
-            const matchDate = rDate >= start && rDate <= end;
-            
-            let matchWard = true;
-            if (selectedWard !== 'all') {
-                const rWard = removeVietnameseTones(r.ward || '');
-                const sWard = removeVietnameseTones(selectedWard);
-                matchWard = rWard.includes(sWard);
+            if (listDateMode !== 'all') {
+                if (!r.receivedDate) return false;
+                const rDate = new Date(r.receivedDate);
+                if (rDate < start || rDate > end) return false;
             }
 
-            return matchDate && matchWard;
-        });
-    }, [activeRecords, fromDate, toDate, selectedWard]);
+            if (listSelectedWard !== 'all') {
+                const rWard = removeVietnameseTones(r.ward || '');
+                const sWard = removeVietnameseTones(listSelectedWard);
+                if (!rWard.includes(sWard)) return false;
+            }
 
-    // Reset pagination when data changes
+            if (listRecordTypeFilter !== 'all') {
+                if (r.recordType !== listRecordTypeFilter) return false;
+            }
+
+            if (listStatusFilter !== 'all') {
+                if (listStatusFilter === 'overdue') {
+                    if (!isRecordOverdue(r)) return false;
+                } else if (listStatusFilter === 'completed') {
+                    const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
+                    if (!isDone) return false;
+                } else if (listStatusFilter === 'processing') {
+                    const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
+                    if (isDone || r.status === RecordStatus.WITHDRAWN) return false;
+                } else if (r.status !== listStatusFilter) {
+                    return false;
+                }
+            }
+
+            if (listSearchQuery.trim()) {
+                const q = removeVietnameseTones(listSearchQuery.toLowerCase());
+                const matchCode = removeVietnameseTones(r.code || '').toLowerCase().includes(q);
+                const matchName = removeVietnameseTones(r.customerName || '').toLowerCase().includes(q);
+                const matchPlot = String(r.landPlot || '').includes(q);
+                const matchSheet = String(r.mapSheet || '').includes(q);
+                if (!matchCode && !matchName && !matchPlot && !matchSheet) return false;
+            }
+
+            return true;
+        });
+    }, [activeRecords, listDateMode, listFromDate, listToDate, listSelectedWard, listRecordTypeFilter, listStatusFilter, listSearchQuery]);
+
+    // Reset pagination when list data changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [filteredData]);
+    }, [listFilteredData]);
 
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
-        return filteredData.slice(start, start + itemsPerPage);
-    }, [filteredData, currentPage, itemsPerPage]);
+        return listFilteredData.slice(start, start + itemsPerPage);
+    }, [listFilteredData, currentPage, itemsPerPage]);
 
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(listFilteredData.length / itemsPerPage));
 
-    // --- STATS CHO CÁC TAB ---
-    // Updated: Hỗ trợ lọc theo nhân viên khi ở tab Employee
-    const generalStats = useMemo(() => {
-        let sourceData = filteredData;
-
-        // Nếu đang ở tab Thống kê theo ngày -> Lọc theo điều kiện của tab đó
-        if (activeTab === 'daily_stats') {
-            sourceData = dailyStatsRecords;
-        }
-        // Nếu đang ở tab Nhân viên và đã chọn nhân viên -> Lọc theo nhân viên đó
-        else if (activeTab === 'employee' && selectedEmpId) {
-            sourceData = filteredData.filter(r => r.assignedTo === selectedEmpId);
-        }
-
-        const total = sourceData.length;
-        // Tính cả SIGNED là completed để đồng bộ logic
-        const completed = sourceData.filter(r => 
+    // Stats for List Tab
+    const listStats = useMemo(() => {
+        const total = listFilteredData.length;
+        const completed = listFilteredData.filter(r => 
             r.status === RecordStatus.HANDOVER || 
             r.status === RecordStatus.RETURNED || 
             r.status === RecordStatus.SIGNED ||
-            !!r.exportBatch || !!r.exportDate // Đã xuất cũng tính là xong
+            !!r.exportBatch || !!r.exportDate
         ).length;
         
-        const withdrawn = sourceData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
+        const withdrawn = listFilteredData.filter(r => r.status === RecordStatus.WITHDRAWN).length;
         
-        // Logic overdue pending: Quá hạn và chưa xong (chưa xuất/chưa trả/chưa rút)
-        const overduePending = sourceData.filter(r => {
+        const overduePending = listFilteredData.filter(r => {
             if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || r.exportBatch) return false;
             return isRecordOverdue(r);
         }).length;
         
-        // Logic overdue completed: Đã xong nhưng bị trễ
-        const overdueCompleted = sourceData.filter(r => {
+        const overdueCompleted = listFilteredData.filter(r => {
             const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
             if (!isDone) return false;
             if (!r.deadline || !r.completedDate) return false;
@@ -260,39 +303,35 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
         const processing = total - completed - withdrawn;
         
-        return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
-    }, [filteredData, activeTab, selectedEmpId, dailyStatsRecords]);
+        const totalPlotCount = listFilteredData.reduce((sum, r) => {
+            const isNonPlotType = ['Sao lục', 'Công văn'].includes(r.recordType || '');
+            const defaultCount = isNonPlotType ? 0 : 1;
+            const count = r.plotCount !== undefined && r.plotCount !== null && String(r.plotCount).trim() !== ''
+                ? Number(r.plotCount)
+                : defaultCount;
+            return sum + (isNaN(count) ? defaultCount : count);
+        }, 0);
 
-    const totalPlotCount = useMemo(() => {
-        return filteredData.reduce((sum, r) => sum + (r.plotCount || 1), 0);
-    }, [filteredData]);
+        return { total, completed, withdrawn, overduePending, overdueCompleted, processing, totalPlotCount };
+    }, [listFilteredData]);
 
-    const handleQuickReport = (type: 'week' | 'month') => {
-        const now = new Date();
-        let start = new Date();
-        if (type === 'week') {
-            const day = now.getDay();
-            const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Thứ 2
-            start = new Date(now.setDate(diff));
-        } else {
-            start = new Date(now.getFullYear(), now.getMonth(), 1);
-        }
-        
-        const fromStr = start.toISOString().split('T')[0];
-        const toStr = new Date().toISOString().split('T')[0];
-        setFromDate(fromStr);
-        setToDate(toStr);
-        setReportType(type);
-        if (activeTab === 'employee' || activeTab === 'ward_stats') {
-            // Keep tab
-        } else {
-            setActiveTab('list');
-        }
+    const handleExportExcelClick = () => {
+        const from = listDateMode === 'all' ? '2000-01-01' : listFromDate;
+        const to = listDateMode === 'all' ? new Date().toISOString().split('T')[0] : listToDate;
+        onExportExcel(from, to, listSelectedWard);
     };
 
-    const handleGenerateClick = () => {
-        if (!fromDate || !toDate) { showToast("Vui lòng chọn đầy đủ thời gian.", "error"); return; }
-        
+    const handleGenerateClick = (
+        customFromDate?: string, 
+        customToDate?: string, 
+        customType?: string, 
+        customRecords?: RecordFile[]
+    ) => {
+        const genFrom = customFromDate || listFromDate;
+        const genTo = customToDate || listToDate;
+        const genType = customType || 'month';
+        const genRecords = customRecords || listFilteredData;
+
         const currentKey = getGeminiKey();
         if (!currentKey && !process.env.API_KEY) {
             setIsKeyModalOpen(true);
@@ -302,16 +341,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         setActiveTab('ai');
         
         let title = "BÁO CÁO TÌNH HÌNH TIẾP NHẬN VÀ GIẢI QUYẾT HỒ SƠ";
-        if (reportType === 'week') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC TUẦN";
-        if (reportType === 'month') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC THÁNG";
+        if (genType === 'week') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC TUẦN";
+        if (genType === 'month') title = "BÁO CÁO KẾT QUẢ CÔNG TÁC THÁNG";
 
-        // Pass filteredData to onGenerate
-        onGenerate(fromDate, toDate, title, filteredData);
-    };
-
-    const handleExportExcelClick = () => {
-        if (!fromDate || !toDate) { showToast("Vui lòng chọn đầy đủ thời gian.", "error"); return; }
-        onExportExcel(fromDate, toDate, selectedWard);
+        onGenerate(genFrom, genTo, title, genRecords);
     };
 
     const handlePrint = () => {
@@ -360,247 +393,317 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0">
                 <button 
                     onClick={() => setMainTab('measurement')}
-                    className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                    className={`px-5 py-2.5 text-xs md:text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                 >
-                    <Ruler size={18} /> Báo cáo Đo đạc
+                    <Ruler size={16} /> Báo cáo Đo đạc
                 </button>
                 <button 
                     onClick={() => setMainTab('archive')}
-                    className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                    className={`px-5 py-2.5 text-xs md:text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                 >
-                    <FolderArchive size={18} /> Báo cáo Lưu trữ
+                    <FolderArchive size={16} /> Báo cáo Lưu trữ
                 </button>
             </div>
 
-            {/* Toolbar */}
-            <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-xl ${mainTab === 'measurement' ? 'bg-blue-200 text-blue-700' : 'bg-orange-200 text-orange-700'}`}>
-                            <BarChart3 size={24} />
-                        </div>
-                        <div>
-                            <h2 className={`font-bold text-lg ${mainTab === 'measurement' ? 'text-blue-900' : 'text-orange-900'}`}>
-                                {mainTab === 'measurement' ? 'Thống kê Hồ sơ Đo đạc' : 'Thống kê Hồ sơ Lưu trữ'}
-                            </h2>
-                            <p className="text-xs text-gray-500">
-                                {mainTab === 'measurement' ? 'Dữ liệu từ Tổ đo đạc & Kỹ thuật' : 'Dữ liệu từ Tổ thông tin lưu trữ'}
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                        <button onClick={() => handleQuickReport('week')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
-                            <CalendarDays size={14} /> Tuần này
-                        </button>
-                        <button onClick={() => handleQuickReport('month')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
-                            <Layout size={14} /> Tháng này
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 ml-auto">
-                        {/* SELECT WARD */}
-                        <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-300 rounded-lg shadow-sm">
-                            <MapPin size={16} className="text-gray-500" />
-                            <select 
-                                value={selectedWard} 
-                                onChange={(e) => setSelectedWard(e.target.value)} 
-                                className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[150px]"
-                            >
-                                <option value="all">Toàn bộ địa bàn</option>
-                                {wards.map(w => (
-                                    <option key={w} value={w}>{w}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-sm">
-                            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setReportType('custom'); }} className="text-sm outline-none text-gray-700 font-medium" />
-                            <span className="text-gray-400">➜</span>
-                            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} className="text-sm outline-none text-gray-700 font-medium" />
-                        </div>
-                        
-                        <button onClick={handleExportExcelClick} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">
-                            <FileSpreadsheet size={18} /> Xuất Excel
-                        </button>
-                    </div>
-                </div>
-
-                {/* STATS CARDS: HIỂN THỊ LUÔN (Theo yêu cầu layout mới) */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-fade-in">
-                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-blue-200 p-2 rounded-lg text-blue-700"><ListFilter size={20}/></div>
-                        <div><div className="text-2xl font-bold text-blue-800">{generalStats.total}</div><div className="text-xs text-blue-600 uppercase font-bold">Tổng hồ sơ</div></div>
-                    </div>
-                    <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-green-200 p-2 rounded-lg text-green-700"><CheckCircle2 size={20}/></div>
-                        <div><div className="text-2xl font-bold text-green-800">{generalStats.completed}</div><div className="text-xs text-green-600 uppercase font-bold">Đã xong</div></div>
-                    </div>
-                    <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-orange-200 p-2 rounded-lg text-orange-700"><Clock size={20}/></div>
-                        <div><div className="text-2xl font-bold text-orange-800">{generalStats.processing}</div><div className="text-xs text-orange-600 uppercase font-bold">Đang xử lý</div></div>
-                    </div>
-                    {/* Thêm Card Tổng số thửa đất */}
-                    <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-amber-200 p-2 rounded-lg text-amber-700"><Ruler size={20}/></div>
-                        <div><div className="text-2xl font-bold text-amber-800">{totalPlotCount}</div><div className="text-xs text-amber-600 uppercase font-bold">Tổng số thửa đất</div></div>
-                    </div>
-                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-3">
-                        <div className="bg-red-200 p-2 rounded-lg text-red-700"><AlertTriangle size={20}/></div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center text-red-800">
-                                <span className="text-xs font-semibold">Chưa xong:</span>
-                                <span className="text-xl font-bold">{generalStats.overduePending}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-red-600/70">
-                                <span className="text-xs font-semibold">Đã xong:</span>
-                                <span className="text-sm font-bold">{generalStats.overdueCompleted}</span>
-                            </div>
-                            <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-1 border-t border-red-200">
-                                Tổng trễ hạn
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Content Tabs */}
-            <div className="flex bg-white border-b border-gray-200 px-4">
+            {/* Content Tabs Header */}
+            <div className="flex bg-white border-b border-gray-200 px-4 overflow-x-auto custom-scrollbar shrink-0">
                 <button 
                     onClick={() => setActiveTab('list')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'list' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'list' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <ListFilter size={16}/> Danh sách kết quả ({filteredData.length})
+                    <ListFilter size={15}/> Danh sách kết quả ({listFilteredData.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('ward_stats')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <PieChart size={16}/> Thống kê theo Xã
+                    <PieChart size={15}/> Thống kê theo Xã
                 </button>
                 <button 
                     onClick={() => setActiveTab('employee')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <UserCheck size={16}/> Thống kê nhân viên
+                    <UserCheck size={15}/> Thống kê nhân viên
                 </button>
                 <button 
                     onClick={() => setActiveTab('quantity_report')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'quantity_report' ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'quantity_report' ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <ListFilter size={16}/> Báo cáo số lượng
+                    <ListFilter size={15}/> Báo cáo số lượng
                 </button>
                 <button 
                     onClick={() => setActiveTab('execution_report')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'execution_report' ? 'border-amber-600 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'execution_report' ? 'border-amber-600 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <ClipboardCheck size={16}/> Báo cáo HS thực hiện
+                    <ClipboardCheck size={15}/> Báo cáo HS thực hiện
                 </button>
                 <button 
                     onClick={() => setActiveTab('daily_stats')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <CalendarDays size={16}/> Thống kê theo ngày
+                    <CalendarDays size={15}/> Thống kê theo ngày
                 </button>
                 <button 
                     onClick={() => setActiveTab('late_records')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'late_records' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'late_records' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <AlertTriangle size={16}/> Hồ sơ trễ hạn
+                    <AlertTriangle size={15}/> Hồ sơ trễ hạn
                 </button>
                 {canViewHandoverControl && (
                     <button 
                         onClick={() => setActiveTab('handover_control')}
-                        className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'handover_control' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'handover_control' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
-                        <FileCheck2 size={16}/> So sánh hạn trả 1 cửa
+                        <FileCheck2 size={15}/> So sánh hạn trả 1 cửa
                     </button>
                 )}
                 <button 
                     onClick={() => setActiveTab('ai')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2.5 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <Sparkles size={16}/> Văn bản Báo cáo (AI)
+                    <Sparkles size={15}/> Văn bản Báo cáo (AI)
                 </button>
             </div>
 
-            {/* TAB CONTENT */}
+            {/* TAB CONTENT CONTAINER */}
             <div className="flex-1 overflow-hidden bg-slate-100 p-0">
                 {activeTab === 'list' && (
-                    <div className="bg-white rounded-none h-full overflow-hidden flex flex-col animate-fade-in-up p-4">
-                        <div className="flex-1 overflow-auto rounded-xl border border-gray-200">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10">
-                                    <tr>
-                                        <th className="p-3 w-10 text-center">#</th>
-                                        <th className="p-3 w-32">Mã HS</th>
-                                        <th className="p-3 w-48">Chủ sử dụng</th>
-                                        <th className="p-3 w-32">Xã/Phường</th>
-                                        <th className="p-3 w-16 text-center">Tờ</th>
-                                        <th className="p-3 w-16 text-center">Thửa</th>
-                                        <th className="p-3 w-24">Ngày nhận</th>
-                                        <th className="p-3 w-24">Hẹn trả</th>
-                                        <th className="p-3 w-24">Hoàn thành</th>
-                                        <th className="p-3 w-32">NV Xử lý</th>
-                                        <th className="p-3 w-32 text-center">Trạng thái</th>
-                                        <th className="p-3">Ghi chú</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {paginatedData.length > 0 ? paginatedData.map((r, i) => {
-                                        const emp = employees.find(e => e.id === r.assignedTo);
-                                        const isOverdue = isRecordOverdue(r);
-                                        const rowIndex = (currentPage - 1) * itemsPerPage + i + 1;
-                                        
-                                        let isCompletedLate = false;
-                                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
-                                            if (r.deadline && r.completedDate) {
-                                                const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                                                const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                                                if (c > d) isCompletedLate = true;
-                                            }
-                                        }
+                    <div className="bg-white rounded-none h-full overflow-hidden flex flex-col animate-fade-in-up">
+                        {/* Independent List Toolbar & Filter Bar */}
+                        <div className="p-3.5 border-b border-gray-200 bg-slate-50 flex flex-col gap-3 shrink-0">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* Quick Date Presets */}
+                                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                                        <button 
+                                            onClick={() => handleListQuickDate('week')} 
+                                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${listDateMode === 'week' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:text-blue-700'}`}
+                                        >
+                                            <CalendarDays size={13} /> Tuần này
+                                        </button>
+                                        <button 
+                                            onClick={() => handleListQuickDate('month')} 
+                                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${listDateMode === 'month' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:text-blue-700'}`}
+                                        >
+                                            <Layout size={13} /> Tháng này
+                                        </button>
+                                        <button 
+                                            onClick={() => handleListQuickDate('all')} 
+                                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${listDateMode === 'all' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:text-blue-700'}`}
+                                        >
+                                            Tất cả
+                                        </button>
+                                    </div>
 
-                                        return (
-                                        <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
-                                            <td className="p-3 text-center text-gray-400">{rowIndex}</td>
-                                            <td className="p-3 font-medium text-blue-600">{r.code}</td>
-                                            <td className="p-3 font-medium">{r.customerName}</td>
-                                            <td className="p-3 text-gray-600">{getNormalizedWard(r.ward)}</td>
-                                            <td className="p-3 text-center text-gray-600">{r.mapSheet || '-'}</td>
-                                            <td className="p-3 text-center text-gray-600">{r.landPlot || '-'}</td>
-                                            <td className="p-3 text-gray-600">{formatDate(r.receivedDate)}</td>
-                                            <td className={`p-3 font-medium ${isOverdue ? 'text-red-600' : 'text-gray-600'}`}>{formatDate(r.deadline)}</td>
-                                            <td className={`p-3 font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>
-                                                {formatDate(r.completedDate)}
-                                            </td>
-                                            <td className="p-3 text-gray-600 text-xs truncate" title={emp?.name}>{emp ? emp.name : '-'}</td>
-                                            <td className="p-3 text-center">
-                                                <span className={`px-2 py-1 rounded text-xs border ${
-                                                    r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
-                                                    r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
-                                                    isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
-                                                    'bg-blue-50 text-blue-700 border-blue-100'
-                                                }`}>
-                                                    {STATUS_LABELS[r.status]}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 text-gray-500 italic truncate max-w-xs">
-                                                {isCompletedLate && <span className="text-[10px] text-orange-600 font-bold mr-1">[Trễ xong]</span>}
-                                                {r.notes || r.content}
-                                            </td>
-                                        </tr>
-                                    )}) : (
-                                        <tr><td colSpan={10} className="p-8 text-center text-gray-400">Không có dữ liệu trong khoảng thời gian này.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    {/* Date Range Inputs */}
+                                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+                                        <span className="text-gray-400 font-medium">Từ:</span>
+                                        <input 
+                                            type="date" 
+                                            value={listFromDate} 
+                                            disabled={listDateMode === 'all'}
+                                            onChange={(e) => { setListFromDate(e.target.value); setListDateMode('custom'); }} 
+                                            className="text-xs outline-none text-gray-700 font-medium disabled:opacity-50" 
+                                        />
+                                        <span className="text-gray-400 font-medium">Đến:</span>
+                                        <input 
+                                            type="date" 
+                                            value={listToDate} 
+                                            disabled={listDateMode === 'all'}
+                                            onChange={(e) => { setListToDate(e.target.value); setListDateMode('custom'); }} 
+                                            className="text-xs outline-none text-gray-700 font-medium disabled:opacity-50" 
+                                        />
+                                    </div>
+
+                                    {/* Ward Filter */}
+                                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 border border-gray-300 rounded-lg shadow-sm">
+                                        <MapPin size={14} className="text-gray-500" />
+                                        <select 
+                                            value={listSelectedWard} 
+                                            onChange={(e) => setListSelectedWard(e.target.value)} 
+                                            className="text-xs outline-none bg-transparent text-gray-700 font-medium cursor-pointer max-w-[140px]"
+                                        >
+                                            <option value="all">Tất cả Xã/Phường</option>
+                                            {wards.map(w => (
+                                                <option key={w} value={w}>{w}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Record Type Filter */}
+                                    <select
+                                        value={listRecordTypeFilter}
+                                        onChange={(e) => setListRecordTypeFilter(e.target.value)}
+                                        className="text-xs px-2.5 py-1 border border-gray-300 rounded-lg bg-white text-gray-700 font-medium shadow-sm outline-none max-w-[160px]"
+                                    >
+                                        <option value="all">Tất cả loại hồ sơ</option>
+                                        {MEASUREMENT_RECORD_TYPES.map(type => (
+                                            <option key={type} value={type}>{type}</option>
+                                        ))}
+                                    </select>
+
+                                    {/* Status Filter */}
+                                    <select
+                                        value={listStatusFilter}
+                                        onChange={(e) => setListStatusFilter(e.target.value)}
+                                        className="text-xs px-2.5 py-1 border border-gray-300 rounded-lg bg-white text-gray-700 font-medium shadow-sm outline-none"
+                                    >
+                                        <option value="all">Tất cả trạng thái</option>
+                                        <option value="completed">Đã hoàn thành / Bàn giao</option>
+                                        <option value="processing">Đang xử lý</option>
+                                        <option value="overdue">Hồ sơ trễ hạn</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2 ml-auto">
+                                    {/* Search Input */}
+                                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 border border-gray-300 rounded-lg shadow-sm text-xs">
+                                        <Search size={14} className="text-gray-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Tìm mã HS, tên, thửa..."
+                                            value={listSearchQuery}
+                                            onChange={(e) => setListSearchQuery(e.target.value)}
+                                            className="text-xs outline-none w-36 md:w-44 text-gray-700"
+                                        />
+                                    </div>
+
+                                    <button 
+                                        onClick={handleExportExcelClick} 
+                                        className="flex items-center gap-1.5 bg-green-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-green-700 font-bold text-xs shadow-sm transition-colors" 
+                                        title="Xuất Excel danh sách đang lọc"
+                                    >
+                                        <FileSpreadsheet size={15} /> Xuất Excel
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Metrics Summary Strip for List View */}
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                                <div className="bg-white border border-blue-100 p-2.5 rounded-lg flex items-center gap-2.5 shadow-2xs">
+                                    <div className="bg-blue-100 p-1.5 rounded-md text-blue-700"><ListFilter size={16}/></div>
+                                    <div>
+                                        <div className="text-base font-bold text-blue-900 leading-tight">{listStats.total}</div>
+                                        <div className="text-[10px] text-blue-600 font-semibold uppercase">Tổng hồ sơ</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-green-100 p-2.5 rounded-lg flex items-center gap-2.5 shadow-2xs">
+                                    <div className="bg-green-100 p-1.5 rounded-md text-green-700"><CheckCircle2 size={16}/></div>
+                                    <div>
+                                        <div className="text-base font-bold text-green-900 leading-tight">{listStats.completed}</div>
+                                        <div className="text-[10px] text-green-600 font-semibold uppercase">Đã xong</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-orange-100 p-2.5 rounded-lg flex items-center gap-2.5 shadow-2xs">
+                                    <div className="bg-orange-100 p-1.5 rounded-md text-orange-700"><Clock size={16}/></div>
+                                    <div>
+                                        <div className="text-base font-bold text-orange-900 leading-tight">{listStats.processing}</div>
+                                        <div className="text-[10px] text-orange-600 font-semibold uppercase">Đang xử lý</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-amber-100 p-2.5 rounded-lg flex items-center gap-2.5 shadow-2xs">
+                                    <div className="bg-amber-100 p-1.5 rounded-md text-amber-700"><Ruler size={16}/></div>
+                                    <div>
+                                        <div className="text-base font-bold text-amber-900 leading-tight">{listStats.totalPlotCount}</div>
+                                        <div className="text-[10px] text-amber-600 font-semibold uppercase">Tổng số thửa</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-red-100 p-2.5 rounded-lg flex items-center gap-2.5 shadow-2xs">
+                                    <div className="bg-red-100 p-1.5 rounded-md text-red-700"><AlertTriangle size={16}/></div>
+                                    <div>
+                                        <div className="text-base font-bold text-red-900 leading-tight flex items-baseline gap-1.5">
+                                            <span>{listStats.overduePending}</span>
+                                            {listStats.overdueCompleted > 0 && (
+                                                <span className="text-[11px] text-orange-600 font-normal">({listStats.overdueCompleted} trễ xong)</span>
+                                            )}
+                                        </div>
+                                        <div className="text-[10px] text-red-600 font-semibold uppercase">Trễ hạn chưa xong</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* List Table */}
+                        <div className="flex-1 overflow-auto p-3">
+                            <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-2xs">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-gray-50 text-[11px] text-gray-500 uppercase font-bold sticky top-0 shadow-xs z-10">
+                                        <tr>
+                                            <th className="p-2.5 w-10 text-center">#</th>
+                                            <th className="p-2.5 w-28">Mã HS</th>
+                                            <th className="p-2.5 w-44">Chủ sử dụng</th>
+                                            <th className="p-2.5 w-28">Xã/Phường</th>
+                                            <th className="p-2.5 w-14 text-center">Tờ</th>
+                                            <th className="p-2.5 w-14 text-center">Thửa</th>
+                                            <th className="p-2.5 w-24">Ngày nhận</th>
+                                            <th className="p-2.5 w-24">Hẹn trả</th>
+                                            <th className="p-2.5 w-24">Hoàn thành</th>
+                                            <th className="p-2.5 w-32">NV Xử lý</th>
+                                            <th className="p-2.5 w-28 text-center">Trạng thái</th>
+                                            <th className="p-2.5">Ghi chú</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {paginatedData.length > 0 ? paginatedData.map((r, i) => {
+                                            const emp = employees.find(e => e.id === r.assignedTo);
+                                            const isOverdue = isRecordOverdue(r);
+                                            const rowIndex = (currentPage - 1) * itemsPerPage + i + 1;
+                                            
+                                            let isCompletedLate = false;
+                                            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED) {
+                                                if (r.deadline && r.completedDate) {
+                                                    const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                                                    const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                                                    if (c > d) isCompletedLate = true;
+                                                }
+                                            }
+
+                                            return (
+                                            <tr key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                                                <td className="p-2.5 text-center text-gray-400">{rowIndex}</td>
+                                                <td className="p-2.5 font-bold text-blue-600">{r.code}</td>
+                                                <td className="p-2.5 font-medium text-gray-900">{r.customerName}</td>
+                                                <td className="p-2.5 text-gray-600">{getNormalizedWard(r.ward)}</td>
+                                                <td className="p-2.5 text-center text-gray-600">{r.mapSheet || '-'}</td>
+                                                <td className="p-2.5 text-center text-gray-600">{r.landPlot || '-'}</td>
+                                                <td className="p-2.5 text-gray-600">{formatDate(r.receivedDate)}</td>
+                                                <td className={`p-2.5 font-medium ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-600'}`}>{formatDate(r.deadline)}</td>
+                                                <td className={`p-2.5 font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>
+                                                    {formatDate(r.completedDate)}
+                                                </td>
+                                                <td className="p-2.5 text-gray-600 text-xs truncate" title={emp?.name}>{emp ? emp.name : '-'}</td>
+                                                <td className="p-2.5 text-center">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                                        r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                        r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                        isOverdue ? 'bg-red-50 text-red-700 border-red-200' :
+                                                        'bg-blue-50 text-blue-700 border-blue-100'
+                                                    }`}>
+                                                        {STATUS_LABELS[r.status]}
+                                                    </span>
+                                                </td>
+                                                <td className="p-2.5 text-gray-500 italic truncate max-w-xs">
+                                                    {isCompletedLate && <span className="text-[10px] text-orange-600 font-bold mr-1">[Trễ xong]</span>}
+                                                    {r.notes || r.content}
+                                                </td>
+                                            </tr>
+                                        )}) : (
+                                            <tr>
+                                                <td colSpan={12} className="p-8 text-center text-gray-400">
+                                                    Không tìm thấy hồ sơ nào phù hợp với bộ lọc hiện tại.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         {/* Pagination Footer */}
-                        {filteredData.length > 0 && (
-                            <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-between items-center shrink-0 rounded-b-xl">
+                        {listFilteredData.length > 0 && (
+                            <div className="border-t border-gray-200 p-2.5 bg-gray-50 flex justify-between items-center shrink-0">
                                 <span className="text-xs text-gray-500">
-                                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> trên tổng <strong>{filteredData.length}</strong>
+                                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, listFilteredData.length)}</strong> trên tổng <strong>{listFilteredData.length}</strong>
                                 </span>
                                 <div className="flex items-center gap-1">
                                     <div className="flex items-center mr-4 gap-2">
@@ -608,7 +711,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                         <select 
                                             value={itemsPerPage} 
                                             onChange={(e) => setItemsPerPage(Number(e.target.value))} 
-                                            className="border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="border border-gray-300 rounded px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                         >
                                             <option value={20}>20</option>
                                             <option value={50}>50</option>
@@ -616,9 +719,21 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                             <option value={500}>500</option>
                                         </select>
                                     </div>
-                                    <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                                    <button 
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                                        disabled={currentPage === 1} 
+                                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
                                     <span className="text-xs font-medium mx-2">Trang {currentPage} / {totalPages}</span>
-                                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                                    <button 
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                                        disabled={currentPage === totalPages} 
+                                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -626,7 +741,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 )}
 
                 {activeTab === 'ward_stats' && (
-                    <WardStatsView records={filteredData} />
+                    <WardStatsView records={activeRecords} />
                 )}
 
                 {activeTab === 'employee' && (
@@ -634,10 +749,36 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         records={activeRecords}
                         employees={activeEmployees}
                         schedules={schedules}
-                        fromDate={fromDate}
-                        toDate={toDate}
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
+                    />
+                )}
+
+                {activeTab === 'quantity_report' && (
+                    <QuantityReportView
+                        records={activeRecords}
+                        employees={activeEmployees}
+                        schedules={schedules}
+                        fromDate={listFromDate}
+                        toDate={listToDate}
+                    />
+                )}
+
+                {activeTab === 'execution_report' && (
+                    <ExecutionReportView
+                        records={activeRecords}
+                        employees={activeEmployees}
+                        schedules={schedules}
+                        fromDate={listFromDate}
+                        toDate={listToDate}
+                    />
+                )}
+
+                {activeTab === 'daily_stats' && (
+                    <DailyStatsView 
+                        records={activeRecords} 
+                        employees={employees} 
+                        wards={wards} 
                     />
                 )}
 
@@ -645,8 +786,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <LateRecordsView
                         records={activeRecords}
                         employees={activeEmployees}
-                        fromDate={fromDate}
-                        toDate={toDate}
                         wards={wards}
                     />
                 )}
@@ -656,8 +795,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         records={activeRecords}
                         employees={employees}
                         wards={wards}
-                        fromDate={fromDate}
-                        toDate={toDate}
+                        fromDate={listFromDate}
+                        toDate={listToDate}
                     />
                 )}
 
@@ -670,42 +809,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             onPrint={handlePrint}
                             onOpenKeyModal={() => setIsKeyModalOpen(true)}
                             records={activeRecords}
-                            reportType={reportType}
-                            fromDate={fromDate}
-                            toDate={toDate}
                         />
                     </div>
                 )}
-
-                {activeTab === 'quantity_report' && (
-                    <QuantityReportView
-                        records={activeRecords}
-                        employees={activeEmployees}
-                        schedules={schedules}
-                        fromDate={fromDate}
-                        toDate={toDate}
-                    />
-                )}
-
-                {activeTab === 'execution_report' && (
-                    <ExecutionReportView
-                        records={activeRecords}
-                        employees={activeEmployees}
-                        schedules={schedules}
-                        fromDate={fromDate}
-                        toDate={toDate}
-                    />
-                )}
-
-                {activeTab === 'daily_stats' && (
-                    <DailyStatsView 
-                        records={activeRecords} 
-                        employees={employees} 
-                        wards={wards} 
-                        onFilteredRecordsChange={setDailyStatsRecords}
-                    />
-                )}
-
             </div>
 
             {/* API Key Modal */}

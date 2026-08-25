@@ -31,7 +31,7 @@ const PhieuXinLoiModal: React.FC<PhieuXinLoiModalProps> = ({ data, receivingWard
         recordType: data.recordType || '',
         code: data.code || '',
         deadline: formatForInput(initialDDate),
-        wardName: getFullWard(receivingWard),
+        wardName: getFullWard(data.receivingWard || receivingWard),
         reason: 'Số lượng hồ sơ trích đo trên địa bàn tăng đột biến, dẫn đến quá tải trong công tác kiểm tra thực địa và biên tập hồ sơ kỹ thuật, chưa kịp thời xử lý đúng theo thời gian quy định.',
         newReturnDate: ''
     });

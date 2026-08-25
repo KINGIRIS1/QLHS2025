@@ -106,9 +106,13 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
         };
     }, [myRecords, reportRange]);
 
-    const getRecordPlotCount = (r: RecordFile) => {
-        if (['Sao lục', 'Công văn'].includes(r.recordType || '')) return 0;
-        return r.plotCount || 1;
+    const getRecordPlotCount = (r: RecordFile): number => {
+        const isNonPlot = ['Sao lục', 'Công văn'].includes(r.recordType || '');
+        const defaultVal = isNonPlot ? 0 : 1;
+        const parsed = r.plotCount !== undefined && r.plotCount !== null && String(r.plotCount).trim() !== ''
+            ? Number(r.plotCount)
+            : defaultVal;
+        return isNaN(parsed) ? defaultVal : parsed;
     };
 
     const totalPlotCountCompleted = useMemo(() => {

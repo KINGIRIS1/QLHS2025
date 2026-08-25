@@ -13,6 +13,10 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
         return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
+    const docDateLocation = data.DIA_DANH || data.DON_VI_TIEP_NHAN_KHONG_TIEN_TO || (data.PHUONG ? getTitleCase(data.PHUONG.replace(/^(PHƯỜNG|XÃ|THỊ TRẤN)\s+/i, '')) : 'Chơn Thành');
+    const donViTiepNhanHeader = data.DON_VI_TIEP_NHAN_FULL || data.DON_VI_TIEP_NHAN || data.XA || '';
+    const nhanKetQuaTaiText = data.NHAN_KET_QUA_TAI || `Trung tâm Phục vụ Hành chính công ${docDateLocation}`;
+
     const doc = new Document({
         sections: [
             {
@@ -58,7 +62,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                                             new Paragraph({
                                                 alignment: AlignmentType.CENTER,
                                                 children: [
-                                                    new TextRun({ text: `${data.DON_VI_TIEP_NHAN || data.XA || ''}`, font: "Times New Roman", size: 26, bold: true, underline: {} }),
+                                                    new TextRun({ text: `${donViTiepNhanHeader}`, font: "Times New Roman", size: 26, bold: true, underline: {} }),
                                                 ],
                                             }),
                                         ],
@@ -107,7 +111,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                                                 alignment: AlignmentType.CENTER,
                                                 spacing: { before: 120 },
                                                 children: [
-                                                    new TextRun({ text: `${data.PHUONG ? getTitleCase(data.PHUONG.replace(/^(PHƯỜNG|XÃ|THỊ TRẤN)\s+/i, '')) : ''}, ngày ${data.NGAY || '...'} tháng ${data.THANG || '...'} năm ${data.NAM || '...'}`, font: "Times New Roman", size: 26 }),
+                                                    new TextRun({ text: `${docDateLocation}, ngày ${data.NGAY || '...'} tháng ${data.THANG || '...'} năm ${data.NAM || '...'}`, font: "Times New Roman", size: 26 }),
                                                 ],
                                             }),
                                         ],
@@ -337,7 +341,7 @@ export const generateDefaultReceiptDocx = async (data: any): Promise<Blob> => {
                         spacing: { after: 80 },
                         indent: { left: 360 },
                         children: [
-                            new TextRun({ text: `Nhận kết quả tại: ${data.NHAN_KET_QUA_TAI || ''}`, font: "Times New Roman", size: 26 }),
+                            new TextRun({ text: `Nhận kết quả tại: ${nhanKetQuaTaiText}`, font: "Times New Roman", size: 26 }),
                         ],
                     }),
                     new Paragraph({

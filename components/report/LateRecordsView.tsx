@@ -3,23 +3,57 @@ import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { isRecordOverdue } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
-import { FileSpreadsheet, ListFilter } from 'lucide-react';
+import { FileSpreadsheet, ListFilter, CalendarDays, Layout, Filter } from 'lucide-react';
 
 interface LateRecordsViewProps {
     records: RecordFile[];
     employees: Employee[];
-    fromDate: string;
-    toDate: string;
+    fromDate?: string;
+    toDate?: string;
     wards: string[];
 }
 
-const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, fromDate, toDate, wards }) => {
+const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, fromDate: initialFromDate, toDate: initialToDate, wards }) => {
     const [subTab, setSubTab] = useState<'pending' | 'completed'>('pending');
     const [filterWard, setFilterWard] = useState<string>('all');
+    
+    // Independent date filter
+    const [dateMode, setDateMode] = useState<'all' | 'week' | 'month' | 'custom'>('all');
+    const [localFromDate, setLocalFromDate] = useState<string>(() => {
+        if (initialFromDate) return initialFromDate;
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    });
+    const [localToDate, setLocalToDate] = useState<string>(() => {
+        if (initialToDate) return initialToDate;
+        return new Date().toISOString().split('T')[0];
+    });
+
+    const handleQuickDate = (mode: 'week' | 'month' | 'all') => {
+        setDateMode(mode);
+        const now = new Date();
+        if (mode === 'week') {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const start = new Date(now.setDate(diff));
+            setLocalFromDate(start.toISOString().split('T')[0]);
+            setLocalToDate(new Date().toISOString().split('T')[0]);
+        } else if (mode === 'month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            setLocalFromDate(start.toISOString().split('T')[0]);
+            setLocalToDate(new Date().toISOString().split('T')[0]);
+        }
+    };
 
     const recordsInTimeRange = useMemo(() => {
-        const start = new Date(fromDate); start.setHours(0,0,0,0);
-        const end = new Date(toDate); end.setHours(23,59,59,999);
+        if (dateMode === 'all') {
+            return records.filter(r => {
+                if (filterWard !== 'all' && r.ward !== filterWard) return false;
+                return true;
+            });
+        }
+        const start = new Date(localFromDate); start.setHours(0,0,0,0);
+        const end = new Date(localToDate); end.setHours(23,59,59,999);
         return records.filter(r => {
             if (!r.receivedDate) return false;
             const rDate = new Date(r.receivedDate);
@@ -27,7 +61,7 @@ const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, f
             if (filterWard !== 'all' && r.ward !== filterWard) return false;
             return true;
         });
-    }, [records, fromDate, toDate, filterWard]);
+    }, [records, dateMode, localFromDate, localToDate, filterWard]);
 
     const { overduePendingList, overdueCompletedList } = useMemo(() => {
         const pending: RecordFile[] = [];
@@ -64,7 +98,9 @@ const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, f
 
     const exportToExcel = () => {
         const title = subTab === 'pending' ? 'DANH SÁCH HS TRỄ HẠN(CHƯA KẾT QUẢ)' : 'DANH SÁCH HS TRỄ HẠN(ĐÃ CÓ KẾT QUẢ)';
-        const dateRangeStr = `(Từ ${fromDate.split('-').reverse().join('/')} Đến ${toDate.split('-').reverse().join('/')})`;
+        const dateRangeStr = dateMode === 'all' 
+            ? '(Toàn bộ thời gian)' 
+            : `(Từ ${localFromDate.split('-').reverse().join('/')} Đến ${localToDate.split('-').reverse().join('/')})`;
         
         const wb = XLSX.utils.book_new();
         const wsData: any[][] = [
@@ -137,35 +173,78 @@ const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, f
     return (
         <div className="flex flex-col h-full bg-white animate-fade-in">
             {/* Toolbar */}
-            <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-slate-50 shrink-0">
-                <div className="flex bg-white rounded-lg p-1 border border-gray-200">
-                    <button 
-                        onClick={() => setSubTab('pending')}
-                        className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${subTab === 'pending' ? 'bg-red-50 text-red-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                    >
-                        Chưa có kết quả ({overduePendingList.length})
-                    </button>
-                    <button 
-                        onClick={() => setSubTab('completed')}
-                        className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${subTab === 'completed' ? 'bg-orange-50 text-orange-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                    >
-                        Đã có kết quả ({overdueCompletedList.length})
-                    </button>
+            <div className="p-4 border-b border-gray-100 flex flex-col xl:flex-row gap-3 justify-between items-start xl:items-center bg-slate-50 shrink-0">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                        <button 
+                            onClick={() => setSubTab('pending')}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${subTab === 'pending' ? 'bg-red-50 text-red-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            Chưa có kết quả ({overduePendingList.length})
+                        </button>
+                        <button 
+                            onClick={() => setSubTab('completed')}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${subTab === 'completed' ? 'bg-orange-50 text-orange-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            Đã có kết quả ({overdueCompletedList.length})
+                        </button>
+                    </div>
+
+                    {/* Quick Date Filters */}
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                        <button 
+                            onClick={() => handleQuickDate('week')} 
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${dateMode === 'week' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:text-red-700'}`}
+                        >
+                            <CalendarDays size={12} /> Tuần này
+                        </button>
+                        <button 
+                            onClick={() => handleQuickDate('month')} 
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${dateMode === 'month' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:text-red-700'}`}
+                        >
+                            <Layout size={12} /> Tháng này
+                        </button>
+                        <button 
+                            onClick={() => handleQuickDate('all')} 
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${dateMode === 'all' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:text-red-700'}`}
+                        >
+                            Tất cả
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+                        <span className="text-gray-400 font-medium">Từ:</span>
+                        <input 
+                            type="date" 
+                            value={localFromDate} 
+                            disabled={dateMode === 'all'}
+                            onChange={(e) => { setLocalFromDate(e.target.value); setDateMode('custom'); }} 
+                            className="text-xs outline-none text-gray-700 font-medium disabled:opacity-50" 
+                        />
+                        <span className="text-gray-400 font-medium">Đến:</span>
+                        <input 
+                            type="date" 
+                            value={localToDate} 
+                            disabled={dateMode === 'all'}
+                            onChange={(e) => { setLocalToDate(e.target.value); setDateMode('custom'); }} 
+                            className="text-xs outline-none text-gray-700 font-medium disabled:opacity-50" 
+                        />
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <select
                         value={filterWard}
                         onChange={(e) => setFilterWard(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm"
                     >
                         <option value="all">Tất cả Xã/Phường</option>
                         {wards.map(w => (
                             <option key={w} value={w}>{w}</option>
                         ))}
                     </select>
-                    <button onClick={exportToExcel} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors">
-                        <FileSpreadsheet size={16} /> Xuất danh sách này (Excel)
+                    <button onClick={exportToExcel} className="flex items-center gap-1.5 bg-green-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-green-700 font-bold text-xs shadow-sm transition-colors">
+                        <FileSpreadsheet size={15} /> Xuất Excel
                     </button>
                 </div>
             </div>

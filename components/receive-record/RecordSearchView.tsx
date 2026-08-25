@@ -17,6 +17,7 @@ interface RecordSearchViewProps {
 
 const SEARCHABLE_RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
+  'Trích đo Chuyển mục đích',
   'Trích đo bản đồ địa chính',
   'Thẩm định Trích đo',
   'Trích lục bản đồ địa chính',

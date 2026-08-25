@@ -1,5 +1,6 @@
 
 import { RecordFile, RecordStatus, Holiday } from '../types';
+import { calculateNextRecordCode, getWardShortCode as getShortCodeUtil } from './codeGenerator';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -177,7 +178,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd = 15;
     } else if (lowerType.includes('cung cấp thông tin') || lowerType.includes('sao lục') || lowerType.includes('trích lục')) {
         daysToAdd = 10; 
-    } else if (lowerType.includes('trích đo chỉnh lý')) {
+    } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chuyển mục đích') || lowerType.includes('chuyen muc dich') || lowerType.includes('tdcmd')) {
         daysToAdd = 15; 
     } else if (lowerType.includes('thẩm định') || lowerType.includes('trích đo') || lowerType.includes('đo đạc') || lowerType.includes('cắm mốc') || lowerType.includes('thu hồi giấy chứng nhận')) {
         daysToAdd = 30; 
@@ -266,22 +267,7 @@ export function getReceivingWard(record: RecordFile): string {
 
 // --- HÀM XÁC ĐỊNH MÃ VIẾT TẮT ĐỊA BÀN VÀ SINH MÃ HỒ SƠ TỰ ĐỘNG ---
 export function getWardShortCode(ward: string): string {
-    if (!ward) return 'CT';
-    const normalized = ward.toLowerCase().trim();
-    const cleanName = normalized
-        .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
-        .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
-
-    if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
-    if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
-    if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
-    if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
-    if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
-    if (cleanName.includes('quang minh') || cleanName.includes('quangminh')) return 'QM';
-    if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
-    if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
-    
-    return 'CT';
+    return getShortCodeUtil(ward);
 }
 
 export function generateNextRecordCode(
@@ -291,61 +277,7 @@ export function generateNextRecordCode(
     extraCodes: string[] = [], 
     recordType?: string
 ): string {
-    if (!wardName || !dateStr) return '';
-
-    const d = new Date(dateStr);
-    const yy = d.getFullYear().toString().slice(-2);
-    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
-    const dd = ('0' + d.getDate()).slice(-2);
-    const datePrefix = `${yy}${mm}${dd}`;
-    
-    const suffix = getWardShortCode(wardName);
-    
-    let targetPrefixType = '';
-    if (recordType === 'Sao lục hồ sơ' || recordType === 'Sao lục') {
-        targetPrefixType = 'SLHS';
-    } else if (recordType === 'Thuế chính quy') {
-        targetPrefixType = 'TCQ';
-    } else if (recordType === 'Thu hồi Giấy chứng nhận') {
-        targetPrefixType = 'THG';
-    }
-
-    let maxSeq = 0;
-
-    const checkAndExtractSeq = (codeStr: string | null | undefined) => {
-        if (!codeStr) return;
-        const cleanCode = codeStr.trim().toUpperCase();
-        const parts = cleanCode.split('-');
-        
-        if (targetPrefixType) {
-            if (parts.length === 4) {
-                const [rType, rDate, rSeq, rSuffix] = parts;
-                if (rType === targetPrefixType && rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
-                    const seqNum = parseInt(rSeq, 10);
-                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-                }
-            }
-        } else {
-            if (parts.length === 3) {
-                const [rDate, rSeq, rSuffix] = parts;
-                if (rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
-                    const seqNum = parseInt(rSeq, 10);
-                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-                }
-            }
-        }
-    };
-
-    allRecords.forEach(r => checkAndExtractSeq(r.code));
-    extraCodes.forEach(code => checkAndExtractSeq(code));
-
-    const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
-    
-    if (targetPrefixType) {
-        return `${targetPrefixType}-${datePrefix}-${nextSeq}-${suffix}`;
-    } else {
-        return `${datePrefix}-${nextSeq}-${suffix}`;
-    }
+    return calculateNextRecordCode(wardName, dateStr, allRecords as any, extraCodes, recordType);
 }
 
 // --- TÍNH NĂNG CẢNH BÁO HỒ SƠ CẦN CHÚ Ý ĐÃ KÝ DUYỆT ---

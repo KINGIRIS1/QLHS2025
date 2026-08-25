@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, Employee, User, UserRole, Holiday, RecordStatus } from '../types';
-import { STATUS_LABELS, RECORD_TYPES, EXTENDED_RECORD_TYPES } from '../constants';
+import { STATUS_LABELS, RECORD_TYPES, EXTENDED_RECORD_TYPES, MEASUREMENT_RECORD_TYPES, OTHER_RECORD_TYPES } from '../constants';
 import { COLUMN_DEFS } from '../utils/appHelpers';
 
 // Components
@@ -422,12 +422,16 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                                             className="w-28 sm:w-32 px-1.5 py-1 bg-white border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer"
                                         >
                                             <option value="all">Mọi loại HS...</option>
-                                            {RECORD_TYPES.map(type => (
-                                                <option key={type} value={type}>{type}</option>
-                                            ))}
-                                            {EXTENDED_RECORD_TYPES.filter(x => !RECORD_TYPES.includes(x)).map(type => (
-                                                <option key={type} value={type}>{type}</option>
-                                            ))}
+                                            {(() => {
+                                                const typesToDisplay = isOtherView 
+                                                    ? OTHER_RECORD_TYPES 
+                                                    : isMeasurementView 
+                                                        ? MEASUREMENT_RECORD_TYPES 
+                                                        : RECORD_TYPES;
+                                                return typesToDisplay.map(type => (
+                                                    <option key={type} value={type}>{type}</option>
+                                                ));
+                                            })()}
                                         </select>
 
                                         {/* Ngày tiếp nhận */}

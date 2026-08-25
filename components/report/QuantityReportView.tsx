@@ -146,7 +146,14 @@ const QuantityReportView: React.FC<QuantityReportViewProps> = ({
     const completedRecords = receivedRecords.filter(r => isCompletedStatus(r.status));
 
     // Thống kê số thửa đất
-    const getPlotCount = (r: RecordFile) => ['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1);
+    const getPlotCount = (r: RecordFile): number => {
+      const isNonPlot = ['Sao lục', 'Công văn'].includes(r.recordType || '');
+      const defaultVal = isNonPlot ? 0 : 1;
+      const parsed = r.plotCount !== undefined && r.plotCount !== null && String(r.plotCount).trim() !== ''
+        ? Number(r.plotCount)
+        : defaultVal;
+      return isNaN(parsed) ? defaultVal : parsed;
+    };
     const totalReceivedPlots = receivedRecords.reduce((sum, r) => sum + getPlotCount(r), 0);
     const totalCompletedPlots = completedRecords.reduce((sum, r) => sum + getPlotCount(r), 0);
 

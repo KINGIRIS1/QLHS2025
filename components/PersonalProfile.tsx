@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, User, Employee } from '../types';
 import StatusBadge from './StatusBadge';
 import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare, FileText, Eye, ShieldAlert, RefreshCw } from 'lucide-react';
 import { getShortRecordType } from '../constants';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, getReceivingWard } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
 import { fetchArchiveRecords, ArchiveRecord, saveArchiveRecord } from '../services/apiArchive';
 import PhieuXinLoiModal from './PhieuXinLoiModal';
@@ -1217,7 +1217,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       {showPhieuXinLoi && selectedRecordForPhieu && (
         <PhieuXinLoiModal
             data={selectedRecordForPhieu}
-            receivingWard={employees?.find(e => e.id === user.employeeId)?.managedWards?.[0] || 'chơn thành'}
+            receivingWard={selectedRecordForPhieu.receivingWard || getReceivingWard(selectedRecordForPhieu) || employees?.find(e => e.id === user.employeeId)?.managedWards?.[0] || 'chơn thành'}
             onClose={() => {
                 setShowPhieuXinLoi(false);
                 setSelectedRecordForPhieu(null);

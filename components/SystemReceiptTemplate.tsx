@@ -114,12 +114,14 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         return `${day}/${month}/${year}`;
     };
 
-    const wardName = getFullWard(receivingWard);
+    const actualReceivingWard = data.receivingWard || receivingWard || 'Chơn Thành';
+    const wardName = getFullWard(actualReceivingWard);
     const wardNameNoPrefix = wardName.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
 
     const type = (data.recordType || '').toLowerCase();
     const isHienDat = type.includes('hiến đất') || type.includes('hien dat');
     const isThamDinhTrichDo = type.includes('thẩm định') || type.includes('tham dinh');
+    const isTrichDoCMD = type.includes('chuyển mục đích') || type.includes('chuyen muc dich') || type.includes('tdcmd');
     let standardDays = "30"; 
     if (isHienDat) {
         standardDays = "8";
@@ -129,7 +131,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         standardDays = "15";
     } else if (type.includes('cung cấp thông tin') || type.includes('sao lục') || type.includes('trích lục')) {
         standardDays = "10";
-    } else if (type.includes('trích đo chỉnh lý')) {
+    } else if (type.includes('trích đo chỉnh lý') || isTrichDoCMD) {
         standardDays = "15"; 
     } else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) {
         standardDays = "30";
@@ -140,14 +142,18 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         tp1Value = 'Tờ khai thuế';
     } else if (type.includes('cung cấp thông tin') || type.includes('sao lục')) {
         tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
-    } else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
+    } else if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục') || isTrichDoCMD) {
         tp1Value = `Phiếu yêu cầu trích lục, trích đo`;
     } 
     else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
 
-    const sdtLienHe = getContactInfo(contactSettings, data.ward || "", type);
+    const receiptTypeName = isTrichDoCMD 
+        ? 'Trích đo xác định vị trí Chuyển mục đích' 
+        : (data.recordType || '');
+
+    const sdtLienHe = getContactInfo(contactSettings, data.ward || "", type, actualReceivingWard);
 
 
     return (
@@ -201,7 +207,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <div>Tờ bản đồ số: {data.mapSheet}</div>
                             <div>Diện tích: {data.area}m<sup>2</sup></div>
                             <div>Địa chỉ thửa đất: {data.address ? data.address + ' - ' : ''}{getFullWard(data.ward || '')}</div>
-                            <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{isHienDat ? `Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.${data.content ? ' - ' + data.content : ''}` : isThamDinhTrichDo ? `Kiểm tra, thẩm định bản trích đo địa chính.${data.content ? ' - ' + data.content : ''}` : `${data.recordType ? data.recordType + ' - ' : ''}${data.content}`}</span></div>
+                            <div className="mt-2 mb-2"><span className="font-bold">Nội dung yêu cầu giải quyết: </span><span className="font-bold">{isHienDat ? `Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.${data.content ? ' - ' + data.content : ''}` : isThamDinhTrichDo ? `Kiểm tra, thẩm định bản trích đo địa chính.${data.content ? ' - ' + data.content : ''}` : `${receiptTypeName ? receiptTypeName + ' - ' : ''}${data.content}`}</span></div>
                             
                             {isHienDat ? (
                                 <>

@@ -16,6 +16,7 @@ import SystemReceiptTemplate from '../SystemReceiptTemplate';
 import PhieuXinLoiModal from '../PhieuXinLoiModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../../services/apiSystem';
+import { getReceivingWard } from '../../utils/appHelpers';
 
 
 interface MobileDetailModalProps {
@@ -196,8 +197,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
     
-    const sdtLienHe = getContactInfo(contactSettings, record.ward || "", type);
-
+    const donViWard = record.receivingWard || getReceivingWard(record as RecordFile) || employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
+    const donViWardFull = getFullWard(donViWard);
+    const donViWardShort = getNormalizedWard(donViWard);
+    
+    const sdtLienHe = getContactInfo(contactSettings, record.ward || "", type, donViWard);
 
     const day = rDate.getDate().toString().padStart(2, '0');
     const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
@@ -213,14 +217,16 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
-    const donViWard = employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
-
     const printData = {
         code: val(record.code),
         customerName: val(record.customerName),
         landPlot: val(record.landPlot),
         mapSheet: val(record.mapSheet),
-        DON_VI_TIEP_NHAN: val(getFullWard(donViWard)).toUpperCase(),
+        DON_VI_TIEP_NHAN: val(donViWardFull).toUpperCase(),
+        DON_VI_TIEP_NHAN_FULL: val(donViWardFull),
+        DON_VI_TIEP_NHAN_KHONG_TIEN_TO: val(donViWardShort),
+        DIA_DANH: val(donViWardShort),
+        RECEIVING_WARD: val(donViWard),
         XAPHUONG: val(getNormalizedWard(record.ward)),
         NGAYNHAN: dateFullString,
         NGAY_NHAN: dateShortString, 
@@ -280,7 +286,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành",
-        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${getFullWard(donViWard).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
+        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${donViWardShort}`
     };
 
     if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
@@ -668,14 +674,14 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       {showSystemReceipt && (
           <SystemReceiptTemplate
               data={record}
-              receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
+              receivingWard={record.receivingWard || getReceivingWard(record as RecordFile) || employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
               onClose={() => setShowSystemReceipt(false)}
           />
       )}
       {showPhieuXinLoi && (
           <PhieuXinLoiModal
               data={record}
-              receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
+              receivingWard={record.receivingWard || getReceivingWard(record as RecordFile) || employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
               onClose={() => setShowPhieuXinLoi(false)}
           />
       )}

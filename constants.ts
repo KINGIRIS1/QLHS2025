@@ -47,6 +47,7 @@ export const WARDS = DEFAULT_WARDS;
 // Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
 export const RECORD_TYPES = [
   'Trích đo chỉnh lý bản đồ địa chính',
+  'Trích đo Chuyển mục đích',
   'Trích đo bản đồ địa chính',
   'Thẩm định Trích đo',
   'Trích lục bản đồ địa chính',
@@ -57,6 +58,31 @@ export const RECORD_TYPES = [
   'Thuế chính quy',
   'Thu hồi Giấy chứng nhận',
   'Hiến đất'
+];
+
+// Danh sách các loại hồ sơ thuộc nhóm Đo đạc (dành cho Tab Đo đạc & Báo cáo Đo đạc)
+export const MEASUREMENT_RECORD_TYPES = [
+  'Trích đo chỉnh lý bản đồ địa chính',
+  'Trích đo Chuyển mục đích',
+  'Trích đo bản đồ địa chính',
+  'Thẩm định Trích đo',
+  'Trích lục bản đồ địa chính',
+  'Đo đạc theo yêu cầu',
+  'Cắm mốc',
+  'Cung cấp thông tin quy hoạch',
+  'Sao lục hồ sơ'
+];
+
+// Danh sách các loại hồ sơ thuộc nhóm Khác (dành cho Tab Khác & Báo cáo Khác)
+export const OTHER_RECORD_TYPES = [
+  'Thuế chính quy',
+  'Thu hồi Giấy chứng nhận',
+  'Hiến đất',
+  'CMD',
+  'Cung cấp thông tin',
+  'Thi hành án',
+  'Tòa án',
+  'Xin số thửa'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)

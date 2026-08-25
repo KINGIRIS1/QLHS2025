@@ -418,36 +418,54 @@ export const saveContactSettings = async (settings: ContactSettings): Promise<bo
     return await saveSystemSetting('contact_settings_v2', value);
 };
 
-export const getContactInfo = (settings: ContactSettings, ward: string, type: string): string => {
+export const getContactInfo = (settings: ContactSettings | null | undefined, ward: string, type: string, receivingWard?: string): string => {
+    const s = settings || cachedContactSettings || DEFAULT_CONTACT_SETTINGS;
     const tLower = (type || "").toLowerCase();
     
     // Check type-specific settings first
     if (tLower.includes("thẩm định") || tLower.includes("tham dinh")) {
-        return settings.type_thamdinh || DEFAULT_CONTACT_SETTINGS.type_thamdinh || "";
+        const val = s.type_thamdinh?.trim();
+        if (val) return val;
     }
     if (tLower.includes("hiến đất") || tLower.includes("hien dat")) {
-        return settings.type_hiendat || DEFAULT_CONTACT_SETTINGS.type_hiendat || "";
+        const val = s.type_hiendat?.trim();
+        if (val) return val;
     }
-    if (tLower.includes("sao lục") || tLower.includes("saoluc")) {
-        return settings.type_saoluc || DEFAULT_CONTACT_SETTINGS.type_saoluc;
+    if (tLower.includes("sao lục") || tLower.includes("saoluc") || tLower.includes("cung cấp thông tin")) {
+        const val = s.type_saoluc?.trim();
+        if (val) return val;
     }
     if (tLower.includes("thuế") || tLower.includes("thue")) {
-        return settings.type_thue || DEFAULT_CONTACT_SETTINGS.type_thue;
+        const val = s.type_thue?.trim();
+        if (val) return val;
     }
     
-    // Fallback to ward-specific settings
+    // Check receiving ward first (Phi địa giới - Đơn vị tiếp nhận hồ sơ)
+    const rLower = (receivingWard || "").toLowerCase();
+    if (rLower.includes("minh hưng") || rLower.includes("minh hung")) {
+        return s.ward_minhhung || DEFAULT_CONTACT_SETTINGS.ward_minhhung;
+    }
+    if (rLower.includes("nha bích") || rLower.includes("nha bich")) {
+        return s.ward_nhabich || DEFAULT_CONTACT_SETTINGS.ward_nhabich;
+    }
+    if (rLower.includes("chơn thành") || rLower.includes("chon thanh")) {
+        return s.ward_chonthanh || DEFAULT_CONTACT_SETTINGS.ward_chonthanh;
+    }
+
+    // Fallback to plot's ward (Địa bàn thửa đất)
     const wLower = (ward || "").toLowerCase();
     if (wLower.includes("minh hưng") || wLower.includes("minh hung")) {
-        return settings.ward_minhhung || DEFAULT_CONTACT_SETTINGS.ward_minhhung;
+        return s.ward_minhhung || DEFAULT_CONTACT_SETTINGS.ward_minhhung;
     }
     if (wLower.includes("nha bích") || wLower.includes("nha bich")) {
-        return settings.ward_nhabich || DEFAULT_CONTACT_SETTINGS.ward_nhabich;
+        return s.ward_nhabich || DEFAULT_CONTACT_SETTINGS.ward_nhabich;
     }
     if (wLower.includes("chơn thành") || wLower.includes("chon thanh")) {
-        return settings.ward_chonthanh || DEFAULT_CONTACT_SETTINGS.ward_chonthanh;
+        return s.ward_chonthanh || DEFAULT_CONTACT_SETTINGS.ward_chonthanh;
     }
     
-    return "";
+    // Default fallback to Chơn Thành office
+    return s.ward_chonthanh || DEFAULT_CONTACT_SETTINGS.ward_chonthanh || "";
 };
 
 // ==========================================

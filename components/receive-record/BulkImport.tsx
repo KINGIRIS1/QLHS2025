@@ -91,6 +91,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                           customerName: r.customerName || 'Không rõ tên',
                           phoneNumber: '',
                           ward: r.ward || processingWard,
+                          receivingWard: processingWard,
                           landPlot: r.landPlot ? String(r.landPlot) : '',
                           mapSheet: r.mapSheet ? String(r.mapSheet) : '',
                           area: typeof r.area === 'number' ? r.area : parseFloat(String(r.area || '0')),
@@ -195,6 +196,9 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'ĐO ĐẠC': 'Đo đạc theo yêu cầu',
               'CM': 'Cắm mốc',
               'CẮM MỐC': 'Cắm mốc',
+              'TDCMD': 'Trích đo Chuyển mục đích',
+              'TRÍCH ĐO CHUYỂN MỤC ĐÍCH': 'Trích đo Chuyển mục đích',
+              'CHUYỂN MỤC ĐÍCH': 'Trích đo Chuyển mục đích',
               'CL': 'Trích đo chỉnh lý bản đồ địa chính',
               'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính',
               'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
@@ -254,7 +258,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   isSaved: false,
                   customerName: String(customerName),
                   phoneNumber: String(getVal(['SĐT', 'ĐIỆN THOẠI']) || ''),
-                  ward: String(ward),
+                  ward: String(ward || processingWard),
+                  receivingWard: processingWard,
                   landPlot: String(getVal(['THỬA']) || ''),
                   mapSheet: String(getVal(['TỜ']) || ''),
                   area: parseFloat(String(getVal(['DIỆN TÍCH']) || '0')),
@@ -280,9 +285,10 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       setBulkRecords(prev => {
           const newList = [...prev];
           const record = newList[index];
+          const targetReceivingWard = record.receivingWard || processingWard;
           const existingBulkCodes = newList.map(r => r.code || '').filter(c => c !== '');
-          const newCode = calculateNextCode(processingWard, record.receivedDate || '', existingBulkCodes, record.recordType || '');
-          newList[index] = { ...record, code: newCode };
+          const newCode = calculateNextCode(targetReceivingWard, record.receivedDate || '', existingBulkCodes, record.recordType || '');
+          newList[index] = { ...record, code: newCode, receivingWard: targetReceivingWard };
           return newList;
       });
   };
@@ -294,6 +300,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       const newRecord: RecordFile = { 
           ...record, 
           id: Math.random().toString(36).substr(2, 9),
+          receivingWard: record.receivingWard || processingWard,
+          ward: record.ward || processingWard,
           receivedDate: record.receivedDate || new Date().toISOString().split('T')[0],
           deadline: record.deadline || '',
           status: RecordStatus.RECEIVED,

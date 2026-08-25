@@ -5,19 +5,19 @@ import {
     Sparkles, FileText, CheckCircle2, Clock, AlertTriangle, FileCheck2, 
     History, MapPin, FolderArchive, Printer, Settings, Loader2, Camera, 
     Check, LayoutGrid, FileCode, TrendingUp, Award, Layers, BarChart3,
-    AlertCircle, ChevronRight, PieChart, ShieldAlert
+    AlertCircle, ChevronRight, PieChart, ShieldAlert, CalendarDays, Layout
 } from 'lucide-react';
 
 interface AiReportCardViewProps {
     reportContent: string;
     isGenerating: boolean;
-    onGenerate: () => void;
+    onGenerate: (fromDate?: string, toDate?: string, reportType?: string, records?: RecordFile[]) => void;
     onPrint: () => void;
     onOpenKeyModal: () => void;
     records: RecordFile[];
-    reportType: 'week' | 'month' | 'custom';
-    fromDate: string;
-    toDate: string;
+    reportType?: 'week' | 'month' | 'custom';
+    fromDate?: string;
+    toDate?: string;
     timeLabel?: string;
 }
 
@@ -28,9 +28,9 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
     onPrint,
     onOpenKeyModal,
     records,
-    reportType,
-    fromDate,
-    toDate,
+    reportType: initialReportType = 'month',
+    fromDate: initialFromDate,
+    toDate: initialToDate,
     timeLabel
 }) => {
     // Mode toggle: 'cards' = Card Dashboard layout; 'a4' = Classic A4 Print document
@@ -41,9 +41,48 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
     const [captureSuccess, setCaptureSuccess] = useState(false);
     const reportCardRef = useRef<HTMLDivElement>(null);
 
+    // Independent Date Filter
+    const [localReportType, setLocalReportType] = useState<'week' | 'month' | 'all' | 'custom'>(initialReportType);
+    const [localFromDate, setLocalFromDate] = useState<string>(() => {
+        if (initialFromDate) return initialFromDate;
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    });
+    const [localToDate, setLocalToDate] = useState<string>(() => {
+        if (initialToDate) return initialToDate;
+        return new Date().toISOString().split('T')[0];
+    });
+
+    const handleQuickDate = (mode: 'week' | 'month' | 'all') => {
+        setLocalReportType(mode);
+        const now = new Date();
+        if (mode === 'week') {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const start = new Date(now.setDate(diff));
+            setLocalFromDate(start.toISOString().split('T')[0]);
+            setLocalToDate(new Date().toISOString().split('T')[0]);
+        } else if (mode === 'month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            setLocalFromDate(start.toISOString().split('T')[0]);
+            setLocalToDate(new Date().toISOString().split('T')[0]);
+        }
+    };
+
+    const filteredRecords = useMemo(() => {
+        if (localReportType === 'all') return records;
+        const start = new Date(localFromDate); start.setHours(0, 0, 0, 0);
+        const end = new Date(localToDate); end.setHours(23, 59, 59, 999);
+        return records.filter(r => {
+            if (!r.receivedDate) return false;
+            const rDate = new Date(r.receivedDate);
+            return rDate >= start && rDate <= end;
+        });
+    }, [records, localReportType, localFromDate, localToDate]);
+
     // Tính toán số liệu tổng quan chi tiết từ danh sách hồ sơ
     const stats = useMemo(() => {
-        const total = records.length;
+        const total = filteredRecords.length;
         let done = 0;
         let processing = 0;
         let pendingSign = 0;
@@ -59,7 +98,7 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        records.forEach(r => {
+        filteredRecords.forEach(r => {
             const isCompleted = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED;
             
             if (isCompleted) done++;
@@ -126,7 +165,7 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
             wardTypeDetails,
             overdueRecordsList
         };
-    }, [records]);
+    }, [filteredRecords]);
 
     // Trích xuất các đoạn nhận xét từ HTML Gemini nếu có
     const extractedSections = useMemo(() => {
@@ -160,7 +199,7 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
                 backgroundColor: '#f8fafc'
             });
 
-            const fileName = `Bao_Cao_The_${reportType}_${fromDate}_den_${toDate}.png`;
+            const fileName = `Bao_Cao_The_${localReportType}_${localFromDate}_den_${localToDate}.png`;
             const dataUrl = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.download = fileName;
@@ -180,23 +219,70 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
     return (
         <div className="w-full flex flex-col items-center p-3 md:p-5 gap-4">
             {/* TOOLBAR BÁO CÁO */}
-            <div className="w-full bg-white p-3.5 md:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-base md:text-lg text-slate-800 tracking-tight">
-                            Báo Cáo Tiến Độ Đo Đạc
-                        </span>
-                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
-                            {reportType === 'week' ? 'Báo cáo Tuần' : reportType === 'month' ? 'Báo cáo Tháng' : 'Tùy chỉnh'}
-                        </span>
+            <div className="w-full bg-white p-3.5 md:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 shrink-0">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-base text-slate-800 tracking-tight">
+                                Báo Cáo Tiến Độ Đo Đạc
+                            </span>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
+                                {localReportType === 'week' ? 'Báo cáo Tuần' : localReportType === 'month' ? 'Báo cáo Tháng' : localReportType === 'all' ? 'Tất cả' : 'Tùy chỉnh'}
+                            </span>
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium">
+                            {localReportType === 'all' ? (
+                                <span>Toàn bộ dữ liệu ({filteredRecords.length} hồ sơ)</span>
+                            ) : (
+                                <span>Từ <strong className="text-slate-700">{localFromDate}</strong> đến <strong className="text-slate-700">{localToDate}</strong> ({filteredRecords.length} hồ sơ)</span>
+                            )}
+                        </div>
                     </div>
-                    <div className="text-xs text-slate-500 font-medium">
-                        Khoảng thời gian: <strong className="text-slate-700">{fromDate}</strong> đến <strong className="text-slate-700">{toDate}</strong>
-                        {timeLabel && <span className="ml-2 italic text-slate-400">({timeLabel})</span>}
+
+                    {/* Quick Date Filters */}
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        <button 
+                            onClick={() => handleQuickDate('week')} 
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${localReportType === 'week' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-indigo-700'}`}
+                        >
+                            <CalendarDays size={13} /> Tuần này
+                        </button>
+                        <button 
+                            onClick={() => handleQuickDate('month')} 
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${localReportType === 'month' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-indigo-700'}`}
+                        >
+                            <Layout size={13} /> Tháng này
+                        </button>
+                        <button 
+                            onClick={() => handleQuickDate('all')} 
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${localReportType === 'all' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-indigo-700'}`}
+                        >
+                            Tất cả
+                        </button>
+                    </div>
+
+                    {/* Custom Date Input */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
+                        <span className="text-slate-400 font-medium">Từ:</span>
+                        <input 
+                            type="date" 
+                            value={localFromDate} 
+                            disabled={localReportType === 'all'}
+                            onChange={(e) => { setLocalFromDate(e.target.value); setLocalReportType('custom'); }} 
+                            className="text-xs outline-none bg-transparent text-slate-700 font-medium disabled:opacity-50" 
+                        />
+                        <span className="text-slate-400 font-medium">Đến:</span>
+                        <input 
+                            type="date" 
+                            value={localToDate} 
+                            disabled={localReportType === 'all'}
+                            onChange={(e) => { setLocalToDate(e.target.value); setLocalReportType('custom'); }} 
+                            className="text-xs outline-none bg-transparent text-slate-700 font-medium disabled:opacity-50" 
+                        />
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
                     {/* View Switcher Toggle */}
                     <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200 text-xs font-bold">
                         <button
@@ -230,7 +316,7 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
                     </button>
 
                     <button 
-                        onClick={onGenerate} 
+                        onClick={() => onGenerate(localFromDate, localToDate, localReportType, filteredRecords)} 
                         disabled={isGenerating} 
                         className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md shadow-purple-500/20 hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 active:scale-95"
                     >

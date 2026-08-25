@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper, showToast } from '../utils/appHelpers';
 import { fetchArchiveRecords, saveArchiveRecord } from '../services/apiArchive';
 import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
+import { calculateNextRecordCode, getWardShortCode } from '../utils/codeGenerator';
 import ExportReceiptSection from './receive-record/ExportReceiptSection';
 
 
@@ -285,96 +286,14 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [previewExcelName, setPreviewExcelName] = useState('');
 
-  // --- LOGIC TẠO MÃ HỒ SƠ (CẬP NHẬT CHÍNH XÁC THEO ĐỊA BÀN) ---
-  const getShortCode = (ward: string) => {
-      const normalized = ward.toLowerCase().trim();
-      const cleanName = normalized
-          .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
-          .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
-
-      if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
-      if (cleanName.includes('chơn thành') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
-      if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
-      if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
-      if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
-      if (cleanName.includes('quang minh') || cleanName.includes('quangminh')) return 'QM';
-      if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
-      if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
-      
-      return 'CT';
-  };
-
+  // --- LOGIC TẠO MÃ HỒ SƠ CHỐNG TRÙNG THEO LOẠI HỒ SƠ & 3 XÃ ---
   const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = [], recordType?: string) => {
-    if (!wardName || !dateStr) return '';
-
-    const d = new Date(dateStr);
-    const yy = d.getFullYear().toString().slice(-2);
-    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
-    const dd = ('0' + d.getDate()).slice(-2);
-    const datePrefix = `${yy}${mm}${dd}`;
-    
-    const suffix = getShortCode(wardName);
-    
-    // Xác định tiền tố mong muốn tùy thuộc vào loại hồ sơ
-    let targetPrefixType = '';
-    if (recordType === 'Sao lục hồ sơ' || recordType === 'Sao lục') {
-        targetPrefixType = 'SLHS';
-    } else if (recordType === 'Thuế chính quy') {
-        targetPrefixType = 'TCQ';
-    } else if (recordType === 'Thu hồi Giấy chứng nhận') {
-        targetPrefixType = 'THG';
-    }
-
-    let maxSeq = 0;
-
-    const checkAndExtractSeq = (codeStr: string | null | undefined) => {
-        if (!codeStr) return;
-        const cleanCode = codeStr.trim().toUpperCase();
-        const parts = cleanCode.split('-');
-        
-        if (targetPrefixType) {
-            // Đang sinh mã có tiền tố SLHS hoặc TCQ (độ dài 4)
-            if (parts.length === 4) {
-                const [rType, rDate, rSeq, rSuffix] = parts;
-                if (rType === targetPrefixType && rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
-                    const seqNum = parseInt(rSeq, 10);
-                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-                }
-            }
-        } else {
-            // Đang sinh mã thường (độ dài 3)
-            if (parts.length === 3) {
-                const [rDate, rSeq, rSuffix] = parts;
-                if (rDate === datePrefix && rSuffix === suffix.toUpperCase()) {
-                    const seqNum = parseInt(rSeq, 10);
-                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
-                }
-            }
-        }
-    };
-
-    records.forEach(r => checkAndExtractSeq(r.code));
-
-    // Duyệt qua thêm cả danh sách hồ sơ sao lục của hôm nay để tính toán mã số tiếp theo
-    archiveSaoLucRecords.forEach(r => {
-        // Hồ sơ lưu trữ cũng có code
-        checkAndExtractSeq(r.code);
-    });
-
-    // Duyệt qua cả danh sách hồ sơ vào sổ lưu trữ của hôm nay để tính toán mã số tiếp theo
-    archiveVaoSoRecords.forEach(r => {
-        checkAndExtractSeq(r.code);
-    });
-
-    existingCodes.forEach(code => checkAndExtractSeq(code));
-
-    const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
-    
-    if (targetPrefixType) {
-        return `${targetPrefixType}-${datePrefix}-${nextSeq}-${suffix}`;
-    } else {
-        return `${datePrefix}-${nextSeq}-${suffix}`;
-    }
+    const allExisting = [
+        ...records,
+        ...archiveSaoLucRecords,
+        ...archiveVaoSoRecords
+    ];
+    return calculateNextRecordCode(wardName, dateStr, allExisting, existingCodes, recordType);
   };
 
   // --- LOGIC TÍNH HẠN TRẢ (CẬP NHẬT FIX LỖI TIMEZONE VÀ NGÀY NGHỈ) ---
@@ -414,7 +333,11 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
 
-    const sdtLienHe = getContactInfo(contactSettings, dataToUse.ward || "", rType);
+    const donViWard = dataToUse.receivingWard || employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
+    const donViWardFull = getFullWard(donViWard);
+    const donViWardShort = getNormalizedWard(donViWard);
+
+    const sdtLienHe = getContactInfo(contactSettings, dataToUse.ward || "", rType, donViWard);
 
 
     const dayRec = rDate.getDate().toString().padStart(2, '0');
@@ -431,14 +354,16 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
-    const donViWard = employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
-
     const printData = {
         code: val(dataToUse.code),
         customerName: val(dataToUse.customerName),
         landPlot: val(dataToUse.landPlot),
         mapSheet: val(dataToUse.mapSheet),
-        DON_VI_TIEP_NHAN: val(getFullWard(donViWard)).toUpperCase(),
+        DON_VI_TIEP_NHAN: val(donViWardFull).toUpperCase(),
+        DON_VI_TIEP_NHAN_FULL: val(donViWardFull),
+        DON_VI_TIEP_NHAN_KHONG_TIEN_TO: val(donViWardShort),
+        DIA_DANH: val(donViWardShort),
+        RECEIVING_WARD: val(donViWard),
         
         XAPHUONG: val(getNormalizedWard(dataToUse.ward)),
         NGAYNHAN: dateFullString,
@@ -510,7 +435,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành",
-        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${getFullWard(donViWard).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
+        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${donViWardShort}`
     };
     
     if (hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
@@ -703,7 +628,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       {showSystemReceipt && systemReceiptData && (
           <SystemReceiptTemplate
               data={systemReceiptData}
-              receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
+              receivingWard={systemReceiptData?.receivingWard || employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành'}
               onClose={() => setShowSystemReceipt(false)}
           />
       )}

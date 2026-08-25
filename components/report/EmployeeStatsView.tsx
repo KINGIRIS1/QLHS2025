@@ -5,7 +5,7 @@ import {
     User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, 
     CheckCircle2, Clock, AlertTriangle, Briefcase, FileSpreadsheet, 
     Calendar, ChevronRight, CheckCircle, ArrowLeft, Layers, 
-    Folder, HelpCircle 
+    Folder, HelpCircle, CalendarDays, Layout, Filter
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { STATUS_LABELS } from '../../constants';
@@ -14,18 +14,46 @@ interface EmployeeStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
     schedules: WorkSchedule[];
-    fromDate: string;
-    toDate: string;
+    fromDate?: string;
+    toDate?: string;
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
 }
 
 const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
-    records, employees, schedules = [], fromDate, toDate, selectedEmpId, setSelectedEmpId 
+    records, employees, schedules = [], fromDate: initialFromDate, toDate: initialToDate, selectedEmpId, setSelectedEmpId 
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [recordListTab, setRecordListTab] = useState<'uncompleted' | 'completed'>('uncompleted');
+
+    // Independent date filter
+    const [dateMode, setDateMode] = useState<'month' | 'week' | 'all' | 'custom'>('month');
+    const [localFromDate, setLocalFromDate] = useState<string>(() => {
+        if (initialFromDate) return initialFromDate;
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    });
+    const [localToDate, setLocalToDate] = useState<string>(() => {
+        if (initialToDate) return initialToDate;
+        return new Date().toISOString().split('T')[0];
+    });
+
+    const handleQuickDate = (mode: 'week' | 'month' | 'all') => {
+        setDateMode(mode);
+        const now = new Date();
+        if (mode === 'week') {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const start = new Date(now.setDate(diff));
+            setLocalFromDate(start.toISOString().split('T')[0]);
+            setLocalToDate(new Date().toISOString().split('T')[0]);
+        } else if (mode === 'month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            setLocalFromDate(start.toISOString().split('T')[0]);
+            setLocalToDate(new Date().toISOString().split('T')[0]);
+        }
+    };
 
     // Helper: format dates
     const formatLocalDate = (dateStr: string | null | undefined) => {
@@ -40,25 +68,27 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 
     // Filter records by date range
     const recordsInTimeRange = useMemo(() => {
-        const start = new Date(fromDate); start.setHours(0,0,0,0);
-        const end = new Date(toDate); end.setHours(23,59,59,999);
+        if (dateMode === 'all') return records;
+        const start = new Date(localFromDate); start.setHours(0,0,0,0);
+        const end = new Date(localToDate); end.setHours(23,59,59,999);
         return records.filter(r => {
             if (!r.receivedDate) return false;
             const rDate = new Date(r.receivedDate);
             return rDate >= start && rDate <= end;
         });
-    }, [records, fromDate, toDate]);
+    }, [records, dateMode, localFromDate, localToDate]);
 
     // Filter schedules by date range
     const schedulesInTimeRange = useMemo(() => {
-        const start = new Date(fromDate); start.setHours(0,0,0,0);
-        const end = new Date(toDate); end.setHours(23,59,59,999);
+        if (dateMode === 'all') return schedules;
+        const start = new Date(localFromDate); start.setHours(0,0,0,0);
+        const end = new Date(localToDate); end.setHours(23,59,59,999);
         return schedules.filter(s => {
             if (!s.date) return false;
             const sDate = new Date(s.date);
             return sDate >= start && sDate <= end;
         });
-    }, [schedules, fromDate, toDate]);
+    }, [schedules, dateMode, localFromDate, localToDate]);
 
     // Calculate report statistics for each employee
     const employeeStatsList = useMemo(() => {
@@ -195,7 +225,9 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             empName,
             aiStats,
             overdueList,
-            `Từ ${new Date(fromDate).toLocaleDateString('vi-VN')} đến ${new Date(toDate).toLocaleDateString('vi-VN')}`
+            dateMode === 'all' 
+                ? 'Toàn bộ thời gian' 
+                : `Từ ${new Date(localFromDate).toLocaleDateString('vi-VN')} đến ${new Date(localToDate).toLocaleDateString('vi-VN')}`
         );
         
         setAiEvaluation(result);
@@ -213,7 +245,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             ['Nhân viên:', emp.name],
             ['Tổ / Phòng ban:', emp.department],
             ['Chức vụ:', emp.position || 'Nhân viên'],
-            ['Thời gian báo cáo:', `Từ ngày ${formatLocalDate(fromDate)} đến ngày ${formatLocalDate(toDate)}`],
+            ['Thời gian báo cáo:', dateMode === 'all' ? 'Toàn bộ thời gian' : `Từ ngày ${formatLocalDate(localFromDate)} đến ngày ${formatLocalDate(localToDate)}`],
             [],
             ['CHỈ SỐ THỐNG KÊ'],
             ['Tổng số hồ sơ phụ trách', selectedEmpStats.total],
@@ -286,15 +318,15 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             XLSX.utils.book_append_sheet(wb, wsSchedules, "Lịch công tác");
         }
 
-        XLSX.writeFile(wb, `BC_NhanVien_${emp.name}_${fromDate}_to_${toDate}.xlsx`);
+        XLSX.writeFile(wb, `BC_NhanVien_${emp.name}_${localFromDate}_to_${localToDate}.xlsx`);
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
+        <div className="flex flex-col h-full bg-slate-100 p-4 lg:p-6 overflow-y-auto">
             
-            {/* 1. SELECTION BAR */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* 1. SELECTION & DATE FILTER BAR */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col xl:flex-row items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3 w-full xl:w-auto">
                     <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
                         <Briefcase size={20} />
                     </div>
@@ -303,20 +335,63 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                         <p className="text-xs text-gray-500">Thống kê số lượng, phân loại hồ sơ và lịch công tác nhân sự</p>
                     </div>
                 </div>
-                
-                <div className="w-full md:w-96">
-                    <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <select 
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300"
-                            value={selectedEmpId}
-                            onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
+
+                {/* Independent Date Filter Controls */}
+                <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <button 
+                            onClick={() => handleQuickDate('week')} 
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${dateMode === 'week' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-indigo-700'}`}
                         >
-                            <option value="">-- Tổng hợp tất cả nhân viên --</option>
-                            {employees.map(emp => (
-                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
-                            ))}
-                        </select>
+                            <CalendarDays size={13} /> Tuần này
+                        </button>
+                        <button 
+                            onClick={() => handleQuickDate('month')} 
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${dateMode === 'month' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-indigo-700'}`}
+                        >
+                            <Layout size={13} /> Tháng này
+                        </button>
+                        <button 
+                            onClick={() => handleQuickDate('all')} 
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${dateMode === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-indigo-700'}`}
+                        >
+                            Tất cả
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs shadow-sm">
+                        <span className="text-gray-400 font-medium">Từ:</span>
+                        <input 
+                            type="date" 
+                            value={localFromDate} 
+                            disabled={dateMode === 'all'}
+                            onChange={(e) => { setLocalFromDate(e.target.value); setDateMode('custom'); }} 
+                            className="text-xs outline-none text-gray-700 font-medium disabled:opacity-50" 
+                        />
+                        <span className="text-gray-400 font-medium">Đến:</span>
+                        <input 
+                            type="date" 
+                            value={localToDate} 
+                            disabled={dateMode === 'all'}
+                            onChange={(e) => { setLocalToDate(e.target.value); setDateMode('custom'); }} 
+                            className="text-xs outline-none text-gray-700 font-medium disabled:opacity-50" 
+                        />
+                    </div>
+                
+                    <div className="w-full sm:w-72">
+                        <div className="relative">
+                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <select 
+                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300"
+                                value={selectedEmpId}
+                                onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
+                            >
+                                <option value="">-- Tổng hợp tất cả nhân viên --</option>
+                                {employees.map(emp => (
+                                    <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -382,7 +457,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                                 <ListFilter size={16} className="text-indigo-600" /> Bảng tổng hợp báo cáo nhân sự chi tiết
                             </h3>
                             <span className="text-xs text-gray-500 font-semibold">
-                                Khoảng thời gian: <span className="text-indigo-700 font-bold">{formatLocalDate(fromDate)}</span> - <span className="text-indigo-700 font-bold">{formatLocalDate(toDate)}</span>
+                                Khoảng thời gian: <span className="text-indigo-700 font-bold">{dateMode === 'all' ? 'Toàn bộ thời gian' : `${formatLocalDate(localFromDate)} - ${formatLocalDate(localToDate)}`}</span>
                             </span>
                         </div>
                         

@@ -5,7 +5,7 @@ import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi
 import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, UserCheck } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
 import ContractSignerConfigModal from './ContractSignerConfigModal';
-import { fetchContractSignerSettingsCached, getContractSignerInfo, ContractSignerSettings, DEFAULT_CONTRACT_SIGNER_SETTINGS } from '../services/apiSystem';
+import { fetchContractSignerSettingsCached, getContractSignerInfo, ContractSignerSettings, DEFAULT_CONTRACT_SIGNER_SETTINGS, fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
@@ -71,6 +71,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isSignerConfigOpen, setIsSignerConfigOpen] = useState(false);
   const [signerSettings, setSignerSettings] = useState<ContractSignerSettings>(DEFAULT_CONTRACT_SIGNER_SETTINGS);
+  const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   
   // Không dùng Modal Preview nữa, nhưng vẫn giữ state để tránh lỗi biên dịch nếu cần
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -86,17 +87,26 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       setSignerSettings(settings);
   };
 
+  const loadContactInfoSettings = async () => {
+      const settings = await fetchContactSettingsCached();
+      setContactSettings(settings);
+  };
+
   useEffect(() => { 
       loadPrices(); 
       loadContracts();
       loadSignerSettings();
+      loadContactInfoSettings();
 
       const handleCacheUpdate = () => {
           loadSignerSettings();
+          loadContactInfoSettings();
       };
       window.addEventListener('contract_signer_settings_cache_updated', handleCacheUpdate);
+      window.addEventListener('contact_settings_cache_updated', handleCacheUpdate);
       return () => {
           window.removeEventListener('contract_signer_settings_cache_updated', handleCacheUpdate);
+          window.removeEventListener('contact_settings_cache_updated', handleCacheUpdate);
       };
   }, []);
 
@@ -310,14 +320,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, r
       const signerName = signerInfo.name;
       const signerPosition = signerInfo.position;
 
-      let sdtLienHe = ""; 
-      if (normWard.includes("minh hung")) {
-          sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
-      } else if (normWard.includes("nha bich")) {
-          sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
-      } else if (normWard.includes("chon thanh")) {
-          sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
-      }
+      const sdtLienHe = getContactInfo(contactSettings, rawWard, dataToPrint.contractType || dataToPrint.serviceType || '');
 
       const detailAddress = val(dataToPrint.address);
       const fullLandAddress = detailAddress ? `${detailAddress}, ${unitPrefix} ${rawWard}` : `${unitPrefix} ${rawWard}`;

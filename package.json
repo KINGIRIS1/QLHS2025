@@ -14,6 +14,7 @@
     "electron:dev": "wait-on tcp:5173 && electron .",
     "electron:build": "npm run build && electron-builder --win --x64 -p never",
     "start": "node dist/server.cjs",
+    "backup": "tsx backup_tables.ts",
     "cap:sync": "cap sync",
     "cap:add-android": "cap add android",
     "cap:open-android": "cap open android"

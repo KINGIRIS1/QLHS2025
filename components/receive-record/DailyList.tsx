@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee, UserRole } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
+import { getWardShortCode } from '../../utils/codeGenerator';
 import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX, AlertTriangle } from 'lucide-react';
 import { PaginationControls } from '../PaginationControls';
 
@@ -20,21 +21,7 @@ interface DailyListProps {
 
 // Hàm lấy mã viết tắt (Suffix) từ tên Xã/Phường
 const getShortCode = (ward: string) => {
-    const normalized = ward.toLowerCase().trim();
-    const cleanName = normalized
-        .replace(/^(xã|phường|thị trấn|tt\.|p\.|x\.)\s+/g, '')
-        .replace(/\s+(xã|phường|thị trấn)\s+/g, ' ');
-
-    if (cleanName.includes('minh hưng') || cleanName.includes('minhhung')) return 'MH';
-    if (cleanName.includes('chơn thành') || cleanName.includes('the_chon_thanh') || cleanName.includes('chonthanh') || cleanName.includes('hưng long')) return 'CT';
-    if (cleanName.includes('nha bích') || cleanName.includes('nhabich')) return 'NB';
-    if (cleanName.includes('minh lập') || cleanName.includes('minhlap')) return 'ML';
-    if (cleanName.includes('minh thắng') || cleanName.includes('minhthang')) return 'MT';
-    if (cleanName.includes('quang minh') || cleanName.includes('quangminh')) return 'QM';
-    if (cleanName.includes('thành tâm') || cleanName.includes('thanhtam')) return 'TT';
-    if (cleanName.includes('minh long') || cleanName.includes('minhlong')) return 'MLO';
-    
-    return 'CT'; // Mặc định
+    return getWardShortCode(ward);
 };
 
 const getRecordSuffix = (code: string) => {
@@ -661,7 +648,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                     <tbody className="divide-y divide-gray-100 text-sm">
                         {paginatedRecords.length > 0 ? (
                             paginatedRecords.map((r, index) => (
-                                <tr key={r.id} className="hover:bg-blue-50/20 group transition-colors">
+                                <tr key={`${r.id || 'rec'}-${(currentPage - 1) * itemsPerPage + index}`} className="hover:bg-blue-50/20 group transition-colors">
                                     <td className="p-4 text-center text-gray-400 align-middle font-medium font-mono">{(currentPage - 1) * itemsPerPage + index + 1}</td> 
                                     <td className="p-4 font-bold text-blue-600 truncate align-middle tracking-tight" title={r.code}>
                                         <div className="flex flex-col items-start gap-1">

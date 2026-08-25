@@ -21,7 +21,10 @@ export const PlotCountModal: React.FC<PlotCountModalProps> = ({
   // Cập nhật lại số lượng thửa mặc định từ hồ sơ nếu có sẵn dã lưu
   useEffect(() => {
     if (isOpen && record) {
-      setPlotCount(record.plotCount || 1);
+      const initialCount = record.plotCount !== undefined && record.plotCount !== null && String(record.plotCount).trim() !== ''
+        ? Number(record.plotCount)
+        : 1;
+      setPlotCount(isNaN(initialCount) || initialCount < 1 ? 1 : initialCount);
     }
   }, [isOpen, record]);
 
@@ -29,11 +32,12 @@ export const PlotCountModal: React.FC<PlotCountModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (plotCount < 1) {
+    const finalCount = Number(plotCount);
+    if (isNaN(finalCount) || finalCount < 1) {
       showToast('Vui lòng nhập số lượng thửa đất hợp lệ (tối thiểu là 1).', 'error');
       return;
     }
-    onConfirm(plotCount);
+    onConfirm(finalCount);
   };
 
   const isOther = ['CMD', 'Tòa án', 'Thi hành án', 'Thuế chính quy', 'Thu hồi Giấy chứng nhận', 'Xin số thửa', 'Hiến đất'].includes(record.recordType || '');

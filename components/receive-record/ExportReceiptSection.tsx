@@ -160,11 +160,12 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
     const rType = (record.recordType || '').toLowerCase();
     const isHienDat = rType.includes('hiến đất') || rType.includes('hien dat');
     const isThamDinh = rType.includes('thẩm định') || rType.includes('tham dinh');
+    const isTrichDoCMD = rType.includes('chuyển mục đích') || rType.includes('chuyen muc dich') || rType.includes('tdcmd');
     if (isHienDat) standardDays = "8";
     else if (isThamDinh) standardDays = "30";
     else if (rType.includes('thuế chính quy')) standardDays = "15";
     else if (rType.includes('cung cấp thông tin') || rType.includes('sao lục') || rType.includes('trích lục')) standardDays = "10";
-    else if (rType.includes('trích đo chỉnh lý')) standardDays = "15";
+    else if (rType.includes('trích đo chỉnh lý') || isTrichDoCMD) standardDays = "15";
     else if (rType.includes('trích đo') || rType.includes('đo đạc') || rType.includes('cắm mốc')) standardDays = "30";
 
     let tp1Value = 'Phiếu yêu cầu';
@@ -172,13 +173,17 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
         tp1Value = 'Tờ khai thuế';
     } else if (rType.includes('cung cấp thông tin') || rType.includes('sao lục')) {
         tp1Value = 'Phiếu yêu cầu cung cấp thông tin';
-    } else if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục')) {
+    } else if (rType.includes('chỉnh lý') || rType.includes('trích đo') || rType.includes('trích lục') || isTrichDoCMD) {
         tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
     } else if (rType.includes('đo đạc') || rType.includes('cắm mốc')) {
         tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
     }
 
-    const sdtLienHe = getContactInfo(contactSettings, record.ward || "", rType);
+    const donViWard = getReceivingWard(record as RecordFile) || employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
+    const donViWardFull = getFullWard(donViWard);
+    const donViWardShort = getNormalizedWard(donViWard);
+
+    const sdtLienHe = getContactInfo(contactSettings, record.ward || "", rType, donViWard);
 
     const dayRec = rDate.getDate().toString().padStart(2, '0');
     const monthRec = (rDate.getMonth() + 1).toString().padStart(2, '0');
@@ -194,14 +199,16 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
-    const donViWard = employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'chơn thành';
-
     return {
         code: val(record.code),
         customerName: val(record.customerName),
         landPlot: val(record.landPlot),
         mapSheet: val(record.mapSheet),
-        DON_VI_TIEP_NHAN: val(getFullWard(donViWard)).toUpperCase(),
+        DON_VI_TIEP_NHAN: val(donViWardFull).toUpperCase(),
+        DON_VI_TIEP_NHAN_FULL: val(donViWardFull),
+        DON_VI_TIEP_NHAN_KHONG_TIEN_TO: val(donViWardShort),
+        DIA_DANH: val(donViWardShort),
+        RECEIVING_WARD: val(donViWard),
         
         XAPHUONG: val(getNormalizedWard(record.ward)),
         NGAYNHAN: dateFullString,
@@ -259,8 +266,8 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
         
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(record.recordType), 
-        RECORD_TYPE: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : val(record.recordType),
+        LOAI_HS: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : isTrichDoCMD ? 'Trích đo xác định vị trí Chuyển mục đích' : val(record.recordType), 
+        RECORD_TYPE: isHienDat ? 'Hiến đất - Đối với trường hợp tặng cho đất cho Nhà nước hoặc cộng đồng dân cư hoặc mở rộng đường giao thông.' : isThamDinh ? 'Kiểm tra, thẩm định bản trích đo địa chính.' : isTrichDoCMD ? 'Trích đo xác định vị trí Chuyển mục đích' : val(record.recordType),
         GIAY_TO_KHAC: val(record.otherDocs),
         
         NGUOI_UY_QUYEN: val(record.authorizedBy).toUpperCase(),
@@ -274,7 +281,7 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
         SDTLH: sdtLienHe, 
         TINH: "Bình Phước", 
         HUYEN: "thị xã Chơn Thành",
-        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${getFullWard(donViWard).replace(/^Phường /i, 'phường ').replace(/^Xã /i, 'xã ')}`
+        NHAN_KET_QUA_TAI: `Trung tâm Phục vụ Hành chính công ${donViWardShort}`
     };
   };
 

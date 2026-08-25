@@ -18,10 +18,15 @@ interface RecordModalProps {
 }
 
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays }) => {
+  const linkedEmp = employees.find(e => e.id === currentUser.employeeId);
+  const userReceivingWard = linkedEmp?.managedWards?.[0] || 'Chơn Thành';
+
   const defaultState: Partial<RecordFile> = {
     code: '', customerName: '', phoneNumber: '', cccd: '', content: '', otherDocs: '',
     receivedDate: new Date().toISOString().split('T')[0], deadline: '', assignedTo: '',
-    group: GROUPS[0], ward: '', landPlot: '', mapSheet: '', area: 0, address: '',
+    group: GROUPS[0], 
+    receivingWard: userReceivingWard,
+    ward: '', landPlot: '', mapSheet: '', area: 0, address: '',
     recordType: EXTENDED_RECORD_TYPES[0], measurementNumber: '', excerptNumber: '',
     privateNotes: '', authorizedBy: '', authDocType: '', receiptNumber: '', resultReturnedDate: '',
     isPriority: false, priorityNote: ''
@@ -34,7 +39,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   useEffect(() => {
     if (isOpen) {
-        if (initialData) setFormData(initialData);
+        if (initialData) setFormData({
+            ...initialData,
+            receivingWard: initialData.receivingWard || userReceivingWard
+        });
         else setFormData({ ...defaultState, code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}` });
     }
   }, [initialData, isOpen]);
@@ -44,6 +52,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalData = { ...formData };
+    if (!finalData.receivingWard) {
+        finalData.receivingWard = userReceivingWard;
+    }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)
@@ -131,14 +142,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleChange = (field: keyof RecordFile, value: any) => {
       setFormData(prev => {
         const newData = { ...prev, [field]: value };
-        if (field === 'recordType' || field === 'receivedDate' || field === 'ward') {
+        if (field === 'recordType' || field === 'receivedDate' || field === 'receivingWard') {
             const rType = field === 'recordType' ? value : prev.recordType;
             const rDate = field === 'receivedDate' ? value : prev.receivedDate;
-            const rWard = field === 'ward' ? value : prev.ward;
+            const rReceivingWard = field === 'receivingWard' ? value : (prev.receivingWard || userReceivingWard);
             if (rType && rDate) {
                 newData.deadline = calculateDeadlineHelper(rType, rDate, holidays);
                 if (initialData && rType !== initialData.recordType) {
-                    const newCalculatedCode = generateNextRecordCode(rWard || 'Chơn Thành', rDate, [], [], rType);
+                    const newCalculatedCode = generateNextRecordCode(rReceivingWard, rDate, [], [], rType);
                     if (newCalculatedCode) {
                         newData.code = newCalculatedCode;
                     }
@@ -179,11 +190,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <label className="block text-xs font-bold text-gray-700 mb-1">Mã hồ sơ <span className="text-red-500">*</span></label>
                             <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 font-bold text-blue-700" value={val(formData.code)} onChange={(e) => handleChange('code', e.target.value)} />
                         </div>
-                        <div className="md:col-span-3">
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-bold text-gray-700 mb-1">Loại hồ sơ</label>
                             <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={val(formData.recordType)} onChange={(e) => handleChange('recordType', e.target.value)}>
                                 <option value="">-- Chọn loại hồ sơ --</option>
                                 {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                        <div className="md:col-span-1">
+                            <label className="block text-xs font-bold text-blue-800 mb-1">Nơi nhận (Phi địa giới)</label>
+                            <select className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 font-semibold text-blue-900" value={val(formData.receivingWard || userReceivingWard)} onChange={(e) => handleChange('receivingWard', e.target.value)}>
+                                {wards.map(w => <option key={w} value={w}>{w}</option>)}
                             </select>
                         </div>
                         {hasAdminRights && (

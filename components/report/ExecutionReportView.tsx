@@ -147,7 +147,22 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
       return !isNaN(dt.getTime()) && dt >= s && dt <= e;
     };
 
-    const getPlotCount = (r: RecordFile) => ['Sao lục', 'Công văn'].includes(r.recordType || '') ? 0 : (r.plotCount || 1);
+    const getPlotCount = (r: RecordFile): number => {
+      const typeLower = (r.recordType || '').toLowerCase();
+      if (typeLower.includes('sao lục') || typeLower.includes('công văn')) return 0;
+      if (r.plotCount !== undefined && r.plotCount !== null) {
+        const num = Number(r.plotCount);
+        if (!isNaN(num) && num > 0) return num;
+      }
+      if (r.landPlot) {
+        const plots = String(r.landPlot)
+          .split(/[,;\s/]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        if (plots.length > 0) return plots.length;
+      }
+      return 1;
+    };
 
     // 1. Đã thực hiện (COMPLETED_WORK)
     const listCompletedWork = records.filter(r => {
@@ -217,28 +232,43 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
       employeeMap[emp.id] = { employee: emp, completedWork: 0, pendingSign: 0, signed: 0, handover: 0, plots: 0, schedules: 0 };
     });
 
+    const findEmpId = (assignedTo?: string | null): string | null => {
+      if (!assignedTo) return null;
+      const target = assignedTo.trim().toLowerCase();
+      if (employeeMap[assignedTo]) return assignedTo;
+      const found = Object.keys(employeeMap).find(id => {
+        const emp = employeeMap[id].employee;
+        return emp.id.toLowerCase() === target || emp.name.trim().toLowerCase() === target;
+      });
+      return found || null;
+    };
+
     listCompletedWork.forEach(r => {
-      if (r.assignedTo && employeeMap[r.assignedTo]) {
-        employeeMap[r.assignedTo].completedWork++;
-        employeeMap[r.assignedTo].plots += getPlotCount(r);
+      const empId = findEmpId(r.assignedTo);
+      if (empId && employeeMap[empId]) {
+        employeeMap[empId].completedWork++;
+        employeeMap[empId].plots += getPlotCount(r);
       }
     });
     listPendingSign.forEach(r => {
-      if (r.assignedTo && employeeMap[r.assignedTo]) {
-        employeeMap[r.assignedTo].pendingSign++;
-        employeeMap[r.assignedTo].plots += getPlotCount(r);
+      const empId = findEmpId(r.assignedTo);
+      if (empId && employeeMap[empId]) {
+        employeeMap[empId].pendingSign++;
+        employeeMap[empId].plots += getPlotCount(r);
       }
     });
     listApproved.forEach(r => {
-      if (r.assignedTo && employeeMap[r.assignedTo]) {
-        employeeMap[r.assignedTo].signed++;
-        employeeMap[r.assignedTo].plots += getPlotCount(r);
+      const empId = findEmpId(r.assignedTo);
+      if (empId && employeeMap[empId]) {
+        employeeMap[empId].signed++;
+        employeeMap[empId].plots += getPlotCount(r);
       }
     });
     listHandover.forEach(r => {
-      if (r.assignedTo && employeeMap[r.assignedTo]) {
-        employeeMap[r.assignedTo].handover++;
-        employeeMap[r.assignedTo].plots += getPlotCount(r);
+      const empId = findEmpId(r.assignedTo);
+      if (empId && employeeMap[empId]) {
+        employeeMap[empId].handover++;
+        employeeMap[empId].plots += getPlotCount(r);
       }
     });
 
@@ -536,7 +566,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 text-center">
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:shadow-sm transition-all">
                 <div className="text-indigo-600 font-black text-2xl">{reportData.active.completedWork}</div>
                 <div className="text-slate-500 text-[10px] uppercase font-black tracking-wider mt-1.5 leading-tight">Đã thực hiện</div>
@@ -552,6 +582,10 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:shadow-sm transition-all">
                 <div className="text-blue-600 font-black text-2xl">{reportData.active.handover}</div>
                 <div className="text-slate-500 text-[10px] uppercase font-black tracking-wider mt-1.5 leading-tight">Đã chuyển 1 cửa</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-amber-300 bg-amber-50/40 shadow-xs hover:shadow-sm transition-all col-span-2 lg:col-span-1">
+                <div className="text-amber-700 font-black text-2xl">{reportData.active.plots}</div>
+                <div className="text-amber-900 text-[10px] uppercase font-black tracking-wider mt-1.5 leading-tight">Tổng số thửa đất</div>
               </div>
             </div>
 
@@ -570,7 +604,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                       <th className="p-3.5 text-center">Đang trình ký</th>
                       <th className="p-3.5 text-center">Đã ký duyệt</th>
                       <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>
-                      <th className="p-3.5 text-center">Số thửa đất</th>
+                      <th className="p-3.5 text-center font-black text-amber-900 bg-amber-50/60">Số thửa đất</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
@@ -581,7 +615,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                         <td className="p-3.5 text-center font-bold text-orange-500">{item.pendingSign}</td>
                         <td className="p-3.5 text-center font-extrabold text-emerald-600 bg-emerald-50/20">{item.signed}</td>
                         <td className="p-3.5 text-center font-bold text-blue-600">{item.handover}</td>
-                        <td className="p-3.5 text-center font-bold text-slate-500 bg-slate-50/50">{item.plots}</td>
+                        <td className="p-3.5 text-center font-black text-amber-700 bg-amber-50/30">{item.plots}</td>
                       </tr>
                     ))}
                     {reportData.active.wardStats.length === 0 && (
@@ -592,6 +626,28 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                       </tr>
                     )}
                   </tbody>
+                  {reportData.active.wardStats.length > 0 && (
+                    <tfoot className="bg-slate-100/80 font-black text-slate-900 border-t-2 border-slate-300">
+                      <tr>
+                        <td className="p-3.5 uppercase tracking-wider">Tổng cộng ({reportData.active.wardStats.length} địa bàn)</td>
+                        <td className="p-3.5 text-center text-indigo-700 bg-indigo-100/40">
+                          {reportData.active.wardStats.reduce((s, i) => s + i.completedWork, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-orange-600">
+                          {reportData.active.wardStats.reduce((s, i) => s + i.pendingSign, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-emerald-700 bg-emerald-100/40">
+                          {reportData.active.wardStats.reduce((s, i) => s + i.signed, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-blue-700">
+                          {reportData.active.wardStats.reduce((s, i) => s + i.handover, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-amber-800 bg-amber-100/60 font-black">
+                          {reportData.active.wardStats.reduce((s, i) => s + i.plots, 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             </div>
@@ -611,7 +667,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                       <th className="p-3.5 text-center">Đang trình ký</th>
                       <th className="p-3.5 text-center">Đã ký duyệt</th>
                       <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>
-                      <th className="p-3.5 text-center">Thửa đất đo đạc</th>
+                      <th className="p-3.5 text-center font-black text-amber-900 bg-amber-50/60">Thửa đất đo đạc</th>
                       <th className="p-3.5 text-center">Lịch công tác</th>
                     </tr>
                   </thead>
@@ -623,7 +679,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                         <td className="p-3.5 text-center font-bold text-orange-500">{item.pendingSign}</td>
                         <td className="p-3.5 text-center font-extrabold text-emerald-600 bg-emerald-50/20">{item.signed}</td>
                         <td className="p-3.5 text-center font-bold text-blue-600">{item.handover}</td>
-                        <td className="p-3.5 text-center font-bold text-slate-500 bg-slate-50/50">{item.plots}</td>
+                        <td className="p-3.5 text-center font-black text-amber-700 bg-amber-50/30">{item.plots}</td>
                         <td className="p-3.5 text-center font-extrabold text-violet-600 bg-violet-50/20">{item.schedules}</td>
                       </tr>
                     ))}
@@ -635,6 +691,31 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                       </tr>
                     )}
                   </tbody>
+                  {reportData.active.employeeStats.length > 0 && (
+                    <tfoot className="bg-slate-100/80 font-black text-slate-900 border-t-2 border-slate-300">
+                      <tr>
+                        <td className="p-3.5 uppercase tracking-wider">Tổng cộng ({reportData.active.employeeStats.length} nhân sự)</td>
+                        <td className="p-3.5 text-center text-indigo-700 bg-indigo-100/40">
+                          {reportData.active.employeeStats.reduce((s, i) => s + i.completedWork, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-orange-600">
+                          {reportData.active.employeeStats.reduce((s, i) => s + i.pendingSign, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-emerald-700 bg-emerald-100/40">
+                          {reportData.active.employeeStats.reduce((s, i) => s + i.signed, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-blue-700">
+                          {reportData.active.employeeStats.reduce((s, i) => s + i.handover, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-amber-800 bg-amber-100/60 font-black">
+                          {reportData.active.employeeStats.reduce((s, i) => s + i.plots, 0)}
+                        </td>
+                        <td className="p-3.5 text-center text-violet-700 bg-violet-100/40">
+                          {reportData.active.employeeStats.reduce((s, i) => s + i.schedules, 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             </div>

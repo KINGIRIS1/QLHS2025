@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2, Eye, EyeOff, ServerOff, RefreshCw, AlertTriangle, Play, FastForward, FolderKanban } from 'lucide-react';
@@ -429,5 +428,3 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 };
 
 export default Login;
-
-

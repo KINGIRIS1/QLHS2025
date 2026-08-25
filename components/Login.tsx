@@ -190,22 +190,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       {/* Dynamic Animated Laser Pulse on Dong Nai */}
       <VietnamMapIntro phase={introPhase} />
 
-      {/* Top Header Bar / Brand */}
-      <div className="absolute top-6 left-8 z-30 flex items-center gap-3">
-        <div className="w-11 h-11 rounded-2xl bg-slate-900/80 p-2 border border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center backdrop-blur-md">
-          <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
-        </div>
-        <div>
-          <h1 className="text-base font-extrabold tracking-wide text-white flex items-center gap-2">
-            HỆ THỐNG QUẢN LÝ HỒ SƠ
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">
-              v{APP_VERSION}
-            </span>
-          </h1>
-          <p className="text-xs text-slate-400 font-medium">Chi nhánh Văn phòng Đăng ký Đất đai</p>
-        </div>
-      </div>
-
       {/* Top Right Quick Controls: Skip Intro & Replay Demo */}
       <div className="absolute top-6 right-8 z-30 flex items-center gap-2">
         {introPhase !== 'login_ready' ? (
@@ -243,23 +227,30 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
               : 'opacity-0 translate-x-20 pointer-events-none'
           }`}
         >
-          <div className="w-full max-w-[460px] bg-slate-900/85 backdrop-blur-2xl border-2 border-cyan-400/50 rounded-[32px] p-8 sm:p-10 shadow-[0_0_50px_rgba(6,182,212,0.35),inset_0_0_20px_rgba(6,182,212,0.1)] text-slate-100 relative overflow-hidden animate-fade-in-up">
+          <div className="w-full max-w-[500px] bg-slate-900/85 backdrop-blur-2xl border-2 border-cyan-400/50 rounded-[32px] p-8 sm:p-10 shadow-[0_0_50px_rgba(6,182,212,0.35),inset_0_0_20px_rgba(6,182,212,0.1)] text-slate-100 relative overflow-hidden animate-fade-in-up">
             
             {/* Top Glowing Ambient Light */}
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-cyan-500/20 rounded-full blur-[50px] pointer-events-none" />
 
-            {/* Header with High-Tech Folder Icon matching Mockup */}
-            <div className="mb-8 text-center flex flex-col items-center">
-              <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-cyan-400/40 flex items-center justify-center text-cyan-400 mb-4 shadow-[0_0_25px_rgba(6,182,212,0.4)]">
-                <FolderKanban size={36} className="text-cyan-300 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
+            {/* Header with Logo and System Name */}
+            <div className="mb-8 flex justify-center">
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-2xl bg-slate-900/80 p-2.5 border border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center backdrop-blur-md shrink-0">
+                  <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
+                </div>
+                <div className="text-left flex flex-col justify-center">
+                  <h1 className="text-xl sm:text-2xl font-extrabold tracking-wide text-white flex items-center gap-2">
+                    HỆ THỐNG QUẢN LÝ HỒ SƠ
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30 whitespace-nowrap">
+                      v{APP_VERSION}
+                    </span>
+                  </h1>
+                  <div className="mt-0.5">
+                    <p className="text-[13px] text-slate-300 font-semibold tracking-wide">VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH ĐỒNG NAI</p>
+                    <p className="text-xs text-slate-400 font-medium">Chi nhánh Chơn Thành</p>
+                  </div>
+                </div>
               </div>
-
-              <h2 className="text-2xl sm:text-[26px] font-black text-white tracking-tight uppercase">
-                HỆ THỐNG QUẢN LÝ HỒ SƠ
-              </h2>
-              <p className="text-slate-300/80 text-xs sm:text-sm mt-2 max-w-xs leading-relaxed">
-                Chào mừng bạn đến với hệ thống quản lý hồ sơ kỹ thuật số.
-              </p>
             </div>
 
             {/* Error Message */}

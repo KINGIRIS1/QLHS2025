@@ -232,24 +232,24 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             {/* Top Glowing Ambient Light */}
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-cyan-500/20 rounded-full blur-[50px] pointer-events-none" />
 
-            {/* Header with Logo and System Name */}
-            <div className="mb-8 flex justify-center">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl bg-slate-900/80 p-2.5 border border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center backdrop-blur-md shrink-0">
-                  <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
-                </div>
-                <div className="text-left flex flex-col justify-center">
-                  <h1 className="text-xl sm:text-2xl font-extrabold tracking-wide text-white flex items-center gap-2">
-                    HỆ THỐNG QUẢN LÝ HỒ SƠ
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30 whitespace-nowrap">
-                      v{APP_VERSION}
-                    </span>
-                  </h1>
-                  <div className="mt-0.5">
-                    <p className="text-[13px] text-slate-300 font-semibold tracking-wide">VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH ĐỒNG NAI</p>
-                    <p className="text-xs text-slate-400 font-medium">Chi nhánh Chơn Thành</p>
-                  </div>
-                </div>
+            {/* Header with Centered Logo and System Name */}
+            <div className="mb-6 flex flex-col items-center text-center">
+              {/* Logo on Top */}
+              <div className="w-16 h-16 rounded-2xl bg-slate-900/90 p-2.5 border border-cyan-500/40 shadow-[0_0_25px_rgba(6,182,212,0.35)] flex items-center justify-center backdrop-blur-md mb-3.5">
+                <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
+              </div>
+
+              {/* Centered Typography Cluster */}
+              <div className="space-y-1">
+                <h1 className="text-xl sm:text-2xl font-black tracking-wide text-white">
+                  HỆ THỐNG QUẢN LÝ HỒ SƠ
+                </h1>
+                <p className="text-xs sm:text-[13px] text-slate-200 font-bold tracking-wide uppercase">
+                  VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH ĐỒNG NAI
+                </p>
+                <p className="text-xs text-cyan-300/90 font-medium">
+                  Chi nhánh Chơn Thành
+                </p>
               </div>
             </div>
 
@@ -348,6 +348,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                 )}
               </button>
             </form>
+
+            {/* Version Badge at Bottom Right of Login Card */}
+            <div className="mt-5 flex justify-end items-center">
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-950/70 text-cyan-300/80 font-mono border border-cyan-500/25 shadow-sm">
+                v{APP_VERSION}
+              </span>
+            </div>
           </div>
         </div>
       </div>

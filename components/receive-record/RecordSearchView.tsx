@@ -136,7 +136,7 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
       case RecordStatus.IN_PROGRESS:
         return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Đang thực hiện</span>;
       case RecordStatus.COMPLETED_WORK:
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Đã hoàn thành kỹ thuật</span>;
+        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Đang trình kiểm tra</span>;
       case RecordStatus.PENDING_SIGN:
         return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-850">Chờ ký duyệt</span>;
       case RecordStatus.SIGNED:
@@ -178,6 +178,7 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
 
     if (records) {
       records.forEach(r => {
+        if (r.isCancelled) return;
         const type = (r.recordType || '').toLowerCase();
         if (type.includes('xin số thửa') || type.includes('xin so thua') || type.includes('xst')) {
           xinSoThua++;
@@ -212,6 +213,7 @@ export const RecordSearchView: React.FC<RecordSearchViewProps> = ({
     if (!records) return [];
 
     let result = records.filter(r => {
+      if (r.isCancelled) return false;
       // 1. Chỉ hiển thị các loại hồ sơ được chỉ định trong yêu cầu
       const rType = r.recordType || '';
       const matchedType = SEARCHABLE_RECORD_TYPES.some(t => {

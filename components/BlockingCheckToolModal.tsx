@@ -250,7 +250,7 @@ const BlockingCheckToolModal: React.FC<BlockingCheckToolModalProps> = ({ isOpen,
       case 'received': return 'Đã tiếp nhận';
       case 'assigned': return 'Đã phân công';
       case 'in_progress': return 'Đang thực hiện';
-      case 'completed_work': return 'Đã thực hiện xong';
+      case 'completed_work': return 'Đang trình kiểm tra';
       case 'pending_sign': return 'Đang trình ký';
       case 'signed': return 'Đã ký duyệt';
       case 'handover': return 'Đã trả kết quả';

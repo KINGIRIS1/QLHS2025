@@ -7,7 +7,7 @@ import {
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi,
     initRealtimeRecords, initRealtimeHolidays, checkServerHealth
 } from '../services/api';
-import { saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
+import { initRealtimeArchive, saveArchiveRecord, findArchiveRecordBySoHieu, deleteArchiveRecord } from '../services/apiArchive';
 import { logUserActivity } from '../services/apiLogs';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 import { triggerPrioritySignedAlert } from '../utils/appHelpers';
@@ -98,11 +98,19 @@ export const useAppData = (currentUser: User | null) => {
         // Bật realtime và lắng nghe thay đổi
         initRealtimeRecords();
         initRealtimeHolidays();
+        initRealtimeArchive();
         
         const handleRecordsUpdate = async () => {
             // Lấy trực tiếp từ cache (đã được update bởi Realtime) và gán luôn để UI phản hồi tức thì
             const freshRecords = await fetchRecords();
             setRecords(freshRecords);
+        };
+
+        const handleVisibilityOrFocus = async () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                const freshRecords = await fetchRecords();
+                setRecords(freshRecords);
+            }
         };
 
         const handleHolidaysUpdate = async (e?: any) => {
@@ -160,6 +168,8 @@ export const useAppData = (currentUser: User | null) => {
         window.addEventListener('records_realtime_update', handleRecordsUpdate);
         window.addEventListener('holidays_realtime_update', handleHolidaysUpdate);
         window.addEventListener('system_update_available', handleSystemUpdate);
+        document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+        window.addEventListener('focus', handleVisibilityOrFocus);
         
         // Heartbeat check định kỳ để phát hiện máy chủ tắt / mất kết nối
         const heartbeatInterval = setInterval(async () => {
@@ -193,6 +203,8 @@ export const useAppData = (currentUser: User | null) => {
             window.removeEventListener('records_realtime_update', handleRecordsUpdate);
             window.removeEventListener('holidays_realtime_update', handleHolidaysUpdate);
             window.removeEventListener('system_update_available', handleSystemUpdate);
+            document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+            window.removeEventListener('focus', handleVisibilityOrFocus);
         };
     }, [loadData]);
 

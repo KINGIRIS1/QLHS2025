@@ -239,14 +239,14 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
                 </div>
                 <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex flex-col justify-start">
                     <div className="text-center mb-2">
-                        <span className="text-gray-500 text-sm font-semibold uppercase mb-1 block">Đã thực hiện</span>
+                        <span className="text-gray-500 text-sm font-semibold uppercase mb-1 block">Đang trình kiểm tra</span>
                         <span className="text-3xl font-bold text-orange-700">{filteredRecords.completedWork.length + filteredRecords.pendingSign.length}</span>
                     </div>
                     {(filteredRecords.completedWork.length > 0 || filteredRecords.pendingSign.length > 0) && (
                         <div className="w-full text-sm text-orange-800 space-y-1 bg-orange-100/50 p-3 rounded mt-2">
                             {filteredRecords.completedWork.length > 0 && (
                                 <div className="flex justify-between w-full">
-                                    <span className="truncate mr-2">- Chờ kiểm tra:</span> <span className="font-semibold whitespace-nowrap">{filteredRecords.completedWork.length} hs</span>
+                                    <span className="truncate mr-2">- Trình kiểm tra:</span> <span className="font-semibold whitespace-nowrap">{filteredRecords.completedWork.length} hs</span>
                                 </div>
                             )}
                             {filteredRecords.pendingSign.length > 0 && (

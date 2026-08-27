@@ -93,7 +93,8 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     const loadData = async () => {
         const data = await fetchArchiveRecords('congvan');
-        setRecords(data);
+        const deduplicated = Array.from(new Map(data.map(r => [r.id, r])).values());
+        setRecords(deduplicated);
     };
 
     const handleDeleteAll = async () => {
@@ -108,11 +109,11 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const priorityCount = useMemo(() => {
-        return records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority)).length;
+        return records.filter(r => !r.is_cancelled && !r.isCancelled && !r.data?.is_cancelled && !r.data?.isCancelled && (Boolean(r.data?.isPriority) || Boolean(r.isPriority))).length;
     }, [records]);
 
     const filteredRecords = useMemo(() => {
-        let list = records;
+        let list = records.filter(r => !r.is_cancelled && !r.isCancelled && !r.data?.is_cancelled && !r.data?.isCancelled);
         
         if (subTab === 'draft') list = list.filter(r => r.status === 'draft');
         if (subTab === 'assigned') list = list.filter(r => r.status === 'assigned');

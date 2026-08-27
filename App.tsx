@@ -967,6 +967,8 @@ function App() {
       const recordsToExport = candidates.filter(r => r.status === RecordStatus.SIGNED || (r.status === RecordStatus.WITHDRAWN && !r.exportBatch));
       if (recordsToExport.length === 0) return;
 
+      const numBatch = Number(batchNumber) || 1;
+
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : RecordStatus.HANDOVER;
           let recWard = r.receivingWard || getReceivingWard(r);
@@ -977,7 +979,7 @@ function App() {
           }
           return { 
               ...r, 
-              exportBatch: batchNumber, 
+              exportBatch: numBatch, 
               exportDate: batchDate, 
               status: nextStatus, 
               completedDate: r.completedDate || todayStr,
@@ -992,7 +994,7 @@ function App() {
       await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
       updatesToApply.forEach(r => triggerPrioritySignedAlert(r, r.status));
       setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `Đã chốt danh sách ĐỢT ${batchNumber} (${recordsToExport.length} hồ sơ) thành công.` });
+      setToast({ type: 'success', message: `Đã chốt danh sách ĐỢT ${numBatch} (${recordsToExport.length} hồ sơ) thành công.` });
   };
 
   const handleConfirmSignBatch = async () => {

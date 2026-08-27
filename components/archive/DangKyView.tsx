@@ -115,7 +115,8 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
         }
         
         const data = await fetchArchiveRecords('dangky', true, allowedWards); // Force update to get fresh data with new filter
-        setRecords(data);
+        const deduplicated = Array.from(new Map(data.map(r => [r.id, r])).values());
+        setRecords(deduplicated);
     };
 
     const handleDeleteAll = async () => {
@@ -137,11 +138,11 @@ const DangKyView: React.FC<DangKyViewProps> = ({ currentUser, wards }) => {
     }, [employees, assignTargetStatus]);
 
     const priorityCount = useMemo(() => {
-        return records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority)).length;
+        return records.filter(r => !r.is_cancelled && !r.isCancelled && !r.data?.is_cancelled && !r.data?.isCancelled && (Boolean(r.data?.isPriority) || Boolean(r.isPriority))).length;
     }, [records]);
 
     const filteredRecords = useMemo(() => {
-        let list = records;
+        let list = records.filter(r => !r.is_cancelled && !r.isCancelled && !r.data?.is_cancelled && !r.data?.isCancelled);
         
         // Filter by Tab
         if (activeTab === 'all') {

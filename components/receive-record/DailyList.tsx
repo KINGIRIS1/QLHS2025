@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee, UserRole } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
 import { getWardShortCode } from '../../utils/codeGenerator';
-import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX, AlertTriangle } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, Archive, X, CheckCircle2, ShieldCheck, MapPinned, FileX, AlertTriangle, Ban } from 'lucide-react';
 import { PaginationControls } from '../PaginationControls';
 
 interface DailyListProps {
@@ -17,6 +17,7 @@ interface DailyListProps {
   onEdit: (record: RecordFile) => void;
   onDelete: (record: RecordFile) => void;
   onPrint: (record: RecordFile) => void;
+  onCancel?: (record: RecordFile) => void;
 }
 
 // Hàm lấy mã viết tắt (Suffix) từ tên Xã/Phường
@@ -42,7 +43,7 @@ const normalizeWardName = (w: string) => {
         .trim();
 };
 
-const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], wards, currentUser, employees = [], onPreviewExcel, onEdit, onDelete, onPrint }) => {
+const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], wards, currentUser, employees = [], onPreviewExcel, onEdit, onDelete, onPrint, onCancel }) => {
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   // Bộ lọc bên ngoài
   const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -69,10 +70,11 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       return myManagedWards.map(w => getShortCode(w));
   }, [employees, currentUser]);
 
-  // Lọc tất cả các hồ sơ đo đạc thô của ngày nhận hiện tại (bỏ qua Sao lục, thuế chính quy và các loại CMD, tòa án...)
+  // Lọc tất cả các hồ sơ đo đạc thô của ngày nhận hiện tại (bỏ qua Sao lục, thuế chính quy, các loại CMD, tòa án... và hồ sơ đã hủy)
   const dailyMeasureRecords = useMemo(() => {
       if (!records) return [];
       return records.filter(r => {
+          if (r.isCancelled) return false;
           const typeLower = (r.recordType || '').toLowerCase();
           const isSaoLuc = typeLower.includes('sao lục');
           const isTax = typeLower.includes('thuế chính quy');
@@ -158,6 +160,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const filteredArchiveRecords = useMemo(() => {
       const searchLower = searchTerm.toLowerCase();
       const list = archiveRecords.filter(r => {
+          if (r.isCancelled) return false;
           // 1. Lọc theo ngày nhận
           if (r.receivedDate !== filterDate) return false;
           
@@ -188,6 +191,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const filteredTaxRecords = useMemo(() => {
       const searchLower = searchTerm.toLowerCase();
       const list = records.filter(r => {
+          if (r.isCancelled) return false;
           // 1. Lọc theo loại hồ sơ
           const isTax = (r.recordType || '').toLowerCase().includes('thuế chính quy');
           if (!isTax) return false;
@@ -222,6 +226,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const filteredInfoRecords = useMemo(() => {
       const searchLower = searchTerm.toLowerCase();
       const list = records.filter(r => {
+          if (r.isCancelled) return false;
           // 1. Lọc theo loại hồ sơ
           const isInfo = (r.recordType || '').toLowerCase().includes('cung cấp thông tin');
           if (!isInfo) return false;
@@ -256,6 +261,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
   const filteredWithdrawRecords = useMemo(() => {
       const searchLower = searchTerm.toLowerCase();
       const list = records.filter(r => {
+          if (r.isCancelled) return false;
           // 1. Lọc theo loại hồ sơ
           const typeLower = (r.recordType || '').toLowerCase();
           const isWithdraw = typeLower.includes('thu hồi giấy chứng nhận') || typeLower.includes('thu hồi gcn');
@@ -298,6 +304,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       const uniqueList = Array.from(map.values());
 
       const list = uniqueList.filter(r => {
+          if (r.isCancelled) return false;
           const isPrio = Boolean(r.isPriority) || Boolean((r as any).data?.isPriority);
           if (!isPrio) return false;
           if (filterDate && r.receivedDate && r.receivedDate !== filterDate) return false;
@@ -357,7 +364,9 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
 
   // Hàm tạo Biên bản in Excel tổng hợp chung
   const createDailyListWorkbook = (recordsToExport: RecordFile[], targetWard: string, targetDate: string, titleSuffix: string = '') => {
-      if (recordsToExport.length === 0) return null;
+      // Loại bỏ tuyệt đối các hồ sơ đã hủy khỏi danh sách xuất Excel
+      const validRecords = recordsToExport.filter(r => !r.isCancelled);
+      if (validRecords.length === 0) return null;
       
       const wardTitle = targetWard !== 'all' ? targetWard.toUpperCase() : "CÁC ĐƠN VỊ";
       const dateParts = targetDate.split('-'); 
@@ -365,7 +374,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
       
       const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã / Phường", "Tờ", "Thửa", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"];
       
-      const dataRows = recordsToExport.map((r, i) => [
+      const dataRows = validRecords.map((r, i) => [
           i + 1, r.code, r.customerName, 
           getNormalizedWard(r.ward), 
           r.mapSheet || '-', r.landPlot || '-', 
@@ -695,8 +704,13 @@ const DailyList: React.FC<DailyListProps> = ({ records, archiveRecords = [], war
                                             <button onClick={() => onPrint(r)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors" title="In biên nhận">
                                                 <Printer size={15} />
                                             </button>
+                                            {onCancel && (
+                                                <button onClick={() => onCancel(r)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Hủy hồ sơ">
+                                                    <Ban size={15} />
+                                                </button>
+                                            )}
                                             {isAdmin && (
-                                                <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title="Xóa">
+                                                <button onClick={() => onDelete(r)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
                                                     <Trash2 size={15} />
                                                 </button>
                                             )}

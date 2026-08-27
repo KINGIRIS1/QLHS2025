@@ -114,12 +114,21 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
       records.forEach(r => {
-          if (r.exportBatch && r.exportDate && r.exportDate.startsWith(todayStr)) {
-              if (r.exportBatch > maxBatch) maxBatch = r.exportBatch;
+          if (r.exportBatch) {
+              const rawDate = r.exportDate || r.completedDate || '';
+              const datePart = rawDate.includes('T') ? rawDate.split('T')[0] : (rawDate.includes(' ') ? rawDate.split(' ')[0] : rawDate);
+              if (datePart === todayStr) {
+                  const b = typeof r.exportBatch === 'number' 
+                      ? r.exportBatch 
+                      : parseInt(String(r.exportBatch).replace(/\D/g, ''), 10);
+                  if (!isNaN(b) && Number(b) > Number(maxBatch)) {
+                      maxBatch = Number(b);
+                  }
+              }
           }
       });
       return {
-          batch: maxBatch + 1,
+          batch: Number(maxBatch) + 1,
           date: new Date().toISOString()
       };
   }, [records, todayStr]);
@@ -129,14 +138,18 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       
       records.forEach(r => {
           if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.RETURNED || !!r.exportBatch) && r.exportBatch && r.exportDate) {
-              const datePart = r.exportDate.split('T')[0];
-              const key = `${datePart}_${r.exportBatch}`;
+              const rawDate = r.exportDate || '';
+              const datePart = rawDate.includes('T') ? rawDate.split('T')[0] : (rawDate.includes(' ') ? rawDate.split(' ')[0] : rawDate);
+              const batchNum = typeof r.exportBatch === 'number' 
+                  ? r.exportBatch 
+                  : (parseInt(String(r.exportBatch).replace(/\D/g, ''), 10) || 1);
+              const key = `${datePart}_${batchNum}`;
               
               if (!batches[key]) {
                   batches[key] = { 
                       date: datePart, 
-                      batch: r.exportBatch, 
-                      count: 0,
+                      batch: Number(batchNum), 
+                      count: 0, 
                       fullDate: r.exportDate 
                   };
               }
@@ -147,7 +160,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       const sorted = Object.values(batches).sort((a, b) => {
           const dateDiff = b.date.localeCompare(a.date);
           if (dateDiff !== 0) return dateDiff;
-          return b.batch - a.batch;
+          return Number(b.batch) - Number(a.batch);
       });
 
       // Chỉ cho phép bổ sung vào 1 đợt gần nhất duy nhất trước đó (đợt gần nhất hôm nay hoặc đợt cuối cùng ngày trước)
@@ -172,18 +185,18 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       }
 
       if (mode === 'new') {
-          onConfirm(nextBatchInfo.batch, nextBatchInfo.date, recordWards);
+          onConfirm(Number(nextBatchInfo.batch), nextBatchInfo.date, recordWards);
       } else {
           if (!selectedExistingBatch) {
               alert('Vui lòng chọn một đợt cũ.');
               return;
           }
           const [datePart, batchNumStr] = selectedExistingBatch.split('_');
-          const batchNum = parseInt(batchNumStr);
-          const found = historyBatches.find(h => h.date === datePart && h.batch === batchNum);
+          const batchNum = parseInt(batchNumStr, 10);
+          const found = historyBatches.find(h => h.date === datePart && Number(h.batch) === Number(batchNum));
           
           if (found) {
-              onConfirm(found.batch, found.fullDate, recordWards);
+              onConfirm(Number(found.batch), found.fullDate, recordWards);
           }
       }
       setNeedsCorrectionConfirm(false);

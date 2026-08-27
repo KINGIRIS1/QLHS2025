@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArchiveRecord, updateArchiveRecordsBatch } from '../../services/apiArchive';
-import { X, Clock, User, FileText, MapPin, Calendar, Save, MessageSquare, CheckCircle, Loader2 } from 'lucide-react';
+import { X, Clock, User, FileText, MapPin, Calendar, Save, MessageSquare, CheckCircle, Loader2, Ban } from 'lucide-react';
 import { Employee } from '../../types';
 
 interface RecordDetailModalProps {
@@ -95,6 +95,27 @@ const RecordDetailModal: React.FC<RecordDetailModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/50">
+                    {(record.is_cancelled || record.data?.isCancelled || record.data?.is_cancelled) && (
+                        <div className="mb-6 p-4 bg-rose-50 border-2 border-rose-300 rounded-xl flex items-start gap-3 text-rose-900 shadow-sm animate-fade-in">
+                            <Ban size={24} className="shrink-0 text-rose-600 mt-0.5" />
+                            <div className="flex-1">
+                                <h4 className="font-bold text-sm uppercase tracking-wide text-rose-800 flex items-center gap-2">
+                                    HỒ SƠ ĐÃ BỊ HỦY
+                                </h4>
+                                <div className="text-xs text-rose-700 mt-1.5 space-y-1">
+                                    <p><span className="font-semibold">Lý do hủy:</span> {record.cancel_reason || record.data?.cancelReason || record.data?.cancel_reason || 'Không có lý do'}</p>
+                                    <div className="flex flex-wrap gap-4 pt-1 text-[11px] text-rose-600 font-medium">
+                                        {(record.cancelled_by || record.data?.cancelledBy || record.data?.cancelled_by) && (
+                                            <span>Người hủy: <strong>{record.cancelled_by || record.data?.cancelledBy || record.data?.cancelled_by}</strong></span>
+                                        )}
+                                        {(record.cancelled_at || record.data?.cancelledAt || record.data?.cancelled_at) && (
+                                            <span>Thời gian hủy: <strong>{new Date(record.cancelled_at || record.data?.cancelledAt || record.data?.cancelled_at).toLocaleString('vi-VN')}</strong></span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
                         {/* Cột 1: Thông tin chủ hồ sơ, địa chính, người xử lý, ghi chú cá nhân */}
                         <div className="col-span-1 lg:col-span-4 flex flex-col gap-4">

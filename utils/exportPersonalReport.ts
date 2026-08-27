@@ -63,17 +63,17 @@ export const exportPersonalReportToWord = async (
   addText(`- Tổng số lượng thửa đất đã hoàn thành: ${plotCountCompleted} thửa`, true, 720);
 
   const execCount = filteredRecords.completedWork.length + filteredRecords.pendingSign.length;
-  addText(`3. Số hồ sơ đã thực hiện: ${execCount} hồ sơ`, true, 360);
+  addText(`3. Số hồ sơ đang trình kiểm tra / chờ ký: ${execCount} hồ sơ`, true, 360);
   if (execCount > 0) {
     addText("Trong đó:", false, 720);
     if (filteredRecords.completedWork.length > 0) {
-      addText(`- Đã thực hiện (đang chờ kiểm tra): ${filteredRecords.completedWork.length} hồ sơ`, false, 1080);
+      addText(`- Đang trình kiểm tra: ${filteredRecords.completedWork.length} hồ sơ`, false, 1080);
     }
     if (filteredRecords.pendingSign.length > 0) {
-      addText(`- Đã thực hiện (chờ ký duyệt): ${filteredRecords.pendingSign.length} hồ sơ`, false, 1080);
+      addText(`- Chờ ký duyệt: ${filteredRecords.pendingSign.length} hồ sơ`, false, 1080);
     }
     const plotCountExecuted = [...filteredRecords.completedWork, ...filteredRecords.pendingSign].reduce((sum: number, r: any) => sum + getRecordPlotCount(r), 0);
-    addText(`- Tổng số lượng thửa đất đã thực hiện: ${plotCountExecuted} thửa`, true, 1080);
+    addText(`- Tổng số lượng thửa đất đang trình kiểm tra / chờ ký: ${plotCountExecuted} thửa`, true, 1080);
   }
 
   addText(`4. Lịch công tác: ${mySchedules.length} lịch`, true, 360);

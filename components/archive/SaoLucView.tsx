@@ -133,16 +133,19 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
 
     const loadData = async () => {
         const data = await fetchArchiveRecords('saoluc');
-        setRecords(data);
+        const deduplicated = Array.from(new Map(data.map(r => [r.id, r])).values());
+        setRecords(deduplicated);
         try {
             const mData = await fetchRecords();
-            setMeasureRecords(mData);
+            const deduplicatedM = Array.from(new Map(mData.map(r => [r.id, r])).values());
+            setMeasureRecords(deduplicatedM);
         } catch (e) {
             console.error("Lỗi fetch records trong SaoLucView:", e);
         }
         try {
             const vsData = await fetchArchiveRecords('vaoso');
-            setArchiveVaoSoRecords(vsData);
+            const deduplicatedVs = Array.from(new Map(vsData.map(r => [r.id, r])).values());
+            setArchiveVaoSoRecords(deduplicatedVs);
         } catch (e) {
             console.error("Lỗi fetch vaoso trong SaoLucView:", e);
         }
@@ -245,7 +248,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Minh Hư
     }, [records]);
 
     const filteredRecords = useMemo(() => {
-        let list = records;
+        let list = records.filter(r => !r.is_cancelled && !r.isCancelled && !r.data?.is_cancelled && !r.data?.isCancelled);
         
         // Filter by Tab
         if (subTab === 'draft') list = list.filter(r => r.status === 'draft');

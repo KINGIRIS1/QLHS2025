@@ -584,7 +584,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   };
 
   const proceedMarkAsDone = async (record: RecordFile, skipConfirm = false) => {
-    if (skipConfirm || await confirmAction(`Xác nhận đã hoàn thành công việc cho hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã thực hiện".`)) {
+    if (skipConfirm || await confirmAction(`Xác nhận chuyển hồ sơ ${record.code} sang trạng thái "Đang trình kiểm tra"?`)) {
         if (record.recordType === 'Sao lục' || record.recordType === 'Công văn') {
             // Handle Archive Record
             const archiveType = record.recordType === 'Sao lục' ? 'saoluc' : 'congvan';
@@ -793,10 +793,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
       return { color: 'text-gray-600', icon: null, text: '' };
   };
 
-  const renderSortHeader = (label: string, key: keyof RecordFile) => {
+  const renderSortHeader = (label: string, key: keyof RecordFile, customClass?: string) => {
       const isSorted = sortConfig.key === key;
       return (
-          <div className="flex items-center gap-1 cursor-pointer select-none" onClick={() => handleSort(key)}>
+          <div className={`flex items-center gap-1 cursor-pointer select-none ${customClass || ''}`} onClick={() => handleSort(key)}>
               {label}
               <span className="text-gray-400">
                 {isSorted ? (
@@ -811,7 +811,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   const getTabLabel = () => {
       switch(activeTab) {
           case 'pending': return 'Đang thực hiện';
-          case 'completed_work': return 'Đã thực hiện';
+          case 'completed_work': return 'Đang trình kiểm tra';
           case 'pending_sign': return 'Chờ ký';
           case 'finished': return 'Hoàn thành';
           case 'reminder': return 'Nhắc việc';
@@ -854,7 +854,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
              </div>
              <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-cyan-50 rounded-lg border border-cyan-100 min-w-[90px]">
                 <div className="text-xl font-bold text-cyan-700">{completedWorkRecords.length}</div>
-                <div className="text-[10px] text-cyan-600 uppercase font-semibold">Đã thực hiện</div>
+                <div className="text-[10px] text-cyan-600 uppercase font-semibold">Đang trình kiểm tra</div>
              </div>
              <div className="flex-1 md:flex-none text-center px-3 py-1.5 bg-purple-50 rounded-lg border border-purple-100 min-w-[90px]">
                 <div className="text-xl font-bold text-purple-700">{reviewRecords.length}</div>
@@ -934,7 +934,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                     <Clock size={16} /> Đang thực hiện ({pendingRecords.length})
                 </button>
                 <button 
-                    onClick={() => { setActiveTab('extended'); setCurrentPage(1); setSearchTerm(''); }}
+                    onClick={() => { 
+                        setActiveTab('extended'); 
+                        setCurrentPage(1); 
+                        setSearchTerm(''); 
+                        setSortConfig({ key: 'extendedDeadline', direction: 'asc' });
+                    }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                         activeTab === 'extended' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -947,7 +952,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                         activeTab === 'completed_work' ? 'bg-cyan-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
-                    <CheckSquare size={16} /> Đã thực hiện ({completedWorkRecords.length})
+                    <CheckSquare size={16} /> Đang trình kiểm tra ({completedWorkRecords.length})
                 </button>
                 <button 
                     onClick={() => { setActiveTab('pending_sign'); setCurrentPage(1); setSearchTerm(''); }}
@@ -1000,15 +1005,38 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
             </div>
             
             {activeTab !== 'report' && (
-                <div className="relative w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input 
-                        type="text" 
-                        placeholder={`Tìm trong ${getTabLabel()}...`}
-                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                        value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                    />
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    {/* Nút sắp xếp theo ngày gia hạn hồ sơ */}
+                    <button
+                        onClick={() => handleSort('extendedDeadline')}
+                        className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-2xs cursor-pointer ${
+                            sortConfig.key === 'extendedDeadline'
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs ring-2 ring-amber-300'
+                            : 'bg-white text-slate-700 border-gray-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                        }`}
+                        title="Sắp xếp danh sách hồ sơ theo ngày gia hạn (hạn trả mới)"
+                    >
+                        <CalendarClock size={15} className={sortConfig.key === 'extendedDeadline' ? 'text-white' : 'text-amber-600'} />
+                        <span>Sắp xếp theo ngày gia hạn</span>
+                        <span className="ml-0.5">
+                            {sortConfig.key === 'extendedDeadline' ? (
+                                sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                            ) : (
+                                <ArrowUpDown size={13} className="text-gray-400" />
+                            )}
+                        </span>
+                    </button>
+
+                    <div className="relative w-full md:w-60">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder={`Tìm trong ${getTabLabel()}...`}
+                            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        />
+                    </div>
                 </div>
             )}
         </div>
@@ -1042,7 +1070,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                 {activeTab === 'reminder' 
                                     ? <div className="flex items-center gap-1 text-pink-600"><CalendarClock size={14}/> Thời gian nhắc</div>
                                     : activeTab === 'extended'
-                                    ? <div className="flex items-center gap-1 text-amber-600"><CalendarClock size={14}/> Ngày hẹn mới</div>
+                                    ? renderSortHeader('Ngày hẹn mới', 'extendedDeadline', 'text-amber-700 font-bold')
                                     : renderSortHeader('Hẹn trả', 'deadline')
                                 }
                             </th>
@@ -1160,15 +1188,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                                                 </button>
                                             )}
 
-                                            {/* Nút Đã thực hiện */}
+                                            {/* Nút Trình kiểm tra */}
                                             {(activeTab === 'pending' || activeTab === 'extended') && r.status !== RecordStatus.COMPLETED_WORK && (
                                                 <button 
                                                     onClick={() => handleMarkAsDone(r)} 
-                                                    title="Đánh dấu đã thực hiện" 
+                                                    title="Trình kiểm tra hồ sơ" 
                                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 text-white border border-teal-600 rounded-lg hover:bg-teal-700 text-xs font-bold shadow-2xs transition-all cursor-pointer"
                                                 >
                                                     <CheckSquare size={13} />
-                                                    <span>Đã thực hiện</span>
+                                                    <span>Trình kiểm tra</span>
                                                 </button>
                                             )}
 
@@ -1357,7 +1385,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                   >
                     <CheckSquare size={16} />
                     <span>
-                      {pendingAction === 'forward_to_sign' ? 'Xác nhận chuyển "Trình ký"' : 'Xác nhận "Đã thực hiện"'}
+                      {pendingAction === 'forward_to_sign' ? 'Xác nhận chuyển "Trình ký"' : 'Xác nhận "Trình kiểm tra"'}
                     </span>
                   </button>
                 </div>

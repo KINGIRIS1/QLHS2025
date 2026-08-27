@@ -805,13 +805,13 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
             2. Báo cáo hồ sơ đã thực hiện
           </h3>
           <p className="text-xs text-slate-500 mt-2.5 leading-relaxed">
-            Phân tích số liệu và tác vụ chuyển trạng thái lũy tiến của nhân viên như: <b>Đã thực hiện, Đang trình ký, Đã ký duyệt, Chuyển Một cửa</b>.
+            Phân tích số liệu và tác vụ chuyển trạng thái lũy tiến của nhân viên như: <b>Đang trình kiểm tra, Đang trình ký, Đã ký duyệt, Chuyển Một cửa</b>.
           </p>
           
           {/* Quick Stats Grid Preview */}
           <div className="grid grid-cols-4 gap-2 my-6 py-4 border-y border-slate-100 bg-slate-50/50 px-2.5 rounded-2xl text-center text-xs">
             <div>
-              <div className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Đã làm</div>
+              <div className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Trình K.Tra</div>
               <div className="text-sm font-extrabold text-blue-600 mt-0.5">{report2Data.active.completedWork}</div>
             </div>
             <div>
@@ -1499,7 +1499,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                         <thead>
                           <tr className="bg-slate-50/75 text-slate-700 uppercase font-bold text-[9px] tracking-wider border-b border-slate-200">
                             <th className="p-3.5">Địa bàn Xã / Phường</th>
-                            <th className="p-3.5 text-center">Đã thực hiện</th>
+                            <th className="p-3.5 text-center">Đang trình kiểm tra</th>
                             <th className="p-3.5 text-center">Đang trình ký</th>
                             <th className="p-3.5 text-center">Đã ký duyệt</th>
                             <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>
@@ -1540,7 +1540,7 @@ const TeamWeeklyDetailsView: React.FC<TeamWeeklyDetailsViewProps> = ({
                         <thead>
                           <tr className="bg-slate-50/75 text-slate-700 uppercase font-bold text-[9px] tracking-wider border-b border-slate-200">
                             <th className="p-3.5">Họ tên kỹ sư, nhân viên</th>
-                            <th className="p-3.5 text-center">Đã thực hiện</th>
+                            <th className="p-3.5 text-center">Đang trình kiểm tra</th>
                             <th className="p-3.5 text-center">Đang trình ký</th>
                             <th className="p-3.5 text-center">Đã ký duyệt</th>
                             <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>

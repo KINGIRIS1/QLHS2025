@@ -156,7 +156,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         if (currentView === 'check_list' || currentView === 'other_check_list') title = 'Danh sách Trình Ký';
         else if (currentView === 'handover_list' || currentView === 'other_handover_list') title = 'Danh sách Giao 1 cửa';
         else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks') title = 'Hồ sơ chưa giao';
-        else if (currentView === 'completed_work_list') title = 'Hồ sơ đã thực hiện';
+        else if (currentView === 'completed_work_list') title = 'Hồ sơ đang trình kiểm tra';
         else if (currentView === 'all_records' || currentView === 'other_records') title = 'Tất cả hồ sơ';
 
         return (
@@ -187,7 +187,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                                 onClick={() => props.setCurrentView('completed_work_list')}
                                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === 'completed_work_list' ? 'border-cyan-600 text-cyan-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                             >
-                                <CheckSquare size={16} /> Đã thực hiện
+                                <CheckSquare size={16} /> Đang trình kiểm tra
                             </button>
 
                             {(isAdmin || isSubadmin || currentUser.role === UserRole.RECEPTION_HANDOVER) && (

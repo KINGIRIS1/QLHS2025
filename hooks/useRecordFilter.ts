@@ -108,6 +108,9 @@ export const useRecordFilter = (
         
         let result = Array.from(uniqueMap.values()) as RecordFile[];
 
+        // Loại bỏ hoàn toàn các hồ sơ đã bị hủy khỏi quy trình nghiệp vụ thông thường
+        result = result.filter(r => !r.isCancelled);
+
         // View-based filtering
         if (currentView === 'check_list' || currentView === 'other_check_list') {
             result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);

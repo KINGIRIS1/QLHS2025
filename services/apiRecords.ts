@@ -22,10 +22,14 @@ const RECORD_DB_COLUMNS = [
     'forwardNotes',
     'forwardHistory',
     'isPriority',
-    'priorityNote'
+    'priorityNote',
+    'isCancelled',
+    'cancelReason',
+    'cancelledBy',
+    'cancelledAt'
 ];
 
-// Helper functions to serialize and deserialize workCompletedDate, extendedDeadline, receivingWard, isPriority inside privateNotes securely
+// Helper functions to serialize and deserialize workCompletedDate, extendedDeadline, receivingWard, isPriority, isCancelled inside privateNotes securely
 export const packRecord = (record: RecordFile): RecordFile => {
     const copy = { ...record };
     let notes = copy.privateNotes || '';
@@ -36,6 +40,10 @@ export const packRecord = (record: RecordFile): RecordFile => {
     notes = notes.replace(/\[REC_WARD:[^\]]+\]/g, '').trim();
     notes = notes.replace(/\[PRIO:(true|false)\]/g, '').trim();
     notes = notes.replace(/\[PRIO_NOTE:[^\]]*\]/g, '').trim();
+    notes = notes.replace(/\[CANCEL:(true|false)\]/g, '').trim();
+    notes = notes.replace(/\[CANCEL_REASON:[^\]]*\]/g, '').trim();
+    notes = notes.replace(/\[CANCEL_BY:[^\]]*\]/g, '').trim();
+    notes = notes.replace(/\[CANCEL_AT:[^\]]*\]/g, '').trim();
     
     if (copy.extendedDeadline) {
         notes = `${notes} [EXT_DL:${copy.extendedDeadline}]`.trim();
@@ -52,6 +60,20 @@ export const packRecord = (record: RecordFile): RecordFile => {
         const safeNote = encodeURIComponent(copy.priorityNote);
         notes = `${notes} [PRIO_NOTE:${safeNote}]`.trim();
     }
+    if (copy.isCancelled) {
+        notes = `${notes} [CANCEL:true]`.trim();
+        if (copy.cancelReason) {
+            notes = `${notes} [CANCEL_REASON:${encodeURIComponent(copy.cancelReason)}]`.trim();
+        }
+        if (copy.cancelledBy) {
+            notes = `${notes} [CANCEL_BY:${encodeURIComponent(copy.cancelledBy)}]`.trim();
+        }
+        if (copy.cancelledAt) {
+            notes = `${notes} [CANCEL_AT:${copy.cancelledAt}]`.trim();
+        }
+    } else {
+        notes = `${notes} [CANCEL:false]`.trim();
+    }
     
     copy.privateNotes = notes === '' ? null : notes;
     return copy;
@@ -62,6 +84,10 @@ export const unpackRecord = (record: RecordFile): RecordFile => {
     copy.extendedDeadline = null;
     copy.isPriority = !!record.isPriority;
     copy.priorityNote = record.priorityNote || null;
+    copy.isCancelled = !!record.isCancelled;
+    copy.cancelReason = record.cancelReason || null;
+    copy.cancelledBy = record.cancelledBy || null;
+    copy.cancelledAt = record.cancelledAt || null;
     
     if (copy.privateNotes) {
         // Parse PRIO
@@ -78,6 +104,38 @@ export const unpackRecord = (record: RecordFile): RecordFile => {
             } catch (e) {
                 copy.priorityNote = noteMatch[1];
             }
+        }
+
+        // Parse CANCEL
+        const cancelMatch = copy.privateNotes.match(/\[CANCEL:(true|false)\]/);
+        if (cancelMatch) {
+            copy.isCancelled = cancelMatch[1] === 'true';
+        }
+
+        // Parse CANCEL_REASON
+        const reasonMatch = copy.privateNotes.match(/\[CANCEL_REASON:([^\]]*)\]/);
+        if (reasonMatch) {
+            try {
+                copy.cancelReason = decodeURIComponent(reasonMatch[1]);
+            } catch (e) {
+                copy.cancelReason = reasonMatch[1];
+            }
+        }
+
+        // Parse CANCEL_BY
+        const byMatch = copy.privateNotes.match(/\[CANCEL_BY:([^\]]*)\]/);
+        if (byMatch) {
+            try {
+                copy.cancelledBy = decodeURIComponent(byMatch[1]);
+            } catch (e) {
+                copy.cancelledBy = byMatch[1];
+            }
+        }
+
+        // Parse CANCEL_AT
+        const atMatch = copy.privateNotes.match(/\[CANCEL_AT:([^\]]+)\]/);
+        if (atMatch) {
+            copy.cancelledAt = atMatch[1];
         }
 
         // Parse REC_WARD
@@ -107,6 +165,10 @@ export const unpackRecord = (record: RecordFile): RecordFile => {
             .replace(/\[REC_WARD:[^\]]+\]/g, '')
             .replace(/\[PRIO:(true|false)\]/g, '')
             .replace(/\[PRIO_NOTE:[^\]]*\]/g, '')
+            .replace(/\[CANCEL:(true|false)\]/g, '')
+            .replace(/\[CANCEL_REASON:[^\]]*\]/g, '')
+            .replace(/\[CANCEL_BY:[^\]]*\]/g, '')
+            .replace(/\[CANCEL_AT:[^\]]*\]/g, '')
             .trim();
             
         copy.privateNotes = cleanedNotes === '' ? null : cleanedNotes;
@@ -117,6 +179,29 @@ export const unpackRecord = (record: RecordFile): RecordFile => {
 let CACHED_RECORDS: RecordFile[] = [];
 let IS_CACHED_RECORDS_LOADED = false;
 let IS_REALTIME_SUBSCRIBED = false;
+
+// BroadcastChannel for instant cross-tab sync in same browser session
+const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
+    ? new BroadcastChannel('qlhs_realtime_sync')
+    : null;
+
+if (syncChannel) {
+    syncChannel.onmessage = (event) => {
+        if (event.data && event.data.type === 'RECORDS_UPDATED') {
+            window.dispatchEvent(new CustomEvent('records_realtime_update'));
+        }
+    };
+}
+
+export const broadcastCrossTab = (type: string, detail?: any) => {
+    if (syncChannel) {
+        try {
+            syncChannel.postMessage({ type, detail });
+        } catch (e) {
+            // ignore
+        }
+    }
+};
 
 // Function to clear cache
 export const clearRecordsCache = () => {
@@ -156,6 +241,7 @@ export const initRealtimeRecords = () => {
             if (changed) {
                 // Dispatch custom event to notify React components
                 window.dispatchEvent(new CustomEvent('records_realtime_update'));
+                broadcastCrossTab('RECORDS_UPDATED');
             }
         })
         .subscribe();
@@ -256,6 +342,7 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             if (!error && data?.[0]) {
                 const unpacked = unpackRecord(data[0] as RecordFile);
                 if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS.unshift(unpacked);
+                broadcastCrossTab('RECORDS_UPDATED');
                 return unpacked;
             }
 
@@ -327,6 +414,7 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
                     if (idx !== -1) CACHED_RECORDS[idx] = unpacked;
                     else CACHED_RECORDS.unshift(unpacked);
                 }
+                broadcastCrossTab('RECORDS_UPDATED');
                 return unpacked;
             }
 
@@ -389,6 +477,7 @@ export const deleteRecordApi = async (id: string): Promise<boolean> => {
            if (IS_CACHED_RECORDS_LOADED) CACHED_RECORDS = CACHED_RECORDS.filter(r => r.id !== id);
         }
         
+        broadcastCrossTab('RECORDS_UPDATED');
         return true;
     } catch (error) {
         logError("deleteRecordApi", error);
@@ -407,6 +496,7 @@ export const createRecordsBatchApi = async (records: RecordFile[]): Promise<bool
             const unpackedData = data.map(r => unpackRecord(r as RecordFile));
             CACHED_RECORDS = [...unpackedData, ...CACHED_RECORDS];
         }
+        broadcastCrossTab('RECORDS_UPDATED');
         return true;
     } catch (error) {
         logError("createRecordsBatchApi", error);

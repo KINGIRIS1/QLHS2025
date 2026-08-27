@@ -114,6 +114,7 @@ export const ReturnedList: React.FC<ReturnedListProps> = ({
     ];
 
     return combined.filter(r => {
+        if (r.isCancelled) return false;
         // Hồ sơ được coi là đã trả kết quả nếu có trạng thái RETURNED hoặc có ngày trả kết quả cho dân
         const isReturnedStatus = r.status === 'RETURNED' || (r.status as any) === 'returned';
         const hasReturnDate = !!r.resultReturnedDate;

@@ -36,6 +36,14 @@ export interface ArchiveRecord {
     so_trang_sao_luc?: number | null;
     isPriority?: boolean;
     priorityNote?: string;
+    is_cancelled?: boolean;
+    cancel_reason?: string | null;
+    cancelled_by?: string | null;
+    cancelled_at?: string | null;
+    isCancelled?: boolean;
+    cancelReason?: string | null;
+    cancelledBy?: string | null;
+    cancelledAt?: string | null;
 }
 
 // Mock Data Stores
@@ -76,9 +84,13 @@ export const initRealtimeArchive = () => {
                 const newRec = payload.new as ArchiveRecord;
                 typeChanged = newRec.type;
                 if (IS_CACHED_LOADED[newRec.type]) {
-                    const arr = CACHED_ARCHIVE_RECORDS[newRec.type];
-                    if (!arr.find(r => r.id === newRec.id)) {
-                        arr.unshift(newRec);
+                    const arr = CACHED_ARCHIVE_RECORDS[newRec.type] || [];
+                    const existingIdx = arr.findIndex(r => r.id === newRec.id);
+                    if (existingIdx !== -1) {
+                        arr[existingIdx] = newRec;
+                        changed = true;
+                    } else {
+                        CACHED_ARCHIVE_RECORDS[newRec.type] = [newRec, ...arr];
                         changed = true;
                     }
                 }
@@ -86,13 +98,13 @@ export const initRealtimeArchive = () => {
                 const newRec = payload.new as ArchiveRecord;
                 typeChanged = newRec.type;
                 if (IS_CACHED_LOADED[newRec.type]) {
-                    const arr = CACHED_ARCHIVE_RECORDS[newRec.type];
+                    const arr = CACHED_ARCHIVE_RECORDS[newRec.type] || [];
                     const idx = arr.findIndex(r => r.id === newRec.id);
                     if (idx !== -1) {
                         arr[idx] = newRec;
                         changed = true;
                     } else {
-                        arr.unshift(newRec);
+                        CACHED_ARCHIVE_RECORDS[newRec.type] = [newRec, ...arr];
                         changed = true;
                     }
                 }
@@ -167,10 +179,11 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan' |
             }
         }
         
-        CACHED_ARCHIVE_RECORDS[type] = allData;
+        const uniqueData = Array.from(new Map(allData.map(r => [r.id, r])).values());
+        CACHED_ARCHIVE_RECORDS[type] = uniqueData;
         IS_CACHED_LOADED[type] = true;
         
-        return [...allData];
+        return [...uniqueData];
     } catch (error) {
         logError(`fetchArchiveRecords-${type}`, error);
         return MOCK_ARCHIVE.filter(r => r.type === type);
@@ -257,6 +270,18 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
             if (payload.so_gcn !== undefined) updatePayload.so_gcn = payload.so_gcn;
             if (payload.so_trang_sao_luc !== undefined) updatePayload.so_trang_sao_luc = payload.so_trang_sao_luc;
+            if (payload.is_cancelled !== undefined || payload.isCancelled !== undefined) {
+                updatePayload.is_cancelled = payload.is_cancelled ?? payload.isCancelled;
+            }
+            if (payload.cancel_reason !== undefined || payload.cancelReason !== undefined) {
+                updatePayload.cancel_reason = payload.cancel_reason ?? payload.cancelReason;
+            }
+            if (payload.cancelled_by !== undefined || payload.cancelledBy !== undefined) {
+                updatePayload.cancelled_by = payload.cancelled_by ?? payload.cancelledBy;
+            }
+            if (payload.cancelled_at !== undefined || payload.cancelledAt !== undefined) {
+                updatePayload.cancelled_at = payload.cancelled_at ?? payload.cancelledAt;
+            }
 
             let res = await supabase.from('archive_records').update(updatePayload).eq('id', record.id).select();
             
@@ -264,6 +289,10 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 // If columns do not exist yet, fallback to saving without them (relying on data JSONB)
                 delete updatePayload.so_gcn;
                 delete updatePayload.so_trang_sao_luc;
+                delete updatePayload.is_cancelled;
+                delete updatePayload.cancel_reason;
+                delete updatePayload.cancelled_by;
+                delete updatePayload.cancelled_at;
                 res = await supabase.from('archive_records').update(updatePayload).eq('id', record.id).select();
             }
             
@@ -311,6 +340,18 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
             if (payload.so_gcn !== undefined) insertPayload.so_gcn = payload.so_gcn;
             if (payload.so_trang_sao_luc !== undefined) insertPayload.so_trang_sao_luc = payload.so_trang_sao_luc;
+            if (payload.is_cancelled !== undefined || payload.isCancelled !== undefined) {
+                insertPayload.is_cancelled = payload.is_cancelled ?? payload.isCancelled;
+            }
+            if (payload.cancel_reason !== undefined || payload.cancelReason !== undefined) {
+                insertPayload.cancel_reason = payload.cancel_reason ?? payload.cancelReason;
+            }
+            if (payload.cancelled_by !== undefined || payload.cancelledBy !== undefined) {
+                insertPayload.cancelled_by = payload.cancelled_by ?? payload.cancelledBy;
+            }
+            if (payload.cancelled_at !== undefined || payload.cancelledAt !== undefined) {
+                insertPayload.cancelled_at = payload.cancelled_at ?? payload.cancelledAt;
+            }
             
             let res = await supabase.from('archive_records').insert([insertPayload]).select();
             
@@ -318,6 +359,10 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 // If columns do not exist yet, fallback
                 delete insertPayload.so_gcn;
                 delete insertPayload.so_trang_sao_luc;
+                delete insertPayload.is_cancelled;
+                delete insertPayload.cancel_reason;
+                delete insertPayload.cancelled_by;
+                delete insertPayload.cancelled_at;
                 res = await supabase.from('archive_records').insert([insertPayload]).select();
             }
             
@@ -340,7 +385,13 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
             // Mutate cache
             if (IS_CACHED_LOADED[data.type]) {
-                CACHED_ARCHIVE_RECORDS[data.type].unshift(data as ArchiveRecord);
+                const arr = CACHED_ARCHIVE_RECORDS[data.type] || [];
+                const idx = arr.findIndex(r => r.id === data.id);
+                if (idx !== -1) {
+                    arr[idx] = data as ArchiveRecord;
+                } else {
+                    CACHED_ARCHIVE_RECORDS[data.type] = [data as ArchiveRecord, ...arr];
+                }
             }
             
             return data as ArchiveRecord;
@@ -473,7 +524,11 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
             if (data) {
                 data.forEach((r: any) => {
                     const arr = CACHED_ARCHIVE_RECORDS[r.type];
-                    if (arr) arr.unshift(r as ArchiveRecord);
+                    if (arr) {
+                        const idx = arr.findIndex(x => x.id === r.id);
+                        if (idx !== -1) arr[idx] = r as ArchiveRecord;
+                        else arr.unshift(r as ArchiveRecord);
+                    }
                 });
             }
         }

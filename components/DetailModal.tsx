@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, CheckCircle, AlertTriangle } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, CheckCircle, AlertTriangle, Ban } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './SystemReceiptTemplate';
@@ -492,6 +492,23 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6">
+            {record.isCancelled && (
+                <div className="mb-6 p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-3 text-rose-900 shadow-sm animate-fade-in">
+                    <Ban size={24} className="shrink-0 text-rose-600 mt-0.5" />
+                    <div className="flex-1">
+                        <h4 className="font-bold text-sm uppercase tracking-wide text-rose-800 flex items-center gap-2">
+                            HỒ SƠ ĐÃ BỊ HỦY
+                        </h4>
+                        <div className="text-xs text-rose-700 mt-1.5 space-y-1">
+                            <p><span className="font-semibold">Lý do hủy:</span> {record.cancelReason || 'Không có lý do'}</p>
+                            <div className="flex flex-wrap gap-4 pt-1 text-[11px] text-rose-600 font-medium">
+                                {record.cancelledBy && <span>Người hủy: <strong>{record.cancelledBy}</strong></span>}
+                                {record.cancelledAt && <span>Thời gian hủy: <strong>{new Date(record.cancelledAt).toLocaleString('vi-VN')}</strong></span>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             {record.isPriority && (
                 <div className="mb-6 p-4 bg-gradient-to-r from-red-600 via-amber-600 to-red-600 text-white rounded-2xl shadow-md border-2 border-red-500 flex items-start gap-3">
                     <AlertTriangle size={24} className="shrink-0 text-yellow-300 mt-0.5 animate-bounce" />
@@ -753,7 +770,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             <TimelineItem 
                                 date={null} 
                                 forceActive={isWorkDone}
-                                label="ĐÃ THỰC HIỆN" 
+                                label="ĐANG TRÌNH KIỂM TRA" 
                                 icon={CheckSquare}
                                 colorClass={{text: 'text-cyan-700', border: 'border-cyan-600', bg: 'bg-cyan-600'}}
                             />

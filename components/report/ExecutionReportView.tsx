@@ -461,7 +461,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
           </div>
           <h2 className="text-xl font-black text-slate-800">Báo cáo hồ sơ thực hiện</h2>
           <p className="text-xs text-slate-500 font-medium">
-            Phân tích số liệu và tác vụ chuyển trạng thái: Đã thực hiện, Đang trình ký, Đã ký duyệt, Chuyển Một cửa
+            Phân tích số liệu và tác vụ chuyển trạng thái: Đang trình kiểm tra, Đang trình ký, Đã ký duyệt, Chuyển Một cửa
           </p>
         </div>
 
@@ -569,7 +569,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 text-center">
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:shadow-sm transition-all">
                 <div className="text-indigo-600 font-black text-2xl">{reportData.active.completedWork}</div>
-                <div className="text-slate-500 text-[10px] uppercase font-black tracking-wider mt-1.5 leading-tight">Đã thực hiện</div>
+                <div className="text-slate-500 text-[10px] uppercase font-black tracking-wider mt-1.5 leading-tight">Đang trình kiểm tra</div>
               </div>
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:shadow-sm transition-all">
                 <div className="text-pink-600 font-black text-2xl">{reportData.active.pendingSign}</div>
@@ -600,7 +600,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                   <thead>
                     <tr className="bg-slate-50 text-slate-700 uppercase font-bold text-[9px] tracking-wider border-b border-slate-200">
                       <th className="p-3.5">Địa bàn Xã / Phường</th>
-                      <th className="p-3.5 text-center">Đã thực hiện</th>
+                      <th className="p-3.5 text-center">Đang trình kiểm tra</th>
                       <th className="p-3.5 text-center">Đang trình ký</th>
                       <th className="p-3.5 text-center">Đã ký duyệt</th>
                       <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>
@@ -663,7 +663,7 @@ const ExecutionReportView: React.FC<ExecutionReportViewProps> = ({
                   <thead>
                     <tr className="bg-slate-50 text-slate-700 uppercase font-bold text-[9px] tracking-wider border-b border-slate-200">
                       <th className="p-3.5">Họ tên kỹ sư, nhân viên</th>
-                      <th className="p-3.5 text-center">Đã thực hiện</th>
+                      <th className="p-3.5 text-center">Đang trình kiểm tra</th>
                       <th className="p-3.5 text-center">Đang trình ký</th>
                       <th className="p-3.5 text-center">Đã ký duyệt</th>
                       <th className="p-3.5 text-center">Đã chuyển 1 cửa</th>

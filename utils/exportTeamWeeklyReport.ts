@@ -85,12 +85,12 @@ export const exportTeamWeeklyReportToWord = async (
   addText(`- Tổng số lượng thửa đất thuộc hồ sơ hoàn thành: ${reportData.totalPlotCountCompleted} thửa`, true, 720);
 
   const totalExecuted = reportData.totalCompletedWorkCount + reportData.totalPendingSignCount;
-  addText(`3. Tổng số hồ sơ đã thực hiện: ${totalExecuted} hồ sơ`, true, 360);
+  addText(`3. Tổng số hồ sơ đang trình kiểm tra / chờ ký: ${totalExecuted} hồ sơ`, true, 360);
   if (totalExecuted > 0) {
     addText("Trong đó:", false, 720);
-    addText(`- Đã thực hiện (đang chờ kiểm tra): ${reportData.totalCompletedWorkCount} hồ sơ`, false, 1080);
-    addText(`- Đã thực hiện (chờ ký duyệt): ${reportData.totalPendingSignCount} hồ sơ`, false, 1080);
-    addText(`- Tổng số lượng thửa đất thuộc hồ sơ đã thực hiện: ${reportData.totalPlotCountExecuted} thửa`, true, 1080);
+    addText(`- Đang trình kiểm tra: ${reportData.totalCompletedWorkCount} hồ sơ`, false, 1080);
+    addText(`- Chờ ký duyệt: ${reportData.totalPendingSignCount} hồ sơ`, false, 1080);
+    addText(`- Tổng số lượng thửa đất thuộc hồ sơ đang trình kiểm tra / chờ ký: ${reportData.totalPlotCountExecuted} thửa`, true, 1080);
   }
 
   addText(`4. Tổng lịch công tác: ${reportData.totalScheduleCount} lịch`, true, 360);
@@ -128,13 +128,13 @@ export const exportTeamWeeklyReportToWord = async (
     addText(`- Tổng số lượng thửa đất đã hoàn thành: ${plotCountCompleted} thửa`, true, 1080);
     
     const execCount = data.completedWork.length + data.pendingSign.length;
-    addText(`c) Số hồ sơ đã thực hiện: ${execCount} hồ sơ`, true, 720);
+    addText(`c) Số hồ sơ đang trình kiểm tra / chờ ký: ${execCount} hồ sơ`, true, 720);
     if (execCount > 0) {
       addText("Trong đó:", false, 1080);
-      if (data.completedWork.length > 0) addText(`- Đã thực hiện (đang chờ kiểm tra): ${data.completedWork.length} hồ sơ`, false, 1440);
-      if (data.pendingSign.length > 0) addText(`- Đã thực hiện (chờ ký duyệt): ${data.pendingSign.length} hồ sơ`, false, 1440);
+      if (data.completedWork.length > 0) addText(`- Đang trình kiểm tra: ${data.completedWork.length} hồ sơ`, false, 1440);
+      if (data.pendingSign.length > 0) addText(`- Chờ ký duyệt: ${data.pendingSign.length} hồ sơ`, false, 1440);
       const plotCountExecuted = [...data.completedWork, ...data.pendingSign].reduce((sum: number, r: any) => sum + getRecordPlotCount(r), 0);
-      addText(`- Tổng số lượng thửa đất đã thực hiện: ${plotCountExecuted} thửa`, true, 1440);
+      addText(`- Tổng số lượng thửa đất đang trình kiểm tra / chờ ký: ${plotCountExecuted} thửa`, true, 1440);
     }
     
     addText(`d) Lịch công tác theo địa bàn: ${data.schedules.length} lịch`, true, 720);
@@ -229,7 +229,7 @@ export const exportExecutionReportToWord = async (
   );
 
   addText("I. TỔNG HỢP TIẾN TRÌNH THỰC HIỆN", true);
-  addText(`- Đã thực hiện: ${reportData.completedWork} hồ sơ`, false, 360);
+  addText(`- Đang trình kiểm tra: ${reportData.completedWork} hồ sơ`, false, 360);
   addText(`- Đang trình ký: ${reportData.pendingSign} hồ sơ`, false, 360);
   addText(`- Đã ký duyệt (chờ Một Cửa): ${reportData.signed} hồ sơ`, false, 360);
   addText(`- Đã chuyển 1 cửa: ${reportData.handover} hồ sơ`, false, 360);
@@ -240,7 +240,7 @@ export const exportExecutionReportToWord = async (
   addText("II. PHÂN BỔ THEO ĐỊA BÀN XÃ / PHƯỜNG", true);
   reportData.wardStats.forEach((w: any) => {
     addText(
-      `• ${w.ward}: Đã thực hiện: ${w.completedWork} | Trình ký: ${w.pendingSign} | Đã ký duyệt: ${w.signed} | Chuyển 1 cửa: ${w.handover} | Số thửa: ${w.plots}`,
+      `• ${w.ward}: Đang trình kiểm tra: ${w.completedWork} | Trình ký: ${w.pendingSign} | Đã ký duyệt: ${w.signed} | Chuyển 1 cửa: ${w.handover} | Số thửa: ${w.plots}`,
       false,
       360
     );
@@ -250,7 +250,7 @@ export const exportExecutionReportToWord = async (
   addText("III. ĐÓNG GÓP NGHIỆP VỤ CỦA NHÂN VIÊN", true);
   reportData.employeeStats.forEach((e: any, index: number) => {
     addText(
-      `${index + 1}. ${e.employee.name} (${e.employee.department}): Đã thực hiện: ${e.completedWork} | Trình ký: ${e.pendingSign} | Đã ký: ${e.signed} | Chuyển 1 cửa: ${e.handover} | Thửa: ${e.plots} | Lịch CT: ${e.schedules}`,
+      `${index + 1}. ${e.employee.name} (${e.employee.department}): Đang trình kiểm tra: ${e.completedWork} | Trình ký: ${e.pendingSign} | Đã ký: ${e.signed} | Chuyển 1 cửa: ${e.handover} | Thửa: ${e.plots} | Lịch CT: ${e.schedules}`,
       false,
       360
     );

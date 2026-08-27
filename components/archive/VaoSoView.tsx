@@ -131,11 +131,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const loadData = async () => {
         setLoading(true);
         const data = await fetchArchiveRecords('vaoso');
-        setRecords(data);
+        const deduplicated = Array.from(new Map(data.map(r => [r.id, r])).values());
+        setRecords(deduplicated);
         
         // Calculate max book number from existing records
         let maxNum = 0;
-        data.forEach(r => {
+        deduplicated.forEach(r => {
             const val = r.data?.so_vao_so || '';
             if (val.startsWith('CN ')) {
                 const numPart = val.replace('CN ', '');
@@ -164,7 +165,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const filteredRecords = useMemo(() => {
-        let filtered = records;
+        let baseList = records.filter(r => !r.is_cancelled && !r.isCancelled && !r.data?.is_cancelled && !r.data?.isCancelled);
+        let filtered = baseList;
 
         // Filter by Tab (Status)
         // If user selects status from dropdown, it overrides the tab logic or syncs with it.
@@ -173,15 +175,15 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         
         if (activeTab === 'all') {
             // Danh sách tổng: Hiển thị tất cả
-            filtered = records;
+            filtered = baseList;
         } else if (activeTab === 'pending') {
             // Chờ chuyển Scan: Đã được đánh dấu chuyển scan NHƯNG chưa có đợt scan (chưa scan xong)
-            filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
+            filtered = baseList.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
         } else if (activeTab === 'scanned') {
             // Đã chuyển Scan: Đã có đợt scan
-            filtered = records.filter(r => r.data?.is_scanned);
+            filtered = baseList.filter(r => r.data?.is_scanned);
         } else if (activeTab === 'priority') {
-            filtered = records.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority));
+            filtered = baseList.filter(r => Boolean(r.data?.isPriority) || Boolean(r.isPriority));
         }
 
         // Filter by Date (Ngày nhận)

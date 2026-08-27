@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, UserRole } from '../types';
 import { getNormalizedWard, getFullWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock, ClipboardCheck, Printer } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, Search, Clock, ClipboardCheck, Printer, Ban } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper, showToast } from '../utils/appHelpers';
@@ -10,6 +10,8 @@ import { fetchArchiveRecords, saveArchiveRecord } from '../services/apiArchive';
 import { fetchContactSettingsCached, getContactInfo, ContactSettings, DEFAULT_CONTACT_SETTINGS } from '../services/apiSystem';
 import { calculateNextRecordCode, getWardShortCode } from '../utils/codeGenerator';
 import ExportReceiptSection from './receive-record/ExportReceiptSection';
+import CancelRecordModal from './receive-record/CancelRecordModal';
+import CancelledRecordsView from './receive-record/CancelledRecordsView';
 
 
 const mapStatusToEnum = (s: string): RecordStatus => {
@@ -65,7 +67,11 @@ const mapArchiveToRecordFile = (ar: any): RecordFile => {
         _archiveType: ar.type,
         receiptNumber: d.so_bien_lai || null,
         resultReturnedDate: d.ngay_tra_ket_qua || null,
-        receiverName: d.nguoi_nhan_kq || null
+        receiverName: d.nguoi_nhan_kq || null,
+        isCancelled: Boolean(ar.is_cancelled ?? ar.isCancelled ?? d.is_cancelled ?? d.isCancelled),
+        cancelReason: ar.cancel_reason || ar.cancelReason || d.cancel_reason || d.cancelReason || null,
+        cancelledBy: ar.cancelled_by || ar.cancelledBy || d.cancelled_by || d.cancelledBy || null,
+        cancelledAt: ar.cancelled_at || ar.cancelledAt || d.cancelled_at || d.cancelledAt || null
     };
 };
 
@@ -127,9 +133,12 @@ const formatDateKey = (date: Date): string => {
 
 const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onReturnResult, onUpdateReturnResult }) => {
   const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended' | 'returned_list' | 'export_receipt'>('create');
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'search' | 'extended' | 'returned_list' | 'export_receipt' | 'cancelled'>('create');
   const [contactSettings, setContactSettings] = useState<ContactSettings>(DEFAULT_CONTACT_SETTINGS);
   
+  // State quản lý Hủy hồ sơ
+  const [cancellingRecord, setCancellingRecord] = useState<RecordFile | null>(null);
+
   // State quản lý danh sách hồ sơ Sao lục lấy từ Archive
 
   const [archiveSaoLucRecords, setArchiveSaoLucRecords] = useState<RecordFile[]>([]);
@@ -224,6 +233,140 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
           await loadArchiveCongVan();
       }
       return success;
+  };
+
+  // Tính tổng số lượng hồ sơ đã hủy
+  const cancelledCount = useMemo(() => {
+      let count = 0;
+      records.forEach(r => { if (r.isCancelled) count++; });
+      archiveSaoLucRecords.forEach(r => { if (r.isCancelled) count++; });
+      archiveVaoSoRecords.forEach(r => { if (r.isCancelled) count++; });
+      archiveDangKyRecords.forEach(r => { if (r.isCancelled) count++; });
+      archiveCongVanRecords.forEach(r => { if (r.isCancelled) count++; });
+      return count;
+  }, [records, archiveSaoLucRecords, archiveVaoSoRecords, archiveDangKyRecords, archiveCongVanRecords]);
+
+  // Xử lý xác nhận Hủy hồ sơ
+  const handleConfirmCancel = async (record: RecordFile, reason: string, cancelledBy: string, cancelledAt: string) => {
+      const isArchive = Boolean((record as any)._isArchive) || ['Sao lục hồ sơ', 'Vào sổ', 'Đăng ký biến động', 'Công văn', 'Sao lục'].includes(record.recordType || '');
+      if (isArchive) {
+          let type: 'saoluc' | 'vaoso' | 'dangky' | 'congvan' = 'saoluc';
+          const rType = record.recordType || '';
+          if (rType.includes('ổ') || rType === 'Vào sổ') type = 'vaoso';
+          else if (rType.includes('độn') || rType === 'Đăng ký biến động') type = 'dangky';
+          else if (rType.includes('vă') || rType === 'Công văn') type = 'congvan';
+          
+          try {
+              const rawList = await fetchArchiveRecords(type, true);
+              const found = rawList.find(r => r.id === record.id || r.so_hieu === record.code);
+              if (found) {
+                  const updatedData = {
+                      ...found.data,
+                      isCancelled: true,
+                      is_cancelled: true,
+                      cancelReason: reason,
+                      cancel_reason: reason,
+                      cancelledBy: cancelledBy,
+                      cancelled_by: cancelledBy,
+                      cancelledAt: cancelledAt,
+                      cancelled_at: cancelledAt
+                  };
+                  await saveArchiveRecord({
+                      ...found,
+                      is_cancelled: true,
+                      cancel_reason: reason,
+                      cancelled_by: cancelledBy,
+                      cancelled_at: cancelledAt,
+                      data: updatedData
+                  });
+                  window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type } }));
+                  if (type === 'saoluc') await loadArchiveSaoLuc();
+                  else if (type === 'vaoso') await loadArchiveVaoSo();
+                  else if (type === 'dangky') await loadArchiveDangKy();
+                  else if (type === 'congvan') await loadArchiveCongVan();
+                  showToast(`Đã hủy hồ sơ ${record.code} thành công.`, 'success');
+              }
+          } catch (err) {
+              console.error("Lỗi khi hủy hồ sơ lưu trữ:", err);
+              showToast("Có lỗi xảy ra khi hủy hồ sơ lưu trữ.", "error");
+              throw err;
+          }
+      } else {
+          const updatedRecord: RecordFile = {
+              ...record,
+              isCancelled: true,
+              cancelReason: reason,
+              cancelledBy: cancelledBy,
+              cancelledAt: cancelledAt
+          };
+          const success = await onSave(updatedRecord);
+          if (success) {
+              showToast(`Đã hủy hồ sơ ${record.code} thành công.`, 'success');
+          }
+      }
+  };
+
+  // Xử lý Khôi phục hồ sơ đã hủy
+  const handleRestoreRecord = async (record: RecordFile): Promise<boolean> => {
+      const isArchive = Boolean((record as any)._isArchive) || ['Sao lục hồ sơ', 'Vào sổ', 'Đăng ký biến động', 'Công văn', 'Sao lục'].includes(record.recordType || '');
+      if (isArchive) {
+          let type: 'saoluc' | 'vaoso' | 'dangky' | 'congvan' = 'saoluc';
+          const rType = record.recordType || '';
+          if (rType.includes('ổ') || rType === 'Vào sổ') type = 'vaoso';
+          else if (rType.includes('độn') || rType === 'Đăng ký biến động') type = 'dangky';
+          else if (rType.includes('vă') || rType === 'Công văn') type = 'congvan';
+          
+          try {
+              const rawList = await fetchArchiveRecords(type, true);
+              const found = rawList.find(r => r.id === record.id || r.so_hieu === record.code);
+              if (found) {
+                  const updatedData = {
+                      ...found.data,
+                      isCancelled: false,
+                      is_cancelled: false,
+                      cancelReason: null,
+                      cancel_reason: null,
+                      cancelledBy: null,
+                      cancelled_by: null,
+                      cancelledAt: null,
+                      cancelled_at: null
+                  };
+                  await saveArchiveRecord({
+                      ...found,
+                      is_cancelled: false,
+                      cancel_reason: null,
+                      cancelled_by: null,
+                      cancelled_at: null,
+                      data: updatedData
+                  });
+                  window.dispatchEvent(new CustomEvent('archive_realtime_update', { detail: { type } }));
+                  if (type === 'saoluc') await loadArchiveSaoLuc();
+                  else if (type === 'vaoso') await loadArchiveVaoSo();
+                  else if (type === 'dangky') await loadArchiveDangKy();
+                  else if (type === 'congvan') await loadArchiveCongVan();
+                  showToast(`Đã khôi phục hồ sơ ${record.code} thành công.`, 'success');
+                  return true;
+              }
+          } catch (err) {
+              console.error("Lỗi khi khôi phục hồ sơ lưu trữ:", err);
+              showToast("Có lỗi xảy ra khi khôi phục hồ sơ lưu trữ.", "error");
+              return false;
+          }
+      } else {
+          const updatedRecord: RecordFile = {
+              ...record,
+              isCancelled: false,
+              cancelReason: null,
+              cancelledBy: null,
+              cancelledAt: null
+          };
+          const success = await onSave(updatedRecord);
+          if (success) {
+              showToast(`Đã khôi phục hồ sơ ${record.code} thành công.`, 'success');
+              return true;
+          }
+      }
+      return false;
   };
 
   const handleExtendRecord = async (record: RecordFile, extDate: string): Promise<boolean> => {
@@ -497,6 +640,24 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <button onClick={() => setViewMode('returned_list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${viewMode === 'returned_list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <ClipboardCheck size={16} /> Danh sách đã trả kết quả
             </button>
+            <button 
+                onClick={() => setViewMode('cancelled')} 
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all shrink-0 ${
+                    viewMode === 'cancelled' 
+                        ? 'bg-rose-600 text-white shadow-sm font-semibold' 
+                        : 'text-rose-700 hover:bg-rose-50'
+                }`}
+            >
+                <Ban size={16} /> 
+                <span>Hồ sơ đã hủy</span>
+                {cancelledCount > 0 && (
+                    <span className={`px-1.5 py-0.5 text-xs font-bold rounded-full ${
+                        viewMode === 'cancelled' ? 'bg-white text-rose-700' : 'bg-rose-100 text-rose-700'
+                    }`}>
+                        {cancelledCount}
+                    </span>
+                )}
+            </button>
             {isAdmin && (
                 <button 
                     onClick={() => setViewMode('export_receipt')} 
@@ -555,6 +716,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}
                 onPrint={handlePreviewDocx}
+                onCancel={(r) => setCancellingRecord(r)}
             />
         )}
 
@@ -605,6 +767,23 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             />
         )}
 
+        {viewMode === 'cancelled' && (
+            <CancelledRecordsView 
+                records={[
+                    ...records,
+                    ...archiveSaoLucRecords,
+                    ...archiveVaoSoRecords,
+                    ...archiveDangKyRecords,
+                    ...archiveCongVanRecords
+                ]}
+                wards={wards}
+                currentUser={currentUser}
+                employees={employees}
+                onRestoreRecord={handleRestoreRecord}
+                onPreviewExcel={handlePreviewExcel}
+            />
+        )}
+
         {viewMode === 'export_receipt' && (
             <ExportReceiptSection 
                 records={[
@@ -625,6 +804,17 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       <TemplateConfigModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} type={templateType as any} />
       <DocxPreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} docxBlob={previewBlob} fileName={previewFileName} />
       <ExcelPreviewModal isOpen={isExcelPreviewOpen} onClose={() => setIsExcelPreviewOpen(false)} workbook={previewWorkbook} fileName={previewExcelName} />
+      
+      {cancellingRecord && (
+          <CancelRecordModal 
+              isOpen={Boolean(cancellingRecord)}
+              record={cancellingRecord}
+              currentUser={currentUser}
+              onClose={() => setCancellingRecord(null)}
+              onConfirmCancel={handleConfirmCancel}
+          />
+      )}
+
       {showSystemReceipt && systemReceiptData && (
           <SystemReceiptTemplate
               data={systemReceiptData}

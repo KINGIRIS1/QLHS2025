@@ -72,6 +72,7 @@ export const ExtendedList: React.FC<ExtendedListProps> = ({
 
     // Lọc hồ sơ thực tế có gia hạn (extendedDeadline không rỗng) và thuộc địa bàn được phân quyền phụ trách
     return combined.filter(r => {
+      if (r.isCancelled) return false;
       const hasExtension = !!(r.extendedDeadline && r.extendedDeadline.trim() !== '');
       if (!hasExtension) return false;
       return isManagedWard(r.ward || '');

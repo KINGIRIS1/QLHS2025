@@ -120,7 +120,7 @@ export const exportReportToExcel = async (
         "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
         "Ngày Nhận", 
         "Hẹn Trả", 
-        "Đã Thực Hiện", // NEW 
+        "Đang Trình Kiểm Tra", // NEW 
         "Chờ Ký Duyệt", // NEW
         "Ngày hoàn thành",
         "Ngày trả kết quả",

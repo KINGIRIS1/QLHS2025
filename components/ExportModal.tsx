@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye } from 'lucide-react';
 import { showToast, getReceivingWard } from '../utils/appHelpers';
+import { getNormalizedWard } from '../constants';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -14,23 +15,45 @@ interface ExportModalProps {
   onPreview: (workbook: XLSX.WorkBook, fileName: string) => void; // Callback để mở Preview
 }
 
+// Helper trích xuất số đợt chuẩn hóa
+const extractBatchNumber = (batch: any): number => {
+  if (typeof batch === 'number') return batch;
+  if (!batch) return 0;
+  const num = parseInt(String(batch).replace(/\D/g, ''), 10);
+  return isNaN(num) ? 0 : num;
+};
+
+// Helper chuẩn hóa ngày YYYY-MM-DD
+const extractDateOnly = (dateVal: any): string => {
+  if (!dateVal) return '';
+  const str = String(dateVal).trim();
+  if (str.includes('T')) return str.split('T')[0];
+  if (str.includes(' ')) return str.split(' ')[0];
+  return str;
+};
+
 const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, wards, type, onPreview }) => {
   const [selectedBatchKey, setSelectedBatchKey] = useState<string>('');
   const [selectedWard, setSelectedWard] = useState<string>('all');
 
   // 1. Tổng hợp danh sách các đợt (Batch Options)
   const batchOptions = useMemo(() => {
-    const batches: Record<string, { date: string, batch: number | string, count: number }> = {};
+    const batches: Record<string, { date: string, batch: number, count: number }> = {};
 
     records.forEach(r => {
+      if (r.isCancelled) return; // Bỏ qua hồ sơ đã hủy
+      
       if (type === 'handover') {
-          // Logic cho Giao 1 cửa: Dựa vào exportBatch
+          // Logic cho Giao 1 cửa: Dựa vào exportBatch & exportDate
           // Bao gồm cả HANDOVER, SIGNED, WITHDRAWN và RETURNED (nếu đã có batch)
           if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.RETURNED || !!r.exportBatch) && r.exportBatch && r.exportDate) {
-            const dateStr = r.exportDate.split('T')[0];
-            const key = `${dateStr}_${r.exportBatch}`;
+            const dateStr = extractDateOnly(r.exportDate);
+            const batchNum = extractBatchNumber(r.exportBatch);
+            if (!dateStr || batchNum === 0) return;
+            
+            const key = `${dateStr}_${batchNum}`;
             if (!batches[key]) {
-              batches[key] = { date: dateStr, batch: r.exportBatch, count: 0 };
+              batches[key] = { date: dateStr, batch: batchNum, count: 0 };
             }
             batches[key].count++;
           }
@@ -38,21 +61,25 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
           // Logic cho Trình Ký: Dựa vào ngày tiếp nhận (receivedDate) để gom nhóm
           // Lấy các hồ sơ đang Chờ ký hoặc Đã ký (nhưng chưa giao)
           if (r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED) {
-             const dateStr = r.receivedDate;
+             const dateStr = extractDateOnly(r.receivedDate);
              if (!dateStr) return;
              const key = `date_${dateStr}`;
              if (!batches[key]) {
-                 batches[key] = { date: dateStr, batch: 'Theo ngày', count: 0 };
+                 batches[key] = { date: dateStr, batch: 0, count: 0 };
              }
              batches[key].count++;
           }
       }
     });
 
-    // Sắp xếp giảm dần theo ngày
+    // Sắp xếp giảm dần theo ngày, sau đó giảm dần theo đợt
     return Object.entries(batches)
         .map(([key, value]) => ({ key, ...value }))
-        .sort((a, b) => b.date.localeCompare(a.date));
+        .sort((a, b) => {
+          const dateComp = b.date.localeCompare(a.date);
+          if (dateComp !== 0) return dateComp;
+          return (Number(b.batch) || 0) - (Number(a.batch) || 0);
+        });
   }, [records, isOpen, type]);
 
   // Tự động chọn đợt mới nhất khi mở modal
@@ -83,6 +110,15 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     return str.toUpperCase();
   };
 
+  // Hàm so khớp địa bàn xã/phường linh hoạt
+  const matchWardFilter = (recordWard: string | null | undefined, filterWard: string): boolean => {
+    if (filterWard === 'all') return true;
+    if (!recordWard) return false;
+    const normRec = getNormalizedWard(recordWard).toLowerCase().trim();
+    const normFilter = getNormalizedWard(filterWard).toLowerCase().trim();
+    return normRec === normFilter || normRec.includes(normFilter) || normFilter.includes(normRec);
+  };
+
   // Hàm tạo Workbook chung (cho cả Preview và Download)
   const generateWorkbook = (): { wb: XLSX.WorkBook, fileName: string } | null => {
     if (!selectedBatchKey) return null;
@@ -93,17 +129,20 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     let fileName = "";
 
     // Xử lý tên xã phường để hiển thị
-    // NẾU selectedWard là 'all' thì hiển thị "TOÀN BỘ", ngược lại hiển thị tên xã
     const wardTitle = selectedWard === 'all' ? "" : ` - ${selectedWard.toUpperCase()}`;
 
     if (type === 'handover') {
         const [dateStr, batchStr] = selectedBatchKey.split('_');
-        const batchNum = parseInt(batchStr);
+        const batchNum = parseInt(batchStr, 10);
         
         recordsToExport = records.filter(r => {
-            const matchBatch = r.exportDate?.startsWith(dateStr) && r.exportBatch === batchNum;
+            if (r.isCancelled) return false;
+            const rDate = extractDateOnly(r.exportDate);
+            const rBatch = extractBatchNumber(r.exportBatch);
+            const matchBatch = (rDate === dateStr) && (rBatch === batchNum);
+            
             const recWard = getReceivingWard(r);
-            const matchWard = selectedWard === 'all' || recWard === selectedWard;
+            const matchWard = matchWardFilter(recWard, selectedWard);
             return matchBatch && matchWard;
         });
 
@@ -117,9 +156,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         const dateStr = selectedBatchKey.replace('date_', '');
         
         recordsToExport = records.filter(r => {
-            const matchDate = r.receivedDate === dateStr;
+            if (r.isCancelled) return false;
+            const rDate = extractDateOnly(r.receivedDate);
+            const matchDate = rDate === dateStr;
             const matchStatus = r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED;
-            const matchWard = selectedWard === 'all' || r.ward === selectedWard;
+            const matchWard = matchWardFilter(r.ward, selectedWard);
             return matchDate && matchStatus && matchWard;
         });
 

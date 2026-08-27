@@ -105,6 +105,12 @@ export interface RecordFile {
   // Hồ sơ cần chú ý / Ưu tiên báo cáo ngay
   isPriority?: boolean;           // Đánh dấu là hồ sơ chú ý / ưu tiên
   priorityNote?: string | null;   // Ghi chú lý do cần chú ý (sếp dặn, cần báo gấp, ...)
+
+  // Hủy hồ sơ
+  isCancelled?: boolean;          // Đánh dấu hồ sơ đã bị hủy
+  cancelReason?: string | null;   // Lý do hủy hồ sơ
+  cancelledBy?: string | null;    // Tên người thực hiện hủy
+  cancelledAt?: string | null;    // Thời gian thực hiện hủy
 }
 
 // Interface cho Item tách thửa

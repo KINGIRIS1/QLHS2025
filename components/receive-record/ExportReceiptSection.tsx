@@ -68,7 +68,7 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
   const availableRecordTypes = useMemo(() => {
     const types = new Set<string>();
     records.forEach(r => {
-      if (r.recordType) types.add(r.recordType);
+      if (!r.isCancelled && r.recordType) types.add(r.recordType);
     });
     return Array.from(types).sort();
   }, [records]);
@@ -76,6 +76,7 @@ export const ExportReceiptSection: React.FC<ExportReceiptSectionProps> = ({
   // Filtered records
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
+      if (r.isCancelled) return false;
       // Date filter
       if (dateMode === 'single') {
         if (r.receivedDate !== singleDate) return false;

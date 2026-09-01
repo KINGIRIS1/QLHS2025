@@ -1,3 +1,4 @@
+import { localDateKey } from '../../utils/dateUtils';
 import React, { useMemo, useState } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
@@ -22,11 +23,11 @@ const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, f
     const [localFromDate, setLocalFromDate] = useState<string>(() => {
         if (initialFromDate) return initialFromDate;
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        return localDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
     });
     const [localToDate, setLocalToDate] = useState<string>(() => {
         if (initialToDate) return initialToDate;
-        return new Date().toISOString().split('T')[0];
+        return localDateKey();
     });
 
     const handleQuickDate = (mode: 'week' | 'month' | 'all') => {
@@ -36,12 +37,12 @@ const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, f
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
             const start = new Date(now.setDate(diff));
-            setLocalFromDate(start.toISOString().split('T')[0]);
-            setLocalToDate(new Date().toISOString().split('T')[0]);
+            setLocalFromDate(localDateKey(start));
+            setLocalToDate(localDateKey());
         } else if (mode === 'month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            setLocalFromDate(start.toISOString().split('T')[0]);
-            setLocalToDate(new Date().toISOString().split('T')[0]);
+            setLocalFromDate(localDateKey(start));
+            setLocalToDate(localDateKey());
         }
     };
 
@@ -166,7 +167,7 @@ const LateRecordsView: React.FC<LateRecordsViewProps> = ({ records, employees, f
         ws['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
 
         XLSX.utils.book_append_sheet(wb, ws, "HoSoTreHan");
-        const filename = `Ho_So_Tre_Han_${subTab}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const filename = `Ho_So_Tre_Han_${subTab}_${localDateKey()}.xlsx`;
         XLSX.writeFile(wb, filename);
     };
 

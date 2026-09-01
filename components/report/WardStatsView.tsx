@@ -1,3 +1,4 @@
+import { localDateKey } from '../../utils/dateUtils';
 import React, { useState, useMemo } from 'react';
 import { RecordFile } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
@@ -14,10 +15,10 @@ const WardStatsView: React.FC<WardStatsViewProps> = ({ records }) => {
     const [dateMode, setDateMode] = useState<'all' | 'week' | 'month' | 'custom'>('month');
     const [fromDate, setFromDate] = useState(() => {
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        return localDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
     });
     const [toDate, setToDate] = useState(() => {
-        return new Date().toISOString().split('T')[0];
+        return localDateKey();
     });
 
     const handleQuickDate = (mode: 'week' | 'month' | 'all') => {
@@ -27,12 +28,12 @@ const WardStatsView: React.FC<WardStatsViewProps> = ({ records }) => {
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
             const start = new Date(now.setDate(diff));
-            setFromDate(start.toISOString().split('T')[0]);
-            setToDate(new Date().toISOString().split('T')[0]);
+            setFromDate(localDateKey(start));
+            setToDate(localDateKey());
         } else if (mode === 'month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            setFromDate(start.toISOString().split('T')[0]);
-            setToDate(new Date().toISOString().split('T')[0]);
+            setFromDate(localDateKey(start));
+            setToDate(localDateKey());
         }
     };
 

@@ -1,3 +1,4 @@
+import { localDateKey } from '../../utils/dateUtils';
 import React, { useState, useRef, useMemo } from 'react';
 import { RecordFile, RecordStatus } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
@@ -46,11 +47,11 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
     const [localFromDate, setLocalFromDate] = useState<string>(() => {
         if (initialFromDate) return initialFromDate;
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        return localDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
     });
     const [localToDate, setLocalToDate] = useState<string>(() => {
         if (initialToDate) return initialToDate;
-        return new Date().toISOString().split('T')[0];
+        return localDateKey();
     });
 
     const handleQuickDate = (mode: 'week' | 'month' | 'all') => {
@@ -60,12 +61,12 @@ export const AiReportCardView: React.FC<AiReportCardViewProps> = ({
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
             const start = new Date(now.setDate(diff));
-            setLocalFromDate(start.toISOString().split('T')[0]);
-            setLocalToDate(new Date().toISOString().split('T')[0]);
+            setLocalFromDate(localDateKey(start));
+            setLocalToDate(localDateKey());
         } else if (mode === 'month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            setLocalFromDate(start.toISOString().split('T')[0]);
-            setLocalToDate(new Date().toISOString().split('T')[0]);
+            setLocalFromDate(localDateKey(start));
+            setLocalToDate(localDateKey());
         }
     };
 

@@ -7,19 +7,38 @@ import fs from 'fs';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 const rootDir = process.cwd();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'he-thong-quan-ly-ho-so-chon-thanh-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(48).toString('hex');
+
+if (!process.env.JWT_SECRET) {
+    console.warn('[BAO MAT] JWT_SECRET chưa được cấu hình. Khóa ngẫu nhiên chỉ phù hợp cho môi trường phát triển.');
+}
+
+const hashPassword = (password: string): string => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return `scrypt$${salt}$${hash}`;
+};
+
+const verifyPassword = (password: string, storedPassword: string): boolean => {
+    if (!storedPassword.startsWith('scrypt$')) {
+        const actual = Buffer.from(String(password));
+        const expected = Buffer.from(String(storedPassword));
+        return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+    }
+
+    const [, salt, expectedHex] = storedPassword.split('$');
+    if (!salt || !expectedHex) return false;
+    const actual = crypto.scryptSync(password, salt, 64);
+    const expected = Buffer.from(expectedHex, 'hex');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+};
 
 const getGoogleGenAIClient = (req: Request) => {
   let apiKey = (req.headers['x-gemini-key'] as string) || '';
-  if (!apiKey) {
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      apiKey = authHeader.substring(7);
-    }
-  }
   if (!apiKey) {
     apiKey = process.env.GEMINI_API_KEY || '';
   }
@@ -40,6 +59,24 @@ const getGoogleGenAIClient = (req: Request) => {
 
 const server = jsonServer.create();
 const dbFile = process.env.DB_PATH || path.join(rootDir, 'server/db.json');
+if (!fs.existsSync(dbFile)) {
+    const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+    if (!initialAdminPassword) {
+        throw new Error('INITIAL_ADMIN_PASSWORD bắt buộc khi khởi tạo cơ sở dữ liệu mới.');
+    }
+    const initialData = {
+        records: [],
+        audit_logs: [],
+        excerpt_history: [],
+        excerpt_counters: { "Chơn Thành": 0, "Minh Hưng": 0, "Nha Bích": 0 },
+        employees: [],
+        users: [{ username: 'admin', password: hashPassword(initialAdminPassword), name: 'Administrator', role: 'ADMIN' }]
+    };
+    console.log("Khoi tao co so du lieu ban dau...");
+    const dir = path.dirname(dbFile);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(dbFile, JSON.stringify(initialData, null, 2));
+}
 const router = jsonServer.router(dbFile);
 const middlewares = jsonServer.defaults();
 
@@ -68,38 +105,24 @@ try {
         fs.copyFileSync(dbFile, backupFile);
         console.log(`[AN TOAN] Da tu dong sao luu du lieu tai: backups/db-${timeStr}.json`);
 
-        const files = fs.readdirSync(backupDir);
+        const files = fs.readdirSync(backupDir)
+            .filter(file => file.startsWith('db-') && file.endsWith('.json'));
         if (files.length > 20) {
             files.sort((a, b) => {
                 return fs.statSync(path.join(backupDir, b)).mtime.getTime() - 
                        fs.statSync(path.join(backupDir, a)).mtime.getTime();
             });
-            const fileToDelete = path.join(backupDir, files[files.length - 1]);
-            fs.unlinkSync(fileToDelete);
-            console.log(`[DON DEP] Da xoa ban sao luu cu: ${fileToDelete}`);
+            files.slice(20).forEach(file => {
+                const fileToDelete = path.join(backupDir, file);
+                fs.unlinkSync(fileToDelete);
+                console.log(`[DON DEP] Da xoa ban sao luu cu: ${fileToDelete}`);
+            });
         }
     }
 } catch (err) {
     console.error("[LOI] Khong the sao luu du lieu tu dong:", err);
 }
 // -------------------------------------
-
-// Dữ liệu mặc định
-const DEFAULT_DATA = {
-    records: [], 
-    audit_logs: [],
-    excerpt_history: [],
-    excerpt_counters: { "Chơn Thành": 0, "Minh Hưng": 0, "Nha Bích": 0 },
-    employees: [],
-    users: [{ username: 'admin', password: '123', name: 'Administrator', role: 'ADMIN' }]
-};
-
-if (!fs.existsSync(dbFile)) {
-    console.log("Khoi tao co so du lieu ban dau...");
-    const dir = path.dirname(dbFile);
-    if (!fs.existsSync(dir)){ fs.mkdirSync(dir, { recursive: true }); }
-    fs.writeFileSync(dbFile, JSON.stringify(DEFAULT_DATA, null, 2));
-}
 
 // Use default middlewares (logger, static, cors and no-cache)
 server.use(cors());
@@ -127,34 +150,40 @@ server.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // --- API LOGIN PUBLIC ENDPOINT ---
+server.get('/api/health', (_req: Request, res: Response) => {
+    res.jsonp({ ok: true });
+});
+
 server.post('/custom/login', (req: Request, res: Response) => {
     try {
-        const { username, password, user: providedUser } = req.body || {};
+        const { username, password } = req.body || {};
         if (!username || !password) {
             return res.status(400).jsonp({ error: "Vui lòng nhập tên đăng nhập và mật khẩu." });
         }
         const db = router.db;
         const localUsers = db.get('users').value() || [];
         
-        let authenticatedUser = localUsers.find((u: any) => 
-            u.username && u.username.toLowerCase().trim() === String(username).toLowerCase().trim() && 
-            String(u.password) === String(password)
+        const authenticatedUser = localUsers.find((u: any) =>
+            u.username &&
+            u.username.toLowerCase().trim() === String(username).toLowerCase().trim() &&
+            verifyPassword(String(password), String(u.password || ''))
         );
-
-        if (!authenticatedUser && providedUser && 
-            providedUser.username?.toLowerCase().trim() === String(username).toLowerCase().trim() && 
-            String(providedUser.password) === String(password)) {
-            authenticatedUser = providedUser;
-        }
 
         if (!authenticatedUser) {
             return res.status(401).jsonp({ error: "Tên đăng nhập hoặc mật khẩu không chính xác." });
         }
 
+        // Tự động nâng cấp mật khẩu cũ dạng rõ sang scrypt sau lần đăng nhập hợp lệ đầu tiên.
+        if (!String(authenticatedUser.password || '').startsWith('scrypt$')) {
+            authenticatedUser.password = hashPassword(String(password));
+            db.write();
+        }
+
         const token = jwt.sign(
             { 
                 username: authenticatedUser.username, 
-                role: authenticatedUser.role, 
+                role: 'authenticated',
+                appRole: authenticatedUser.role,
                 name: authenticatedUser.name, 
                 id: authenticatedUser.id || authenticatedUser.username 
             },
@@ -171,22 +200,6 @@ server.post('/custom/login', (req: Request, res: Response) => {
 
 // --- MIDDLEWARE NÂNG CAO BẢO MẬT API (AUTHENTICATION & AUTHORIZATION) ---
 // Danh sách các tài nguyên dữ liệu / API cần bảo vệ nghiêm ngặt bằng JWT Token:
-const PROTECTED_COLLECTIONS = [
-    '/records',
-    '/employees',
-    '/users',
-    '/contracts',
-    '/holidays',
-    '/audit_logs',
-    '/settings',
-    '/chat_messages',
-    '/archive_records',
-    '/custom/bulk',
-    '/custom/batch_update',
-    '/system/reset',
-    '/api/gemini/compare-documents'
-];
-
 server.use((req: Request, res: Response, next: NextFunction) => {
     // 0. Bỏ qua các yêu cầu OPTIONS (CORS preflight) hoặc HEAD
     if (req.method === 'OPTIONS' || req.method === 'HEAD') {
@@ -194,7 +207,7 @@ server.use((req: Request, res: Response, next: NextFunction) => {
     }
 
     // 1. Cho phép các yêu cầu truy cập công khai (Public):
-    const isExplicitPublic = req.path === '/custom/login' || 
+    const isExplicitPublic = req.path === '/custom/login' ||
                              req.path === '/api/health' || 
                              req.path.startsWith('/updates');
 
@@ -202,14 +215,18 @@ server.use((req: Request, res: Response, next: NextFunction) => {
         return next();
     }
 
-    // 2. Kiểm tra xem yêu cầu hiện tại có phải là truy vấn API / Dữ liệu cần bảo vệ hay không
-    const isProtectedApi = PROTECTED_COLLECTIONS.some(endpoint => 
-        req.path === endpoint || req.path.startsWith(endpoint + '/')
-    ) || req.path.startsWith('/api/');
-
-    // 3. Nếu là yêu cầu tải mã nguồn giao diện (Frontend/Vite/Assets/GET HTML/JS/CSS/TSX/Node modules) và không phải API:
-    // Cho phép đi tiếp để Vite/Express phục vụ giao diện bình thường
-    if (!isProtectedApi && req.method === 'GET') {
+    // Chỉ tài nguyên giao diện mới được phép GET công khai. Mọi collection/API còn lại
+    // đều phải xác thực, kể cả collection mới được thêm về sau.
+    const isFrontendAsset = req.method === 'GET' && (
+        req.path === '/' ||
+        req.path === '/index.html' ||
+        req.path.startsWith('/assets/') ||
+        req.path.startsWith('/src/') ||
+        req.path.startsWith('/@vite/') ||
+        req.path.startsWith('/node_modules/') ||
+        /\.(?:tsx?|jsx?|css|map|png|jpe?g|gif|svg|ico|woff2?|ttf)$/i.test(req.path)
+    );
+    if (isFrontendAsset) {
         return next();
     }
 
@@ -236,11 +253,17 @@ server.use((req: Request, res: Response, next: NextFunction) => {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         (req as any).user = decoded;
 
-        // Phân quyền cho thao tác nhạy cảm: Reset hệ thống bắt buộc phải là ADMIN
-        if (req.path === '/system/reset' && decoded.role !== 'ADMIN') {
+        const isAdmin = decoded.appRole === 'ADMIN';
+        const isSubAdmin = decoded.appRole === 'SUBADMIN';
+        if ((req.path === '/system/reset' || req.path === '/users' || req.path.startsWith('/users/')) && !isAdmin) {
             return res.status(403).jsonp({ 
-                error: "Quyền hạn không đủ. Chỉ Quản trị viên (ADMIN) mới có thể thực hiện thao tác khôi phục hệ thống." 
+                error: "Quyền hạn không đủ. Chỉ Quản trị viên (ADMIN) được phép thực hiện thao tác này." 
             });
+        }
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
+            (req.path === '/employees' || req.path.startsWith('/employees/')) &&
+            !isAdmin && !isSubAdmin) {
+            return res.status(403).jsonp({ error: 'Không có quyền thay đổi dữ liệu nhân sự.' });
         }
 
         return next();
@@ -249,6 +272,16 @@ server.use((req: Request, res: Response, next: NextFunction) => {
             error: "Xác thực không hợp lệ hoặc đã hết hạn phiên làm việc. Vui lòng đăng nhập lại." 
         });
     }
+});
+
+server.get('/custom/session', (req: Request, res: Response) => {
+    const decoded = (req as any).user;
+    const dbUser = (router.db.get('users').value() || []).find(
+        (user: any) => user.username === decoded?.username
+    );
+    if (!dbUser) return res.status(401).jsonp({ error: 'Tài khoản không còn tồn tại.' });
+    const { password: _, ...safeUser } = dbUser;
+    return res.jsonp({ user: safeUser });
 });
 
 // Custom Routes
@@ -580,6 +613,19 @@ const startServer = async () => {
         server.use(express.static(distPath));
     }
 
+    router.render = (req: Request, res: Response) => {
+        if (req.path === '/users' || req.path.startsWith('/users/')) {
+            const redact = (user: any) => {
+                if (!user || typeof user !== 'object') return user;
+                const { password: _, ...safeUser } = user;
+                return safeUser;
+            };
+            res.jsonp(Array.isArray(res.locals.data) ? res.locals.data.map(redact) : redact(res.locals.data));
+            return;
+        }
+        res.jsonp(res.locals.data);
+    };
+
     // Use router AFTER custom routes and Vite middleware (for API fallback)
     // Ideally, API should be under /api prefix, but current frontend expects root.
     // json-server router handles requests matching db.json keys.
@@ -592,9 +638,11 @@ const startServer = async () => {
         });
     }
 
-    const PORT = 3000;
-    server.listen(PORT, '0.0.0.0', () => {
+    const PORT = Number(process.env.PORT || 3000);
+    const HOST = process.env.SERVER_HOST || '127.0.0.1';
+    server.listen(PORT, HOST, () => {
       console.log(`Server running on http://localhost:${PORT}`);
+      if (typeof process.send === 'function') process.send('ready');
     });
 };
 

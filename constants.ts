@@ -1,4 +1,3 @@
-
 import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './types';
 
 // CẤU HÌNH KẾT NỐI
@@ -8,7 +7,7 @@ export const API_BASE_URL = typeof window !== 'undefined' && localStorage.getIte
   : 'https://api.qlhsct.info.vn'; 
 
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.8.4';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',

@@ -1,3 +1,4 @@
+import { localDateKey } from '../utils/dateUtils';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
     BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, 
@@ -185,10 +186,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({
     const [listDateMode, setListDateMode] = useState<'all' | 'week' | 'month' | 'custom'>('month');
     const [listFromDate, setListFromDate] = useState<string>(() => {
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        return localDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
     });
     const [listToDate, setListToDate] = useState<string>(() => {
-        return new Date().toISOString().split('T')[0];
+        return localDateKey();
     });
     const [listSelectedWard, setListSelectedWard] = useState<string>('all');
     const [listRecordTypeFilter, setListRecordTypeFilter] = useState<string>('all');
@@ -206,12 +207,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
             const start = new Date(now.setDate(diff));
-            setListFromDate(start.toISOString().split('T')[0]);
-            setListToDate(new Date().toISOString().split('T')[0]);
+            setListFromDate(localDateKey(start));
+            setListToDate(localDateKey());
         } else if (mode === 'month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            setListFromDate(start.toISOString().split('T')[0]);
-            setListToDate(new Date().toISOString().split('T')[0]);
+            setListFromDate(localDateKey(start));
+            setListToDate(localDateKey());
         }
     };
 
@@ -317,7 +318,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({
 
     const handleExportExcelClick = () => {
         const from = listDateMode === 'all' ? '2000-01-01' : listFromDate;
-        const to = listDateMode === 'all' ? new Date().toISOString().split('T')[0] : listToDate;
+        const to = listDateMode === 'all' ? localDateKey() : listToDate;
         onExportExcel(from, to, listSelectedWard);
     };
 

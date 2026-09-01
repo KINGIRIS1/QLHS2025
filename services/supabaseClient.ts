@@ -45,6 +45,15 @@ if (!isConfigured) {
 const urlToUse = isConfigured ? SUPABASE_URL : 'https://placeholder.supabase.co';
 const keyToUse = isConfigured ? SUPABASE_ANON_KEY : 'placeholder';
 
+const authenticatedFetch: typeof fetch = (input, init = {}) => {
+    const headers = new Headers(init.headers || {});
+    if (typeof window !== 'undefined') {
+        const sessionToken = localStorage.getItem('app_session_token');
+        if (sessionToken) headers.set('x-app-token', sessionToken);
+    }
+    return fetch(input, { ...init, headers });
+};
+
 export const supabase = createClient(urlToUse, keyToUse, {
     auth: {
         persistSession: true, // Giữ đăng nhập khi F5
@@ -52,7 +61,8 @@ export const supabase = createClient(urlToUse, keyToUse, {
     },
     db: {
         schema: 'public',
-    }
+    },
+    global: { fetch: authenticatedFetch }
 });
 
 // Single shared channel for online presence

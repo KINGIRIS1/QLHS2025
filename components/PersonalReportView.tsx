@@ -1,3 +1,4 @@
+import { localDateKey } from '../utils/dateUtils';
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, RecordStatus, WorkSchedule } from '../types';
 import { fetchWorkSchedules } from '../services/apiWorkSchedule';
@@ -24,10 +25,10 @@ const PersonalReportView: React.FC<PersonalReportViewProps> = ({ myRecords, user
         const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1))); 
         const lastDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 7));
         
-        setFromDate(firstDayOfWeek.toISOString().split('T')[0]);
-        setToDate(lastDayOfWeek.toISOString().split('T')[0]);
+        setFromDate(localDateKey(firstDayOfWeek));
+        setToDate(localDateKey(lastDayOfWeek));
         
-        const m = (new Date()).toISOString().slice(0, 7)
+        const m = localDateKey().slice(0, 7)
         setMonth(m);
         
         fetchWorkSchedules().then(res => setSchedules(res));

@@ -1,3 +1,4 @@
+import { localDateKey } from './utils/dateUtils';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message } from './types';
@@ -12,7 +13,7 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction, getReceivingWard, triggerPriori
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, saveArchiveRecord, fetchArchiveRecordById } from './services/api';
+import { updateRecordApi, saveEmployeeApi, saveUserApi, updateOwnAccountApi, forceUpdateRecordsBatchApi, saveArchiveRecord, fetchArchiveRecordById } from './services/api';
 import { logUserActivity } from './services/apiLogs';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -32,19 +33,25 @@ import PrioritySignedModalAlert from './components/PrioritySignedModalAlert';
 import ServerConnectionLockModal from './components/ServerConnectionLockModal';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { offlineDb } from './utils/offlineDb';
+import { restoreAuthenticatedUser } from './services/authService';
+import { checkAndRunAutoBackup } from './services/backupService';
 
 function App() {
   const isMobile = useIsMobile(768);
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-      try {
-          const stored = localStorage.getItem('currentUser');
-          return stored ? JSON.parse(stored) : null;
-      } catch (e) {
-          return null;
-      }
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+      let active = true;
+      restoreAuthenticatedUser().then(user => {
+          if (!active) return;
+          setCurrentUser(user);
+          setIsRestoringSession(false);
+      });
+      return () => { active = false; };
+  }, []);
   
   const [notificationEnabled, setNotificationEnabled] = useState(() => {
       const saved = localStorage.getItem('chat_notification_enabled');
@@ -268,9 +275,7 @@ function App() {
   // Tự động kiểm tra và thực hiện Sao lưu định kỳ (Auto Backup) nếu đến hạn
   useEffect(() => {
       if (currentUser) {
-          import('./services/backupService').then(({ checkAndRunAutoBackup }) => {
-              checkAndRunAutoBackup(currentUser.name);
-          });
+          checkAndRunAutoBackup(currentUser.name);
       }
   }, [currentUser]);
 
@@ -368,10 +373,13 @@ function App() {
       await exportReportToExcel(records, fromDateStr, toDateStr, ward, employees);
   };
 
-  const handleUpdateCurrentAccount = async (data: { name: string; password?: string; department?: string }) => {
+  const handleUpdateCurrentAccount = async (data: { name: string; password?: string; currentPassword?: string; department?: string }) => {
       if (!currentUser) return false;
-      const updatedUser: User = { ...currentUser, name: data.name, ...(data.password ? { password: data.password } : {}) };
-      const savedUser = await saveUserApi(updatedUser, true);
+      const savedUser = await updateOwnAccountApi({
+          name: data.name,
+          currentPassword: data.currentPassword,
+          newPassword: data.password
+      });
       if (!savedUser) return false;
       if (currentUser.employeeId && data.department) {
           const emp = employees.find(e => e.id === currentUser.employeeId);
@@ -382,9 +390,6 @@ function App() {
       }
       setUsers(prev => prev.map(u => u.username === currentUser.username ? savedUser : u));
       setCurrentUser(savedUser);
-      try {
-          localStorage.setItem('currentUser', JSON.stringify(savedUser));
-      } catch (e) {}
       loadData();
       return true;
   };
@@ -461,7 +466,7 @@ function App() {
   }, [records, isRecordSelectable]);
 
   const confirmAssign = async (employeeId: string) => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateKey();
       const updatedIds = assignTargetRecords.map(r => r.id);
       
       const updates = {
@@ -484,7 +489,7 @@ function App() {
   };
 
   const getUpdatesForStatusChange = useCallback((newStatus: RecordStatus) => {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = localDateKey();
       const updates: any = { status: newStatus };
 
       switch (newStatus) {
@@ -542,7 +547,7 @@ function App() {
   const handleBulkUpdate = async (field: keyof RecordFile, value: any) => {
       const selectedIds = Array.from(selectedRecordIds);
       let updates: any = { [field]: value };
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = localDateKey();
 
       if (field === 'status') {
           updates = getUpdatesForStatusChange(value as RecordStatus);
@@ -598,7 +603,7 @@ function App() {
 
   const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string) => {
       if (!returnRecord) return;
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateKey();
       
       if (returnRecord.recordType === 'Sao lục hồ sơ') {
           try {
@@ -962,7 +967,7 @@ function App() {
   }, [selectedRecordForPlotCount, getUpdatesForStatusChange]);
 
   const executeBatchExport = async (batchNumber: number, batchDate: string, customWardsMap?: Record<string, string> | string) => {
-      const todayStr = recordFilterProps.filterDate || new Date().toISOString().split('T')[0];
+      const todayStr = recordFilterProps.filterDate || localDateKey();
       const candidates = selectedRecordIds.size > 0 ? records.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
       const recordsToExport = candidates.filter(r => r.status === RecordStatus.SIGNED || (r.status === RecordStatus.WITHDRAWN && !r.exportBatch));
       if (recordsToExport.length === 0) return;
@@ -1017,7 +1022,7 @@ function App() {
           : `Xác nhận chuyển tất cả ${pendingSign.length} hồ sơ sang "Đã ký"?`;
 
       if (await confirmAction(confirmMsg)) {
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayStr = localDateKey();
           const updates = { status: RecordStatus.SIGNED, approvalDate: todayStr, completedDate: null };
           const updatedList = pendingSign.map(r => ({ ...r, ...updates }));
           setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, ...updates } : r));
@@ -1034,7 +1039,7 @@ function App() {
       if (!canWithdraw) return;
 
       if (await confirmAction(`Xác nhận rút ${selectedRecordIds.size} hồ sơ đã chọn sang trạng thái "CSD rút hồ sơ"?`)) {
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayStr = localDateKey();
           const targets = records.filter(r => selectedRecordIds.has(r.id));
           const updatesToApply = targets.map(r => ({
               ...r,
@@ -1060,9 +1065,6 @@ function App() {
 
   const handleLogin = (user: User) => {
       setCurrentUser(user);
-      try {
-          localStorage.setItem('currentUser', JSON.stringify(user));
-      } catch (e) {}
       setWelcomeUser(user);
       setIsWelcomeModalOpen(true);
       logUserActivity({
@@ -1086,9 +1088,14 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('app_session_token');
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
   };
+
+  if (isRestoringSession) {
+      return <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">Đang xác thực phiên đăng nhập...</div>;
+  }
 
   if (!currentUser) {
       return (
@@ -1102,7 +1109,7 @@ function App() {
                 onUpdateNow={handleUpdateNow}
                 onUpdateLater={handleUpdateLater}
             />
-            <Login onLogin={handleLogin} users={users} />
+            <Login onLogin={handleLogin} />
           </>
       );
   }

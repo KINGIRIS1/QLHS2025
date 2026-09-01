@@ -10,17 +10,8 @@
   "files": [
     "dist",
     "electron",
-    "package.json"
-  ],
-  "extraResources": [
-    {
-      "from": "server",
-      "to": "server",
-      "filter": [
-        "**/*",
-        "!db.json"
-      ]
-    }
+    "package.json",
+    "server/runtime.cjs"
   ],
   "win": {
     "target": "nsis",
@@ -33,7 +24,7 @@
     "createDesktopShortcut": true,
     "runAfterFinish": true,
     "shortcutName": "Quan Ly Ho So",
-    "deleteAppDataOnUninstall": true,
+    "deleteAppDataOnUninstall": false,
     "differentialPackage": true
   },
   "publish": [

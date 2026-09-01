@@ -1,7 +1,7 @@
 
-const { ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
-window.electronAPI = {
+contextBridge.exposeInMainWorld('electronAPI', {
   captureScreenshot: (options) => ipcRenderer.invoke('capture-screenshot', options),
   openExternal: (url) => ipcRenderer.invoke('open-external-link', url),
   
@@ -29,4 +29,4 @@ window.electronAPI = {
 
   // API Native Confirm
   showConfirmDialog: (message, title) => ipcRenderer.invoke('show-confirm-dialog', { message, title })
-};
+});

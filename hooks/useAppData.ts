@@ -1,3 +1,4 @@
+import { localDateKey } from '../utils/dateUtils';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RecordFile, Employee, User, RecordStatus, Holiday, UserRole } from '../types';
@@ -33,6 +34,7 @@ export const useAppData = (currentUser: User | null) => {
     const [updateUrl, setUpdateUrl] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
+        if (!currentUser) return;
         try {
             // Kiểm tra tình trạng kết nối máy chủ trước
             const health = await checkServerHealth(4000);
@@ -83,7 +85,7 @@ export const useAppData = (currentUser: User | null) => {
             setEmployees((prev) => prev.length > 0 ? prev : []);
             setUsers((prev) => prev.length > 0 ? prev : []);
         }
-    }, []);
+    }, [currentUser]);
 
     const currentUserRef = useRef(currentUser);
     useEffect(() => {
@@ -92,6 +94,7 @@ export const useAppData = (currentUser: User | null) => {
 
     // Initial Load
     useEffect(() => {
+        if (!currentUser) return;
         loadData();
         // Removed setInterval to reduce PostgREST egress
         
@@ -307,7 +310,7 @@ export const useAppData = (currentUser: User | null) => {
                     status: existingArchive.status || 'draft',
                     so_hieu: recordData.code,
                     trich_yeu: recordData.content || '',
-                    ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
+                    ngay_thang: recordData.receivedDate || localDateKey(),
                     noi_nhan_gui: recordData.customerName || '',
                     data: archivePayloadData,
                 });
@@ -318,7 +321,7 @@ export const useAppData = (currentUser: User | null) => {
                     status: 'draft' as any,
                     so_hieu: recordData.code,
                     trich_yeu: recordData.content || '',
-                    ngay_thang: recordData.receivedDate || new Date().toISOString().split('T')[0],
+                    ngay_thang: recordData.receivedDate || localDateKey(),
                     noi_nhan_gui: recordData.customerName || '',
                     data: archivePayloadData,
                     created_by: recordData.createdBy || (currentUser?.name || ''),

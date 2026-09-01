@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, shell, dialog, Notificatio
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 
@@ -16,17 +17,50 @@ autoUpdater.allowDowngrade = false;
 
 let serverProcess;
 let mainWindow;
+let initialAdminPassword = null;
+const allowedOutputFolders = new Set();
+const allowedSavedFiles = new Set();
+
+const isPathInside = (parentPath, targetPath) => {
+  const relative = path.relative(path.resolve(parentPath), path.resolve(targetPath));
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+};
+
+const openSafeExternalUrl = async (rawUrl) => {
+  const parsed = new URL(rawUrl);
+  if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
+    throw new Error('Giao thức liên kết không được phép.');
+  }
+  return shell.openExternal(parsed.toString());
+};
 
 function startServer() {
   const serverPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'server', 'index.js')
+    ? path.join(app.getAppPath(), 'server', 'runtime.cjs')
     : path.join(__dirname, '../server/index.js');
 
   const userDataPath = app.getPath('userData');
   const dbPath = path.join(userDataPath, 'db.json');
+  const jwtSecretPath = path.join(userDataPath, '.jwt-secret');
+  let jwtSecret = '';
+  try {
+    jwtSecret = fs.readFileSync(jwtSecretPath, 'utf8').trim();
+  } catch (_) {}
+  if (jwtSecret.length < 64) {
+    jwtSecret = crypto.randomBytes(48).toString('hex');
+    fs.writeFileSync(jwtSecretPath, jwtSecret, { encoding: 'utf8', mode: 0o600 });
+  }
+  if (!fs.existsSync(dbPath)) initialAdminPassword = crypto.randomBytes(12).toString('base64url');
 
   serverProcess = fork(serverPath, [], {
-    env: { ...process.env, DB_PATH: dbPath },
+    env: {
+      ...process.env,
+      DB_PATH: dbPath,
+      JWT_SECRET: jwtSecret,
+      NODE_ENV: 'production',
+      PORT: '3005',
+      ...(initialAdminPassword ? { INITIAL_ADMIN_PASSWORD: initialAdminPassword } : {})
+    },
     stdio: ['pipe', 'pipe', 'pipe', 'ipc']
   });
 
@@ -46,9 +80,10 @@ function createWindow() {
     height: 800,
     icon: path.join(__dirname, '../public/icon.ico'), 
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
       preload: path.join(__dirname, 'preload.js')
     },
     autoHideMenuBar: true,
@@ -64,9 +99,21 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  if (initialAdminPassword) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Mật khẩu quản trị ban đầu',
+        message: 'Cơ sở dữ liệu cục bộ vừa được tạo.',
+        detail: `Tài khoản: admin\nMật khẩu tạm thời: ${initialAdminPassword}\n\nHãy đổi mật khẩu ngay sau lần đăng nhập đầu tiên.`,
+        buttons: ['Đã sao chép/ghi lại']
+      });
+    });
+  }
   
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openSafeExternalUrl(url).catch(error => log.warn('Blocked external URL:', error.message));
     return { action: 'deny' };
   });
 }
@@ -81,7 +128,9 @@ ipcMain.handle('select-folder', async (event) => {
         buttonLabel: 'Chọn thư mục này'
     });
     if (!result.canceled && result.filePaths.length > 0) {
-        return result.filePaths[0];
+        const selectedFolder = path.resolve(result.filePaths[0]);
+        allowedOutputFolders.add(selectedFolder);
+        return selectedFolder;
     }
     return null;
 });
@@ -89,13 +138,21 @@ ipcMain.handle('select-folder', async (event) => {
 // Lưu file và trả về đường dẫn để mở (Dùng cho tính năng Xuất & Mở ngay)
 // Cập nhật: Chấp nhận outputFolder
 ipcMain.handle('save-and-open-file', async (event, { fileName, base64Data, outputFolder }) => {
-    // Nếu có outputFolder thì dùng, nếu không thì mặc định Downloads
-    const folder = outputFolder || app.getPath('downloads');
-    const filePath = path.join(folder, fileName);
-    
     try {
+        if (!fileName || path.basename(fileName) !== fileName) {
+          throw new Error('Tên tệp không hợp lệ.');
+        }
+        const downloadsFolder = path.resolve(app.getPath('downloads'));
+        allowedOutputFolders.add(downloadsFolder);
+        const folder = path.resolve(outputFolder || downloadsFolder);
+        if (!allowedOutputFolders.has(folder)) {
+          throw new Error('Thư mục lưu chưa được người dùng cho phép.');
+        }
+        const filePath = path.resolve(folder, fileName);
+        if (!isPathInside(folder, filePath)) throw new Error('Đường dẫn tệp không hợp lệ.');
         const buffer = Buffer.from(base64Data, 'base64');
         fs.writeFileSync(filePath, buffer);
+        allowedSavedFiles.add(filePath);
         // Tự động mở file sau khi lưu
         shell.openPath(filePath);
         return { success: true, path: filePath };
@@ -108,7 +165,11 @@ ipcMain.handle('save-and-open-file', async (event, { fileName, base64Data, outpu
 // Chỉ mở file theo đường dẫn
 ipcMain.handle('open-file-path', async (event, filePath) => {
     if (filePath) {
-        shell.openPath(filePath);
+        const resolvedPath = path.resolve(filePath);
+        const isAllowed = allowedSavedFiles.has(resolvedPath) ||
+          [...allowedOutputFolders].some(folder => isPathInside(folder, resolvedPath));
+        if (!isAllowed) return false;
+        await shell.openPath(resolvedPath);
         return true;
     }
     return false;
@@ -123,7 +184,11 @@ ipcMain.handle('check-for-update', async (event, serverUrl) => {
     // 2. Nếu serverUrl là IP hoặc tên miền riêng (LAN) -> Sử dụng chế độ Custom Server
     
     if (serverUrl && !serverUrl.includes('github.com') && serverUrl.trim() !== '') {
-        const feedUrl = `${serverUrl}/updates`;
+        const parsedServerUrl = new URL(serverUrl);
+        if (!['http:', 'https:'].includes(parsedServerUrl.protocol)) {
+          throw new Error('Địa chỉ máy chủ cập nhật không hợp lệ.');
+        }
+        const feedUrl = `${parsedServerUrl.toString().replace(/\/$/, '')}/updates`;
         log.info(`Checking updates from Custom Server: ${feedUrl}`);
         autoUpdater.setFeedURL(feedUrl);
     } else {
@@ -227,7 +292,7 @@ ipcMain.handle('capture-screenshot', async (event, { hideWindow = true } = {}) =
 });
 
 ipcMain.handle('open-external-link', async (event, url) => {
-  await shell.openExternal(url);
+  await openSafeExternalUrl(url);
 });
 
 ipcMain.handle('show-notification', async (event, { title, body }) => {

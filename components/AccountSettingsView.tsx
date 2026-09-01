@@ -6,7 +6,7 @@ import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Load
 interface AccountSettingsViewProps {
   currentUser: User;
   linkedEmployee: Employee | undefined;
-  onUpdate: (data: { name: string; password?: string; department?: string; position?: string }) => Promise<boolean>;
+  onUpdate: (data: { name: string; password?: string; currentPassword?: string; department?: string; position?: string }) => Promise<boolean>;
   notificationEnabled: boolean; // Prop mới
   setNotificationEnabled: (enabled: boolean) => void; // Prop mới
 }
@@ -66,7 +66,7 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
     setIsLoading(true);
 
     try {
-        const updateData: { name: string; password?: string; department?: string; position?: string } = {
+        const updateData: { name: string; password?: string; currentPassword?: string; department?: string; position?: string } = {
             name: name.trim()
         };
 
@@ -83,14 +83,10 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
         if (activeTab === 'security') {
             if (!currentPassword) throw new Error("Vui lòng nhập mật khẩu hiện tại để xác thực.");
             
-            // Check old password (Verify against currentUser prop locally first)
-            if (currentPassword !== currentUser.password) {
-                throw new Error("Mật khẩu hiện tại không chính xác.");
-            }
-
             if (newPassword) {
-                if (newPassword.length < 3) throw new Error("Mật khẩu mới quá ngắn (tối thiểu 3 ký tự).");
+                if (newPassword.length < 8) throw new Error("Mật khẩu mới phải có ít nhất 8 ký tự.");
                 if (newPassword !== confirmPassword) throw new Error("Xác nhận mật khẩu không khớp.");
+                updateData.currentPassword = currentPassword;
                 updateData.password = newPassword;
             } else {
                  throw new Error("Vui lòng nhập mật khẩu mới.");

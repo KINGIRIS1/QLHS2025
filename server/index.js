@@ -2,6 +2,8 @@
 const jsonServer = require('json-server');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 let express;
 try {
   express = require('express');
@@ -16,6 +18,50 @@ try {
 const dbFile = process.env.DB_PATH || path.join(__dirname, 'db.json');
 
 console.log(`Dang su dung Database tai: ${dbFile}`);
+
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(48).toString('hex');
+
+if (!process.env.JWT_SECRET) {
+    console.warn('[BAO MAT] JWT_SECRET chưa được cấu hình. Khóa ngẫu nhiên chỉ phù hợp khi chạy cục bộ.');
+}
+
+const hashPassword = (password) => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return `scrypt$${salt}$${hash}`;
+};
+
+const verifyPassword = (password, storedPassword) => {
+    const stored = String(storedPassword || '');
+    if (!stored.startsWith('scrypt$')) {
+        const actual = Buffer.from(String(password));
+        const expected = Buffer.from(stored);
+        return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+    }
+    const [, salt, expectedHex] = stored.split('$');
+    if (!salt || !expectedHex) return false;
+    const actual = crypto.scryptSync(String(password), salt, 64);
+    const expected = Buffer.from(expectedHex, 'hex');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+};
+
+if (!fs.existsSync(dbFile)) {
+    const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+    if (!initialAdminPassword) {
+        throw new Error('INITIAL_ADMIN_PASSWORD bat buoc khi khoi tao co so du lieu moi.');
+    }
+    const initialData = {
+        records: [],
+        excerpt_history: [],
+        excerpt_counters: { "Chơn Thành": 0, "Minh Hưng": 0, "Nha Bích": 0 },
+        employees: [],
+        users: [{ username: 'admin', password: hashPassword(initialAdminPassword), name: 'Administrator', role: 'ADMIN' }]
+    };
+    console.log("Khoi tao co so du lieu ban dau...");
+    const dir = path.dirname(dbFile);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(dbFile, JSON.stringify(initialData, null, 2));
+}
 
 const server = jsonServer.create();
 const router = jsonServer.router(dbFile);
@@ -48,37 +94,24 @@ try {
         fs.copyFileSync(dbFile, backupFile);
         console.log(`[AN TOAN] Da tu dong sao luu du lieu tai: backups/db-${timeStr}.json`);
 
-        const files = fs.readdirSync(backupDir);
+        const files = fs.readdirSync(backupDir)
+            .filter(file => file.startsWith('db-') && file.endsWith('.json'));
         if (files.length > 20) {
             files.sort((a, b) => {
                 return fs.statSync(path.join(backupDir, b)).mtime.getTime() - 
                        fs.statSync(path.join(backupDir, a)).mtime.getTime();
             });
-            const fileToDelete = path.join(backupDir, files[files.length - 1]);
-            fs.unlinkSync(fileToDelete);
-            console.log(`[DON DEP] Da xoa ban sao luu cu: ${fileToDelete}`);
+            files.slice(20).forEach(file => {
+                const fileToDelete = path.join(backupDir, file);
+                fs.unlinkSync(fileToDelete);
+                console.log(`[DON DEP] Da xoa ban sao luu cu: ${fileToDelete}`);
+            });
         }
     }
 } catch (err) {
     console.error("[LOI] Khong the sao luu du lieu tu dong:", err);
 }
 // -------------------------------------
-
-// Dữ liệu mặc định
-const DEFAULT_DATA = {
-    records: [], 
-    excerpt_history: [],
-    excerpt_counters: { "Chơn Thành": 0, "Minh Hưng": 0, "Nha Bích": 0 },
-    employees: [],
-    users: [{ username: 'admin', password: '123', name: 'Administrator', role: 'ADMIN' }]
-};
-
-if (!fs.existsSync(dbFile)) {
-    console.log("Khoi tao co so du lieu ban dau...");
-    const dir = path.dirname(dbFile);
-    if (!fs.existsSync(dir)){ fs.mkdirSync(dir, { recursive: true }); }
-    fs.writeFileSync(dbFile, JSON.stringify(DEFAULT_DATA, null, 2));
-}
 
 server.use(middlewares);
 server.use(jsonServer.bodyParser);
@@ -89,6 +122,81 @@ server.use((req, res, next) => {
         console.log(`${new Date().toLocaleTimeString()} - ${req.method} request received`);
     }
     next();
+});
+
+server.get('/api/health', (_req, res) => {
+    res.jsonp({ ok: true });
+});
+
+server.post('/custom/login', (req, res) => {
+    try {
+        const { username, password } = req.body || {};
+        if (!username || !password) {
+            return res.status(400).jsonp({ error: 'Vui lòng nhập tên đăng nhập và mật khẩu.' });
+        }
+        const db = router.db;
+        const users = db.get('users').value() || [];
+        const authenticatedUser = users.find(user =>
+            user.username &&
+            user.username.toLowerCase().trim() === String(username).toLowerCase().trim() &&
+            verifyPassword(String(password), user.password)
+        );
+        if (!authenticatedUser) {
+            return res.status(401).jsonp({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác.' });
+        }
+        if (!String(authenticatedUser.password || '').startsWith('scrypt$')) {
+            authenticatedUser.password = hashPassword(String(password));
+            db.write();
+        }
+        const token = jwt.sign({
+            username: authenticatedUser.username,
+            name: authenticatedUser.name,
+            id: authenticatedUser.id || authenticatedUser.username,
+            role: 'authenticated',
+            appRole: authenticatedUser.role
+        }, JWT_SECRET, { expiresIn: '24h' });
+        const { password: _password, ...safeUser } = authenticatedUser;
+        return res.jsonp({ success: true, token, user: safeUser });
+    } catch (error) {
+        console.error('[LOI] Dang nhap that bai:', error);
+        return res.status(500).jsonp({ error: 'Lỗi máy chủ khi xác thực đăng nhập.' });
+    }
+});
+
+server.use((req, res, next) => {
+    if (req.method === 'OPTIONS' || req.method === 'HEAD') return next();
+    if (req.path === '/custom/login' || req.path === '/api/health' || req.path.startsWith('/updates')) return next();
+
+    const header = req.headers.authorization || req.headers['x-access-token'];
+    const token = typeof header === 'string'
+        ? (header.startsWith('Bearer ') ? header.slice(7).trim() : header.trim())
+        : '';
+    if (!token) return res.status(401).jsonp({ error: 'Thiếu Token xác thực.' });
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        const isAdmin = decoded.appRole === 'ADMIN';
+        const isSubAdmin = decoded.appRole === 'SUBADMIN';
+        if ((req.path === '/system/reset' || req.path === '/users' || req.path.startsWith('/users/')) && !isAdmin) {
+            return res.status(403).jsonp({ error: 'Chỉ quản trị viên được phép đặt lại hệ thống.' });
+        }
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
+            (req.path === '/employees' || req.path.startsWith('/employees/')) &&
+            !isAdmin && !isSubAdmin) {
+            return res.status(403).jsonp({ error: 'Không có quyền thay đổi dữ liệu nhân sự.' });
+        }
+        return next();
+    } catch (_error) {
+        return res.status(401).jsonp({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
+    }
+});
+
+server.get('/custom/session', (req, res) => {
+    const dbUser = (router.db.get('users').value() || []).find(user => user.username === req.user?.username);
+    if (!dbUser) return res.status(401).jsonp({ error: 'Tài khoản không còn tồn tại.' });
+    const { password: _password, ...safeUser } = dbUser;
+    return res.jsonp({ user: safeUser });
 });
 
 // Custom Routes
@@ -168,11 +276,25 @@ server.post('/custom/counters', (req, res) => {
     }
 });
 
+router.render = (req, res) => {
+    if (req.path === '/users' || req.path.startsWith('/users/')) {
+        const redact = user => {
+            if (!user || typeof user !== 'object') return user;
+            const { password: _password, ...safeUser } = user;
+            return safeUser;
+        };
+        return res.jsonp(Array.isArray(res.locals.data) ? res.locals.data.map(redact) : redact(res.locals.data));
+    }
+    return res.jsonp(res.locals.data);
+};
+
 server.use(router);
 
 // ĐỔI PORT TỪ 3000 -> 3005 ĐỂ TRÁNH XUNG ĐỘT
-const PORT = 3005;
-server.listen(PORT, '0.0.0.0', () => {
+const PORT = Number(process.env.PORT || 3005);
+const HOST = process.env.SERVER_HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Update feed available at: http://localhost:${PORT}/updates`);
+  if (typeof process.send === 'function') process.send('ready');
 });

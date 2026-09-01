@@ -1,3 +1,4 @@
+import { localDateKey } from '../../utils/dateUtils';
 import React, { useMemo, useState } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
@@ -296,24 +297,24 @@ const HandoverComparisonView: React.FC<HandoverComparisonViewProps> = ({
       setLocalFromDate('');
       setLocalToDate('');
     } else if (preset === 'this_month') {
-      const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const last = new Date().toISOString().split('T')[0];
+      const first = localDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
+      const last = localDateKey();
       setLocalFromDate(first);
       setLocalToDate(last);
     } else if (preset === 'last_month') {
-      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-      const last = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      const first = localDateKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+      const last = localDateKey(new Date(now.getFullYear(), now.getMonth(), 0));
       setLocalFromDate(first);
       setLocalToDate(last);
     } else if (preset === 'quarter') {
       const currentQuarter = Math.floor(now.getMonth() / 3);
-      const first = new Date(now.getFullYear(), currentQuarter * 3, 1).toISOString().split('T')[0];
-      const last = new Date().toISOString().split('T')[0];
+      const first = localDateKey(new Date(now.getFullYear(), currentQuarter * 3, 1));
+      const last = localDateKey();
       setLocalFromDate(first);
       setLocalToDate(last);
     } else if (preset === 'year') {
-      const first = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-      const last = new Date().toISOString().split('T')[0];
+      const first = localDateKey(new Date(now.getFullYear(), 0, 1));
+      const last = localDateKey();
       setLocalFromDate(first);
       setLocalToDate(last);
     }
@@ -412,7 +413,7 @@ const HandoverComparisonView: React.FC<HandoverComparisonViewProps> = ({
     ws['!cols'] = colWidths;
 
     XLSX.utils.book_append_sheet(wb, ws, 'SoSanhHanTra1Cua');
-    XLSX.writeFile(wb, `BaoCao_SoSanhHanTra_Giao1Cua_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `BaoCao_SoSanhHanTra_Giao1Cua_${localDateKey()}.xlsx`);
   };
 
   return (

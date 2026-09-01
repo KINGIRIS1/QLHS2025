@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User, Employee } from '../types';
 import StatusBadge from './StatusBadge';
-import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare, FileText, Eye, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Briefcase, ArrowRight, CheckCircle, Clock, Send, AlertTriangle, UserCog, ChevronLeft, ChevronRight, AlertCircle, Search, ArrowUp, ArrowDown, ArrowUpDown, Bell, CalendarClock, FileCheck, Map, CheckSquare, FileText, Eye, ShieldAlert, RefreshCw, Filter, X } from 'lucide-react';
 import { getShortRecordType } from '../constants';
 import { confirmAction, getReceivingWard } from '../utils/appHelpers';
 import { updateRecordApi } from '../services/api';
@@ -58,6 +58,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRecordType, setSelectedRecordType] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{ key: keyof RecordFile; direction: 'asc' | 'desc' }>({
     key: 'deadline',
     direction: 'desc' 
@@ -202,23 +203,34 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
     return [...mainRecords, ...mappedArchives];
   }, [records, archiveRecords, user.employeeId]);
   
+  // Danh sách các loại hồ sơ có trong hồ sơ của cá nhân
+  const availableRecordTypes = useMemo(() => {
+      const typesSet = new Set<string>();
+      myRecords.forEach(r => {
+          if (r.recordType && r.recordType.trim()) {
+              typesSet.add(r.recordType.trim());
+          }
+      });
+      return Array.from(typesSet).sort((a, b) => a.localeCompare(b, 'vi'));
+  }, [myRecords]);
+
   // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS)
   const pendingRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, selectedRecordType]);
 
   // 2. Hồ sơ Đã thực hiện (COMPLETED_WORK)
   const completedWorkRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.COMPLETED_WORK);
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, selectedRecordType]);
 
   // 3. Hồ sơ Chờ ký (PENDING_SIGN) - Chuyển thành Tab chính
   const reviewRecords = useMemo(() => {
       let list = myRecords.filter(r => r.status === RecordStatus.PENDING_SIGN);
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, selectedRecordType]);
 
   // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, WITHDRAWN)
   const finishedRecords = useMemo(() => {
@@ -228,8 +240,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           r.status === RecordStatus.RETURNED ||
           r.status === RecordStatus.WITHDRAWN
       );
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, selectedRecordType]);
 
   // 5. Hồ sơ Có hẹn nhắc việc
   const reminderRecords = useMemo(() => {
@@ -239,6 +251,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           r.status !== RecordStatus.WITHDRAWN &&
           r.status !== RecordStatus.RETURNED
       );
+      if (selectedRecordType !== 'all') {
+          list = list.filter(r => (r.recordType || '').trim() === selectedRecordType);
+      }
       // Logic search & sort riêng cho reminder
       if (searchTerm) {
           const lowerSearch = removeVietnameseTones(searchTerm);
@@ -254,7 +269,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           const timeB = new Date(b.reminderDate!).getTime();
           return timeA - timeB;
       });
-  }, [myRecords, searchTerm]);
+  }, [myRecords, searchTerm, selectedRecordType]);
 
   // Helper check hoan thanh
   const isRecordFinished = (record: RecordFile) => {
@@ -282,8 +297,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           return diffDays >= 0 && diffDays <= 2;
       });
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, selectedRecordType]);
 
   // 7. Hồ sơ Trễ hạn (Chưa hoàn thành, hạn < 0 ngày, tức là ngày kết thúc trước hôm nay)
   const overdueRecords = useMemo(() => {
@@ -298,8 +313,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           return diffDays < 0;
       });
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, selectedRecordType]);
 
   // 8. Hồ sơ Gia hạn (Nhân viên tự theo dõi hồ sơ hẹn thêm ngày)
   const extendedRecords = useMemo(() => {
@@ -309,11 +324,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
           r.extendedDeadline !== '' &&
           !isRecordFinished(r)
       );
-      return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig, isRecordFinished]);
+      return filterAndSort(list, searchTerm, sortConfig, selectedRecordType);
+  }, [myRecords, searchTerm, sortConfig, isRecordFinished, selectedRecordType]);
 
   // Helper filter & sort chung
-  function filterAndSort(list: RecordFile[], term: string, sort: any) {
+  function filterAndSort(list: RecordFile[], term: string, sort: any, typeFilter: string = 'all') {
+      if (typeFilter !== 'all') {
+          list = list.filter(r => (r.recordType || '').trim() === typeFilter);
+      }
       if (term) {
           const lowerSearch = removeVietnameseTones(term);
           const rawSearch = term.toLowerCase();
@@ -1005,34 +1023,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
             </div>
             
             {activeTab !== 'report' && (
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    {/* Nút sắp xếp theo ngày gia hạn hồ sơ */}
-                    <button
-                        onClick={() => handleSort('extendedDeadline')}
-                        className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-2xs cursor-pointer ${
-                            sortConfig.key === 'extendedDeadline'
-                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs ring-2 ring-amber-300'
-                            : 'bg-white text-slate-700 border-gray-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
-                        }`}
-                        title="Sắp xếp danh sách hồ sơ theo ngày gia hạn (hạn trả mới)"
-                    >
-                        <CalendarClock size={15} className={sortConfig.key === 'extendedDeadline' ? 'text-white' : 'text-amber-600'} />
-                        <span>Sắp xếp theo ngày gia hạn</span>
-                        <span className="ml-0.5">
-                            {sortConfig.key === 'extendedDeadline' ? (
-                                sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
-                            ) : (
-                                <ArrowUpDown size={13} className="text-gray-400" />
-                            )}
-                        </span>
-                    </button>
-
-                    <div className="relative w-full md:w-60">
+                <div className="w-full md:w-64 shrink-0">
+                    <div className="relative w-full">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input 
                             type="text" 
                             placeholder={`Tìm trong ${getTabLabel()}...`}
-                            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-2xs"
                             value={searchTerm}
                             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                         />
@@ -1040,6 +1037,59 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({ user, employees, reco
                 </div>
             )}
         </div>
+        
+        {/* BỘ LỌC THEO LOẠI HỒ SƠ (DƯỚI PHẦN TÌM KIẾM) */}
+        {activeTab !== 'report' && (
+            <div className="px-4 py-2 bg-slate-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <Filter size={14} className="text-blue-600" />
+                        <span>Loại hồ sơ:</span>
+                    </div>
+                    <div className="relative">
+                        <select
+                            value={selectedRecordType}
+                            onChange={(e) => {
+                                setSelectedRecordType(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="bg-white border border-gray-300 text-slate-800 text-xs rounded-md pl-2.5 pr-7 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-medium shadow-2xs cursor-pointer"
+                        >
+                            <option value="all">Tất cả loại hồ sơ ({myRecords.length})</option>
+                            {availableRecordTypes.map(type => {
+                                const countForType = myRecords.filter(r => (r.recordType || '').trim() === type).length;
+                                return (
+                                    <option key={type} value={type}>
+                                        {type} ({countForType})
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+
+                    {selectedRecordType !== 'all' && (
+                        <button
+                            onClick={() => {
+                                setSelectedRecordType('all');
+                                setCurrentPage(1);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded transition-colors cursor-pointer"
+                            title="Xóa bộ lọc loại hồ sơ"
+                        >
+                            <X size={12} />
+                            <span>Xóa lọc</span>
+                        </button>
+                    )}
+                </div>
+
+                <div className="text-slate-500 font-medium flex items-center gap-1.5">
+                    <span>Hiển thị:</span>
+                    <span className="font-bold text-slate-800 bg-white px-2 py-0.5 border border-slate-200 rounded shadow-2xs">
+                        {displayRecords.length} hồ sơ
+                    </span>
+                </div>
+            </div>
+        )}
         
         {activeTab === 'report' ? (
             <PersonalReportView myRecords={myRecords} user={user} />

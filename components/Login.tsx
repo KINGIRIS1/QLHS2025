@@ -4,16 +4,17 @@ import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2, Eye, EyeOff, 
 import { checkServerHealth, ServerHealthResult } from '../services/apiSystem';
 import { fetchUsers } from '../services/apiPeople';
 import { APP_VERSION } from '../constants';
+import { authenticateUser } from '../services/authService';
 import VietnamMapIntro from './VietnamMapIntro';
 
 interface LoginProps {
   onLogin: (user: User) => void;
-  users: User[]; 
+  users?: User[]; 
 }
 
 type IntroPhase = 'map_in' | 'dongnai_glow' | 'login_ready';
 
-const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, users = [] }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -105,71 +106,34 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     const cleanUsername = username.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    // 1. Kiểm tra trong danh sách users hiện có
-    let matchedUser = currentUsersList.find(u => 
-      u.username.trim().toLowerCase() === cleanUsername && 
-      String(u.password).trim() === cleanPassword
-    );
+    if (!cleanUsername || !cleanPassword) {
+      setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+      setIsLoading(false);
+      return;
+    }
 
-    // Nếu chưa tìm thấy hoặc users rỗng, kiểm tra trạng thái máy chủ
-    if (!matchedUser) {
+    try {
+      const authenticatedUser = await authenticateUser(cleanUsername, cleanPassword);
+
+      if (rememberMe) {
+        localStorage.setItem('saved_username', username.trim());
+      } else {
+        localStorage.removeItem('saved_username');
+      }
+
+      onLogin(authenticatedUser);
+    } catch (err: any) {
+      // Nếu lỗi kết nối, kiểm tra trạng thái máy chủ
       const health = await checkServerHealth(3500);
       setServerCheckResult(health);
-
       if (!health.isOnline) {
-        setIsLoading(false);
         setIsServerModalOpen(true);
-        return;
+      } else {
+        setError(err?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
       }
-
-      // Nếu server online, thử fetch lại users từ server một lần nữa
-      const freshUsers = await fetchUsers();
-      if (freshUsers && freshUsers.length > 0) {
-        setCurrentUsersList(freshUsers);
-        matchedUser = freshUsers.find(u => 
-          u.username.trim().toLowerCase() === cleanUsername && 
-          String(u.password).trim() === cleanPassword
-        );
-      }
-
-      if (!matchedUser) {
-        setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
-        setIsLoading(false);
-        return;
-      }
+    } finally {
+      setIsLoading(false);
     }
-
-    // 2. Ghi nhớ tên đăng nhập nếu cán bộ tích chọn
-    if (rememberMe) {
-      localStorage.setItem('saved_username', username.trim());
-    } else {
-      localStorage.removeItem('saved_username');
-    }
-
-    // 3. Gọi server để cấp Token JWT cho phiên làm việc
-    try {
-      const res = await fetch('/custom/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          username: matchedUser.username, 
-          password: cleanPassword,
-          user: matchedUser 
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.token) {
-          localStorage.setItem('auth_token', data.token);
-        }
-      }
-    } catch (err) {
-      console.warn("Không thể lấy Token từ server, tiếp tục đăng nhập trực tiếp:", err);
-    }
-
-    onLogin(matchedUser);
-    setIsLoading(false);
   };
 
   return (

@@ -215,15 +215,25 @@ server.use((req: Request, res: Response, next: NextFunction) => {
         return next();
     }
 
+    // Vite dùng một số đường dẫn module ảo không có phần mở rộng trong môi trường dev.
+    // Chỉ mở các đường dẫn này khi không chạy production; API dữ liệu vẫn phải xác thực.
+    const isViteDevAsset = process.env.NODE_ENV !== 'production' && (
+        req.path === '/@react-refresh' ||
+        req.path === '/__vite_ping' ||
+        req.path.startsWith('/@vite/') ||
+        req.path.startsWith('/@id/') ||
+        req.path.startsWith('/@fs/') ||
+        req.path.startsWith('/src/') ||
+        req.path.startsWith('/node_modules/')
+    );
+
     // Chỉ tài nguyên giao diện mới được phép GET công khai. Mọi collection/API còn lại
     // đều phải xác thực, kể cả collection mới được thêm về sau.
     const isFrontendAsset = req.method === 'GET' && (
         req.path === '/' ||
         req.path === '/index.html' ||
         req.path.startsWith('/assets/') ||
-        req.path.startsWith('/src/') ||
-        req.path.startsWith('/@vite/') ||
-        req.path.startsWith('/node_modules/') ||
+        isViteDevAsset ||
         /\.(?:tsx?|jsx?|css|map|png|jpe?g|gif|svg|ico|woff2?|ttf)$/i.test(req.path)
     );
     if (isFrontendAsset) {
